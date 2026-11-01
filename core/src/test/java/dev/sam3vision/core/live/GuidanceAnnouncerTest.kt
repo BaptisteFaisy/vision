@@ -56,9 +56,12 @@ class GuidanceAnnouncerTest {
         fun decale(x: Float, meters: Float) = PlacedLabel("personne", x, 0.5f, meters)
 
         assertEquals("left.", announcer.onFrame(0L, listOf(decale(0.6f, 3.4f))))
-        assertNull(announcer.onFrame(200L, listOf(decale(0.6f, 2.4f))))
+        // 3,4 -> 3,2 m en 200 ms : pas d'urgence TTC (P0 foule, une approche
+        // rapide parle désormais hors cadence — c'est voulu), donc le même mot
+        // ne se redit pas avant le cooldown.
+        assertNull(announcer.onFrame(200L, listOf(decale(0.6f, 3.2f))))
         // le côté change : reparle aussitôt, sans attendre le cooldown
-        assertEquals("right.", announcer.onFrame(400L, listOf(decale(0.4f, 0.4f))))
+        assertEquals("Right.", announcer.onFrame(400L, listOf(decale(0.4f, 0.4f))))
         assertNull(announcer.onFrame(600L, listOf(decale(0.4f, 0.4f))))
     }
 
@@ -170,11 +173,116 @@ class GuidanceAnnouncerTest {
     fun `decalage stable ne reparle pas`() {
         val announcer = GuidanceAnnouncer()
 
+        // Approche à 1-1,5 m/s (400 ms par pas) : le TTC reste au-dessus de
+        // Timing.URGENT_TTC_S (1,2 s), donc seule la cadence de redite
+        // gouverne — la version à 250 ms de ce test parlait à chaque frame
+        // depuis que l'urgence hors cadence existe (comportement voulu).
         announcer.onFrame(0L, listOf(personneDroite(3.0f)))
-        announcer.onFrame(250L, listOf(personneDroite(2.6f)))
-        assertEquals("Left.", announcer.onFrame(500L, listOf(personneDroite(2.2f))))
-        assertNull(announcer.onFrame(750L, listOf(personneDroite(1.8f))))
-        assertNull(announcer.onFrame(1_000L, listOf(personneDroite(1.4f))))
+        announcer.onFrame(400L, listOf(personneDroite(2.6f)))
+        assertEquals("Left.", announcer.onFrame(800L, listOf(personneDroite(2.0f))))
+        assertNull(announcer.onFrame(1_200L, listOf(personneDroite(1.6f))))
+        assertNull(announcer.onFrame(1_600L, listOf(personneDroite(1.3f))))
+    }
+
+    @Test
+    fun `age mesure par l audit reste utilisable`() {
+        val announcer = GuidanceAnnouncer()
+
+        // 0,70 s : l'âge mesuré par l'audit foule, sous Timing.STALE_MS
+        // (1,2 s) — la frame décrit encore le monde, la voix guide.
+        assertEquals("Straight.", announcer.onFrame(0L, libre, ageMs = 700L))
+    }
+
+    @Test
+    fun `frame perimee supprime tout droit mais laisse parler un cote`() {
+        val announcer = GuidanceAnnouncer()
+        val vieux = Timing.STALE_MS + 100
+
+        // Voie libre annoncée par une frame périmée : « Tout droit. » est une
+        // affirmation, on ne la prononce pas sur une mesure de 1,3 s.
+        assertNull(announcer.onFrame(0L, libre, ageMs = vieux))
+        // Un côté, lui, reste valable : le retour trottoir parle malgré l'âge.
+        assertEquals(
+            "Gauche.",
+            announcer.onFrame(100L, libre, SpeechLanguage.Fr, sidewalk = SidewalkPosition.Left, ageMs = vieux),
+        )
+    }
+
+    @Test
+    fun `deux personnes ne font jamais taire la voix`() {
+        val announcer = GuidanceAnnouncer()
+        fun foule(meters: Float) = listOf(
+            PlacedLabel("personne", 0.2f, 0.5f, meters),
+            PlacedLabel("personne", 0.8f, 0.5f, meters),
+        )
+
+        assertTrue("guidage dès la première frame", announcer.onFrame(0L, foule(2.5f)) != null)
+        announcer.onFrame(400L, foule(2.1f))
+        // Deux personnes, une de chaque côté : le décalage conseille le côté
+        // le plus large au lieu de se taire (muet 90-94 % avant ce patch).
+        assertTrue("le décalage parle en foule", announcer.onFrame(800L, foule(1.7f)) != null)
+        assertTrue("un côté conseillé", announcer.lastNudge != null)
+    }
+
+    @Test
+    fun `decalage serre reste le mot du cote et leve le drapeau`() {
+        val announcer = GuidanceAnnouncer()
+        val trottoirEtroit = FreeSpace(leftM = 0.2f, rightM = 2f)
+
+        announcer.onFrame(0L, listOf(personneDroite(3.0f)), SpeechLanguage.Fr)
+        announcer.onFrame(250L, listOf(personneDroite(2.6f)), SpeechLanguage.Fr)
+        val phrase = announcer.onFrame(500L, listOf(personneDroite(2.2f)), SpeechLanguage.Fr, free = trottoirEtroit)
+
+        // Pas de clip « serrez » au catalogue : la phrase reste le mot de côté…
+        assertEquals("Gauche.", phrase)
+        // …et le drapeau dit à la couche voix qu'il n'y a pas de marge.
+        assertEquals(true, announcer.lastNudge?.tight)
+    }
+
+    @Test
+    fun `urgence ttc fait parler malgre la redite`() {
+        val announcer = GuidanceAnnouncer()
+
+        // Contact à droite : le mot sort à la première frame…
+        assertEquals("Gauche.", announcer.onFrame(0L, listOf(personneDroite(1.4f)), SpeechLanguage.Fr))
+        // …et 200 ms plus tard la fermeture (2,5 m/s) donne un TTC de 0,36 s :
+        // le mot ressort malgré la redite récente (repeatMs = 2 s).
+        assertEquals("Gauche.", announcer.onFrame(200L, listOf(personneDroite(0.9f)), SpeechLanguage.Fr))
+    }
+
+    @Test
+    fun `vitesse de marche elargit la portee`() {
+        val lent = GuidanceAnnouncer()
+        lent.onFrame(0L, listOf(personne(5.5f)), speedMps = 1.0f)
+        assertEquals("portée à 1 m/s : 5,5 m est hors champ", false, lent.lastDecision?.blocked)
+
+        val vite = GuidanceAnnouncer()
+        vite.onFrame(0L, listOf(personne(5.5f)), speedMps = 2.0f)
+        assertEquals("portée à 2 m/s : 5,8 m, l'obstacle entre", true, vite.lastDecision?.blocked)
+    }
+
+    @Test
+    fun `place libre fournie rend le drapeau serre coherent`() {
+        fun nudge(free: FreeSpace): LateralNudge? {
+            val announcer = GuidanceAnnouncer()
+            announcer.onFrame(0L, listOf(personneDroite(3.0f)))
+            announcer.onFrame(250L, listOf(personneDroite(2.6f)))
+            announcer.onFrame(500L, listOf(personneDroite(2.2f)), free = free)
+            return announcer.lastNudge
+        }
+
+        assertEquals(false, nudge(FreeSpace(leftM = 0.9f, rightM = 0.9f))?.tight)
+        assertEquals(true, nudge(FreeSpace(leftM = 0.2f, rightM = 0.9f))?.tight)
+    }
+
+    @Test
+    fun `aucun obstacle comportement inchange`() {
+        val announcer = GuidanceAnnouncer()
+
+        assertEquals("Straight.", announcer.onFrame(0L, libre))
+        assertNull(announcer.onFrame(500L, libre))
+        assertNull(announcer.lastNudge)
+        assertEquals("Straight.", announcer.onFrame(2_000L, libre))
     }
 
     @Test
@@ -303,8 +411,11 @@ class GuidanceAnnouncerTest {
         // toutes les 2 s.
         val contact = listOf(PlacedLabel("personne", 0.2f, 0.5f, 0.4f))
         val contactAnnouncer = GuidanceAnnouncer()
-        assertEquals("right.", contactAnnouncer.onFrame(0L, contact, cap = SteeringCap.Left))
-        assertEquals("right.", contactAnnouncer.onFrame(2_000L, contact, cap = SteeringCap.Left))
+        // Depuis le P0 foule, le décalage latéral (identité, TTC, espace libre)
+        // passe devant la décision de couloir et parle avec les mots SAM : même
+        // direction, autre clip (« Right. » et non « right. »).
+        assertEquals("Right.", contactAnnouncer.onFrame(0L, contact, cap = SteeringCap.Left))
+        assertEquals("Right.", contactAnnouncer.onFrame(2_000L, contact, cap = SteeringCap.Left))
     }
 
     @Test
@@ -313,7 +424,9 @@ class GuidanceAnnouncerTest {
         val sam = Passage(blocked = true, side = "left", label = "person")
         val gauche = listOf(PlacedLabel("personne", 0.3f, 0.5f, 1f))
 
-        assertEquals("right.", announcer.onFrame(0L, gauche, samPassage = sam))
+        // Le décalage latéral prime désormais sur le passage SAM : même côté
+        // dégagé (droite), mot SAM au lieu du mot TwinLite.
+        assertEquals("Right.", announcer.onFrame(0L, gauche, samPassage = sam))
     }
 
     @Test

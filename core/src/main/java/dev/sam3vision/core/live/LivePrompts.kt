@@ -18,21 +18,27 @@ object LivePrompts {
      * (« pedestrian traffic light », « pedestrian signal head », « curb »,
      * « sidewalk », « crosswalk ») puis statiques (« pole », « stairs »,
      * « fence », « gate », « wall », ordre user du 31/10 : iSee détecte
-     * les murs) et les clés (« keys », ordre user du 31/10 :
-     * « barrier » cède son slot, « fence » garde le sien) puis souvenirs (« souvenir shop »,
-     * « beanie », « socks », boutique du square, ordre user du 31/10),
-     * modifiables à chaud dans le direct (champ « Follow »), slot « curb » réservé.
+     * les murs) et, en queue, la foule (« stroller », « child »,
+     * « electric scooter », « dog » — audit foule du 01/11 : en foule, iSee
+     * doit voir une poussette, un enfant, une trottinette, un chien).
+     *
+     * Remplaçants du 01/11 : les souvenirs du 31/10 (« souvenir shop »,
+     * « beanie », « socks », boutique du square) et les clés (« keys », qui
+     * avaient pris le slot de « barrier » le 31/10) cèdent leurs quatre slots
+     * à la foule — le décor de boutique ne barre pas un couloir, une
+     * poussette oui. Modifiables à chaud dans le direct (champ « Follow »),
+     * slot « curb » réservé.
      *
      * Liste **unique** normal/Traversée (ordre user du 30/10 : mêmes masques
      * dans les deux modes) : tout ce que la Traversée doit voir (voiture,
      * bus, vélo, feu, bordure, trottoir, passage, personnes) est déjà suivi
      * ici, la bascule ne change plus les prompts — sauf la traversée active,
      * qui ajoute camion et moto (reel audit 31/10, voir `VehicleConcepts`).
-     * « scooter » et « electric scooter » n'y sont plus (ordre user du 31/10,
-     * boutique du square) : le veto les reconnaît encore par le champ
-     * « Follow », mais la traversée ne les suit plus. « door » et « window »
-     * ont cédé leurs slots aux véhicules, au feu et à la bordure ; « wall »
-     * y est revenu le 31/10 (plafond 17 → 18, rien ne sort).
+     * « door » et « window » ont cédé leurs slots aux véhicules, au feu et à
+     * la bordure ; « barrier » est sorti le 31/10 (le preset extérieur le
+     * reconnaît toujours) ; « electric scooter » est revenu le 01/11 pour la
+     * foule, sans changer le veto de la Traversée (qui le classe véhicule) ;
+     * « wall » y est entré le 31/10 (plafond 17 → 18, rien ne sort).
      *
      * Historique des plafonds : 2 (26/10, le tracker tronquait à
      * `PROMPT_LIMIT = 2`), 6 (28/10, rue + intérieur), 16 (28/10, ordre user :
@@ -44,17 +50,17 @@ object LivePrompts {
      * en plus), 16 (30/10 : unification traversée/normal ; 31/10 : camion,
      * moto et trottinette cèdent leurs slots aux souvenirs), 17 (31/10 :
      * tête du feu piéton en plus du caisson, « barrier » à « keys »),
-     * 18 (31/10 : « wall » en plus, rien ne sort).
-     * Sur `/live` les
-     * prompts sont batchés (un seul forward, mesure du 26/10 : 2 ou 8 concepts
-     * = 118 ms médian) ; sur le tracker chaque concept coûte une inférence par
-     * `/frame`, d'où un coût ×8 assumé sur ce chemin.
+     * 18 (31/10 : « wall » en plus, rien ne sort), puis 01/11 à plafond
+     * constant : les trois souvenirs et « keys » sortent, la foule entre.
+     * Sur `/live` les prompts sont batchés (un seul forward, mesure du 26/10 :
+     * 2 ou 8 concepts = 118 ms médian) ; sur le tracker chaque concept coûte
+     * une inférence par `/frame`, d'où un coût ×8 assumé sur ce chemin.
      */
     val default: List<String> = listOf(
         "person", "car", "bus", "bicycle", "pedestrian traffic light",
         "pedestrian signal head", "curb", "sidewalk", "crosswalk", "pole",
-        "stairs", "keys", "fence", "gate", "wall", "souvenir shop",
-        "beanie", "socks",
+        "stairs", "fence", "gate", "wall",
+        "stroller", "child", "electric scooter", "dog",
     )
 
     /**
@@ -77,20 +83,25 @@ object LivePrompts {
     )
 
     /**
-     * Concepts d'intérieur : **8** objets d'appartement pour la sonde iSee en
+     * Concepts d'intérieur : **9** objets d'appartement pour la sonde iSee en
      * mode maison — la personne et ce qui structure une pièce (portes,
-     * escaliers, murs, fenêtres) plus le mobilier courant (chaises, tables)
-     * et le passage piéton (reel audit 31/10). Bien sous [MAX] ; les pastilles
-     * du mode Maison ([HomeModes]) gardent leurs petits objets (clés,
-     * médicaments…) : ici le décor est suivi, pas le mot parlé.
+     * escaliers, murs, fenêtres) plus le mobilier courant (chaises, tables),
+     * le passage piéton (reel audit 31/10) et la poussette (audit foule du
+     * 01/11 : la personne qui se déplace chez elle avec une poussette ou un
+     * déambulateur — c'est un corps qui bloque, pas du décor ; le déambulateur
+     * n'a pas de concept propre, la poussette est le plus proche voisin).
+     * Bien sous [MAX] ; les pastilles du mode Maison ([HomeModes]) gardent
+     * leurs petits objets (clés, médicaments…) : ici le décor est suivi, pas
+     * le mot parlé.
      */
     val indoor: List<String> = listOf(
-        "person", "door", "chair", "table", "stairs", "wall", "window", "crosswalk",
+        "person", "stroller", "door", "chair", "table", "stairs", "wall", "window",
+        "crosswalk",
     )
 
     /**
      * Liste du monde sensoriel : dehors = [default] (les 18 concepts
-     * extérieurs, traversée incluse), dedans = [indoor] (les 7 objets
+     * extérieurs, foule incluse), dedans = [indoor] (les 9 objets
      * d'intérieur). V1 : seuls les prompts basculent, la portée reste 4 m
      * dans les deux mondes. À ne pas confondre avec le preset [outdoor]
      * (13 concepts de cheminement, pastille « Extérieur » du direct) : la

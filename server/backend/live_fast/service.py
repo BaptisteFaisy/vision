@@ -44,9 +44,11 @@ WORK_EDGE_DEFAULT = 512
 WORK_EDGE_MIN = 512
 WORK_EDGE_MAX = 1024
 # Backstop quand le client n'envoie pas `max_objects` (il envoie son plafond,
-# 8 par défaut) : 16 (reel audit 31/10, ex-12) — les 17 prompts par défaut
-# tiennent presque tous (un objet chacun) et les 2 slots gardés (feu, passage)
-# ne chassent plus un concept entier. Plafond absolu : segmentation.MAX_OBJECTS.
+# 16 depuis le patch foule du 01/11, ex-8 : en foule, 10 personnes ; 8 objets =
+# la moitié de la scène perdue) : 16 (reel audit 31/10, ex-12) — les 17 prompts
+# par défaut tiennent presque tous (un objet chacun) et les places gardées
+# (feu, passage, bordure) ne chassent plus un concept entier.
+# Plafond absolu : segmentation.MAX_OBJECTS (32).
 MAX_OBJECTS_DEFAULT = 16
 MAX_OBJECTS_MIN = 1
 LIVE_DEFAULT_PROMPTS = ("person", "car", "dog", "chair")

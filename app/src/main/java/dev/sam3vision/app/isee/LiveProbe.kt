@@ -23,6 +23,7 @@ import dev.sam3vision.core.live.FrameRate
 import dev.sam3vision.core.live.LatestFrameSlot
 import dev.sam3vision.core.live.LivePrompts
 import dev.sam3vision.core.live.LiveSession
+import dev.sam3vision.core.live.PersonLabels
 import dev.sam3vision.core.live.SteeringCap
 import dev.sam3vision.app.LiveMaskTransport
 import dev.sam3vision.app.depth.DepthMeter
@@ -46,13 +47,11 @@ import kotlinx.coroutines.launch
 import kotlinx.coroutines.yield
 
 /**
- * Analyse SAM de la caméra d'iSee : quand la caméra est active, chaque frame part à
- * `/live` (une à la fois, cadence adaptative) et revient en masques, distances et
- * statistiques. Caméra coupée, `stop` ferme les sessions : la carte s'éteint.
- *
- * Même brique que le Direct ([LiveSession], [HttpLiveClient], [DistanceMeter],
- * [PositionAnnouncer]) : une seule implémentation de l'appel SAM et de la mesure par
- * frame, deux écrans qui la montrent.
+ * Analyse SAM de la caméra d'iSee : caméra active, chaque frame part à `/live` (une à la
+ * fois, cadence adaptative) et revient en masques, distances et statistiques ; caméra
+ * coupée, `stop` ferme les sessions et la carte s'éteint. Même brique que le Direct
+ * ([LiveSession], [HttpLiveClient], [DistanceMeter], [PositionAnnouncer]) : une seule
+ * implémentation de l'appel SAM et de la mesure par frame, deux écrans qui la montrent.
  */
 class LiveProbe(
     private val scope: CoroutineScope,
@@ -92,6 +91,17 @@ class LiveProbe(
      * à démarrer) ; on repasse à la session normale dès qu'une frame est passée. */
     internal var coldSession: LiveSession? = null
 
+    /**
+     * État foule (audit foule du 01/11) : vrai dès qu'un **corps** figure dans la dernière
+     * réponse, faux après [CROWD_EXIT_MS] sans corps (voir [crowdOf]) ; il choisit
+     * [Cadence.Crowd] et se lit depuis la voix.
+     */
+    @Volatile var crowd: Boolean = false
+        private set
+
+    /** Instant (ms) du dernier corps vu : l'hystérésis de sortie compte à partir de là. */
+    private var bodyAtMs = 0L
+
     /** Une frame a-t-elle abouti depuis l'activation de la caméra ? */
     private var warmed = false
 
@@ -128,10 +138,9 @@ class LiveProbe(
     internal val chronology = ScreenTimings(clock)
 
     /**
-     * Coloriage des masques avec tampons réutilisés : une table de 256 niveaux par
-     * couleur, un bitmap par emplacement en double exemplaire. Mesuré en JVM : 8,50 →
-     * 0,66 ms pour 12 masques et −12,8 Mo par frame, là où le chemin direct réalloue
-     * tout à chaque image.
+     * Coloriage des masques avec tampons réutilisés (table de 256 niveaux par couleur,
+     * un bitmap par emplacement) : mesuré en JVM 8,50 → 0,66 ms pour 12 masques et
+     * −12,8 Mo par frame, là où le chemin direct réalloue tout à chaque image.
      */
     internal val painter = MaskPainter({ maskColorAt(it).toArgb() }, MASK_ALPHA)
 
@@ -204,9 +213,9 @@ class LiveProbe(
     }
 
     /**
-     * (Re)ouvre la session normale et la session froide sur [clean] : même transport,
-     * délai long (60 s) pour la froide — c'est le réveil du conteneur qui parle, pas
-     * la frame. Une fois la première analyse passée, on repart sur la normale (10 s).
+     * (Re)ouvre les sessions normale et froide sur [clean] : même transport, délai long
+     * (60 s) pour la froide — c'est le réveil du conteneur qui parle, pas la frame. La
+     * première analyse passée, on repart sur la normale (10 s) via [goWarm].
      */
     private fun openSessions(clean: String, prompts: List<String>, maxObjects: Int) {
         closeSessions()
@@ -219,8 +228,8 @@ class LiveProbe(
     }
 
     /**
-     * Session du direct sur [clean], `null` sans endpoint : une seule construction pour
-     * la session normale et la session froide (même transport, seul le délai change).
+     * Session du direct sur [clean], `null` sans endpoint : une construction pour la
+     * session normale et la froide (même transport, seul le délai change).
      */
     private fun openSession(
         clean: String,
@@ -257,11 +266,10 @@ _state.update { it.cleared() }
     }
 
     /**
-     * Remet le pipeline à zéro (cadence, réserve, chronologie, compteurs, voix,
-     * réveil) : partagé par [configure] et [begin], qui n'ajoutent que leur
-     * propre état. `warming` est ré-armé ici pour que le [markWarming] qui suit
-     * ré-émette l'avis d'armement — sans lui, `begin()` après `configure()`
-     * effacerait l'avis sans le redire.
+     * Remet le pipeline à zéro (cadence, réserve, chronologie, compteurs, voix, foule,
+     * réveil) : partagé par [configure] et [begin]. `warming` est ré-armé ici pour que le
+     * [markWarming] qui suit ré-émette l'avis d'armement — sans lui, `begin()` après
+     * `configure()` effacerait l'avis sans le redire.
      */
     internal fun resetPipeline() {
         warmed = false
@@ -276,6 +284,8 @@ _state.update { it.cleared() }
         crossing.reset()
         traverseVeto.reset()
         noLightGate.reset()
+        crowd = false
+        noteCrowd(0)
         meters.reset()
         adaptive.reset()
         ProbeBackgroundMotion.reset()
@@ -292,13 +302,11 @@ _state.update { it.cleared() }
     fun setSteering(cap: SteeringCap) = applySteering(cap)
 
     /**
-     * Frame encodée en réserve (**une seule**) : elle est convertie **pendant** que la
-     * requête précédente est en vol, puis part dès que le créneau se libère.
-     * Sans elle, chaque cycle payait l'encodage JPEG après la réponse (+30-40 ms).
-     * Les horodatages voyagent avec la frame : une frame en réserve garde sa capture.
-     *
-     * C'est un **emplacement**, pas une file (voir [LatestFrameSlot]) : une frame qui
-     * arrive alors que la réserve est pleine remplace l'ancienne, jamais ne s'empile.
+     * Frame encodée en réserve (**une seule**) : convertie **pendant** que la requête
+     * précédente est en vol, elle part dès que le créneau se libère — sans elle chaque
+     * cycle payait l'encodage JPEG après la réponse (+30-40 ms). Les horodatages voyagent
+     * avec la frame. C'est un **emplacement**, pas une file ([LatestFrameSlot]) : une
+     * frame qui arrive sur une réserve pleine remplace l'ancienne, jamais ne s'empile.
      */
     private val reserve = LatestFrameSlot()
 
@@ -312,13 +320,11 @@ _state.update { it.cleared() }
     internal val labels = FrameLabels()
 
     /**
-     * Faut-il convertir la frame qui arrive ? Oui si une frame de réserve manque :
-     * soit un créneau est libre et la cadence est écoulée, soit une requête est en vol
-     * et on prépare la suivante. Réserve pleine mais périmée : on ré-encode quand même
-     * (remplacement, jamais de file) pour drainer une frame fraîche (poste `up` divisé
-     * par ~2) au lieu d'une frame âgée d'un RTT.
-     * Un refus (réserve pleine et fraîche) est **compté** (jamais silencieux)
-     * et arme la priorité de la suivante.
+     * Faut-il convertir la frame qui arrive ? Oui si une réserve manque : un créneau est
+     * libre et la cadence écoulée, ou une requête est en vol et on prépare la suivante.
+     * Réserve pleine mais périmée : on ré-encode (remplacement, jamais de file) pour
+     * drainer une frame fraîche (poste `up` divisé par ~2) au lieu d'une frame âgée d'un
+     * RTT. Un refus (réserve pleine et fraîche) est **compté** et arme la priorité.
      */
     fun wantsFrame(): Boolean {
         if (!foregroundGate.foreground) return false
@@ -332,13 +338,11 @@ _state.update { it.cleared() }
     }
 
     /**
-     * Frame caméra (JPEG base64, 320 px) : mise en réserve si un créneau est pris,
-     * envoyée tout de suite sinon. Rien n'est mis en file au-delà d'une frame : la
-     * scène a changé, une vieille image n'apprend rien.
-     */
-    /**
-     * Idem avec l'instant d'**exposition** de la frame (`imageInfo.timestamp`, ns
-     * monotones) : c'est lui qui rend la latence per\u00e7ue mesurable de bout en bout.
+     * Frame caméra (JPEG base64, 320 px) avec son instant d'**exposition**
+     * (`imageInfo.timestamp`, ns monotones — c'est lui qui rend la latence perçue
+     * mesurable) : mise en réserve si un créneau est pris, envoyée tout de suite sinon.
+     * Rien n'est mis en file au-delà d'une frame : la scène a changé, une vieille image
+     * n'apprend rien.
      */
     fun onFrame(jpegB64: String, captureAtNs: Long = 0L) {
         if (!foregroundGate.foreground || jpegB64.isBlank()) return
@@ -364,9 +368,9 @@ _state.update { it.cleared() }
     }
 
     /**
-     * Envoie une frame et note l'instant, pour respecter la cadence adaptative.
-     * La cadence affichée se compte **à l'envoi** : deux réponses qui arrivent ensemble
-     * après un réveil ne veulent pas dire « 40 images par seconde ».
+     * Envoie une frame et note l'instant, pour la cadence adaptative. La cadence affichée
+     * se compte **à l'envoi** : deux réponses qui arrivent ensemble après un réveil ne
+     * veulent pas dire « 40 images par seconde ».
      */
     private fun dispatch(
         active: LiveSession,
@@ -384,11 +388,8 @@ _state.update { it.cleared() }
         scope.launch(background) { runFrame(active, jpegB64, at) }
     }
 
-    /**
-     * Une réponse vient d'arriver : si une frame attendait, elle part maintenant.
-     * C'est ce qui fait tourner le cycle à la vitesse de la requête et non à celle de
-     * la requête **plus** l'encodage.
-     */
+    /** Une réponse vient d'arriver : une frame en réserve part maintenant, au lieu
+     * d'attendre le prochain cycle (la requête **plus** l'encodage). */
     private fun drain() {
         val active = (if (warmed) session else coldSession) ?: return
         // Créneau encore pris : la réserve attend son tour, elle n'est pas dupliquée.
@@ -399,6 +400,17 @@ _state.update { it.cleared() }
         cadence.markSent(active, now)
         priorityArmed = false
         dispatch(active, reserved.jpegB64, reserved.captureAtNs, reserved.encodedAtNs, now)
+    }
+
+    /** Corps de la dernière réponse → [crowd] (hystérésis de [crowdOf]), puis cadence des
+     * deux sessions : en foule [Cadence.Crowd] garde le double vol jusqu'à 600 ms. */
+    private fun noteCrowd(bodies: Int) {
+        val now = clock() / 1_000_000L
+        if (bodies > 0) bodyAtMs = now
+        crowd = crowdOf(crowd, bodies, bodyAtMs, now)
+        val cadence = if (crowd) Cadence.Crowd else Cadence.Fast
+        session?.useCadence(cadence)
+        coldSession?.useCadence(cadence)
     }
 
     private suspend fun runFrame(active: LiveSession, jpegB64: String, at: Long) {
@@ -425,19 +437,17 @@ _state.update { it.cleared() }
             return
         }
         if (_state.value.frames == 0) {
-            android.util.Log.i(
-                "sam3vision",
-                "première analyse : ${frame.objects.size} objets, ${frame.elapsedMs} ms",
-            )
+            android.util.Log.i("sam3vision", "première analyse : ${frame.objects.size} objets, ${frame.elapsedMs} ms")
         }
+        noteCrowd(frame.objects.count { PersonLabels.isBody(it.label) })
         publish(active, frame, jpegB64, at, shown)
     }
 
     /** Première frame aboutie : le conteneur est chaud, la session froide a fait son travail. */
     private fun goWarm() {
-        // La première frame paie le démarrage du conteneur (mesuré : 17 s en WebSocket,
-        // 40 s en HTTP) : la laisser dans la moyenne afficherait « 17 192 ms » pour un
-        // lien chaud à ~180 ms, et fausserait aussi le régulateur de créneaux.
+        // La première frame paie le démarrage du conteneur (mesuré : 17 s en WebSocket, 40 s
+        // en HTTP) : la garder dans la moyenne afficherait « 17 192 ms » pour un lien chaud
+        // à ~180 ms, et fausserait aussi le régulateur de créneaux.
         (if (warmed) session else coldSession)?.let { it.stats.reset(); it.serverStats.reset() }
         warmed = true
         // La session chaude ouvre son socket pendant que la 1re réponse se publie.
@@ -450,8 +460,8 @@ _state.update { it.cleared() }
 
     /**
      * Frame effectivement **dessinée** : dernier poste de la chronologie, posé par l'écran
-     * après la composition (`withFrameNanos`). Tant que l'écran ne l'appelle pas, la ligne
-     * s'arrête aux masques et `pixel` affiche « — ».
+     * après la composition (`withFrameNanos`) ; sans lui la ligne s'arrête aux masques et
+     * `pixel` affiche « — ».
      */
     fun noteDrawn() {
         if (!chronology.noteDrawn()) return
@@ -459,11 +469,8 @@ _state.update { it.cleared() }
         _state.update { current -> current.copy(timings = snap) }.also { LiveLatencyLog.frame(snap) }
     }
 
-    /**
-     * Marqueur d'attente du premier retour : posé dès que l'endpoint est connu,
-     * effacé à l'arrivée des premières frames. Aucun appel réseau ici — la première
-     * frame réveille le conteneur Modal d'elle-même.
-     */
+    /** Marqueur d'attente du premier retour : posé dès que l'endpoint est connu, effacé
+     * aux premières frames. Aucun appel réseau : la frame réveille le conteneur. */
     private fun markWarming() {
         if (_state.value.endpoint.isBlank() || warming) return
         warming = true
@@ -478,3 +485,15 @@ _state.update { it.cleared() }
  * RTT (poste `up`), pour ~3 encodages jetés par cycle au pire.
  */
 private const val STALE_RESERVE_MS = 50L
+
+/**
+ * Hystérésis de foule ([LiveProbe.crowd]) : on entre au **premier** corps, on ne sort
+ * qu'après [CROWD_EXIT_MS] sans corps. Sans elle l'état clignote au rythme des frames
+ * (1,4-1,7 décisions/s : une frame sans corps suffit) et le second vol se refermerait
+ * au moment du contact. [sinceMs] = instant du dernier corps vu.
+ */
+internal fun crowdOf(previous: Boolean, bodies: Int, sinceMs: Long, nowMs: Long): Boolean =
+    if (bodies > 0) true else previous && nowMs - sinceMs < CROWD_EXIT_MS
+
+/** Sortie de foule : 3 s sans corps, soit ~4 décisions au rythme mesuré le plus lent. */
+private const val CROWD_EXIT_MS = 3_000L
