@@ -32,6 +32,8 @@ class VoiceNavTracker(
     context: Context,
     private val engine: VoiceNavEngine = VoiceNavEngine(),
     private val onEvent: (NavEvent) -> Unit = {},
+    /** Chaque fix brut, après le dispatch moteur (le rappel 5 s y lit position + cap). */
+    private val onFix: (NavFix) -> Unit = {},
 ) {
 
     private val locations: LocationManager? =
@@ -130,9 +132,11 @@ class VoiceNavTracker(
             accuracyM = location.accuracy,
             hasAccuracy = location.hasAccuracy(),
             atMs = location.time,
+            headingDeg = if (location.hasBearing()) location.bearing else null,
         )
         lastFix = fix
         engine.onFix(fix).forEach(onEvent)
+        onFix(fix)
     }
 
     private inner class FixListener : LocationListener {
@@ -158,7 +162,8 @@ fun shouldResume(listening: Boolean, state: NavState): Boolean =
 /**
  * Fix moteur depuis une position brute : sans précision annoncée, repli
  * [NO_ACCURACY_M] (le moteur ignore les fixes trop grossiers). Pure,
- * testable en JVM sans capteur.
+ * testable en JVM sans capteur. [headingDeg] est le cap suivi brut
+ * (`null` à l'arrêt ou sans cap GPS).
  */
 fun navFixOf(
     lat: Double,
@@ -166,9 +171,11 @@ fun navFixOf(
     accuracyM: Float,
     hasAccuracy: Boolean,
     atMs: Long,
+    headingDeg: Float? = null,
 ): NavFix = NavFix(
     lat = lat,
     lon = lon,
     accM = if (hasAccuracy) accuracyM else NO_ACCURACY_M,
     atMs = atMs,
+    headingDeg = headingDeg,
 )

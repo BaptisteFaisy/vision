@@ -91,6 +91,27 @@ class VoiceNavSpeaker(
     fun onLiteral(phrase: String): String? = announce(VoiceNavEvent.Literal(phrase))
 
     /**
+     * Rappel périodique (guidage 5 s) : redit volontaire, hors porte
+     * anti-répétition — la porte ne sait pas redire deux fois la même clé,
+     * et le rappel ne doit ni l'affamer ni s'y noyer. Parlé au silence seul
+     * (jamais de file : un rappel en retard est périmé), après la douce en
+     * attente s'il y en a une ; le user qui parle passe d'abord. Renvoie la
+     * phrase dite, `null` si le silence a été gardé. Ne lève jamais.
+     */
+    fun onRepeat(phrase: String): String? {
+        try {
+            val clean = phrase.trim()
+            if (clean.isEmpty()) return null
+            if (userSpeaking()) return null
+            drainPending(clock())
+            if (engine.speaking) return null
+            return utter(clean, danger = false)
+        } catch (_: Exception) {
+            return null
+        }
+    }
+
+    /**
      * Danger obstacle (« Gauche. ») : coupe
      * la phrase en cours, même une consigne. Vide la file douce (danger
      * frais : l'ancienne consigne est périmée). Blanc = silence, comme [onStarted].

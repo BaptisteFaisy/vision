@@ -3,6 +3,27 @@
 Le journal part du 2026-10-26 après 19 h : le commit de départ, puis une entrée par fait
 livré et ses preuves (tâche, fichiers, chiffres) dans l'arbre.
 
+## 2026-11-01 — iSee : rappel vocal GPS toutes les 5 s, relatif au cap suivi (branche `feat/isee-gps-voix-5s`)
+
+- **Fait** : quand le guidage in-app court, la voix redit où aller au
+  premier fix GPS qui suit l'échéance de 5 s (`PeriodicGuidance`,
+  `VoiceNavEngineDriver.onTrackerFix`) — six ordres anglais, jamais de nom
+  de rue ni de distance (« Continue straight ahead. », « Turn left. »,
+  « Turn right. », « Turn around. », « Cross the street. »,
+  « At the roundabout, follow the road. »). Consigne relative au cap
+  **suivi** GPS (`NavFix.headingDeg`, direction de marche) vers la
+  prochaine manœuvre ; immobile ou sans cap, repli sur la consigne absolue
+  de la manœuvre. Une annonce moteur recale la cadence, hors guidage et
+  écart : silence, dictée prioritaire. L'orientation du téléphone
+  (boussole) n'est volontairement pas utilisée (appareil souvent en poche).
+- **Preuve** : `:app:testDebugUnitTest` 1 796 verts (0 échec, dont 9
+  nouveaux : 2 `PeriodicVoiceTest`, 5 `VoiceNavSpeakerRepeatTest`, 2
+  `VoiceNavTrackerTest`) ; `:core:testDebugUnitTest` 2 895 verts + 5 échecs
+  pré-existants `PrivateFileSettingsStoreTest` (permissions POSIX, identiques
+  arbre nu — environnement Windows, hors changement), dont 14 nouveaux
+  `PeriodicGuidanceTest` verts ; `check-kotlin-limits.py` OK ; recette rue
+  **non mesurée** (exige un parcours réel avec GPS).
+
 ## 2026-11-01 — iSee : guidage vers le trou de grillage, humains prioritaires (branche `guidage-trou-humains`)
 
 - **Fait** : sur couloir bouché sans chemin optimal, un grillage ouvert à

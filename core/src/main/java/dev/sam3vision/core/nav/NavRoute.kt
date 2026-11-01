@@ -7,12 +7,20 @@ import dev.sam3vision.core.model.RoutePoint
  * annoncée par le fournisseur ([accM], 1σ en mètres) et horodatage
  * ([atMs], `Location.time`, base des déterminismes — le moteur ne lit
  * jamais l'horloge).
+ *
+ * [headingDeg] est le cap **suivi** (direction de marche, degrés dans
+ * [0, 360[ depuis le nord, `Location.bearing` quand le GPS marche assez
+ * pour en donner un), `null` à l'arrêt ou sans cap — jamais l'orientation
+ * du téléphone (boussole), qui ne dit pas où marche son porteur. Le moteur
+ * l'ignore (progression sur positions seules) ; le rappel périodique
+ * ([PeriodicGuidance]) barre en relatif dessus.
  */
 data class NavFix(
     val lat: Double,
     val lon: Double,
     val accM: Float,
     val atMs: Long,
+    val headingDeg: Float? = null,
 ) {
     /** Coordonnées finies et précision positive : sinon le fix est ignoré. */
     fun isUsable(): Boolean =

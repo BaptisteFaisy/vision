@@ -21,6 +21,9 @@ import dev.sam3vision.core.nav.NavFix
 import dev.sam3vision.core.nav.NavGeo
 import dev.sam3vision.core.nav.NavManeuver
 import dev.sam3vision.core.nav.NavRoute
+import dev.sam3vision.core.nav.NavState
+import dev.sam3vision.core.nav.PeriodicGuidance
+import dev.sam3vision.core.nav.WalkDirective
 import dev.sam3vision.core.nav.toNavRoute
 import dev.sam3vision.core.net.HttpRouteClient
 import dev.sam3vision.core.net.RouteClient
@@ -61,6 +64,9 @@ internal const val WALK_METERS_PER_SECOND = 1.3
  * juste en caps, et une mauvaise consigne vaut moins que la phrase exacte.
  * L'arrivée ne passe PAS par le haut-parleur : [onUpdate] la signale et la
  * session annonce (« Arrivée à destination », une seule voix).
+ * Rappel toutes les 5 s ([PeriodicGuidance], au premier fix qui suit
+ * l'échéance) : consigne relative au cap suivi GPS (jamais la boussole),
+ * anglais, sans rue ni distance ; une annonce moteur recale la cadence.
  *
  * Traversée : le moteur remplace l'annonce par [NavEvent.CrossingAhead]
  * quand la cible est un passage protégé — simple préavis parlé (« Crosswalk
@@ -89,12 +95,15 @@ class VoiceNavEngineDriver(
 ) {
 
     private val app = appContext.applicationContext
-    private val tracker = VoiceNavTracker(app, onEvent = ::handleEvent)
+    private val tracker = VoiceNavTracker(app, onEvent = ::handleEvent, onFix = ::onTrackerFix)
     private val ttsLazy = lazy { SystemTtsEngine(AndroidTtsDriver(app)) }
     private val speakerLazy = lazy { VoiceNavSpeaker(ttsLazy.value, settings, userSpeaking = userSpeaking) }
     private val speaker by speakerLazy
     private val routeAnnouncer = VoiceNavAnnouncer()
     private val detourReroute = DetourReroute()
+    private val periodic = PeriodicGuidance()
+    /** Un événement moteur a parlé sur le fix en cours : le rappel se tait, cadence recalée. */
+    private var fixHadEvent = false
 
     @Volatile
     private var legs: GuidingLegs? = null
@@ -137,6 +146,8 @@ class VoiceNavEngineDriver(
         }
         legs = GuidingLegs(nav, tailDistances(nav.maneuvers), RoutePoint(place.latitude, place.longitude))
         detourReroute.reset()
+        periodic.reset()
+        fixHadEvent = false
         say(VoiceNavEvent.Started(destination)) { speaker.onStarted(destination) }
         return true
     }
@@ -176,6 +187,8 @@ class VoiceNavEngineDriver(
         runCatching { onRouteCap(null) }
         runCatching { stopRoute() }
         detourReroute.reset()
+        periodic.reset()
+        fixHadEvent = false
         runCatching { tracker.stop() }
         if (speakerLazy.isInitialized()) {
             runCatching { speaker.stop() }
@@ -215,6 +228,7 @@ class VoiceNavEngineDriver(
     /** Un événement moteur : parole + écran, jamais d'exception. */
     private fun handleEvent(event: NavEvent) {
         runCatching {
+            fixHadEvent = true
             when (event) {
                 is NavEvent.ManeuverAhead -> {
                     runCatching { onRouteCap(routeCapFor(event.action)) }
@@ -256,6 +270,45 @@ class VoiceNavEngineDriver(
     private fun speakCrossing(event: NavEvent.CrossingAhead) {
         val phrase = VoiceNavPhrases.crossingAhead(event.distM)
         say(VoiceNavEvent.Literal(phrase)) { speaker.onLiteral(phrase) }
+    }
+
+    /**
+     * Fix brut après le dispatch moteur : un événement vient-il de parler
+     * sur ce fix ([fixHadEvent]) ? Oui → cadence recalée, silence. Non →
+     * rappel 5 s ([PeriodicGuidance]) si le guidage court. Ne lève jamais.
+     */
+    private fun onTrackerFix(fix: NavFix) {
+        runCatching { tickPeriodic(fix) }
+    }
+
+    /** Un tick de rappel : silence si le moteur a parlé, sinon consigne. */
+    private fun tickPeriodic(fix: NavFix) {
+        if (fixHadEvent) {
+            fixHadEvent = false
+            periodic.noteSpoken(fix.atMs)
+            return
+        }
+        if (tracker.state != NavState.Guiding) return
+        val target = runCatching { tracker.nextManeuver() }.getOrNull() ?: return
+        val directive = periodic.onFix(fix, target) ?: return
+        speakPeriodic(directive)
+    }
+
+    /**
+     * Parole du rappel : voix Laure quand elle est câblée ([speakRoute],
+     * hors porte — le rappel redit exprès, la porte ne sait pas ; l'aval
+     * arbitre : user, lecteur occupé, doublon récent), sinon voix système
+     * ([VoiceNavSpeaker.onRepeat], silence seul). Non urgent, ne lève jamais.
+     */
+    private fun speakPeriodic(directive: WalkDirective) {
+        val language = runCatching { settings().speechLanguage }.getOrNull() ?: return
+        val phrase = VoiceNavPhrases.phrase(periodicEventOf(directive), language)
+        val laure = speakRoute
+        if (laure == null) {
+            runCatching { speaker.onRepeat(phrase) }
+            return
+        }
+        scope.launch { runCatching { laure(phrase, false) } }
     }
 
     /** Traversée passée : annonce, le guidage reprend. */
@@ -358,6 +411,21 @@ internal fun ManeuverAction.toSteeringCap(): SteeringCap? = when (this) {
  */
 internal fun routeCapFor(action: ManeuverAction): SteeringCap =
     action.toSteeringCap() ?: SteeringCap.Straight
+
+/**
+ * Événement parlé d'une consigne de rappel : virages et ligne droite par
+ * les événements existants (la langue de la voix est suivie), demi-tour,
+ * traversée et giratoire en littéral anglais (comme [VoiceNavPhrases.ahead],
+ * jamais de rue ni de distance). Pur, testé en JVM.
+ */
+internal fun periodicEventOf(directive: WalkDirective): VoiceNavEvent = when (directive) {
+    WalkDirective.Straight -> VoiceNavEvent.ContinueStraight(null)
+    WalkDirective.Left -> VoiceNavEvent.Turn(SteeringCap.Left, null, null)
+    WalkDirective.Right -> VoiceNavEvent.Turn(SteeringCap.Right, null, null)
+    WalkDirective.TurnAround -> VoiceNavEvent.Literal(VoiceNavPhrases.TURN_AROUND)
+    WalkDirective.Cross -> VoiceNavEvent.Literal(VoiceNavPhrases.CROSS_NOW)
+    WalkDirective.Roundabout -> VoiceNavEvent.Literal(VoiceNavPhrases.ROUNDABOUT_FOLLOW)
+}
 
 /**
  * Queues de manœuvres : `tails[i]` = distance à vol d'oiseau de la manœuvre
