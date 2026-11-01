@@ -3,7 +3,8 @@ package dev.sam3vision.core.crossing
 import dev.sam3vision.core.speech.SpeechLanguage
 
 /**
- * Guetteur d'annonce du passage piéton : [CONFIRM_FRAMES] frames de suite
+ * Guetteur d'annonce du passage piéton (SPEC v4, niveau 8, couche 1/3 :
+ * annonce une fois par vue) : [CONFIRM_FRAMES] frames de suite
  * avec un passage en vue parlent une fois (« Passage piéton à gauche, à 2
  * mètres. »), à 6 m ou moins ([ANNOUNCE_METERS], mesurés — sans
  * mesure, la direction seule parle), puis silence jusqu'à la prochaine
@@ -14,6 +15,10 @@ import dev.sam3vision.core.speech.SpeechLanguage
  * direction (gauche / devant / droite, [CrossingGuidance.directionOf]) puis
  * distance courte quand elle est mesurée. Sans mesure, la direction seule —
  * jamais de chiffre deviné, jamais de crash sur données manquantes.
+ *
+ * Les deux autres couches v4 : l'alignement ([CrossingLateralAnnouncer],
+ * mot au changement, clé `crosswalk-align`) et l'arrivée
+ * ([CrossingArrivalWatcher], dite une fois, clé `crosswalk-arrival`).
  *
  * Pur et testé en JVM : aucune image, aucun Android, aucune horloge implicite.
  */
@@ -71,7 +76,13 @@ class CrossingApproachWatcher(
         /** Frames avec passage de suite avant l'annonce (miroir de l'arrivée). */
         const val CONFIRM_FRAMES = 2
 
-        /** Au-delà (mètres mesurés), le passage se tait : dit 6 m à l'avance (ordre user du 01/11). */
+        /** Au-delà (mètres mesurés), le passage se tait : dit 6 m à l'avance (SPEC v4 : < 6 m). */
         const val ANNOUNCE_METERS = 6.0f
+
+        /** Niveau VoiceBus v4 : passages piétons (< 6 m, 3 couches). */
+        const val LEVEL = 8
+
+        /** Clé AntiRepeat v4 : annonce du passage (1 fois par vue). */
+        const val KEY_ANNOUNCE = "crosswalk-announce"
     }
 }

@@ -4,11 +4,16 @@ import dev.sam3vision.core.speech.SpeechLanguage
 
 /**
  * Ordre d'annonce trottoir : [phrase] dans la langue de la voix, [position]
- * celle qui l'a déclenché (journal, réglages).
+ * celle qui l'a déclenché (journal, réglages), [level] le niveau VoiceBus v4
+ * (10, trottoirs) et [antiRepeatKey] sa clé AntiRepeat v4 (`sidewalk`, 10 s).
  */
 data class SidewalkCue(
     val phrase: String,
     val position: SidewalkPosition,
+    /** Niveau VoiceBus v4 : trottoirs. */
+    val level: Int = SidewalkWatcher.LEVEL,
+    /** Clé AntiRepeat v4 : `sidewalk` (10 s). */
+    val antiRepeatKey: String = SidewalkWatcher.KEY_SIDEWALK,
 )
 
 /**
@@ -46,7 +51,8 @@ object SidewalkText {
 }
 
 /**
- * Lissage temporel de la position trottoir : il faut [confirmFrames]
+ * Lissage temporel de la position trottoir (SPEC v4 : comportement inchangé,
+ * niveau 10) : il faut [confirmFrames]
  * positifs consécutifs pour parler, et on ne parle qu'au changement —
  * stable = silence (le guidage confirme déjà qu'il veille). L'absent (ou le
  * `null`, guidage coupé) remet le compte à zéro sans parler et sans effacer
@@ -101,7 +107,7 @@ class SidewalkWatcher(
         val phrase = SidewalkText.phrase(position, language) ?: return null
         lastSpoken = position
         lastCueAtMs = nowMs
-        return SidewalkCue(phrase, position)
+        return SidewalkCue(phrase, position, level = LEVEL, antiRepeatKey = KEY_SIDEWALK)
     }
 
     /** Oublie le compte et l'annonce (nouvelle séance). */
@@ -115,6 +121,12 @@ class SidewalkWatcher(
     companion object {
         /** Positifs consécutifs avant d'annoncer (un isolé = bruit). */
         const val DEFAULT_CONFIRM_FRAMES = 2
+
+        /** Niveau VoiceBus v4 : trottoirs (comportement inchangé). */
+        const val LEVEL = 10
+
+        /** Clé AntiRepeat v4 : trottoirs (10 s). */
+        const val KEY_SIDEWALK = "sidewalk"
 
         /** Aucune annonce émise encore. */
         private const val NO_INSTANT = Long.MIN_VALUE

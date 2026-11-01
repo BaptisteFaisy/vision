@@ -4,38 +4,34 @@ import dev.sam3vision.core.distance.KnownSizes
 import dev.sam3vision.core.live.PersonLabels
 
 /**
- * Concepts qui font parler le guetteur danger : la personne (qui dit le
- * seul mot d'évitement « Droite. »/« Gauche. », ordre user du 01/11),
- * le poteau (« Attention au poteau … », reparle depuis l'ordre user du
- * 01/11 : s'écarter des gens et des poteaux même à 15 m devant) et le
- * mobilier qui barre le passage (dire « Attention … » —
- * ordre user du 29/10 : iSee décrit, en douceur — les mots du guidage
- * disent où aller, l'attention dit quoi éviter).
+ * Concepts qui font parler le guetteur danger : la personne proche (le seul
+ * mot d'évitement « Droite. »/« Gauche. », ordre user du 01/11), les
+ * grillages, les murs et les barrières (niveau 4, moins de 6 m), les poteaux,
+ * le mobilier vertical (lampadaire, panneau) et les divers (niveau 7, moins
+ * de 6 m, spec v4). Dire « Attention … » — iSee décrit, en douceur ; les
+ * mots du guidage disent où aller, l'attention dit quoi éviter.
  *
- * `barrier` n'est plus dans les défauts du direct (31/10 : son slot passe
- * à « keys », qui l'a rendu le 01/11 à la foule) ; il reste reconnu côté
- * client ([isHazard])
- * quand le backend le segmente (preset extérieur, champ « Follow »). Le
- * français reste reconnu : un label « barrière » compte comme « barrier ».
- * Lampadaires (« street lamp », « lampadaire », « réverbère »), panneaux
- * (« sign », « panneau », « traffic sign ») et potelets (« potelet »,
- * « plot » → « bollard ») s'y ajoutent (reel audit 31/10).
+ * Le français reste reconnu : un label « barrière » compte comme
+ * « barrier ». Le poteau parle depuis la v4 (niveau 7) : [isSpoken] ne le
+ * tait plus — [isPole] reste, lu par le repli haut-de-poteau de la
+ * Traversée (`CrossingPrompts.selectPoleTopBox`, qui vise le haut du
+ * poteau pour y lire le feu).
  *
- * Le poteau est reconnu ([isPole]) et parlé ([isSpoken]) : « Attention
- * au poteau … » en doux, comme la barrière. La reconnaissance sert aussi
- * au repli haut-de-poteau de la Traversée
- * (`CrossingPrompts.selectPoleTopBox`, qui vise le haut du poteau pour y
- * lire le feu).
+ * Retirés v4 (supprimés de la détection dehors) : la borne (« bollard »,
+ * « borne », « plot », « potelet ») et le portail (« gate », « portail ») —
+ * reconnus nulle part, ils ne parlent plus.
  *
  * Liste fermée : un concept = un nom FR/EN ([HazardName]) ; la personne y
  * entre par [PersonLabels], sans table à part. Le « etc. » de l'ordre
  * s'ajoute ici (clé canonique → nom), jamais en dur dans une phrase.
  *
- * Foule (audit du 01/11) : la poussette, le fauteuil roulant, la trottinette,
- * le chien et l'enfant ont leur nom parlé — ils barrent le passage même sans
- * être un piéton. La poussette, le fauteuil, le chien et l'enfant se
- * contournent comme un corps ([HazardKind.PERSON]) ; la trottinette reste
- * diverse ([HazardKind.OTHER], c'est un véhicule, pas quelqu'un à éviter).
+ * Foule (audit du 01/11, gardé v4) : la poussette, le fauteuil roulant, la
+ * trottinette, le chien et l'enfant ont leur nom parlé — ils barrent le
+ * passage même sans être un piéton. La poussette, le fauteuil, le chien et
+ * l'enfant se contournent comme un corps ([HazardKind.PERSON], niveau 2 :
+ * un corps qui bloque à 2 m dit le mot d'évitement, quelle que soit
+ * l'étiquette) ; la trottinette, le chat, l'animal générique, la poubelle
+ * et les souvenirs restent divers ([HazardKind.OTHER], niveau 7).
  */
 object HazardConcepts {
 
@@ -52,12 +48,13 @@ object HazardConcepts {
         "pole" to HazardName("au poteau", "pole"),
         "poteau" to HazardName("au poteau", "pole"),
         "poteaux" to HazardName("au poteau", "pole"),
-        "bollard" to HazardName("à la borne", "bollard"),
-        "borne" to HazardName("à la borne", "bollard"),
         "fence" to HazardName("à la clôture", "fence"),
         "cloture" to HazardName("à la clôture", "fence"),
-        "gate" to HazardName("au portail", "gate"),
-        "portail" to HazardName("au portail", "gate"),
+        "grillage" to HazardName("à la clôture", "fence"),
+        "wall" to HazardName("au mur", "wall"),
+        "walls" to HazardName("au mur", "wall"),
+        "mur" to HazardName("au mur", "wall"),
+        "murs" to HazardName("au mur", "wall"),
         "street lamp" to HazardName("au lampadaire", "street lamp"),
         "lampadaire" to HazardName("au lampadaire", "street lamp"),
         "reverbere" to HazardName("au lampadaire", "street lamp"),
@@ -65,8 +62,6 @@ object HazardConcepts {
         "panneau" to HazardName("au panneau", "sign"),
         "panneaux" to HazardName("au panneau", "sign"),
         "traffic sign" to HazardName("au panneau de signalisation", "traffic sign"),
-        "potelet" to HazardName("au potelet", "bollard"),
-        "plot" to HazardName("au plot", "bollard"),
         // Foule (01/11) : ce qui barre le passage sans être un piéton debout,
         // plus l'enfant et le chien. Pluriels irréguliers en dur (« children »,
         // « fauteuils roulants »), les autres tombent sur la coupe du « s ».
@@ -85,6 +80,22 @@ object HazardConcepts {
         "child" to HazardName("à l'enfant", "child"),
         "children" to HazardName("à l'enfant", "child"),
         "enfant" to HazardName("à l'enfant", "child"),
+        // Divers v4 (niveau 7) : l'animal générique et le chat (le chien
+        // reste un corps, voir le KDoc), la poubelle et les souvenirs.
+        "animal" to HazardName("à l'animal", "animal"),
+        "animaux" to HazardName("à l'animal", "animal"),
+        "cat" to HazardName("au chat", "cat"),
+        "chat" to HazardName("au chat", "cat"),
+        "trash can" to HazardName("à la poubelle", "trash can"),
+        "poubelle" to HazardName("à la poubelle", "trash can"),
+        "bin" to HazardName("à la poubelle", "trash can"),
+        "benne" to HazardName("à la benne", "dumpster"),
+        "dumpster" to HazardName("à la benne", "dumpster"),
+        "souvenir shop" to HazardName("à la boutique de souvenirs", "souvenir shop"),
+        "beanie" to HazardName("au bonnet", "beanie"),
+        "bonnet" to HazardName("au bonnet", "beanie"),
+        "socks" to HazardName("aux chaussettes", "socks"),
+        "chaussettes" to HazardName("aux chaussettes", "socks"),
     )
 
     /** Nom parlé de [label], `null` si ni personne ni mobilier suivi. */
@@ -103,7 +114,7 @@ object HazardConcepts {
     /**
      * Vrai si [label] désigne un poteau (le nom anglais fait foi, jamais
      * une table à part). Requis par `CrossingPrompts.selectPoleTopBox`
-     * (repli haut-de-poteau) : voix muette mais reconnaissance conservée.
+     * (repli haut-de-poteau) : voix parlante depuis la v4 (niveau 7).
      */
     fun isPole(label: String): Boolean = nameOf(label)?.en == "pole"
 
@@ -120,7 +131,8 @@ object HazardConcepts {
 
     /**
      * Vrai si [label] fait parler le guetteur : personne ou mobilier
-     * suivi, poteau compris (reparle depuis l'ordre user du 01/11).
+     * suivi — le poteau parle depuis la v4 (niveau 7), la borne et le
+     * portail ne sont plus reconnus ([isHazard] les ignore).
      */
     fun isSpoken(label: String): Boolean = isHazard(label)
 
@@ -128,9 +140,38 @@ object HazardConcepts {
     fun isBarrier(label: String): Boolean = nameOf(label)?.en == "barrier"
 
     /**
+     * Niveau VoiceBus v4 de [label] : 2 la personne et les corps qui
+     * s'évitent comme elle (enfant, poussette, fauteuil roulant, chien), 4
+     * les grillages, les murs et les barrières, 7 les poteaux, le mobilier
+     * vertical et les divers. Label inconnu = 7 (divers, jamais la priorité
+     * d'une personne).
+     */
+    fun levelOf(label: String): Int {
+        val en = nameOf(label)?.en ?: return HazardWatcher.LEVEL_POLE
+        return when {
+            kindOf(label) == HazardKind.PERSON -> HazardWatcher.LEVEL_PERSON
+            en == "fence" || en == "wall" || en == "barrier" -> HazardWatcher.LEVEL_FENCE
+            else -> HazardWatcher.LEVEL_POLE
+        }
+    }
+
+    /**
+     * Clé AntiRepeat v4 de [label] (annonce douce) : `human-soft` la
+     * personne et les corps (l'imminente dit `human-imminent`, voir
+     * [HazardWatcher]), `fence` les grillages, murs et barrières, `pole`
+     * le reste. Label inconnu = `pole`.
+     */
+    fun antiRepeatKey(label: String): String = when (levelOf(label)) {
+        HazardWatcher.LEVEL_PERSON -> HazardWatcher.KEY_HUMAN_SOFT
+        HazardWatcher.LEVEL_FENCE -> HazardWatcher.KEY_FENCE
+        else -> HazardWatcher.KEY_POLE
+    }
+
+    /**
      * Sorte parlée de [label] : personne (tout ce qui se contourne comme un
      * corps — personne, enfant, poussette, fauteuil roulant, chien),
-     * barrière, ou divers (poteau, borne, clôture, portail, trottinette).
+     * barrière, ou divers (poteau, clôture, mur, trottinette, animal,
+     * poubelle, souvenirs…).
      */
     fun kindOf(label: String): HazardKind {
         val en = nameOf(label)?.en ?: return HazardKind.OTHER
@@ -153,6 +194,6 @@ enum class HazardKind {
     /** Barrière : descriptive, après la personne (P4). */
     BARRIER,
 
-    /** Divers : poteau, borne, clôture, portail… (avec le reste). */
+    /** Divers : poteau, clôture, mur, lampadaire, panneau, trottinette, animal, poubelle, souvenirs… (avec le reste). */
     OTHER,
 }
