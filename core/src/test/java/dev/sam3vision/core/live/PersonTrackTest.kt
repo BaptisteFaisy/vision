@@ -1,5 +1,7 @@
 package dev.sam3vision.core.live
 
+import java.util.concurrent.ConcurrentLinkedQueue
+import java.util.concurrent.CountDownLatch
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertNotEquals
 import org.junit.Assert.assertNotNull
@@ -234,5 +236,34 @@ class PersonTrackTest {
         assertTrue("3 m → 2 m en 1,3 s : ça se rapproche", c.closingMps!! > 0.5f)
         assertEquals(2.0f, c.meters!!, 0f)
         assertEquals(2.0f / c.closingMps!!, c.ttcS!!, 0.05f)
+    }
+
+    @Test
+    fun `des frames concurrentes ne plantent pas le suivi`() {
+        // Non-régression : `LiveProbe.dispatch` lance un `runFrame` par frame
+        // sans garde anti-recouvrement, et le `PersonTracker` est unique par
+        // séance — deux `onFrame` entrelacés tuaient l'app (`IndexOutOfBounds`
+        // dans `sweep`, constaté sur émulateur le 01/11).
+        val tracker = PersonTracker()
+        val errors = ConcurrentLinkedQueue<Throwable>()
+        val start = CountDownLatch(1)
+        val threads = List(8) { t ->
+            Thread {
+                start.await()
+                try {
+                    repeat(300) { i ->
+                        tracker.onFrame(
+                            (t * 300L + i) * 40L,
+                            listOf(label(0.25f + t * 0.03f, 4.0f), label(0.75f, 6.0f)),
+                        )
+                    }
+                } catch (e: Throwable) {
+                    errors.add(e)
+                }
+            }.also { it.start() }
+        }
+        start.countDown()
+        threads.forEach { it.join(60_000) }
+        assertTrue("plantage concurrent : ${errors.peek()}", errors.isEmpty())
     }
 }
