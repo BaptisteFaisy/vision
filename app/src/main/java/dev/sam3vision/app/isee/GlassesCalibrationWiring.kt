@@ -29,6 +29,22 @@ internal fun LiveProbe.setCalibration(lens: LensSpec, pose: CameraPose? = null) 
  * donc les deux chemins ne divergent jamais. [glassesLens] fournit la mire
  * persistée (`null` = jamais posée, le repli estimé s'applique).
  */
+/**
+ * Bascule lunettes-live de la sonde : le tangage téléphone ne vise pas où visent
+ * les lunettes (DAT 1.0.0 n'expose aucune orientation tête), donc la branche
+ * plan-de-sol est coupée explicitement — sténopé + profondeur gardent la main.
+ * Retour téléphone : la branche rouvre (la pose IMU reprend si le tangage tourne,
+ * sinon `null` = sténopé seul, repli existant).
+ */
+fun LiveProbe.setGlassesLive(live: Boolean) {
+    distances.groundPlaneEnabled = !live
+    if (live) distances.pose = null
+    android.util.Log.i("GlassesBridge", "plan de sol " + if (live) "coupé (lunettes-live, sténopé seul)" else "rouvert (téléphone)")
+}
+
+/** Vrai quand la branche sol est coupée (lunettes-live) : hook UI, sans état. */
+val LiveProbe.groundDegraded: Boolean get() = !distances.groundPlaneEnabled
+
 internal fun LiveProbe.observeGlassesLive(
     scope: CoroutineScope,
     settings: () -> Settings,

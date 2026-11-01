@@ -167,6 +167,16 @@ class DistanceMeter(
     @Volatile
     var pose: CameraPose? = null
 
+    /**
+     * Coupe-circuit de la branche plan-de-sol : `false` en lunettes-live (le
+     * tangage téléphone ne vise pas où visent les lunettes, DAT 1.0.0 sans
+     * orientation tête) — [groundMeters] rend alors `null`, la fusion tombe sur
+     * le sténopé seul, et aucune valeur téléphone ne fuit silencieusement.
+     * Volatile : écrit par l'UI, lu par le thread des frames.
+     */
+    @Volatile
+    var groundPlaneEnabled: Boolean = true
+
     /** Calibrage courant (celui du capteur, sinon le réglage). */
     val lensSpec: LensSpec get() = lens
 
@@ -325,6 +335,7 @@ class DistanceMeter(
      * (poids inutilisé, la branche sol est alors muette).
      */
     private fun groundWeight(box: List<Float>, focalPx: Float, principalY: Float): Float {
+        if (!groundPlaneEnabled) return GroundWeight.MIN_WEIGHT
         val current = pose ?: return 1f
         if (box.size < 4) return GroundWeight.MIN_WEIGHT
         return GroundWeight.of(GroundPlane.depressionRad(box[3], current, focalPx, principalY))
@@ -369,6 +380,7 @@ class DistanceMeter(
         principalY: Float,
         imageHeight: Int,
     ): Float? {
+        if (!groundPlaneEnabled) return null
         val current = pose ?: return null
         if (box.size < 4) return null
         return GroundPlane.forwardMeters(box[3], current, focalPx, principalY, imageHeight)

@@ -39,20 +39,25 @@ internal fun GlassesProbeWiring(probe: LiveProbe, glassesFeed: Boolean) {
         onDispose { sampler.release() }
     }
     LaunchedEffect(probe, glassesFeed) {
+        probe.setGlassesLive(glassesFeed)
         if (!glassesFeed) return@LaunchedEffect
-        GlassesVideoLink.frames.collect { box ->
-            if (box == null || !probe.wantsFrame()) return@collect
-            // La photo vient de la vue (fil UI) ; en veille, la poussée est
-            // décodée hors écran. Tout le reste — redressement, JPEG, Canny,
-            // sonde — tourne en fond, comme le fil d'analyse du téléphone.
-            val snapshot = GlassesVideoLink.takeSnapshot()
-            withContext(Dispatchers.Default) {
-                val fromView = snapshot != null
-                val bitmap = snapshot ?: sampler.bitmapOf(box) ?: return@withContext
-                applyGlassesLens(probe, fromView)
-                val jpeg = bitmapToProbeJpeg(bitmap) ?: return@withContext
-                probe.onFrame(jpeg, SystemClock.elapsedRealtimeNanos())
+        try {
+            GlassesVideoLink.frames.collect { box ->
+                if (box == null || !probe.wantsFrame()) return@collect
+                // La photo vient de la vue (fil UI) ; en veille, la poussée est
+                // décodée hors écran. Tout le reste — redressement, JPEG, Canny,
+                // sonde — tourne en fond, comme le fil d'analyse du téléphone.
+                val snapshot = GlassesVideoLink.takeSnapshot()
+                withContext(Dispatchers.Default) {
+                    val fromView = snapshot != null
+                    val bitmap = snapshot ?: sampler.bitmapOf(box) ?: return@withContext
+                    applyGlassesLens(probe, fromView)
+                    val jpeg = bitmapToProbeJpeg(bitmap) ?: return@withContext
+                    probe.onFrame(jpeg, SystemClock.elapsedRealtimeNanos())
+                }
             }
+        } finally {
+            probe.setGlassesLive(false)
         }
     }
 }

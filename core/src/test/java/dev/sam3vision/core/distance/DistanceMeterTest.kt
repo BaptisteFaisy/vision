@@ -323,4 +323,40 @@ class DistanceMeterTest {
             0.01f,
         )
     }
+
+    @Test
+    fun `sol coupe en lunettes-live : objet au sol sans taille connue n'est plus mesure`() {
+        val feet = box(200f) // pieds à 300 px, bien sous l'horizon
+        val phone = DistanceMeter().apply { pose = CameraPose(1.5f, 0.1f) }
+        assertEquals(1, phone.measure(512, 384, listOf(detection("licorne", feet))).size)
+        val glasses = DistanceMeter().apply {
+            pose = CameraPose(1.5f, 0.1f)
+            groundPlaneEnabled = false
+        }
+        assertTrue(glasses.measure(512, 384, listOf(detection("licorne", feet))).isEmpty())
+        // sténopé garde la main : la personne reste mesurée, sol ou pas
+        assertEquals(1, glasses.measure(512, 384, listOf(detection("personne", feet))).size)
+    }
+
+    @Test
+    fun `sol coupe : le stenope ne subit aucune traction de la fusion`() {
+        val feet = box(200f)
+        val focal = LensSpec.Default.focalPx(512, 384)
+        val pinhole = Pinhole.distanceMeters(feet, 1.70f, focal)!!
+        val raw = DistanceMeter().apply {
+            pose = CameraPose(1.5f, 0.1f)
+            groundPlaneEnabled = false
+        }.measure(512, 384, listOf(detection("personne", feet))).first().rawMeters
+        assertEquals(pinhole, raw, 0f)
+    }
+
+    @Test
+    fun `rouverture du sol restaure la branche plan-de-sol`() {
+        val meter = DistanceMeter().apply { pose = CameraPose(1.5f, 0.1f) }
+        val feet = box(200f)
+        meter.groundPlaneEnabled = false
+        assertTrue(meter.measure(512, 384, listOf(detection("licorne", feet))).isEmpty())
+        meter.groundPlaneEnabled = true
+        assertEquals(1, meter.measure(512, 384, listOf(detection("licorne", feet))).size)
+    }
 }
