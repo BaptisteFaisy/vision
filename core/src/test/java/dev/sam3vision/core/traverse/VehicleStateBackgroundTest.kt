@@ -45,8 +45,9 @@ class VehicleStateBackgroundTest {
 
     @Test
     fun `camera qui suit - jeune cle non jugee, annonce maintenue`() {
-        // Voiture tue par la caméra + bus qui apparaît en croissance : la clé
-        // bus, jamais évaluée, annonce à la confirmation malgré la caméra.
+        // Voiture tue par la caméra + seconde voiture qui apparaît en
+        // croissance : la clé jeune, jamais évaluée, annonce à la
+        // confirmation malgré la caméra.
         val motion = FrameMotion(MotionSample(0.75f, 0f, 1f, 0.9f), 96, 96, 100L)
         val watcher = VehicleStateWatcher()
         var last: VehicleStateCue? = null
@@ -56,15 +57,15 @@ class VehicleStateBackgroundTest {
             val detections = mutableListOf(det("car", carBox))
             val readings = mutableListOf(reading("car", 5f, carBox))
             if (index >= 10) {
-                val busBox = box(100f + (index - 10) * 10f, cx = 500f)
-                detections += det("bus", busBox)
-                readings += reading("bus", 3f, busBox)
+                val youngBox = box(100f + (index - 10) * 10f, cx = 500f)
+                detections += det("car", youngBox)
+                readings += reading("car", 3f, youngBox)
             }
             last = watcher.update(detections, readings, atMs = index * 100L, motion = motion)
-            if (index in 8..11) assertNull("voiture tue, bus pas encore confirmé", last)
+            if (index in 8..11) assertNull("voiture tue, jeune pas encore confirmé", last)
         }
 
-        assertNotNull("le jeune bus en croissance annonce", last)
+        assertNotNull("la jeune voiture en croissance annonce", last)
         assertEquals(3f, last!!.meters)
     }
 
@@ -106,7 +107,7 @@ class VehicleStateBackgroundTest {
             language = SpeechLanguage.En,
         )
 
-        assertEquals("Car moving.", third!!.phrase)
+        assertEquals("Car.", third!!.phrase)
         assertEquals("Stop, car moving.", third.safetyPhrase)
         assertTrue("tau + 8 m + centre : urgent", third.urgent)
     }

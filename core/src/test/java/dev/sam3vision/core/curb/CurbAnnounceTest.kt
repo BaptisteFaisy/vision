@@ -9,7 +9,7 @@ import org.junit.Assert.assertNull
 import org.junit.Assert.assertTrue
 import org.junit.Test
 
-/** Annonces bordure : détection immédiate + compte à rebours 2 / 1,5 / 1 / 0,7 / 0,5 m, bateau. */
+/** Annonces bordure : détection immédiate + compte à rebours 2 / 1,5 / 1 / 0,7 / 0,5 m (plan continu ignoré). */
 class CurbAnnounceTest {
 
     private fun reading(label: String, meters: Float, box: List<Float>) =
@@ -267,15 +267,14 @@ class CurbAnnounceTest {
     }
 
     @Test
-    fun `deux trous dont un bateau ne cassent pas le compte a rebours`() {
+    fun `deux trous ne cassent pas le compte a rebours`() {
         val watcher = CurbWatcher()
         val seen = sig(2.5f)
         watcher.onSignal(seen, 1_000L, SpeechLanguage.Fr)
         assertEquals("Bordure détectée.", watcher.onSignal(seen, 2_000L, SpeechLanguage.Fr)!!.phrase)
 
-        // Deux trous, dont un plan bateau : muets, sans réarmer.
-        val flatHole = CurbSignal(detected = false, meters = 0.4f, centerX = 0.5f, flatPass = true)
-        assertNull(watcher.onSignal(flatHole, 3_000L, SpeechLanguage.Fr))
+        // Deux trous : muets, sans réarmer.
+        assertNull(watcher.onSignal(CurbSignal.none(), 3_000L, SpeechLanguage.Fr))
         assertNull(watcher.onSignal(CurbSignal.none(), 4_000L, SpeechLanguage.Fr))
 
         assertNull(watcher.onSignal(sig(2.0f), 5_000L, SpeechLanguage.Fr))
@@ -353,55 +352,13 @@ class CurbAnnounceTest {
     }
 
     @Test
-    fun `bateau doux une fois par presence`() {
+    fun `plan continu ignore, jamais d annonce`() {
         val watcher = CurbWatcher()
         val pass = CurbSignal.of(listOf(flat()), 512, 1138)
 
-        assertNull(watcher.onSignal(pass, 1_000L, SpeechLanguage.Fr))
-        val cue = watcher.onSignal(pass, 2_000L, SpeechLanguage.Fr)
-
-        assertNotNull(cue)
-        assertEquals("Bateau, pas de marche.", cue!!.phrase)
-        assertEquals(CurbTier.NONE, cue.tier)
-        assertFalse(cue.urgent)
-        assertNull(watcher.onSignal(pass, 3_000L))
-        assertNull(watcher.onSignal(pass, 4_000L))
-        assertNull(watcher.onSignal(pass, 5_000L))
-        assertNull(watcher.onSignal(CurbSignal.none(), 6_000L))
-        assertNull(watcher.onSignal(pass, 13_000L))
-        assertNotNull(watcher.onSignal(pass, 14_000L))
-    }
-
-    @Test
-    fun `bateau supprime apres palier proche`() {
-        val watcher = CurbWatcher()
-        val close = sig(0.65f)
-        watcher.onSignal(close, 1_000L, SpeechLanguage.Fr)
-        watcher.onSignal(close, 2_000L, SpeechLanguage.Fr)
-        watcher.onSignal(close, 3_000L, SpeechLanguage.Fr)
-        assertEquals("Bordure à 0,7 mètre.", watcher.onSignal(close, 4_000L, SpeechLanguage.Fr)!!.phrase)
-
-        // Le plan sous les pieds après le palier : traversée, pas un bateau.
-        val pass = CurbSignal.of(listOf(flat()), 512, 1138)
-        assertNull(watcher.onSignal(pass, 5_000L))
-        assertNull(watcher.onSignal(pass, 6_000L))
-        assertNull(watcher.onSignal(pass, 13_000L))
-        assertNull(watcher.onSignal(pass, 14_000L))
-        assertNotNull(watcher.onSignal(pass, 15_000L))
-    }
-
-    @Test
-    fun `bateau respecte le cooldown`() {
-        val watcher = CurbWatcher()
-        val seen = sig(2.5f)
-        val pass = CurbSignal.of(listOf(flat()), 512, 1138)
-
-        watcher.onSignal(seen, 1_000L)
-        watcher.onSignal(seen, 2_000L)
-        assertNull(watcher.onSignal(pass, 3_000L))
-        assertNull(watcher.onSignal(pass, 4_000L))
-        assertNull(watcher.onSignal(pass, 5_000L))
-        assertNotNull(watcher.onSignal(pass, 12_000L))
+        repeat(5) { index ->
+            assertNull(watcher.onSignal(pass, 1_000L + index * 1_000L, SpeechLanguage.Fr))
+        }
     }
 
     @Test

@@ -31,8 +31,8 @@ class CurbWatcherTest {
         assertTrue(CurbConcepts.isCurb("step"))
         assertTrue(CurbConcepts.isCurb("rebord"))
         assertTrue(CurbConcepts.isCurb("rebords"))
-        assertTrue(CurbConcepts.isCurb("curb ramp"))
-        assertTrue(CurbConcepts.isCurb("bateau"))
+        assertFalse("bateau sorti v4", CurbConcepts.isCurb("curb ramp"))
+        assertFalse("bateau sorti v4", CurbConcepts.isCurb("bateau"))
         assertTrue(CurbConcepts.isCurb("gutter"))
         assertTrue(CurbConcepts.isCurb("caniveau"))
 
@@ -45,14 +45,14 @@ class CurbWatcherTest {
     }
 
     @Test
-    fun `rebord et rampes reconnus, voilier non`() {
+    fun `rebord et rampes reconnus, bateau et voilier non`() {
         assertTrue(CurbConcepts.isCurb("rebord"))
-        assertTrue(CurbConcepts.isCurb("curb ramp"))
-        assertTrue(CurbConcepts.isCurb("bateau"))
+        assertFalse("bateau sorti v4", CurbConcepts.isCurb("curb ramp"))
+        assertFalse("bateau sorti v4", CurbConcepts.isCurb("bateau"))
         assertTrue(CurbConcepts.isCurb("ramp"))
         assertTrue(CurbConcepts.isCurb("rampe"))
-        assertTrue(CurbConcepts.isGround("curb ramp"))
-        assertTrue(CurbConcepts.isGround("bateau"))
+        assertFalse("bateau sorti v4", CurbConcepts.isGround("curb ramp"))
+        assertFalse("bateau sorti v4", CurbConcepts.isGround("bateau"))
 
         assertFalse(CurbConcepts.isCurb("bateau à voile"))
         assertFalse(CurbConcepts.isGround("curb"))
@@ -71,8 +71,8 @@ class CurbWatcherTest {
     }
 
     @Test
-    fun `trottoir au-dela de trois metres = silence`() {
-        val signal = CurbSignal.of(listOf(curb(3.5f)), 512, 1138)
+    fun `trottoir au-dela de six metres = silence`() {
+        val signal = CurbSignal.of(listOf(curb(6.5f)), 512, 1138)
 
         assertFalse(signal.detected)
         assertEquals(CurbTier.NONE, signal.tier)
@@ -136,7 +136,6 @@ class CurbWatcherTest {
 
         assertTrue(signal.detected)
         assertEquals(CurbEdge.Up, signal.edge)
-        assertFalse(signal.flatPass)
     }
 
     @Test
@@ -155,11 +154,6 @@ class CurbWatcherTest {
         assertEquals("Curb at 0.5 meters.", CurbText.distancePhrase(0.5f, SpeechLanguage.En))
     }
 
-    @Test
-    fun `phrases bateau FR et EN`() {
-        assertEquals("Bateau, pas de marche.", CurbText.flatPhrase(SpeechLanguage.Fr))
-        assertEquals("Dropped curb, no step.", CurbText.flatPhrase(SpeechLanguage.En))
-    }
 
     @Test
     fun `detection avec heure, paliers sans heure`() {
@@ -176,13 +170,13 @@ class CurbWatcherTest {
     }
 
     @Test
-    fun `seuils de palier 07 et 30`() {
+    fun `seuils de palier 07 et 60`() {
         assertEquals(CurbTier.NEAR, CurbSignal(detected = true, meters = 0.7f).tier)
         assertEquals(CurbTier.FAR, CurbSignal(detected = true, meters = 0.71f).tier)
-        assertEquals(CurbTier.FAR, CurbSignal(detected = true, meters = 3.0f).tier)
+        assertEquals(CurbTier.FAR, CurbSignal(detected = true, meters = 6.0f).tier)
         assertEquals(CurbTier.NONE, CurbSignal.none().tier)
-        assertEquals(CurbTier.FAR, CurbSignal.of(listOf(curb(3.0f)), 512, 1138).tier)
-        assertEquals(CurbTier.NONE, CurbSignal.of(listOf(curb(3.01f)), 512, 1138).tier)
+        assertEquals(CurbTier.FAR, CurbSignal.of(listOf(curb(6.0f)), 512, 1138).tier)
+        assertEquals(CurbTier.NONE, CurbSignal.of(listOf(curb(6.01f)), 512, 1138).tier)
     }
 
     @Test

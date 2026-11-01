@@ -48,7 +48,7 @@
 ### R-03 — Verdict : texte et clipIds incompatibles avec le catalogue
 
 - `verdict` : `core/.../crossing/CrossingVerdict.kt:36-52` — « Cross. » /
-  « Don't cross. », clips `verdict-cross` / `verdict-dont-cross` (tirets).
+  « Don't cross. », clips `verdict_cross` / `verdict_dont_cross` (format res raw).
 - `clips-en` : `IseeClipsEn.kt:115-118` — « **Cross now.** » /
   « Don't cross. », ids `verdict_cross` / `verdict_wait` (underscores).
 - Avec la politique clips-en (inconnu = silence, `IseeClipPlayer.kt:48`),
@@ -361,7 +361,7 @@
 2. **D-02** : niveau 0 = « Car. » / « Cars. » (clips `car`/`cars`), type
    voiture seul (`isCarLabel`) ; supprimer les 5 autres noms parlés.
 3. **D-03** : verdict = « Cross. » / « Don't cross. », clips
-   `verdict-cross` / `verdict-dont-cross` ; aligner le catalogue clips-en
+   `verdict_cross` / `verdict_dont_cross` ; aligner le catalogue clips-en
    (déjà tranché en `TRAVERSEE.md` § 6).
 4. **D-04** : repli = **silence si clip manquant** hors chat/GPS
    (supprimer la synthèse de `ProximityVoice.speak`) ; chat et GPS seuls

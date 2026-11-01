@@ -3,21 +3,20 @@ package dev.sam3vision.app.isee
 import dev.sam3vision.app.SpeechPlayer
 import dev.sam3vision.app.speech.VoicePack
 import dev.sam3vision.core.settings.Settings
-import dev.sam3vision.core.speech.SpeechLanguage
 import java.io.File
 import java.nio.file.Files
 import kotlinx.coroutines.test.runTest
 import org.junit.Assert.assertEquals
+import org.junit.Assert.assertFalse
 import org.junit.Assert.assertNull
 import org.junit.Assert.assertTrue
 import org.junit.Test
 
 /**
- * Phrases **fixes** d'état jouées en mp3 enregistré (ordre user du 01/11 :
- * « que cela soit un mp3 enregistré ») : le mouvement d'un véhicule ou d'un
- * cycle ne porte plus de position, donc le pack le dit — zéro synthèse. Ce qui
- * porte encore une mesure (arrêt, stationnement) ou un compte (pluriel) reste
- * en synthèse.
+ * Phrases **fixes** jouées en mp3 enregistré (SPEC v4) : « Car. » /
+ * « Cars. » (et leurs FR) partent en clip — zéro synthèse. Hors GPS, une
+ * phrase sans clip se tait (pas de synthèse) ; au niveau GPS, elle se
+ * synthétise.
  */
 class ProximityVoiceRecordedTest {
 
@@ -49,52 +48,57 @@ class ProximityVoiceRecordedTest {
         val attempts = mutableListOf<String>()
         val spoken = mutableListOf<String>()
 
-        voice(pack(), attempts, spoken).onPhrase("Voiture en mouvement.", playerIdle = true)
+        val dit = voice(pack(), attempts, spoken).speak("Voiture.", level = OutdoorLevel.CAR_MOVING)
 
+        assertTrue("parlé en clip", dit)
         assertTrue("aucune synthèse : le clip parle", attempts.isEmpty())
-        assertEquals(listOf("Voiture en mouvement."), spoken.filter { it.isNotBlank() })
+        assertEquals(listOf("Voiture."), spoken.filter { it.isNotBlank() })
     }
 
     @Test
-    fun `mouvement de cycle joue son mp3`() = runTest {
-        val attempts = mutableListOf<String>()
-        val spoken = mutableListOf<String>()
-
-        voice(pack(), attempts, spoken).onPhrase("Attention, vélo en mouvement.", playerIdle = true)
-
-        assertTrue(attempts.isEmpty())
-        assertEquals(listOf("Attention, vélo en mouvement."), spoken.filter { it.isNotBlank() })
-    }
-
-    @Test
-    fun `arret situe et pluriel restent en synthese`() = runTest {
+    fun `phrase sans clip hors GPS = silence sans synthese`() = runTest {
         val attempts = mutableListOf<String>()
         val spoken = mutableListOf<String>()
         val v = voice(pack(), attempts, spoken)
 
-        v.onPhrase("Voiture à l'arrêt, à 2 mètres.", playerIdle = true)
+        assertFalse(v.speak("Voiture à l'arrêt, à 2 mètres.", level = OutdoorLevel.HUMAN))
         v.reset()
-        v.onPhrase("2 vehicles moving.", playerIdle = true)
+        assertFalse(v.speak("2 vehicles moving.", level = OutdoorLevel.HUMAN))
 
-        assertEquals(listOf("Voiture à l'arrêt, à 2 mètres.", "2 vehicles moving."), attempts)
+        assertTrue(attempts.isEmpty())
+        assertTrue(spoken.isEmpty())
     }
 
     @Test
-    fun `sans pack, la phrase fixe se synthetise encore`() = runTest {
+    fun `phrase sans clip niveau GPS = synthese`() = runTest {
         val attempts = mutableListOf<String>()
         val spoken = mutableListOf<String>()
 
-        voice(clips = null, attempts, spoken).onPhrase("Voiture en mouvement.", playerIdle = true)
+        val dit = voice(pack(), attempts, spoken)
+            .speak("Turn left in 20 meters.", level = OutdoorLevel.GPS_EVENT)
 
-        assertEquals(listOf("Voiture en mouvement."), attempts)
+        assertTrue(dit)
+        assertEquals(listOf("Turn left in 20 meters."), attempts)
+    }
+
+    @Test
+    fun `sans pack hors GPS = silence`() = runTest {
+        val attempts = mutableListOf<String>()
+        val spoken = mutableListOf<String>()
+
+        val dit = voice(clips = null, attempts, spoken).speak("Voiture.", level = OutdoorLevel.CAR_MOVING)
+
+        assertFalse(dit)
+        assertTrue(attempts.isEmpty())
+        assertTrue(spoken.isEmpty())
     }
 
     @Test
     fun `table phrase vers clip, une seule source`() {
-        assertEquals("vehicle_car_moving", recordedClipId("Voiture en mouvement."))
+        assertEquals("car", recordedClipId("Voiture."))
+        assertEquals("car", recordedClipId("Car."))
+        assertEquals("cars", recordedClipId("Cars."))
         assertNull("le stop part en voix de sécurité", recordedClipId("Stop, car moving."))
-        assertEquals("cycle_velo_moving", recordedClipId("Attention, vélo en mouvement."))
-        assertEquals("vehicle_car_moving", spokenClipId("Car moving."))
         assertEquals("guide_left", spokenClipId("Gauche."))
         assertNull("phrase située : variable, pas de clip", recordedClipId("Car stopped, 2 meters away."))
     }

@@ -62,10 +62,10 @@ class IseeClipPlayerTest {
         val sink = FakeSink()
         val spoken = mutableListOf<String>()
 
-        val played = player(sink, spoken = spoken).speak("verdict-dont-cross", urgent = false)
+        val played = player(sink, spoken = spoken).speak("verdict_dont_cross", urgent = false)
 
         assertTrue(played)
-        assertEquals(listOf("vp_verdict-dont-cross_en.mp3"), sink.playedFiles)
+        assertEquals(listOf("vp_verdict_dont_cross_en.mp3"), sink.playedFiles)
         assertEquals(listOf("Don't cross."), spoken)
         assertEquals(0, sink.stops)
     }
@@ -99,7 +99,7 @@ class IseeClipPlayerTest {
         val spoken = mutableListOf<String>()
 
         val played = player(sink, bundled = null, spoken = spoken)
-            .speak("verdict-cross", urgent = false)
+            .speak("verdict_cross", urgent = false)
 
         assertFalse(played)
         assertTrue(sink.playedFiles.isEmpty())

@@ -162,8 +162,8 @@ class GuidanceObstaclesTest {
     }
 
     @Test
-    fun `barrière voiture vélo humain à 2 m bloquent mesurés`() {
-        listOf("barrière", "voiture", "vélo", "humain").forEach { label ->
+    fun `barrière voiture chien humain à 2 m bloquent mesurés`() {
+        listOf("barrière", "voiture", "chien", "humain").forEach { label ->
             val out = pinholeChain(frameOf(seg(label, boxFor(label, 2f))))
 
             assertEquals("lecture $label", 2f, out.readings.single().meters, 0.02f)

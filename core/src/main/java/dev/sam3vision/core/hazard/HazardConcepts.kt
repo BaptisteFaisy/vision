@@ -18,9 +18,12 @@ import dev.sam3vision.core.live.PersonLabels
  * poteau pour y lire le feu). Bornes, portails et trottinettes sortis
  * (spec v4 : plus détectés).
  *
- * Retirés v4 (supprimés de la détection dehors) : la borne (« bollard »,
- * « borne », « plot », « potelet ») et le portail (« gate », « portail ») —
- * reconnus nulle part, ils ne parlent plus.
+ * Retirés v4 (ordres user) : la borne (« bollard », « borne », « plot »,
+ * « potelet »), le portail (« gate », « portail ») et la trottinette
+ * (« scooter », « trottinette ») — reconnus nulle part, ils ne parlent
+ * plus. Le reste de la foule (poussette, fauteuil roulant, chien,
+ * enfant), le chat, la benne, le bonnet et les chaussettes restent
+ * reconnus (D-13 : jamais supprimés par l'user).
  *
  * Liste fermée : un concept = un nom FR/EN ([HazardName]) ; la personne y
  * entre par [PersonLabels], sans table à part. Le « etc. » de l'ordre
@@ -56,9 +59,8 @@ object HazardConcepts {
         "panneau" to HazardName("au panneau", "sign"),
         "panneaux" to HazardName("au panneau", "sign"),
         "traffic sign" to HazardName("au panneau de signalisation", "traffic sign"),
-        // Foule (01/11) : ce qui barre le passage sans être un piéton debout,
-        // plus l'enfant et le chien. Pluriels irréguliers en dur (« children »,
-        // « fauteuils roulants »), les autres tombent sur la coupe du « s ».
+        // Foule (D-13) : ce qui barre le passage sans être un piéton debout,
+        // plus l'enfant et le chien — noms parlés propres, sorte PERSON.
         "stroller" to HazardName("à la poussette", "stroller"),
         "poussette" to HazardName("à la poussette", "stroller"),
         "pram" to HazardName("à la poussette", "stroller"),
@@ -71,8 +73,8 @@ object HazardConcepts {
         "child" to HazardName("à l'enfant", "child"),
         "children" to HazardName("à l'enfant", "child"),
         "enfant" to HazardName("à l'enfant", "child"),
-        // Divers v4 (niveau 7) : l'animal générique et le chat (le chien
-        // reste un corps, voir le KDoc), la poubelle et les souvenirs.
+        // Divers v4 (niveau 7) : l'animal générique et le chat, la poubelle,
+        // la benne, les souvenirs, le bonnet et les chaussettes.
         "animal" to HazardName("à l'animal", "animal"),
         "animaux" to HazardName("à l'animal", "animal"),
         "cat" to HazardName("au chat", "cat"),
@@ -111,9 +113,9 @@ object HazardConcepts {
 
     /**
      * Vrai si [label] désigne une personne (le nom anglais fait foi, jamais
-     * une table à part) : l'enfant en est une (il s'évite et se parle comme un
-     * adulte), la poussette, le fauteuil et le chien non — leur [kindOf] dira
-     * seulement qu'ils se contournent.
+     * une table à part) : l'enfant en est une (il s'évite et se parle comme
+     * un adulte), la poussette, le fauteuil et le chien non — leur [kindOf]
+     * dira seulement qu'ils se contournent.
      */
     fun isPerson(label: String): Boolean {
         val en = nameOf(label)?.en ?: return false
@@ -178,7 +180,7 @@ object HazardConcepts {
  * divers avec le reste) : l'arbitre voix y lit le rang du guetteur danger.
  */
 enum class HazardKind {
-    /** Corps qui bloque et s'évite (personne, enfant, poussette, fauteuil roulant, chien) : P3. */
+    /** Corps qui bloque et s'évite (personne, enfant, poussette, fauteuil roulant, chien : niveau 2). */
     PERSON,
 
     /** Barrière : descriptive, après la personne (P4). */

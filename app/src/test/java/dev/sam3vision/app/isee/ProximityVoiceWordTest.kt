@@ -8,163 +8,166 @@ import java.io.File
 import java.nio.file.Files
 import kotlinx.coroutines.test.runTest
 import org.junit.Assert.assertEquals
+import org.junit.Assert.assertFalse
 import org.junit.Assert.assertTrue
 import org.junit.Test
 
 /**
- * Mot du guidage : doux en clip local sans synthèse quand le pack l'a, sinon
- * synthèse réseau mise en cache pour la suite. Directions douces redites en
- * continu, stop unique — et l'urgent part en voix de sécurité, jamais en clip.
+ * Mot du guidage (SPEC v4) : clip local quand le pack l'a (zéro réseau),
+ * sinon synthèse GPS mise en cache (hors GPS : silence) ; directions
+ * redites en continu, stop unique ; gardes user, porte et système (niveau
+ * 0 excepté).
  */
 class ProximityVoiceWordTest {
 
     private fun tempDir(): File = Files.createTempDirectory("mots").toFile()
 
+    private fun packAvecClip(): VoicePack = VoicePack(
+        filesDir = tempDir(),
+        packVoiceId = { "voix-test" },
+        bundledClip = { "faux-mp3".toByteArray() },
+    )
+
+    private fun packVide(): VoicePack = VoicePack(
+        filesDir = tempDir(),
+        packVoiceId = { "voix-test" },
+        bundledClip = { null },
+    )
+
     private fun voice(
         clips: VoicePack?,
         attempts: MutableList<String>,
         spoken: MutableList<String>,
-        safetyDriver: SafetyTestDriver = SafetyTestDriver(),
+        canPlay: () -> Boolean = { true },
+        systemBusy: () -> Boolean = { false },
+        userSpeaking: () -> Boolean = { false },
     ) = ProximityVoice(
         player = SpeechPlayer(File(tempDir(), "play")),
         settings = { Settings.Default.copy(ttsApiKey = "cle-test", ttsVoiceId = "voix-test") },
-        safety = testSafetyVoice(safetyDriver),
         onSpeaking = { spoken += it },
+        canPlay = canPlay,
         synthesize = { _, _, text ->
             attempts += text
             Result.success("$text-audio".toByteArray())
         },
         clips = clips,
+        systemBusy = systemBusy,
+        userSpeaking = userSpeaking,
     )
 
     @Test
     fun `clip present, aucune synthese`() = runTest {
         val attempts = mutableListOf<String>()
         val spoken = mutableListOf<String>()
-        val pack = VoicePack(
-            filesDir = tempDir(),
-            packVoiceId = { "voix-test" },
-            bundledClip = { "faux-mp3".toByteArray() },
-        )
 
-        voice(pack, attempts, spoken).speakWord("guide_left", "Gauche.", SpeechLanguage.Fr, playerIdle = true)
+        val dit = voice(packAvecClip(), attempts, spoken)
+            .speakWord("guide_left", "Gauche.", SpeechLanguage.Fr)
 
+        assertTrue(dit)
         assertTrue(attempts.isEmpty())
         assertEquals("Gauche.", spoken.first())
     }
 
     @Test
-    fun `clip absent, synthese mise en cache`() = runTest {
+    fun `clip absent niveau GPS, synthese mise en cache`() = runTest {
         val attempts = mutableListOf<String>()
         val spoken = mutableListOf<String>()
-        val pack = VoicePack(
-            filesDir = tempDir(),
-            packVoiceId = { "voix-test" },
-            bundledClip = { null },
-        )
-        val voice = voice(pack, attempts, spoken)
+        val voice = voice(packVide(), attempts, spoken)
 
-        voice.speakWord("guide_left", "Gauche.", SpeechLanguage.Fr, playerIdle = true)
+        assertTrue(voice.speakWord("guide_left", "Gauche.", SpeechLanguage.Fr, level = OutdoorLevel.GPS_EVENT))
         assertEquals(listOf("Gauche."), attempts)
 
         voice.reset()
-        voice.speakWord("guide_left", "Gauche.", SpeechLanguage.Fr, playerIdle = true)
+        assertTrue(voice.speakWord("guide_left", "Gauche.", SpeechLanguage.Fr, level = OutdoorLevel.GPS_EVENT))
         assertEquals(listOf("Gauche."), attempts)
+    }
+
+    @Test
+    fun `clip absent hors GPS, silence sans synthese`() = runTest {
+        val attempts = mutableListOf<String>()
+        val spoken = mutableListOf<String>()
+
+        val dit = voice(packVide(), attempts, spoken)
+            .speakWord("guide_left", "Gauche.", SpeechLanguage.Fr, level = OutdoorLevel.HUMAN)
+
+        assertFalse(dit)
+        assertTrue(attempts.isEmpty())
+        assertTrue(spoken.isEmpty())
     }
 
     @Test
     fun `meme mot doux deux fois, parle deux fois`() = runTest {
         val attempts = mutableListOf<String>()
         val spoken = mutableListOf<String>()
-        val pack = VoicePack(
-            filesDir = tempDir(),
-            packVoiceId = { "voix-test" },
-            bundledClip = { "faux-mp3".toByteArray() },
-        )
-        val voice = voice(pack, attempts, spoken)
+        val voice = voice(packAvecClip(), attempts, spoken)
 
-        voice.speakWord("guide_left", "Gauche.", SpeechLanguage.Fr, playerIdle = true)
-        voice.speakWord("guide_left", "Gauche.", SpeechLanguage.Fr, playerIdle = true)
+        voice.speakWord("guide_left", "Gauche.", SpeechLanguage.Fr)
+        voice.speakWord("guide_left", "Gauche.", SpeechLanguage.Fr)
 
         assertEquals(2, spoken.count { it == "Gauche." })
     }
 
     @Test
-    fun `meme stop deux fois, securite une fois`() = runTest {
+    fun `meme stop deux fois, dit une fois`() = runTest {
         val attempts = mutableListOf<String>()
         val spoken = mutableListOf<String>()
-        val safetyDriver = SafetyTestDriver()
-        val pack = VoicePack(
-            filesDir = tempDir(),
-            packVoiceId = { "voix-test" },
-            bundledClip = { "faux-mp3".toByteArray() },
-        )
-        val voice = voice(pack, attempts, spoken, safetyDriver)
+        val voice = voice(packAvecClip(), attempts, spoken)
 
-        voice.speakWord("guide_stop", "Stop.", SpeechLanguage.Fr, playerIdle = true, urgent = true)
-        voice.speakWord("guide_stop", "Stop.", SpeechLanguage.Fr, playerIdle = true, urgent = true)
+        assertTrue(voice.speakWord("guide_stop", "Stop.", SpeechLanguage.Fr))
+        assertFalse(voice.speakWord("guide_stop", "Stop.", SpeechLanguage.Fr))
 
-        assertEquals(listOf("Stop."), safetyDriver.calls.map { it.text })
+        assertEquals(1, spoken.count { it == "Stop." })
+        assertTrue(attempts.isEmpty())
+    }
+
+    @Test
+    fun `porte fermee, jete sans synthese`() = runTest {
+        val attempts = mutableListOf<String>()
+        val spoken = mutableListOf<String>()
+
+        val dit = voice(packAvecClip(), attempts, spoken, canPlay = { false })
+            .speakWord("guide_left", "Gauche.", SpeechLanguage.Fr)
+
+        assertFalse(dit)
         assertTrue(attempts.isEmpty())
         assertTrue(spoken.isEmpty())
     }
 
     @Test
-    fun `mot doux avale puis reemis, parle`() = runTest {
+    fun `niveau 0 passe la porte fermee`() = runTest {
         val attempts = mutableListOf<String>()
         val spoken = mutableListOf<String>()
-        val pack = VoicePack(
-            filesDir = tempDir(),
-            packVoiceId = { "voix-test" },
-            bundledClip = { "faux-mp3".toByteArray() },
-        )
-        val voice = voice(pack, attempts, spoken)
 
-        // Avalé par la route (voie occupée) : rien dit, rien mémorisé.
-        voice.speakWord("guide_left", "Gauche.", SpeechLanguage.Fr, playerIdle = false, urgent = false)
-        assertTrue(spoken.isEmpty())
+        val dit = voice(packAvecClip(), attempts, spoken, canPlay = { false })
+            .speakWord("car", "Voiture.", SpeechLanguage.Fr, level = OutdoorLevel.CAR_MOVING)
 
-        // Réémis au silence : parlé (pas d'empoisonnement de la dédup).
-        voice.speakWord("guide_left", "Gauche.", SpeechLanguage.Fr, playerIdle = true, urgent = false)
-
-        assertEquals("Gauche.", spoken.first())
+        assertTrue(dit)
+        assertEquals("Voiture.", spoken.first())
     }
 
     @Test
-    fun `mot doux en file rejoue au silence`() = runTest {
+    fun `user qui parle, mot jete et lecture coupee`() = runTest {
         val attempts = mutableListOf<String>()
         val spoken = mutableListOf<String>()
-        val pack = VoicePack(
-            filesDir = tempDir(),
-            packVoiceId = { "voix-test" },
-            bundledClip = { "faux-mp3".toByteArray() },
-        )
-        val voice = voice(pack, attempts, spoken)
+        val voice = voice(packAvecClip(), attempts, spoken, userSpeaking = { true })
 
-        voice.speakWord("guide_left", "Gauche.", SpeechLanguage.Fr, playerIdle = false, urgent = false, queue = true)
-        assertTrue(spoken.isEmpty())
+        assertFalse(voice.speakWord("guide_left", "Gauche.", SpeechLanguage.Fr))
+        assertFalse(voice.speakWord("guide_left", "Gauche.", SpeechLanguage.Fr))
 
-        voice.flushPending(playerIdle = true)
-
-        assertEquals("Gauche.", spoken.first())
+        assertTrue(attempts.isEmpty())
+        assertTrue(spoken.all { it.isEmpty() })
     }
 
     @Test
-    fun `mot doux avale par le chat se redit ensuite`() = runTest {
+    fun `systeme occupe, mot jete`() = runTest {
         val attempts = mutableListOf<String>()
         val spoken = mutableListOf<String>()
-        val pack = VoicePack(
-            filesDir = tempDir(),
-            packVoiceId = { "voix-test" },
-            bundledClip = { "faux-mp3".toByteArray() },
-        )
-        val voice = voice(pack, attempts, spoken)
 
-        voice.speakWord("guide_left", "Gauche.", SpeechLanguage.Fr, playerIdle = false, urgent = false)
+        val dit = voice(packAvecClip(), attempts, spoken, systemBusy = { true })
+            .speakWord("guide_left", "Gauche.", SpeechLanguage.Fr)
+
+        assertFalse(dit)
+        assertTrue(attempts.isEmpty())
         assertTrue(spoken.isEmpty())
-
-        voice.speakWord("guide_left", "Gauche.", SpeechLanguage.Fr, playerIdle = true, urgent = false)
-
-        assertEquals("Gauche.", spoken.first())
     }
 }

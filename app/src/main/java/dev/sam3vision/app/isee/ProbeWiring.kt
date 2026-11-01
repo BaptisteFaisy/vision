@@ -313,26 +313,20 @@ internal fun probeGuideFrameOf(
 }
 
 /**
- * Phrase à dire pour la frame (`null` = silence) : voix rouge/vert en
- * Traversée — sauf ordre d'évitement du guidage ([steeringOf], § 25),
- * sinon guidage (cap route, sinon cap manuel) puis positions. Compteur de
- * marches actif : seul l'évitement parle (virage, stop), le reste se tait
- * devant le compte (1 s). Extraite de `LiveProbe.publish` (plafond 50
- * lignes/fonction). Le suivi alimente **chaque** frame, Traversée comprise ; le
- * guidage reçoit les étiquettes identifiées ([ProbeGuideFrame.labels]) et le rail
- * trottoir de la frame ([ProbeGuideFrame.rail]), la Traversée sa liste brute.
+ * Phrase à dire pour la frame (`null` = silence, SPEC v4) : silence en
+ * Traversée (le verdict parle au bus), sinon guidage (cap route, sinon cap
+ * manuel) puis positions. Compteur de marches actif : seul l'évitement
+ * parle (virage, stop), le reste se tait devant le compte. Le suivi
+ * alimente **chaque** frame ; le guidage reçoit les étiquettes identifiées
+ * ([ProbeGuideFrame.labels]) et le rail trottoir de la frame.
  */
 internal fun LiveProbe.phraseOf(
-    cross: CrossingPatch?,
     placed: List<PlacedLabel>,
     readings: List<DistanceReading>,
-    detections: List<Detection>,
     frame: LiveFrame,
     at: Long,
     language: SpeechLanguage,
     hfovDeg: Float,
-    scanTrigger: Boolean = false,
-    motion: FrameMotion? = null,
 ): String? {
     val guide = probeGuideFrameOf(ProbeTracks.tracker, at, state.value.timings, placed, hfovDeg)
     // Traversée : silence — le verdict parle au bus (niveau 100, nourri dans

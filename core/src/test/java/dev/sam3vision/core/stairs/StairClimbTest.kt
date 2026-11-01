@@ -9,7 +9,8 @@ import org.junit.Test
 /**
  * Mode montée du guetteur : compte à rebours lissé au cooldown court, puis
  * dernière marche (compteur ou profondeur). Le brut d'une frame ne décide
- * jamais seul — seule la tendance 2-3 frames parle.
+ * jamais seul — seule la tendance 2-3 frames parle. Les frames sont denses
+ * (miroir du direct) : la séance expire après 2 s sans annonce (SPEC v4).
  */
 class StairClimbTest {
 
@@ -33,34 +34,43 @@ class StairClimbTest {
         val watcher = StairWatcher()
         announce(watcher)
 
-        // 5, 5, 4 : la médiane descend (6, 5, 5) mais le cooldown court tait encore.
-        assertNull(watcher.onSignal(positive(5), 300L))
-        assertNull(watcher.onSignal(positive(5), 400L))
-        assertNull(watcher.onSignal(positive(4), 500L))
+        // La médiane descend (6, 5, 5) mais le cooldown tait encore.
+        assertNull(watcher.onSignal(positive(5), 500L))
+        assertNull(watcher.onSignal(positive(5), 800L))
+        assertNull(watcher.onSignal(positive(4), 1100L))
+        assertNull(watcher.onSignal(positive(4), 1400L))
+        assertNull(watcher.onSignal(positive(4), 1700L))
+        assertNull(watcher.onSignal(positive(4), 2000L))
 
-        // +2,6 s : la tendance à 4 parle, avec le compte lissé (pas le brut).
-        val cue = watcher.onSignal(positive(4), 2800L)
+        // +2,1 s : la tendance à 4 parle, avec le compte lissé (pas le brut).
+        val cue = watcher.onSignal(positive(4), 2300L)
         assertNotNull(cue)
         assertEquals("4 steps left.", cue!!.phrase)
         assertEquals(4, cue.lineCount)
     }
 
     @Test
-    fun `cooldown court en montee, long hors montee`() {
+    fun `cooldown court en montee, standard re-annonce apres seance`() {
         val climb = StairWatcher()
         announce(climb)
-        climb.onSignal(positive(5), 300L)
-        climb.onSignal(positive(5), 400L)
-        climb.onSignal(positive(4), 500L)
-        // +2,6 s après l'annonce : le compte à rebours a le droit de parler.
-        assertNotNull(climb.onSignal(positive(4), 2800L))
+        climb.onSignal(positive(5), 500L)
+        climb.onSignal(positive(5), 800L)
+        climb.onSignal(positive(4), 1100L)
+        climb.onSignal(positive(4), 1400L)
+        climb.onSignal(positive(4), 1700L)
+        climb.onSignal(positive(4), 2000L)
+        // +2,1 s après l'annonce : le compte à rebours a le droit de parler.
+        assertNotNull(climb.onSignal(positive(4), 2300L))
 
+        // Compte stable, séance expirée (+2 s sans annonce) : l'annonce
+        // standard se redit (miroir AntiRepeat 2 s).
         val steady = StairWatcher()
         announce(steady)
-        steady.onSignal(positive(6), 2700L)
-        steady.onSignal(positive(6), 2800L)
-        // +2,7 s, compte stable : l'annonce standard reste tue (10 s).
-        assertNull(steady.onSignal(positive(6), 2900L))
+        assertNull(steady.onSignal(positive(6), 500L))
+        assertNull(steady.onSignal(positive(6), 800L))
+        val cue = steady.onSignal(positive(6), 2600L)
+        assertNotNull(cue)
+        assertEquals("Stairs ahead.", cue!!.phrase)
     }
 
     @Test
@@ -68,9 +78,10 @@ class StairClimbTest {
         val watcher = StairWatcher()
         announce(watcher)
 
-        assertNull(watcher.onSignal(positive(6), 3000L))
-        assertNull(watcher.onSignal(positive(1), 3100L))
-        assertNull(watcher.onSignal(positive(6), 3200L))
+        assertNull(watcher.onSignal(positive(6), 500L))
+        assertNull(watcher.onSignal(positive(1), 800L))
+        assertNull(watcher.onSignal(positive(6), 1100L))
+        assertNull(watcher.onSignal(positive(6), 1400L))
         assertEquals(6, watcher.smoothedLineCount)
     }
 
@@ -79,11 +90,22 @@ class StairClimbTest {
         val watcher = StairWatcher()
         announce(watcher)
 
-        assertNull(watcher.onSignal(positive(2), 3000L))
-        val countdown = watcher.onSignal(positive(1), 3100L)
+        assertNull(watcher.onSignal(positive(2), 500L))
+        assertNull(watcher.onSignal(positive(2), 800L))
+        assertNull(watcher.onSignal(positive(2), 1100L))
+        assertNull(watcher.onSignal(positive(2), 1400L))
+        assertNull(watcher.onSignal(positive(2), 1700L))
+        assertNull(watcher.onSignal(positive(2), 2000L))
+        val countdown = watcher.onSignal(positive(2), 2300L)
         assertEquals("2 steps left.", countdown!!.phrase)
 
-        val last = watcher.onSignal(positive(1), 5700L)
+        assertNull(watcher.onSignal(positive(1), 2600L))
+        assertNull(watcher.onSignal(positive(1), 2900L))
+        assertNull(watcher.onSignal(positive(1), 3200L))
+        assertNull(watcher.onSignal(positive(1), 3500L))
+        assertNull(watcher.onSignal(positive(1), 3800L))
+        assertNull(watcher.onSignal(positive(1), 4100L))
+        val last = watcher.onSignal(positive(1), 4400L)
         assertNotNull(last)
         assertEquals("Last step.", last!!.phrase)
         assertEquals(1, last.lineCount)
@@ -102,16 +124,20 @@ class StairClimbTest {
             watcher.onSignal(near, 200L, SpeechLanguage.Fr, StairDirection.Up, null, 0.8f)!!.phrase,
         )
 
-        // Profondeur confirmée après l'annonce : la fin peut se dire.
-        assertNull(watcher.onSignal(near, 2700L, SpeechLanguage.Fr, StairDirection.Up, null, 0.8f))
-        assertNull(watcher.onSignal(near, 2800L, SpeechLanguage.Fr, StairDirection.Up, null, 0.8f))
-        val cue = watcher.onSignal(near, 2900L, SpeechLanguage.Fr, StairDirection.Up, null, 0.8f)
+        // Profondeur confirmée après l'annonce : la fin peut se dire au cooldown.
+        assertNull(watcher.onSignal(near, 500L, SpeechLanguage.Fr, StairDirection.Up, null, 0.8f))
+        assertNull(watcher.onSignal(near, 800L, SpeechLanguage.Fr, StairDirection.Up, null, 0.8f))
+        assertNull(watcher.onSignal(near, 1100L, SpeechLanguage.Fr, StairDirection.Up, null, 0.8f))
+        assertNull(watcher.onSignal(near, 1400L, SpeechLanguage.Fr, StairDirection.Up, null, 0.8f))
+        assertNull(watcher.onSignal(near, 1700L, SpeechLanguage.Fr, StairDirection.Up, null, 0.8f))
+        assertNull(watcher.onSignal(near, 2000L, SpeechLanguage.Fr, StairDirection.Up, null, 0.8f))
+        val cue = watcher.onSignal(near, 2300L, SpeechLanguage.Fr, StairDirection.Up, null, 0.8f)
         assertNotNull(cue)
         assertEquals("Dernière marche.", cue!!.phrase)
         assertEquals(0.8f, cue.meters!!, 0f)
 
         // La même frame ne boucle pas : dite une fois par approche.
-        assertNull(watcher.onSignal(near, 300L, SpeechLanguage.Fr, StairDirection.Up, null, 0.8f))
+        assertNull(watcher.onSignal(near, 2600L, SpeechLanguage.Fr, StairDirection.Up, null, 0.8f))
     }
 
     @Test
@@ -124,9 +150,13 @@ class StairClimbTest {
             "Escalier descendant.",
             down.onSignal(near, 200L, SpeechLanguage.Fr, StairDirection.Down, null, 0.7f)!!.phrase,
         )
-        down.onSignal(near, 2700L, SpeechLanguage.Fr, StairDirection.Down, null, 0.7f)
-        down.onSignal(near, 2800L, SpeechLanguage.Fr, StairDirection.Down, null, 0.7f)
-        val landed = down.onSignal(near, 2900L, SpeechLanguage.Fr, StairDirection.Down, null, 0.7f)
+        down.onSignal(near, 500L, SpeechLanguage.Fr, StairDirection.Down, null, 0.7f)
+        down.onSignal(near, 800L, SpeechLanguage.Fr, StairDirection.Down, null, 0.7f)
+        down.onSignal(near, 1100L, SpeechLanguage.Fr, StairDirection.Down, null, 0.7f)
+        down.onSignal(near, 1400L, SpeechLanguage.Fr, StairDirection.Down, null, 0.7f)
+        down.onSignal(near, 1700L, SpeechLanguage.Fr, StairDirection.Down, null, 0.7f)
+        down.onSignal(near, 2000L, SpeechLanguage.Fr, StairDirection.Down, null, 0.7f)
+        val landed = down.onSignal(near, 2300L, SpeechLanguage.Fr, StairDirection.Down, null, 0.7f)
         assertEquals("Dernière marche, palier.", landed!!.phrase)
 
         assertEquals("Dernière marche.", StairText.lastStep(SpeechLanguage.Fr, StairDirection.Up))
@@ -159,12 +189,22 @@ class StairClimbTest {
         announce(watcher)
 
         // Sous minLines (4) : négatifs, mais comptés — la tendance continue.
-        assertNull(watcher.onSignal(negative(3), 3000L))
-        val countdown = watcher.onSignal(negative(2), 3100L)
+        assertNull(watcher.onSignal(negative(3), 500L))
+        assertNull(watcher.onSignal(negative(3), 800L))
+        assertNull(watcher.onSignal(negative(3), 1100L))
+        assertNull(watcher.onSignal(negative(3), 1400L))
+        assertNull(watcher.onSignal(negative(3), 1700L))
+        assertNull(watcher.onSignal(negative(3), 2000L))
+        val countdown = watcher.onSignal(negative(3), 2300L)
         assertEquals("3 steps left.", countdown!!.phrase)
-        assertNull(watcher.onSignal(negative(1), 3200L))
 
-        val last = watcher.onSignal(negative(1), 5800L)
+        assertNull(watcher.onSignal(negative(1), 2600L))
+        assertNull(watcher.onSignal(negative(1), 2900L))
+        assertNull(watcher.onSignal(negative(1), 3200L))
+        assertNull(watcher.onSignal(negative(1), 3500L))
+        assertNull(watcher.onSignal(negative(1), 3800L))
+        assertNull(watcher.onSignal(negative(1), 4100L))
+        val last = watcher.onSignal(negative(1), 4400L)
         assertEquals("Last step.", last!!.phrase)
     }
 

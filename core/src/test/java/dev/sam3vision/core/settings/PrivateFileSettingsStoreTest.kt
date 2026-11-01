@@ -8,6 +8,7 @@ import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
 import org.junit.Assert.assertNotEquals
 import org.junit.Assert.assertTrue
+import org.junit.Assume.assumeTrue
 import org.junit.Test
 
 /**
@@ -51,6 +52,7 @@ class PrivateFileSettingsStoreTest {
 
     @Test
     fun `le fichier est lisible et inscriptible par le seul proprietaire`() = runBlocking {
+        assumePosix()
         store().save(saisi)
 
         assertEquals(OWNER_ONLY, permissions(fichier))
@@ -58,6 +60,7 @@ class PrivateFileSettingsStoreTest {
 
     @Test
     fun `les permissions tiennent sur une reecriture`() = runBlocking {
+        assumePosix()
         store().save(saisi)
         fichier.setReadable(true, false) // quelqu'un (ou un outil) a élargi le mode
         store().save(saisi.copy(llmApiKey = "autre-cle"))
@@ -134,6 +137,7 @@ class PrivateFileSettingsStoreTest {
         store().save(saisi)
         fichier.setReadable(false, false)
         fichier.setWritable(false, false)
+        assumeTrue("chmod illisible effectif exigé", !fichier.canRead())
 
         try {
             assertEquals(Settings.Default, store().load())
@@ -172,6 +176,7 @@ class PrivateFileSettingsStoreTest {
 
     @Test
     fun `apres migration l enregistrement moderne est complet`() = runBlocking {
+        assumePosix()
         val herite = "llmApiKey=cle-de-l-epoque\n"
         fichier.writeBytes(chiffre.encrypt(herite.toByteArray(Charsets.UTF_8)))
 
@@ -185,6 +190,7 @@ class PrivateFileSettingsStoreTest {
 
     @Test
     fun `l ecriture cree les dossiers manquants`() = runBlocking {
+        assumePosix()
         val profond = File(dossier, "a/b/c/settings.enc")
 
         PrivateFileSettingsStore(profond, chiffre).save(saisi)
@@ -194,6 +200,14 @@ class PrivateFileSettingsStoreTest {
     }
 
     private val OWNER_ONLY = setOf(PosixFilePermission.OWNER_READ, PosixFilePermission.OWNER_WRITE)
+
+    /** Les permissions POSIX n'existent pas sous Windows : ces tests s'y ignorent. */
+    private fun assumePosix() {
+        assumeTrue(
+            "permissions POSIX exigées",
+            runCatching { Files.getPosixFilePermissions(dossier.toPath()) }.isSuccess,
+        )
+    }
 
     private fun permissions(target: File): Set<PosixFilePermission> =
         Files.getPosixFilePermissions(target.toPath())

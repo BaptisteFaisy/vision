@@ -36,9 +36,9 @@ class FenceOpeningSignalTest {
     }
 
     @Test
-    fun `ferme a quatre metres, silence au-dela`() {
-        assertTrue(FenceOpeningSignal.of(listOf(panel("grillage", 4f)), 512, 1138).detected)
-        assertFalse(FenceOpeningSignal.of(listOf(panel("grillage", 4.1f)), 512, 1138).detected)
+    fun `ferme a six metres, silence au-dela`() {
+        assertTrue(FenceOpeningSignal.of(listOf(panel("grillage", 6f)), 512, 1138).detected)
+        assertFalse(FenceOpeningSignal.of(listOf(panel("grillage", 6.1f)), 512, 1138).detected)
     }
 
     @Test
@@ -57,16 +57,13 @@ class FenceOpeningSignalTest {
     }
 
     @Test
-    fun `portails des deux cotes = portail ouvert devant`() {
+    fun `portails sortis, ignores des deux cotes`() {
         val left = reading("gate", 2f, listOf(5f, 400f, 60f, 900f))
         val right = reading("portail", 2.5f, listOf(450f, 400f, 505f, 900f))
 
         val signal = FenceOpeningSignal.of(listOf(left, right), 512, 1138)
 
-        assertTrue(signal.detected)
-        assertEquals(FenceOpeningState.Open, signal.state)
-        assertTrue(signal.isGate)
-        assertTrue(signal.middle)
+        assertFalse(signal.detected)
     }
 
     @Test

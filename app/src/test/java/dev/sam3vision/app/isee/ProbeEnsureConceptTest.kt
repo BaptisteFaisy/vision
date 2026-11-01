@@ -42,22 +42,18 @@ class ProbeEnsureConceptTest {
     }
 
     @Test
-    fun `defauts exterieur au plafond, find the x remplace le dernier`() = runTest {
-        // Liste unique normal/Traversée (30/10). Depuis « vire … » puis
-        // « rajoute bus », « bicycle moto » (ordres user du 01/11) le défaut
-        // fait 20 concepts :
-        // « Find the X »
-        // dehors **ajoute** sans évincer (plafond 22), puis reconfigure —
-        // sans ça iSee dit « Looking for … » puis reste muet.
+    fun `defauts exterieur, find the x ajoute sous le plafond`() = runTest {
+        // Spec v4 : le défaut fait 16 concepts — « Find the X » dehors
+        // **ajoute** sans évincer (plafond 22), puis reconfigure.
         val (probe, fake) = probeHarness(this)
         val closed = fake.closed
         probe.ensureConcept(Settings.Default, "wallet")
         advanceUntilIdle()
         assertTrue(fake.closed > closed)
         val sent = probe.state.value.conceptsSent
-        assertEquals(22, sent.size)
+        assertEquals(17, sent.size)
         assertTrue(sent.contains("wallet"))
-        assertTrue(sent.contains("dog"))
+        assertTrue(sent.contains("souvenir shop"))
     }
 
     @Test
@@ -65,9 +61,8 @@ class ProbeEnsureConceptTest {
         val (probe, fake) = probeHarness(this)
         val closed = fake.closed
         probe.ensureConcept(Settings.Default, "Person")
-        // « keys » est dans les défauts (ordre user du 01/11) : déjà suivi,
-        // pas de reconfiguration.
-        probe.ensureConcept(Settings.Default, "keys")
+        // « wall » est dans les défauts : déjà suivi, pas de reconfiguration.
+        probe.ensureConcept(Settings.Default, "wall")
         advanceUntilIdle()
         assertEquals(closed, fake.closed)
         assertEquals(LivePrompts.normalize(LivePrompts.default), probe.state.value.conceptsSent)

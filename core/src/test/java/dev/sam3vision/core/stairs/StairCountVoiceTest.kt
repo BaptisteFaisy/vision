@@ -19,14 +19,14 @@ class StairCountVoiceTest {
     }
 
     @Test
-    fun `meme compte se repete apres 1 s, pas avant`() {
+    fun `meme compte se repete apres 2 s, pas avant`() {
         val voice = StairCountVoice()
         assertEquals("5 marches.", voice.onTick(true, 5, 1_000L))
         assertNull(voice.onTick(true, 5, 1_100L))
-        assertNull(voice.onTick(true, 5, 1_999L))
-        assertEquals("5 marches.", voice.onTick(true, 5, 2_000L))
-        assertNull(voice.onTick(true, 5, 2_100L))
+        assertNull(voice.onTick(true, 5, 2_999L))
         assertEquals("5 marches.", voice.onTick(true, 5, 3_000L))
+        assertNull(voice.onTick(true, 5, 3_100L))
+        assertEquals("5 marches.", voice.onTick(true, 5, 5_000L))
     }
 
     @Test

@@ -1,122 +1,92 @@
 package dev.sam3vision.app.isee
 
-import dev.sam3vision.app.SpeechPlayer
-import dev.sam3vision.core.model.LiveFrame
-import dev.sam3vision.core.model.MASK_ENCODING_NONE
-import dev.sam3vision.core.model.SegObject
-import dev.sam3vision.core.settings.Settings
-import dev.sam3vision.core.speech.SpeechLanguage
-import java.io.File
-import java.nio.file.Files
+import dev.sam3vision.core.live.AntiRepeat
 import kotlinx.coroutines.CompletableDeferred
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.cancel
+import kotlinx.coroutines.flow.flowOf
 import kotlinx.coroutines.test.StandardTestDispatcher
-import kotlinx.coroutines.test.TestScope
-import kotlinx.coroutines.test.advanceTimeBy
 import kotlinx.coroutines.test.advanceUntilIdle
 import kotlinx.coroutines.test.runTest
+import org.junit.After
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertNull
 import org.junit.Assert.assertTrue
+import org.junit.Before
 import org.junit.Test
 
 /**
- * La voix de la sonde : un mot ré-émis par les frames suivantes n'annule
- * pas sa synthèse (seul un mot plus frais le fait), et le mot doux reste
- * muet quand le chat lit (seul « Stop. » coupe).
+ * La voix de la sonde (SPEC v4) : le stop part au bus niveau 4, les mots
+ * du guidage au repli 12 ; les émissions gardent l'arbitrage (répétition
+ * douce identique en vol gardée, phrase fraîche dernier-gagnant, urgence
+ * jamais annulée par une douce).
  */
 class ProbeWiringSpokenTest {
 
-    private var ns = 0L
+    /** Porte-parole faux : dits enregistrés (niveau, texte, clip). */
+    private class FakeBusSpeaker : VoiceBusSpeaker {
+        data class Said(val level: Int, val text: String, val clipId: String?)
 
-    private fun frame(objects: List<SegObject> = emptyList(), elapsedMs: Long = 120L) =
-        LiveFrame(width = 512, height = 1138, elapsedMs = elapsedMs, objects = objects)
-
-    /** Personne mesurée au centre : « gauche. » (voix TwinLite) */
-    private fun personne() = SegObject(
-        label = "person",
-        score = 0.9f,
-        box = listOf(206f, 400f, 306f, 900f),
-        maskPngB64 = "",
-        maskEncoding = MASK_ENCODING_NONE,
-    )
-
-    /** Personne décalée à gauche du couloir : « droite. » (voix TwinLite) */
-    private fun obstacleAGauche() = SegObject(
-        label = "person",
-        score = 0.9f,
-        box = listOf(180f, 400f, 230f, 900f),
-        maskPngB64 = "",
-        maskEncoding = MASK_ENCODING_NONE,
-    )
-
-    /** Personne au contact, boîte coupée : non mesurée → « gauche. » (voix TwinLite) */
-    private fun contact() = SegObject(
-        label = "person",
-        score = 0.9f,
-        box = listOf(156f, 0f, 356f, 1138f),
-        maskPngB64 = "",
-        maskEncoding = MASK_ENCODING_NONE,
-    )
-
-    @Test
-    fun `meme phrase reemise, une seule synthese`() = runTest {
-        val attempts = mutableListOf<String>()
-        val completions = mutableListOf<String>()
-        val gate = CompletableDeferred<Result<ByteArray>>()
-        val voice = ProximityVoice(
-            player = SpeechPlayer(File(tempDir(), "play")),
-            settings = { Settings.Default.copy(ttsApiKey = "cle-test") },
-            safety = testSafetyVoice(),
-            synthesize = { _, _, text ->
-                attempts += text
-                gate.await()
-                completions += text
-                Result.success(ByteArray(0))
-            },
-        )
-        val (probe, fake) = harness(this)
-        avecVoix(probe, voice, { true }) {
-            respond(personne(), fake, probe, "A", "B", "C")
-            gate.complete(Result.success(ByteArray(0)))
-            advanceUntilIdle()
+        val said = mutableListOf<Said>()
+        override fun idle(): Boolean = true
+        override fun say(level: Int, text: String, clipId: String?, clips: List<String>) {
+            said += Said(level, text, clipId)
         }
 
-        assertEquals(listOf(WARM_SPOKEN, "left."), attempts)
-        assertEquals(listOf("left."), completions)
+        override fun cut() = Unit
+    }
+
+    private val speaker = FakeBusSpeaker()
+
+    @Before
+    fun brancher() {
+        AntiRepeat.reset()
+        VoiceBus.reset()
+        VoiceBus.speaker = speaker
+    }
+
+    @After
+    fun debrancher() {
+        VoiceBus.speaker = null
+        VoiceBus.reset()
+        AntiRepeat.reset()
+    }
+
+
+    @Test
+    fun `stop poste niveau 4 avec clip`() = runTest {
+        val scope = CoroutineScope(SupervisorJob() + StandardTestDispatcher(testScheduler))
+        try {
+            val probe = LiveProbe(scope = this, clock = { 0L }, background = StandardTestDispatcher(testScheduler))
+            probe.observeSpoken(scope)
+            probe._state.value = LiveProbeState(spoken = "Stop.", spokenUrgent = true, spokenSeq = 1)
+            advanceUntilIdle()
+        } finally {
+            scope.cancel()
+        }
+
+        assertEquals(1, speaker.said.size)
+        assertEquals(OutdoorLevel.FENCE, speaker.said.single().level)
+        assertEquals("Stop.", speaker.said.single().text)
+        assertEquals(spokenClipId("Stop."), speaker.said.single().clipId)
     }
 
     @Test
-    fun `phrase fraiche, dernier gagnant garde`() = runTest {
-        val attempts = mutableListOf<String>()
-        val completions = mutableListOf<String>()
-        val gate = CompletableDeferred<Result<ByteArray>>()
-        val voice = ProximityVoice(
-            player = SpeechPlayer(File(tempDir(), "play")),
-            settings = { Settings.Default.copy(ttsApiKey = "cle-test") },
-            safety = testSafetyVoice(),
-            synthesize = { _, _, text ->
-                attempts += text
-                gate.await()
-                completions += text
-                Result.success(ByteArray(0))
-            },
-        )
-        val (probe, fake) = harness(this)
-        avecVoix(probe, voice, { true }) {
-            respond(personne(), fake, probe, "A")
-            respond(obstacleAGauche(), fake, probe, "B", "C")
-            gate.complete(Result.success(ByteArray(0)))
+    fun `mot doux va au repli 12 sur silence`() = runTest {
+        val scope = CoroutineScope(SupervisorJob() + StandardTestDispatcher(testScheduler))
+        try {
+            val probe = LiveProbe(scope = this, clock = { 0L }, background = StandardTestDispatcher(testScheduler))
+            probe.observeSpoken(scope)
+            probe._state.value = LiveProbeState(spoken = "Gauche.", spokenUrgent = false, spokenSeq = 1)
             advanceUntilIdle()
+        } finally {
+            scope.cancel()
         }
 
-        assertEquals(
-            listOf(WARM_SPOKEN, "left.", "right."),
-            attempts,
-        )
-        assertEquals(listOf("right."), completions)
+        assertEquals(1, speaker.said.size)
+        assertEquals(OutdoorLevel.FALLBACK, speaker.said.single().level)
+        assertEquals("Gauche.", speaker.said.single().text)
     }
 
     @Test
@@ -128,139 +98,44 @@ class ProbeWiringSpokenTest {
     }
 
     @Test
-    fun `mot doux muet quand le chat lit`() = runTest {
-        val spoken = mutableListOf<String>()
-        val voice = ProximityVoice(
-            player = SpeechPlayer(File(tempDir(), "play")),
-            settings = { Settings.Default.copy(ttsApiKey = "cle-test") },
-            safety = testSafetyVoice(),
-            onSpeaking = { if (it.isNotEmpty()) spoken += it },
-            synthesize = { _, _, text -> Result.success("$text-audio".toByteArray()) },
-        )
-        val (probe, fake) = harness(this)
-        avecVoix(probe, voice, { false }) {
-            respond(contact(), fake, probe, "A", "B")
-            advanceUntilIdle()
+    fun `repetition douce identique en vol gardee`() = runTest {
+        val said = mutableListOf<String>()
+        val gate = CompletableDeferred<Unit>()
+        val job = observeSpokenEmissions(
+            flowOf(
+                SpokenEmission("left.", urgent = false, seq = 1),
+                SpokenEmission("left.", urgent = false, seq = 2),
+            ),
+        ) { text, _ ->
+            gate.await()
+            said += text
         }
 
-        assertTrue(spoken.isEmpty())
-    }
+        gate.complete(Unit)
+        advanceUntilIdle()
+        job.cancel()
 
-    @Test
-    fun `phrase douce tuee puis rattrapee au silence`() = runTest {
-        val attempts = mutableListOf<String>()
-        val spoken = mutableListOf<String>()
-        val voice = ProximityVoice(
-            player = SpeechPlayer(File(tempDir(), "play")),
-            settings = { Settings.Default.copy(ttsApiKey = "cle-test") },
-            safety = testSafetyVoice(),
-            onSpeaking = { if (it.isNotEmpty()) spoken += it },
-            synthesize = { _, _, text ->
-                attempts += text
-                Result.success("$text-audio".toByteArray())
-            },
-        )
-        val (probe, fake) = harness(this)
-        avecVoix(probe, voice, { false }) {
-            respond(personne(), fake, probe, "A", "B")
-            advanceUntilIdle()
-        }
-        assertTrue(spoken.isEmpty())
-        assertTrue(attempts.isEmpty())
-
-        // Silence revenu : la file rejoue la phrase tuée, une seule fois.
-        voice.flushPending(playerIdle = true)
-
-        assertEquals(1, spoken.size)
-        assertEquals(attempts, spoken)
-    }
-
-    /** Sonde guidée branchée sur le faux client partagé, prête à recevoir des frames. */
-    private fun harness(scope: TestScope): Pair<LiveProbe, ProbeTestClient> {
-        val fake = ProbeTestClient(mutableListOf())
-        val probe = LiveProbe(
-            scope = scope,
-            clock = { ns },
-            background = StandardTestDispatcher(scope.testScheduler),
-            clientFor = { _, _, marks -> fake.also { it.marks = marks } },
-        )
-        probe.configure(PROBE_TEST_ENDPOINT, guide = true)
-        probe.begin()
-        // Scheduler coupé : ce test verrouille la voix, pas les keyframes (voir LiveAdaptiveTest).
-        probe.adaptive.configure(uploadEnabled = false, keyframesEnabled = false)
-        return probe to fake
-    }
-
-    /**
-     * Câble la voix sur un scope au même ordonnanceur (temps virtuel partagé),
-     * annulé en fin de test : le collecteur infini ne doit ni fuir ni pendre.
-     */
-    private fun TestScope.avecVoix(
-        probe: LiveProbe,
-        voice: ProximityVoice,
-        playerIdle: () -> Boolean,
-        corps: TestScope.() -> Unit,
-    ) {
-        val scope = CoroutineScope(SupervisorJob() + StandardTestDispatcher(testScheduler))
-        try {
-            probe.observeSpoken(scope, voice, playerIdle) { SpeechLanguage.Fr }
-            corps()
-        } finally {
-            scope.cancel()
-        }
-    }
-
-    /**
-     * Livre [obj] sous chaque identifiant : une frame répondue par tour, sans
-     * laisser le virtuel finir la synthèse en cours (c'est la course
-     * frames lentes / synthèse lente qui faisait taire la voix).
-     */
-    private fun TestScope.respond(obj: SegObject, fake: ProbeTestClient, probe: LiveProbe, vararg ids: String) {
-        ids.forEachIndexed { index, id ->
-            probe.onFrame(id, captureAtNs = 8_000_000L + index * 6_000_000L)
-            advanceTimeBy(1_000L)
-            fake.respond(id, frame(listOf(obj)))
-            advanceTimeBy(1_000L)
-        }
+        assertEquals(listOf("left."), said)
     }
 
     @Test
     fun `urgence non annulee par une douce plus fraiche`() = runTest {
-        val attempts = mutableListOf<String>()
-        val completions = mutableListOf<String>()
-        val gate = CompletableDeferred<Result<ByteArray>>()
-        val voice = ProximityVoice(
-            player = SpeechPlayer(File(tempDir(), "play")),
-            settings = { Settings.Default.copy(ttsApiKey = "cle-test") },
-            synthesize = { _, _, text ->
-                attempts += text
-                gate.await()
-                completions += text
-                Result.success(ByteArray(0))
-            },
-        )
-        val scope = CoroutineScope(SupervisorJob() + StandardTestDispatcher(testScheduler))
-        try {
-            val probe = LiveProbe(
-                scope = this,
-                clock = { 0L },
-                background = StandardTestDispatcher(testScheduler),
-            )
-            probe.observeSpoken(scope, voice, { true }) { SpeechLanguage.Fr }
-            probe._state.value = LiveProbeState(spoken = "Stop.", spokenUrgent = true, spokenSeq = 1)
-            advanceUntilIdle()
-            probe._state.value = LiveProbeState(spoken = "Gauche.", spokenUrgent = false, spokenSeq = 2)
-            advanceUntilIdle()
-            gate.complete(Result.success(ByteArray(0)))
-            advanceUntilIdle()
-        } finally {
-            scope.cancel()
+        val said = mutableListOf<String>()
+        val gate = CompletableDeferred<Unit>()
+        val job = observeSpokenEmissions(
+            flowOf(
+                SpokenEmission("Stop.", urgent = true, seq = 1),
+                SpokenEmission("Gauche.", urgent = false, seq = 2),
+            ),
+        ) { text, urgent ->
+            if (urgent) gate.await()
+            said += text
         }
 
-        assertEquals(listOf("Stop.", "Gauche."), attempts)
-        assertEquals(listOf("Stop.", "Gauche."), completions)
-    }
+        gate.complete(Unit)
+        advanceUntilIdle()
+        job.cancel()
 
-    private fun tempDir(): File =
-        Files.createTempDirectory("spokentest").toFile().apply { deleteOnExit() }
+        assertEquals(listOf("Stop.", "Gauche."), said)
+    }
 }

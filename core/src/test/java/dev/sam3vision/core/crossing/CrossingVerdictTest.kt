@@ -64,8 +64,8 @@ class CrossingVerdictTest {
     fun `les phrases sont anglaises avec clip stable`() {
         assertEquals("Don't cross.", CrossingVerdictText.phrase(CrossingVerdict.DontCross))
         assertEquals("Cross.", CrossingVerdictText.phrase(CrossingVerdict.Cross))
-        assertEquals("verdict-dont-cross", CrossingVerdictText.clipId(CrossingVerdict.DontCross))
-        assertEquals("verdict-cross", CrossingVerdictText.clipId(CrossingVerdict.Cross))
+        assertEquals("verdict_dont_cross", CrossingVerdictText.clipId(CrossingVerdict.DontCross))
+        assertEquals("verdict_cross", CrossingVerdictText.clipId(CrossingVerdict.Cross))
     }
 
     @Test
@@ -73,7 +73,7 @@ class CrossingVerdictTest {
         val announcer = CrossingVerdictAnnouncer()
         val cue = announcer.onFrame(0L, CrossingVerdict.Cross)
         assertEquals("Cross.", cue?.phrase)
-        assertEquals("verdict-cross", cue?.clipId)
+        assertEquals("verdict_cross", cue?.clipId)
         assertFalse(cue?.changed ?: true)
     }
 
@@ -108,7 +108,7 @@ class CrossingVerdictTest {
 
     @Test
     fun `l'ordre est verdict puis humains puis bordures`() {
-        val verdict = CrossingPost(CrossingLevels.VERDICT, "Don't cross.", "verdict-dont-cross")
+        val verdict = CrossingPost(CrossingLevels.VERDICT, "Don't cross.", "verdict_dont_cross")
         val human = CrossingPost(CrossingLevels.HUMAN, "Person at 12.", null)
         val curb = CrossingPost(CrossingLevels.CURB, "Curb ahead.", null)
         assertEquals(listOf(verdict, human, curb), CrossingPriority.order(verdict, human, curb))

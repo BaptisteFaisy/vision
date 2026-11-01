@@ -65,7 +65,7 @@ class VehicleGyroStillTest {
             )
         }
 
-        assertEquals("Car moving.", moving!!.phrase)
+        assertEquals("Car.", moving!!.phrase)
         assertNull("12 m : doux, pas de stop", moving.safetyPhrase)
         assertTrue(watcher.movingThisFrame)
         assertTrue("camera prouvee mobile par le gyro, et le mobile parle quand meme", watcher.cameraMoved)
@@ -153,7 +153,7 @@ class VehicleGyroStillTest {
                 atMs = index * 100L, announceStopped = false,
             )
         }
-        assertEquals("Car moving.", moving!!.phrase)
+        assertEquals("Car.", moving!!.phrase)
     }
 
     @Test
@@ -169,7 +169,7 @@ class VehicleGyroStillTest {
                 atMs = index * 100L, movingMeters = VehicleStateWatcher.OUTDOOR_MOVING_METERS,
             )
         }
-        assertEquals("18 m <= 20 m : parle", "Car moving.", spoke!!.phrase)
+        assertEquals("18 m <= 20 m : parle", "Car.", spoke!!.phrase)
 
         val far = VehicleStateWatcher()
         repeat(3) { index ->

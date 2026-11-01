@@ -47,7 +47,6 @@ class SettingsStoreParityTest {
         glassesFovDeg = 62.5f,
         caregiverRole = CaregiverRole.Caregiver,
         caregiverInvite = "https://suivi-parent.vercel.app/?share=marie",
-        googleMapsApiKey = "cle-google-persistee",
         maxObjects = ObjectLimits.MIN_ON_SCREEN + 1,
         samRegion = SamRegion.Us,
         speechLanguage = SpeechLanguage.En,

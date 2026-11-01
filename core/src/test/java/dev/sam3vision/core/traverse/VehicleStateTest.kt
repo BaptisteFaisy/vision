@@ -67,7 +67,7 @@ class VehicleStateTest {
             language = SpeechLanguage.Fr,
         )
 
-        assertEquals("Voiture en mouvement.", third!!.phrase)
+        assertEquals("Voiture.", third!!.phrase)
         assertEquals(5f, third.meters!!, 0.001f)
         assertTrue("tau < 3 s + proche + centre : urgent", third.urgent)
     }
@@ -84,7 +84,7 @@ class VehicleStateTest {
             language = SpeechLanguage.Fr,
         )
 
-        assertEquals("Voiture en mouvement.", third!!.phrase)
+        assertEquals("Voiture.", third!!.phrase)
         assertFalse("sans tau : doux", third.urgent)
     }
 
@@ -121,7 +121,7 @@ class VehicleStateTest {
         moving.update(listOf(det("car", box(110f))), emptyList(), atMs = 100L)
         val third = moving.update(listOf(det("car", box(120f))), emptyList(), atMs = 200L)
 
-        assertEquals("Car moving.", third!!.phrase)
+        assertEquals("Car.", third!!.phrase)
         assertNull(third.meters)
         assertFalse(third.urgent)
 
@@ -227,7 +227,7 @@ class VehicleStateTest {
             atMs = 200L,
         )
 
-        assertEquals("Car moving.", third!!.phrase)
+        assertEquals("Car.", third!!.phrase)
         assertFalse("approche à 9 h : doux", third.urgent)
     }
 
@@ -240,7 +240,7 @@ class VehicleStateTest {
         moving.update(listOf(det("car", box(130f))), listOf(reading("car", 5f, box(130f))), atMs = 1_000L)
         assertNull("mouvement : 900 ms < 4 s", moving.update(listOf(det("car", box(140f))), listOf(reading("car", 5f, box(140f))), atMs = 1_100L))
         val replay = moving.update(listOf(det("car", box(150f))), listOf(reading("car", 5f, box(150f))), atMs = 4_300L)
-        assertEquals("Car moving.", replay!!.phrase)
+        assertEquals("Car.", replay!!.phrase)
 
         val stopped = VehicleStateWatcher()
         repeat(3) { index ->
@@ -255,15 +255,14 @@ class VehicleStateTest {
     @Test
     fun `phrases FR EN`() {
         val voiture = VehicleStateText.nameOf("voiture")!!
-        val bus = VehicleStateText.nameOf("bus")!!
         assertEquals("Voiture", voiture.fr)
         assertEquals("Car", voiture.en)
         assertEquals(
-            "Voiture en mouvement.",
+            "Voiture.",
             VehicleStateText.movingPhrase(voiture, SpeechLanguage.Fr),
         )
         assertEquals(
-            "Car moving.",
+            "Car.",
             VehicleStateText.movingPhrase(voiture, SpeechLanguage.En),
         )
         assertEquals(
@@ -271,8 +270,8 @@ class VehicleStateTest {
             VehicleStateText.stoppedPhrase(voiture, 2f, null, SpeechLanguage.Fr),
         )
         assertEquals(
-            "Bus stopped, 3 meters away.",
-            VehicleStateText.stoppedPhrase(bus, 3f, null, SpeechLanguage.En),
+            "Car stopped, 3 meters away.",
+            VehicleStateText.stoppedPhrase(voiture, 3f, null, SpeechLanguage.En),
         )
         assertEquals(
             "Voiture en stationnement, à 8 mètres.",
@@ -282,8 +281,9 @@ class VehicleStateTest {
             "Car parked, 8 meters away.",
             VehicleStateText.parkedPhrase(voiture, 8f, null, SpeechLanguage.En),
         )
-        assertEquals("Camion", VehicleStateText.nameOf("camion")!!.fr)
-        assertEquals("Motorcycle", VehicleStateText.nameOf("moto")!!.en)
+        assertNull("bus hors liste dehors", VehicleStateText.nameOf("bus"))
+        assertNull("camion hors liste dehors", VehicleStateText.nameOf("camion"))
+        assertNull("moto hors liste dehors", VehicleStateText.nameOf("moto"))
     }
 
     @Test
@@ -320,8 +320,8 @@ class VehicleStateTest {
 
         assertEquals("Stop, car moving.", moving!!.safetyPhrase)
         assertEquals(
-            "Stop, bus moving.",
-            VehicleStateText.safetyPhrase(VehicleStateText.nameOf("bus")!!, SpeechLanguage.En),
+            "Stop, car moving.",
+            VehicleStateText.safetyPhrase(VehicleStateText.nameOf("car")!!, SpeechLanguage.En),
         )
     }
 
@@ -364,7 +364,7 @@ class VehicleStateTest {
             language = SpeechLanguage.En,
         )
 
-        assertEquals("Car moving.", cue!!.phrase)
+        assertEquals("Car.", cue!!.phrase)
         assertNull(cue.safetyPhrase)
         assertFalse("loin du centre du danger : doux", cue.urgent)
     }
@@ -432,22 +432,22 @@ class VehicleStateTest {
         var cue: VehicleStateCue? = null
         listOf(100f, 110f, 120f).forEachIndexed { index, width ->
             cue = watcher.update(
-                listOf(det("car", box(width)), det("bus", box(width, cx = 420f))),
-                listOf(reading("car", 5f, box(width)), reading("bus", 6f, box(width, cx = 420f))),
+                listOf(det("car", box(width)), det("car", box(width, cx = 460f))),
+                listOf(reading("car", 5f, box(width)), reading("car", 6f, box(width, cx = 460f))),
                 atMs = index * 100L,
                 language = SpeechLanguage.En,
             )
         }
 
-        assertEquals("2 vehicles moving.", cue!!.phrase)
+        assertEquals("Cars.", cue!!.phrase)
         assertEquals("Stop, 2 vehicles moving.", cue.safetyPhrase)
         assertEquals(2, cue.movingCount)
         assertEquals(
-            "2 véhicules en mouvement.",
+            "Voitures.",
             VehicleStateText.movingPluralPhrase(2, SpeechLanguage.Fr),
         )
         assertEquals(
-            "2 vehicles moving.",
+            "Cars.",
             VehicleStateText.movingPluralPhrase(2, SpeechLanguage.En),
         )
         assertEquals(

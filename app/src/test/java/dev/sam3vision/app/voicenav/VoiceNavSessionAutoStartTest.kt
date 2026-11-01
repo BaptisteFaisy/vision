@@ -169,16 +169,18 @@ class VoiceNavSessionAutoStartTest {
     }
 
     @Test
-    fun `auto-start guidage eteint ouvre la fiche lieu`() = runBlocking {
+    // SPEC v4 : guidage interne seul, lanceur ignoré — guidage éteint =
+    // repos + annonce d'indisponibilité, jamais de fiche externe.
+    fun `auto-start guidage eteint annonce sans ecran`() = runBlocking {
         val launcher = AutoStartLauncher()
         val session = session(launcher, guidance = false, autoStart = true)
 
         assertTrue(session.onVoiceTranscript("va à la tour Eiffel"))
 
         assertEquals(VoiceNavUiState.Idle, session.state.value)
-        assertEquals(listOf("la tour Eiffel"), launcher.opened)
+        assertTrue(launcher.opened.isEmpty())
         assertTrue(launcher.launched.isEmpty())
-        assertEquals(listOf("Here is the page for la tour Eiffel"), spoken)
+        assertEquals(listOf(NavigationPhrases.GUIDANCE_UNAVAILABLE), spoken)
     }
 
     @Test

@@ -118,8 +118,8 @@ class ProbeStairsPriorityTest {
         assertTrue(StairCannyCount.lineCount() > 0)
 
         val phrase = probe.phraseOf(
-            null, listOf(personne(0.3f, 2.0f)), listOf(stairsReading()),
-            emptyList(), stairsFrame(), 0L, SpeechLanguage.Fr, LensSpec.DEFAULT_H_FOV_DEG,
+            listOf(personne(0.3f, 2.0f)), listOf(stairsReading()),
+            stairsFrame(), 0L, SpeechLanguage.Fr, LensSpec.DEFAULT_H_FOV_DEG,
         )
 
         assertNull(phrase)
@@ -130,8 +130,8 @@ class ProbeStairsPriorityTest {
         val probe = probe(this, announce = true)
 
         val phrase = probe.phraseOf(
-            null, listOf(personne(0.3f, 2.0f)), listOf(stairsReading()),
-            emptyList(), stairsFrame(), 0L, SpeechLanguage.Fr, LensSpec.DEFAULT_H_FOV_DEG,
+            listOf(personne(0.3f, 2.0f)), listOf(stairsReading()),
+            stairsFrame(), 0L, SpeechLanguage.Fr, LensSpec.DEFAULT_H_FOV_DEG,
         )
 
         assertNotNull(phrase)
@@ -146,7 +146,7 @@ class ProbeStairsPriorityTest {
         val frame = stairsFrame()
 
         val fov = LensSpec.DEFAULT_H_FOV_DEG
-        assertNull(probe.phraseOf(null, emptyList(), readings, emptyList(), frame, 0L, SpeechLanguage.Fr, fov))
+        assertNull(probe.phraseOf(emptyList(), readings, frame, 0L, SpeechLanguage.Fr, fov))
 
         // Depuis le P0 foule (01/11), l'évitement parle dès l'approche confirmée
         // (TTC), pas seulement sous 1,5 m : le mot peut sortir sur la 1re frame
@@ -154,7 +154,7 @@ class ProbeStairsPriorityTest {
         // un mot d'évitement sort bel et bien malgré le compteur de marches.
         val phrases = listOf(3.0f, 2.6f, 2.2f).mapIndexed { index, meters ->
             probe.phraseOf(
-                null, listOf(personne(0.78f, meters)), readings, emptyList(), frame,
+                listOf(personne(0.78f, meters)), readings, frame,
                 5_000L + index * 250L, SpeechLanguage.Fr, fov,
             )
         }

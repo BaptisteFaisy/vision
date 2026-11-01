@@ -1,7 +1,7 @@
 package dev.sam3vision.app.isee
 
-import dev.sam3vision.app.SpeechPlayer
 import dev.sam3vision.app.depth.DepthMeter
+import dev.sam3vision.core.live.AntiRepeat
 import dev.sam3vision.core.distance.DistanceReading
 import dev.sam3vision.core.local.LumaPlane
 import dev.sam3vision.core.model.LiveFrame
@@ -9,11 +9,8 @@ import dev.sam3vision.core.model.MASK_ENCODING_NONE
 import dev.sam3vision.core.model.MASK_ENCODING_RLE
 import dev.sam3vision.core.model.SegObject
 import java.util.Base64
-import dev.sam3vision.core.settings.Settings
 import dev.sam3vision.core.speech.SpeechLanguage
 import dev.sam3vision.core.stairs.StairWatcher
-import java.io.File
-import java.nio.file.Files
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.SupervisorJob
@@ -40,10 +37,18 @@ import org.junit.Test
 class ProbeWiringStairsCountTest {
 
     @Before
-    fun setUp() = StairCannyCount.clear()
+    fun setUp() {
+        StairCannyCount.clear()
+        AntiRepeat.reset()
+        VoiceBus.reset()
+    }
 
     @After
-    fun tearDown() = StairCannyCount.clear()
+    fun tearDown() {
+        VoiceBus.reset()
+        AntiRepeat.reset()
+        StairCannyCount.clear()
+    }
 
     /** Profondeur factice : « stairs going up » à 3 mètres, boîte nette. */
     private class StairsDepth : DepthMeter {
@@ -201,13 +206,8 @@ class ProbeWiringStairsCountTest {
         probe.begin()
         // Scheduler coupé : ce test verrouille le guetteur, pas les keyframes (voir LiveAdaptiveTest).
         probe.adaptive.configure(uploadEnabled = false, keyframesEnabled = false)
-        val voice = ProximityVoice(
-            player = SpeechPlayer(File(tempDir(), "play")),
-            settings = { Settings.Default },
-            safety = testSafetyVoice(),
-        )
         val watchers = CoroutineScope(SupervisorJob() + StandardTestDispatcher(scope.testScheduler))
-        val watcher = probe.observeStairs(watchers, voice, { true }) { SpeechLanguage.Fr }
+        val watcher = probe.observeStairs(watchers, { SpeechLanguage.Fr })
         return Wiring(probe, fake, watcher, watchers)
     }
 
@@ -221,6 +221,5 @@ class ProbeWiringStairsCountTest {
         }
     }
 
-    private fun tempDir(): File =
-        Files.createTempDirectory("stairscounttest").toFile().apply { deleteOnExit() }
+
 }

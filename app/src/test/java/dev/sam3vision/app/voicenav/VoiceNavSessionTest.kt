@@ -163,18 +163,18 @@ class VoiceNavSessionTest {
     }
 
     @Test
-    fun `guidage eteint ouvre la fiche lieu et revient au repos`() = runBlocking {
+    fun `guidage eteint annonce indisponible et revient au repos, sans app externe`() = runBlocking {
         val launcher = FakeLauncher()
         val session = session(launcher, guidance = false)
         session.onVoiceTranscript("va à la tour Eiffel")
 
         session.confirmDestination()
 
-        assertEquals(listOf("la tour Eiffel"), launcher.opened)
+        assertTrue(launcher.opened.isEmpty())
         assertTrue(launcher.launched.isEmpty())
         assertEquals(VoiceNavUiState.Idle, session.state.value)
         assertEquals(
-            listOf(questionTour, "Here is the page for la tour Eiffel"),
+            listOf(questionTour, NavigationPhrases.GUIDANCE_UNAVAILABLE),
             spoken,
         )
     }

@@ -10,15 +10,13 @@ import org.junit.Test
 class LivePromptsTest {
 
     @Test
-    fun `vingt et un concepts exterieur par defaut, plafond client a vingt deux`() {
-        assertEquals(21, LivePrompts.default.size)
+    fun `seize concepts exterieur par defaut, plafond client a vingt deux`() {
+        assertEquals(16, LivePrompts.default.size)
         assertEquals(
             listOf(
-                "person", "car", "bus", "bicycle", "motorcycle",
-                "pedestrian traffic light", "pedestrian signal head",
-                "curb", "sidewalk", "crosswalk", "pole", "stairs", "keys", "gate",
-                "souvenir shop", "beanie", "socks", "wall", "stroller", "child",
-                "dog",
+                "person", "car", "pedestrian traffic light", "curb", "sidewalk",
+                "crosswalk", "pole", "stairs", "fence", "wall", "barrier", "sign",
+                "street lamp", "animal", "trash can", "souvenir shop",
             ),
             LivePrompts.default,
         )
@@ -28,48 +26,40 @@ class LivePromptsTest {
     }
 
     @Test
-    fun `murs clotures et portails suivis en exterieur, barrier et keys hors defaut`() {
-        // Ordre user du 31/10 : « fence » avait son slot, « barrier » est sorti
-        // (reconnu encore par le preset extérieur), « wall » est entré en 18e.
-        // Ordre user du 01/11 : les souvenirs et les clés **restent**, mais
-        // « fence » quitte le défaut (« vire … fence ») : il vit dans le
-        // preset extérieur, avec la marche urbaine.
-        assertTrue("keys" in LivePrompts.default)
-        assertFalse("barrier" in LivePrompts.default)
-        assertFalse("fence" in LivePrompts.default)
+    fun `murs clotures barrieres suivis en exterieur, portail et cles hors defaut`() {
+        // Spec v4 : grillages, murs et barrières au même rang dehors ;
+        // portail et clés sortis (clés = dedans).
+        assertFalse("keys" in LivePrompts.default)
+        assertTrue("barrier" in LivePrompts.default)
+        assertTrue("fence" in LivePrompts.default)
         assertTrue("fence" in LivePrompts.outdoor)
-        assertTrue("gate" in LivePrompts.default)
+        assertFalse("gate" in LivePrompts.default)
         assertTrue("wall" in LivePrompts.default)
-        // Unification traversée/normal (30/10) : porte et fenêtre cèdent
-        // leurs slots aux véhicules, au feu et à la bordure.
         assertFalse("door" in LivePrompts.default)
         assertFalse("window" in LivePrompts.default)
     }
 
     @Test
-    fun `foule et souvenirs ensemble dans le defaut, plafond a vingt deux`() {
-        // Ordres user du 01/11, dans l'ordre : « remets souvenir shop, beanie,
-        // socks, keys », « rajoute poussette/enfant/trottinette/chien »,
-        // « vire electric scooter, bus, bicycle, sidewalk, fence », puis
-        // « rajoute bus » et « bicycle moto je veux ».
-        // Résultat : 20 concepts suivis (les souvenirs, la foule, le bus, le
-        // vélo et la moto), plafond toujours à 22 (client et serveur).
-        assertTrue("stroller" in LivePrompts.default)
-        assertTrue("child" in LivePrompts.default)
-        assertTrue("dog" in LivePrompts.default)
+    fun `foule et vehicules sortis du defaut, souvenirs restes`() {
+        // Spec v4 : la foule (poussette, enfant, chien), les véhicules hors
+        // voiture et la trottinette sortent de la détection dehors ; la
+        // boutique de souvenirs reste.
+        assertFalse("stroller" in LivePrompts.default)
+        assertFalse("child" in LivePrompts.default)
+        assertFalse("dog" in LivePrompts.default)
         assertFalse("electric scooter" in LivePrompts.default)
-        assertTrue("bus" in LivePrompts.default)
-        assertTrue("bicycle" in LivePrompts.default)
-        assertTrue("motorcycle" in LivePrompts.default)
+        assertFalse("bus" in LivePrompts.default)
+        assertFalse("bicycle" in LivePrompts.default)
+        assertFalse("motorcycle" in LivePrompts.default)
         assertTrue("sidewalk" in LivePrompts.default)
-        assertFalse("fence" in LivePrompts.default)
+        assertTrue("fence" in LivePrompts.default)
         assertTrue("souvenir shop" in LivePrompts.default)
-        assertTrue("beanie" in LivePrompts.default)
-        assertTrue("socks" in LivePrompts.default)
-        assertTrue("keys" in LivePrompts.default)
-        assertTrue("stroller" in LivePrompts.outdoor)
-        assertTrue("child" in LivePrompts.outdoor)
-        assertTrue("electric scooter" in LivePrompts.outdoor)
+        assertFalse("beanie" in LivePrompts.default)
+        assertFalse("socks" in LivePrompts.default)
+        assertFalse("keys" in LivePrompts.default)
+        assertFalse("stroller" in LivePrompts.outdoor)
+        assertFalse("child" in LivePrompts.outdoor)
+        assertFalse("electric scooter" in LivePrompts.outdoor)
         assertFalse("truck" in LivePrompts.default)
         assertFalse("scooter" in LivePrompts.default)
     }
@@ -98,55 +88,45 @@ class LivePromptsTest {
     }
 
     @Test
-    fun `preset exterieur quinze concepts de cheminement sous le plafond`() {
-        assertEquals(
-            listOf(
-                "person", "pole", "street lamp", "bollard", "fence", "barrier", "gate",
-                "sign", "tree", "trash can", "sidewalk", "crosswalk", "animal",
-                "pedestrian traffic light", "pedestrian signal head",
-                "stroller", "child", "electric scooter",
-            ),
-            LivePrompts.outdoor,
-        )
+    fun `preset exterieur replie sur le defaut seize concepts`() {
+        assertEquals(LivePrompts.default, LivePrompts.outdoor)
+        assertEquals(16, LivePrompts.outdoor.size)
         assertTrue(LivePrompts.outdoor.size <= LivePrompts.MAX)
         assertEquals(LivePrompts.outdoor, LivePrompts.normalize(LivePrompts.outdoor))
     }
 
     @Test
-    fun `trottoir remplace la benne la moins utile dans le preset exterieur`() {
+    fun `trottoir dans le defaut, benne nulle part`() {
         assertTrue("sidewalk" in LivePrompts.outdoor)
         assertFalse("dumpster" in LivePrompts.outdoor)
-        assertTrue("pedestrian signal head" in LivePrompts.outdoor)
-        // 15 de cheminement + poussette, enfant, trottinette (ordre user du
-        // 01/11 : la foule se suit dans le preset extérieur, pas dans le défaut).
-        assertEquals(18, LivePrompts.outdoor.size)
+        assertFalse("dumpster" in LivePrompts.default)
+        assertFalse("benne" in LivePrompts.default)
+        assertEquals(16, LivePrompts.outdoor.size)
     }
 
     @Test
-    fun `dix objets d interieur dedans, cles et poussette incluses, dix huit dangers dehors`() {
+    fun `dix objets dedans spec v4`() {
         assertEquals(
             listOf(
-                "person", "stroller", "door", "chair", "table", "stairs", "wall",
-                "window", "crosswalk", "keys",
+                "keys", "medicine box", "glasses", "glasses case", "phone",
+                "shoes", "door", "wall", "person", "socks",
             ),
             LivePrompts.indoor,
         )
         assertEquals(10, LivePrompts.indoor.size)
-        assertTrue("stroller" in LivePrompts.indoor)
+        assertFalse("stroller" in LivePrompts.indoor)
         assertTrue("keys" in LivePrompts.indoor)
         assertEquals(LivePrompts.default, LivePrompts.forMode(true))
         assertEquals(LivePrompts.indoor, LivePrompts.forMode(false))
     }
 
     @Test
-    fun `le mode exterieur iSee suit les defauts avec murs clotures et portails`() {
+    fun `le mode exterieur iSee suit les defauts seize concepts`() {
         val exterior = LivePrompts.forMode(true)
-        assertEquals(21, exterior.size)
+        assertEquals(16, exterior.size)
         assertTrue("wall" in exterior)
-        assertTrue("gate" in exterior)
-        // Ordres user du 01/11 : « vire fence » puis « go sidewalk » — le
-        // trottoir est revenu (rail du maintien), la clôture non.
-        assertFalse("fence" in exterior)
+        assertFalse("gate" in exterior)
+        assertTrue("fence" in exterior)
         assertTrue("sidewalk" in exterior)
     }
 
@@ -226,19 +206,19 @@ class LivePromptsTest {
     @Test
     fun `find the x rejoint la liste sous le plafond`() {
         assertEquals(
-            LivePrompts.indoor + "phone",
-            LivePrompts.withConcept(LivePrompts.indoor, "phone"),
+            LivePrompts.indoor + "wallet",
+            LivePrompts.withConcept(LivePrompts.indoor, "wallet"),
         )
     }
 
     @Test
     fun `find the x sous le plafond s ajoute sans rien chasser`() {
-        // La liste par défaut est à 21, le plafond à 22 : « Find the X » ajoute
-        // (« wallet ») sans évincer personne — l'éviction ne commence qu'à 22.
+        // La liste par défaut est à 16, le plafond à 22 : « Find the X »
+        // ajoute (« wallet ») sans évincer personne.
         val next = LivePrompts.withConcept(LivePrompts.default, "wallet")
-        assertEquals(22, next.size)
+        assertEquals(17, next.size)
         assertTrue("wallet" in next)
-        assertTrue("dog" in next)
+        assertTrue("souvenir shop" in next)
         assertEquals(LivePrompts.default + "wallet", next)
     }
 
@@ -259,6 +239,6 @@ class LivePromptsTest {
     @Test
     fun `suivis explicites dedans hors liste du monde`() {
         assertEquals(emptyList<String>(), LivePrompts.followedOf(LivePrompts.indoor, false))
-        assertEquals(listOf("phone"), LivePrompts.followedOf(LivePrompts.withConcept(LivePrompts.indoor, "phone"), false))
+        assertEquals(listOf("wallet"), LivePrompts.followedOf(LivePrompts.withConcept(LivePrompts.indoor, "wallet"), false))
     }
 }

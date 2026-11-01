@@ -1,16 +1,14 @@
 package dev.sam3vision.app.isee
 
-import dev.sam3vision.app.SpeechPlayer
 import dev.sam3vision.app.depth.DepthMeter
 import dev.sam3vision.core.distance.DistanceReading
+import dev.sam3vision.core.live.AntiRepeat
 import dev.sam3vision.core.local.LumaPlane
 import dev.sam3vision.core.model.LiveFrame
 import dev.sam3vision.core.model.MASK_ENCODING_NONE
 import dev.sam3vision.core.model.SegObject
 import dev.sam3vision.core.settings.Settings
 import dev.sam3vision.core.speech.SpeechLanguage
-import java.io.File
-import java.nio.file.Files
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.SupervisorJob
@@ -27,10 +25,10 @@ import org.junit.Before
 import org.junit.Test
 
 /**
- * Voix du compteur de marches : quand SAM nomme l'escalier et que la caméra
- * voit des marches fraîches, le battement 300 ms dit le compte (« N
- * marches. »), une fois par compte puis répété toutes les 1 s — en
- * prioritaire (coupe le doux, chat compris) ; sans escalier nommé, sans
+ * Voix du compteur de marches (SPEC v4, niveau 6) : quand SAM nomme
+ * l'escalier et que la caméra voit des marches fraîches, le battement
+ * 300 ms poste le compte (« N marches. »), une fois par compte puis répété
+ * toutes les 2 s — devant le chat (6 < 9) ; sans escalier nommé, sans
  * compte frais ou en Traversée : silence.
  *
  * Jamais `advanceUntilIdle` ici : le battement est une boucle infinie, seul
@@ -39,11 +37,36 @@ import org.junit.Test
 @OptIn(ExperimentalCoroutinesApi::class)
 class ProbeStairsCountVoiceTest {
 
+    /** Porte-parole faux : dits enregistrés (niveau, texte). */
+    private class FakeBusSpeaker : VoiceBusSpeaker {
+        data class Said(val level: Int, val text: String)
+
+        val said = mutableListOf<Said>()
+        override fun idle(): Boolean = true
+        override fun say(level: Int, text: String, clipId: String?, clips: List<String>) {
+            said += Said(level, text)
+        }
+
+        override fun cut() = Unit
+    }
+
+    private val speaker = FakeBusSpeaker()
+
     @Before
-    fun setUp() = StairCannyCount.clear()
+    fun setUp() {
+        StairCannyCount.clear()
+        AntiRepeat.reset()
+        VoiceBus.reset()
+        VoiceBus.speaker = speaker
+    }
 
     @After
-    fun tearDown() = StairCannyCount.clear()
+    fun tearDown() {
+        VoiceBus.speaker = null
+        VoiceBus.reset()
+        AntiRepeat.reset()
+        StairCannyCount.clear()
+    }
 
     /** Profondeur factice : « stairs going up » à 3 mètres, boîte nette. */
     private class StairsDepth : DepthMeter {
@@ -70,9 +93,11 @@ class ProbeStairsCountVoiceTest {
         return luma
     }
 
+    private fun textes(): List<String> = speaker.said.map { it.text }
+
     @Test
-    fun `meme compte se repete toutes les 1 s`() = runTest {
-        val (probe, fake, spoken, scope) = harness(this)
+    fun `meme compte se repete toutes les 2 s`() = runTest {
+        val (probe, fake, scope) = harness(this)
         try {
             StairCannyCount.offerLuma(stairsLuma(50, 58, 66, 74, 82, 90))
             val offered = StairCannyCount.lineCount()
@@ -81,16 +106,17 @@ class ProbeStairsCountVoiceTest {
             respond(probe, fake, "A")
             assertTrue(stairsFoundOf(probe.state.value).detected)
             runCurrent()
-            assertEquals(listOf("$offered marches."), spoken)
+            assertEquals(listOf("$offered marches."), textes())
+            assertEquals(OutdoorLevel.STAIRS, speaker.said.single().level)
 
             advanceTimeBy(1_000L)
             runCurrent()
-            assertEquals(2, spoken.size)
+            assertEquals(1, speaker.said.size)
 
-            advanceTimeBy(1_000L)
+            advanceTimeBy(500L)
             runCurrent()
-            assertEquals(3, spoken.size)
-            assertTrue(spoken.all { it == "$offered marches." })
+            assertEquals(2, speaker.said.size)
+            assertTrue(textes().all { it == "$offered marches." })
         } finally {
             scope.cancel()
         }
@@ -98,7 +124,7 @@ class ProbeStairsCountVoiceTest {
 
     @Test
     fun `sans escalier nomme silence`() = runTest {
-        val (probe, fake, spoken, scope) = harness(this)
+        val (_, _, scope) = harness(this)
         try {
             StairCannyCount.offerLuma(stairsLuma(50, 58, 66, 74, 82, 90))
             assertTrue(StairCannyCount.lineCount() > 0)
@@ -106,7 +132,7 @@ class ProbeStairsCountVoiceTest {
             advanceTimeBy(1_000L)
             runCurrent()
 
-            assertTrue(spoken.isEmpty())
+            assertTrue(speaker.said.isEmpty())
         } finally {
             scope.cancel()
         }
@@ -114,7 +140,7 @@ class ProbeStairsCountVoiceTest {
 
     @Test
     fun `sans compte frais silence`() = runTest {
-        val (probe, fake, spoken, scope) = harness(this)
+        val (probe, fake, scope) = harness(this)
         try {
             respond(probe, fake, "A")
             assertTrue(stairsFoundOf(probe.state.value).detected)
@@ -122,16 +148,17 @@ class ProbeStairsCountVoiceTest {
             advanceTimeBy(1_000L)
             runCurrent()
 
-            assertTrue(spoken.isEmpty())
+            assertTrue(speaker.said.isEmpty())
         } finally {
             scope.cancel()
         }
     }
 
     @Test
-    fun `compteur prioritaire chat en lecture`() = runTest {
-        val (probe, fake, spoken, scope) = harness(this, stairsAudible = { false })
+    fun `compteur poste devant le chat en lecture`() = runTest {
+        val (probe, fake, scope) = harness(this)
         try {
+            VoiceBus.chatSpeaking(true)
             StairCannyCount.offerLuma(stairsLuma(50, 58, 66, 74, 82, 90))
             val offered = StairCannyCount.lineCount()
             assertTrue(offered > 0)
@@ -140,7 +167,7 @@ class ProbeStairsCountVoiceTest {
             assertTrue(stairsFoundOf(probe.state.value).detected)
             runCurrent()
 
-            assertEquals(listOf("$offered marches."), spoken)
+            assertEquals(listOf("$offered marches."), textes())
         } finally {
             scope.cancel()
         }
@@ -148,7 +175,7 @@ class ProbeStairsCountVoiceTest {
 
     @Test
     fun `traversee coupe le compteur`() = runTest {
-        val (probe, fake, spoken, scope) = harness(this)
+        val (probe, fake, scope) = harness(this)
         try {
             respond(probe, fake, "A")
             probe.setCrossingActive(Settings.Default, true)
@@ -158,7 +185,7 @@ class ProbeStairsCountVoiceTest {
             advanceTimeBy(1_000L)
             runCurrent()
 
-            assertTrue(spoken.isEmpty())
+            assertTrue(speaker.said.isEmpty())
         } finally {
             scope.cancel()
         }
@@ -167,12 +194,11 @@ class ProbeStairsCountVoiceTest {
     private data class Wiring(
         val probe: LiveProbe,
         val fake: ProbeTestClient,
-        val spoken: MutableList<String>,
         val scope: CoroutineScope,
     )
 
-    /** Sonde sur faux client + voix capturée, compteur câblé (lui seul). */
-    private fun harness(scope: TestScope, stairsAudible: () -> Boolean = { true }): Wiring {
+    /** Sonde sur faux client, compteur câblé (lui seul) vers le bus. */
+    private fun harness(scope: TestScope): Wiring {
         val fake = ProbeTestClient(mutableListOf())
         val probe = LiveProbe(
             scope = scope,
@@ -185,21 +211,10 @@ class ProbeStairsCountVoiceTest {
         probe.begin()
         // Scheduler coupé : ce test verrouille le compteur, pas les keyframes (voir LiveAdaptiveTest).
         probe.adaptive.configure(uploadEnabled = false, keyframesEnabled = false)
-        val spoken = mutableListOf<String>()
-        // Horloges virtuelles partagées : le compteur et la déduplication voix
-        // suivent le temps du test, pas l'horloge réelle.
         val clock = { scope.testScheduler.currentTime }
-        val voice = ProximityVoice(
-            player = SpeechPlayer(File(tempDir(), "play")),
-            settings = { Settings.Default.copy(ttsApiKey = "cle-test") },
-            safety = testSafetyVoice(),
-            onSpeaking = { if (it.isNotEmpty()) spoken += it },
-            synthesize = { _, _, text -> Result.success("$text-audio".toByteArray()) },
-            nowMs = clock,
-        )
         val watchers = CoroutineScope(SupervisorJob() + StandardTestDispatcher(scope.testScheduler))
-        probe.observeStairsCount(watchers, voice, stairsAudible, { SpeechLanguage.Fr }, nowMs = clock)
-        return Wiring(probe, fake, spoken, watchers)
+        probe.observeStairsCount(watchers, { SpeechLanguage.Fr }, nowMs = clock)
+        return Wiring(probe, fake, watchers)
     }
 
     /** Livre une frame d'escalier par identifiant, comme le ferait le réseau. */
@@ -211,7 +226,4 @@ class ProbeStairsCountVoiceTest {
             advanceTimeBy(1_000L)
         }
     }
-
-    private fun tempDir(): File =
-        Files.createTempDirectory("stairscountvoicetest").toFile().apply { deleteOnExit() }
 }
