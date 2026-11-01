@@ -4,6 +4,7 @@ import dev.sam3vision.core.cycle.CycleConcepts
 import dev.sam3vision.core.distance.DistanceReading
 import dev.sam3vision.core.live.PositionText
 import dev.sam3vision.core.model.Detection
+import dev.sam3vision.core.motion.GyroMotion
 import dev.sam3vision.core.predict.Box
 import dev.sam3vision.core.predict.EgoCompensator
 import dev.sam3vision.core.speech.SpeechLanguage
@@ -42,6 +43,15 @@ data class VehicleStateCue(
  * (le suivi coupe l'arrêt). En stationnement = même immobilité mesurée
  * entre [STOPPED_METERS] et [PARKED_METERS] m (même silence que l'arrêt).
  * Le reste est doute : piste jeune, seau instable, hors portée.
+ *
+ * Gyro-arret : [update] accepte la rotation camera ([GyroMotion]) en repli du
+ * fond optique — pan rapide, fond muet : une boite qui suit le gyro prouve
+ * l'arret compense, une boite qui s'en ecarte roule. Le gyro ne decote jamais
+ * la croissance (rotation pure, pas d'avance/zoom) : un mobile ne passe jamais
+ * pour arrete. Dehors (spec v4, niveau 0 = mouvement seul), le cablage passe
+ * `announceStopped = false` et `movingMeters = OUTDOOR_MOVING_METERS` (20 m) :
+ * l'arret et le stationnement se taisent mais restent suivis ; en Traversee,
+ * le defaut (`announceStopped = true`) garde l'arret utilisable.
  *
  * Les cycles (vélo, trottinette) sont exclus ici : `CycleWatcher` les
  * annonce (« Attention, vélo en mouvement… »), sans double annonce. Le
@@ -130,6 +140,9 @@ class VehicleStateWatcher(
      * [motion] (`null` = pas de signal fond) fait juger chaque piste par le
      * fond : une piste qui suit la caméra ne conclut plus le mouvement.
      * [movingMeters] borne la portée du mouvement (sans-feu : infini — toute voiture qui bouge se dit).
+     * [gyro] (`null` = verdicts visuels seuls, inchangés) : rotation caméra datée,
+     * repli quand le fond optique est muet. [announceStopped] faux = dehors
+     * (mouvement seul, l'arrêt reste suivi mais tu) ; vrai = traversée.
      */
     @Synchronized
     fun update(
@@ -139,13 +152,15 @@ class VehicleStateWatcher(
         language: SpeechLanguage = SpeechLanguage.DEFAULT,
         motion: FrameMotion? = null, depthByBox: Map<List<Float>, Float>? = null, // PISTE2 : proximités par boîte — null = repli géométrie.
         movingMeters: Float = MOVING_METERS,
+        gyro: GyroMotion? = null,
+        announceStopped: Boolean = true,
     ): VehicleStateCue? {
-        val tau = if (atMs >= 0L) approach.update(detections, atMs, motion, depthByBox) // PISTE2
+        val tau = if (atMs >= 0L) approach.update(detections, atMs, motion, depthByBox, gyro = gyro) // PISTE2 + gyro-arret
         else ApproachVerdict(false, null, null)
         val current = currentByKey(detections, depthByBox)
         val meters = metersByKey(readings)
         val hushed = if (atMs >= 0L) approach.cameraMovedKeys else emptySet()
-        val pick = pick(current, meters, tau, atMs, hushed, approach.fondFranc, movingMeters, motion)
+        val pick = pick(gyro, announceStopped, current, meters, tau, atMs, hushed, approach.fondFranc, movingMeters, motion)
         previous = current.mapValues { (key, seen) ->
             Prev(seen.area, seen.cx, seen.cy, PositionText.sceneBucket(meters[key]), atMs, seen.closeness, seen.box) // PISTE2
         }
@@ -211,6 +226,8 @@ class VehicleStateWatcher(
 
     /** Le candidat de la frame : le mouvement d'abord, l'arrêt ensuite, le stationnement enfin. */
     private fun pick(
+        gyro: GyroMotion?,
+        announceStopped: Boolean,
         current: Map<String, Current>,
         meters: Map<String, Float>,
         tau: ApproachVerdict,
@@ -221,7 +238,7 @@ class VehicleStateWatcher(
         motion: FrameMotion?,
     ): Pick? {
         if (current.isEmpty()) return null
-        return movingPick(current, meters, tau, atMs, hushed, movingMeters, motion) ?: stoppedPick(current, meters, atMs, hushed, fondFranc, motion)
+        return movingPick(current, meters, tau, atMs, hushed, movingMeters, motion) ?: if (announceStopped) stoppedPick(gyro, current, meters, atMs, hushed, fondFranc, motion) else null
     }
 
     /** Véhicule en mouvement : tau, traversée du champ ou croissance, en portée (ou non mesuré). */
@@ -260,6 +277,7 @@ class VehicleStateWatcher(
 
     /** Véhicule à l'arrêt : boîte figée (dérive, taille) et seau stable, mesuré ou non, partout. */
     private fun stoppedPick(
+        gyro: GyroMotion?,
         current: Map<String, Current>,
         meters: Map<String, Float>,
         atMs: Long,
@@ -274,11 +292,11 @@ class VehicleStateWatcher(
                 val prev = previous[candidate] ?: return@filter false
                 // Fond franc : l'arrêt brut est suspect — sauf piste suiveuse
                 // (arrêt compensé prouvé, pas un faux).
-                if (fondFranc && (motion == null || backgroundVerdict(prev, seen, atMs, motion) != Verdict.CAMERA_MOVED)) return@filter false
+                if (fondFranc && (motion == null && gyro == null || backgroundVerdict(prev, seen, atMs, motion, gyro) != Verdict.CAMERA_MOVED)) return@filter false
                 val measured = meters[candidate]
                 if (measured != null && measured > PARKED_METERS) return@filter false
                 val grown = seen.area > prev.area * (1f + EgoCompensator.AREA_REL_EPS)
-                if (!still(prev, seen, atMs, motion) || grown) return@filter false
+                if (!still(prev, seen, atMs, motion, gyro) || grown) return@filter false
                 PositionText.sceneBucket(measured) == prev.bucket
             }
             .minByOrNull { meters[it] ?: Float.MAX_VALUE }
@@ -297,23 +315,26 @@ class VehicleStateWatcher(
     }
 
     /** Dérive faible : brute sans signal fond, jugée contre le défilement sinon (une piste qui suit la caméra est un arrêt compensé, pas un mouvement). */
-    private fun still(prev: Prev, seen: Current, atMs: Long, motion: FrameMotion?): Boolean {
-        if (motion == null) return isStillBox(prev.cx, prev.cy, prev.atMs, seen.cx, seen.cy, atMs)
-        val verdict = backgroundVerdict(prev, seen, atMs, motion)
+    private fun still(prev: Prev, seen: Current, atMs: Long, motion: FrameMotion?, gyro: GyroMotion?): Boolean {
+        if (motion == null && gyro == null) return isStillBox(prev.cx, prev.cy, prev.atMs, seen.cx, seen.cy, atMs)
+        val verdict = backgroundVerdict(prev, seen, atMs, motion, gyro)
         return verdict == Verdict.STATIC || verdict == Verdict.CAMERA_MOVED
     }
 
     /** Verdict fond de la dérive [prev]→[seen] ([Verdict.UNKNOWN] sans datation ni géométrie). */
-    private fun backgroundVerdict(prev: Prev, seen: Current, atMs: Long, motion: FrameMotion): Verdict {
+    private fun backgroundVerdict(prev: Prev, seen: Current, atMs: Long, motion: FrameMotion?, gyro: GyroMotion?): Verdict {
         if (atMs < 0L || prev.atMs < 0L) return Verdict.UNKNOWN
         val dtSeconds = (atMs - prev.atMs) / 1000f
         if (dtSeconds <= 0f) return Verdict.UNKNOWN
         val dx = (seen.cx ?: Float.NaN) - (prev.cx ?: Float.NaN)
         val dy = (seen.cy ?: Float.NaN) - (prev.cy ?: Float.NaN)
-        val frameScale = motion.dtMs / 1000f / dtSeconds
+        val lumaWidth = motion?.lumaWidth ?: gyro?.lumaWidth ?: return Verdict.UNKNOWN
+        val lumaHeight = motion?.lumaHeight ?: gyro?.lumaHeight ?: return Verdict.UNKNOWN
+        val dtMs = motion?.dtMs ?: gyro?.dtMs ?: return Verdict.UNKNOWN
+        val frameScale = dtMs / 1000f / dtSeconds
         return VehicleBackground.decide(
             -1, dx * frameScale, dy * frameScale,
-            motion.global, motion.lumaWidth, motion.lumaHeight, motion.dtMs, 0f,
+            motion?.global, lumaWidth, lumaHeight, dtMs, 0f, gyro?.hint,
         ).verdict
     }
 
@@ -387,6 +408,9 @@ class VehicleStateWatcher(
 
         /** Au-delà de cette distance (m), un véhicule en mouvement ne fait pas parler. */
         const val MOVING_METERS = 15f
+
+        /** Portee du mouvement dehors (spec v4, niveau 0) : le cablage sonde passe `movingMeters = OUTDOOR_MOVING_METERS`. */
+        const val OUTDOOR_MOVING_METERS = 20f
 
         /** Sous cette distance (m), le mouvement parle en alerte immédiate (« Stop, … »). */
         const val NEAR_MOVING_METERS = 8f

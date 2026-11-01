@@ -5,6 +5,7 @@ import dev.sam3vision.app.traverse.backgroundOf
 import dev.sam3vision.core.live.MotionGapStats
 import dev.sam3vision.core.traverse.BackgroundFrame
 import dev.sam3vision.core.traverse.FrameMotion
+import dev.sam3vision.core.motion.GyroMotion
 import dev.sam3vision.core.traverse.MovingVerdict
 import dev.sam3vision.core.traverse.Verdict
 import dev.sam3vision.core.motion.BlockMotionSource
@@ -28,6 +29,11 @@ internal object ProbeBackgroundMotion {
     /** Dernier mouvement global estimé (`null` = pas de paire ou estimateur muet). */
     @Volatile
     var lastMotion: FrameMotion? = null
+        private set
+
+    /** Dernier gyro daté (`null` = pas de signal) : repli des verdicts quand le fond optique est muet. */
+    @Volatile
+    var lastGyro: GyroMotion? = null
         private set
 
     /** Fenêtre glissante des écarts boîte-fond (px) : le panneau debug y lit moy/p95. */
@@ -148,10 +154,20 @@ internal object ProbeBackgroundMotion {
             pendingJpeg = null
             prev = null
             lastMotion = null
+            lastGyro = null
             lastDebug = null
             epoch += 1
         }
         gaps.reset()
+    }
+
+    /**
+     * Pose le gyro daté de la frame ([EgoMotion.hintFor] + grille luma + dt inter-frames,
+     * `null` = pas d'avis : capteur absent, delta périmé ou rotation excessive).
+     * Lu avec [lastMotion] par les veilleurs véhicules (repli gyro quand le fond est muet).
+     */
+    fun noteGyro(gyro: GyroMotion?) {
+        lastGyro = gyro
     }
 
     /** Enregistre les écarts (px) et expose les chiffres au panneau debug. */

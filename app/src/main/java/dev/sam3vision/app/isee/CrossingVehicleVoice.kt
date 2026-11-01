@@ -4,6 +4,7 @@ import dev.sam3vision.app.LiveUiState
 import dev.sam3vision.core.cycle.CycleWatcher
 import dev.sam3vision.core.distance.DistanceReading
 import dev.sam3vision.core.model.Detection
+import dev.sam3vision.core.motion.GyroMotion
 import dev.sam3vision.core.settings.Settings
 import dev.sam3vision.core.speech.SpeechLanguage
 import dev.sam3vision.core.traverse.FrameMotion
@@ -55,7 +56,8 @@ internal object CrossingVehicleWatch {
      * mouvement est détectée), sinon 15 m. [motion] (`null` = pas de
      * signal fond) fait juger chaque piste par le fond, avec feu comme
      * sans feu : une boîte qui suit la caméra (pan sur une voiture
-     * garée) ne conclut plus le mouvement.
+     * garée) ne conclut plus le mouvement. [gyro] (`null` = visuel seul) : repli
+     * rotation quand le fond est muet (pan rapide) — traverse comme sans feu.
      */
     fun update(
         detections: List<Detection>,
@@ -64,9 +66,10 @@ internal object CrossingVehicleWatch {
         language: SpeechLanguage,
         noLight: Boolean = false,
         motion: FrameMotion? = null,
+        gyro: GyroMotion? = null,
     ): String? {
         val range = if (noLight) Float.POSITIVE_INFINITY else VehicleStateWatcher.MOVING_METERS
-        val found = watcher.update(detections, readings, atMs, language, motion = motion, movingMeters = range)
+        val found = watcher.update(detections, readings, atMs, language, motion = motion, movingMeters = range, gyro = gyro)
         if (found != null) return found.safetyPhrase ?: found.phrase
         return cycles.update(detections, readings, atMs, language)?.phrase
     }
@@ -119,9 +122,11 @@ internal class LiveVehicleVoice(
         detections: List<Detection>,
         readings: List<DistanceReading>,
         nowMs: Long,
+        motion: FrameMotion? = null,
+        gyro: GyroMotion? = null,
     ) {
         if (traverseActive() || !settings().announcePositions || asking()) return
-        val cue = watcher.update(detections, readings, nowMs, settings().speechLanguage) ?: return
+        val cue = watcher.update(detections, readings, nowMs, settings().speechLanguage, motion = motion, gyro = gyro) ?: return
         state.update { it.copy(spoken = cue.phrase) }
         scope.launch { say(cue.phrase) }
     }
