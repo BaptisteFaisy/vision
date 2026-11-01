@@ -50,6 +50,16 @@ class GuidanceRayTest {
     }
 
     @Test
+    fun `le trait voit loin sur l axe (12 m)`() {
+        // À 12 m le trait fait ±0,016 autour de 0,5 — la boîte
+        // [0,49, 0,51] pile sur l'axe le coupe et bloque.
+        val decision = Guidance.decide(listOf(boxed("personne", 0.49f, 0.51f, 12f)))
+
+        assertTrue(decision.blocked)
+        assertEquals("personne", decision.obstacle!!.label)
+    }
+
+    @Test
     fun `boite inversee toleree`() {
         val decision = Guidance.decide(listOf(boxed("personne", 0.6f, 0.4f, 2f)))
 

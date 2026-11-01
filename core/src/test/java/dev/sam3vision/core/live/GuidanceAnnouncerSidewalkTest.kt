@@ -78,7 +78,8 @@ class GuidanceAnnouncerSidewalkTest {
     @Test
     fun `trottoir absent garde le cap`() {
         val announcer = GuidanceAnnouncer()
-        val loin = listOf(personne(10f))
+        // Au-delà de la portée de l'axe (15 m) : l'obstacle ne bouche pas.
+        val loin = listOf(personne(16f))
 
         assertEquals("Straight.", announcer.onFrame(0L, loin, sidewalk = SidewalkPosition.Absent))
     }
