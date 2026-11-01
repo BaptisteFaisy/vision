@@ -57,7 +57,7 @@ class StairConceptsTest {
             listOf(
                 "person", "car", "bus", "bicycle", "motorcycle",
                 "pedestrian traffic light", "pedestrian signal head",
-                "curb", "crosswalk", "pole", "stairs", "keys", "gate",
+                "curb", "sidewalk", "crosswalk", "pole", "stairs", "keys", "gate",
                 "souvenir shop", "beanie", "socks", "wall", "stroller", "child",
                 "dog",
             ),

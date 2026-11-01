@@ -55,7 +55,7 @@ class ProbeEnsureConceptTest {
         advanceUntilIdle()
         assertTrue(fake.closed > closed)
         val sent = probe.state.value.conceptsSent
-        assertEquals(21, sent.size)
+        assertEquals(22, sent.size)
         assertTrue(sent.contains("wallet"))
         assertTrue(sent.contains("dog"))
     }
