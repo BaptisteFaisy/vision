@@ -12,12 +12,18 @@ import androidx.compose.ui.graphics.ShaderBrush
 import androidx.compose.ui.graphics.drawscope.DrawScope
 import androidx.compose.ui.graphics.drawscope.clipRect
 import dev.sam3vision.core.iseedesign.IseePortrait
+import kotlin.math.cos
+import kotlin.math.sin
 
 /**
  * La boule iSee du design « Portrait » : une sphère de verre (reflet de boîte à lumière,
  * irisation de bulle de savon au bord, liseré) qui tient un liquide marbré Amber. Aucun
  * pixel : verre et liquide seulement. Le liquide passe au bleu quand le user parle, à l'ambre
  * quand iSee parle, et ondule avec la voix.
+ *
+ * Pendant le calcul d'itinéraire le verre tourne ([OrbLook.spin]) mais le liquide reste à
+ * l'horizontale (gravité), avec un ballottement ([OrbLook.slosh]) : il n'est pas scotché au
+ * verre. À l'arrêt (`spin = 0`, `slosh = 0`) le rendu est inchangé.
  *
  * API 33+ : un shader AGSL (même rendu que la maquette web). En dessous : repli en dégradés.
  */
@@ -32,6 +38,10 @@ data class OrbLook(
     val amp: Float,
     /** 0..1 : niveau du liquide dans la boule. */
     val level: Float,
+    /** Degrés horaires du verre seul (0 à l'arrêt) : le liquide ne tourne pas. */
+    val spin: Float = 0f,
+    /** 0..1 : ballottement du liquide (1 pendant le calcul d'itinéraire). */
+    val slosh: Float = 0f,
 )
 
 /** Source AGSL de l'orbe. `internal` : le test JVM de non-régression la relit (OrbShaderTest). */
@@ -43,6 +53,8 @@ uniform float uYou;
 uniform float uSee;
 uniform float uAmp;
 uniform float uLevel;
+uniform float uSpin;
+uniform float uSlosh;
 uniform half4 uIdle[5];
 uniform half4 uPalYou[5];
 uniform half4 uPalSee[5];
@@ -81,22 +93,29 @@ float sheen(float d) {
   return 0.5 - 0.5 * cos(4.0 * 3.14159 * 1.33 * d / 540.0);
 }
 float sdBox(float2 p, float2 b, float r) { float2 q = abs(p) - b + r; return length(max(q, 0.0)) + min(max(q.x, q.y), 0.0) - r; }
+float2 rot(float2 p, float a) { float c = cos(a); float s = sin(a); return float2(c * p.x - s * p.y, s * p.x + c * p.y); }
 
 half4 main(float2 fc) {
   float2 q = (fc - uC) / uR; q.y = -q.y;
   float d = length(q);
   float aa = 1.4 / uR;
   if (d > 1.0 + aa) return half4(0);
+  // Le verre tourne (g) ; le liquide garde le repère écran (q) : sa surface reste
+  // horizontale, tenue par la gravité et non par le verre. Le signe compense l'axe y
+  // vers le haut pour tourner en horaire comme `rotate()` de Compose.
+  float2 g = rot(q, -uSpin);
   float z = sqrt(max(0.0, 1.0 - min(d * d, 1.0)));
   // L'intérieur du verre se teinte de la palette, jamais d'une couleur fixe : le bord ne
   // prend donc plus ni rose, ni vert (l'ancienne irisation arc-en-ciel), ni le bleu d'avant.
   half3 accent = pal(0.45);
   half3 col = mix(mix(half3(0.96, 0.964, 0.968), accent, half(0.05)), half3(1.0), half(z * 0.4));
-  col = mix(col, accent, half((0.05 + 0.18 * (uYou + uSee) * uAmp) * smoothstep(1.0, 0.2, length(q - float2(0.0, -0.2)))));
-  // Le liquide : surface ondulée, marbre en cinq teintes, ménisque blanc.
+  col = mix(col, accent, half((0.05 + 0.18 * (uYou + uSee) * uAmp) * smoothstep(1.0, 0.2, length(g - float2(0.0, -0.2)))));
+  // Le liquide : surface ondulée (repère écran, jamais tournée : la gravité la tient
+  // horizontale), marbre en cinq teintes, ménisque blanc.
   float2 p = q / 0.93;
   float stir = 0.018 + 0.06 * uAmp * (uSee + uYou);
-  float surf = -1.0 + 2.0 * uLevel + stir * sin(p.x * 5.5 + uTime * 2.4) + 0.4 * stir * sin(p.x * 11.0 - uTime * 3.3);
+  float surf = -1.0 + 2.0 * uLevel + stir * sin(p.x * 5.5 + uTime * 2.4) + 0.4 * stir * sin(p.x * 11.0 - uTime * 3.3)
+      + uSlosh * 0.035 * sin(p.x * 4.5 - uTime * 5.0);
   float e = 1.6 / (uR * 0.93);
   float a = smoothstep(e, -e, p.y - surf) * smoothstep(1.0, 1.0 - e * 2.0, length(p));
   if (a > 0.0) {
@@ -112,31 +131,32 @@ half4 main(float2 fc) {
     col = mix(col, c, half(a));
   }
   col *= half(mix(1.0, 0.88, pow(1.0 - z, 3.0)));
-  // Le verre : une irisation très légère, et seulement sur le haut de la boule. Elle n'a que
-  // deux teintes opposées de la palette active - le bleu froid du début de palette et l'or du
-  // milieu - choisies par le bruit spatial du verre : on voit donc des reflets bleu et jaune
-  // au lieu du rose/vert de l'ancien arc-en-ciel à trois longueurs d'onde. Le bas du verre et
-  // tout le reste de la boule restent blanc laiteux, comme avant.
+  // Le verre, dans son repère tournant (g) : une irisation très légère, et seulement sur
+  // le haut de la boule. Elle n'a que deux teintes opposées de la palette active - le bleu
+  // froid du début de palette et l'or du milieu - choisies par le bruit spatial du verre :
+  // on voit donc des reflets bleu et jaune au lieu du rose/vert de l'ancien arc-en-ciel à
+  // trois longueurs d'onde. Le bas du verre et tout le reste de la boule restent blanc
+  // laiteux, comme avant.
   float fres = pow(1.0 - z, 2.6);
-  float grain = fbm(q * 1.6 + float2(0.0, uTime * 0.05) + z);
+  float grain = fbm(g * 1.6 + float2(0.0, uTime * 0.05) + z);
   // La phase d'irisation ne sert plus qu'à l'éclat : les bandes claires et sombres du verre.
-  float irid = sheen(300.0 + 620.0 * grain + 180.0 * (0.5 - 0.5 * q.y));
+  float irid = sheen(300.0 + 620.0 * grain + 180.0 * (0.5 - 0.5 * g.y));
   // La teinte, elle, oppose les deux couleurs de la palette (bleu profond à gauche, or chaud à
   // droite), avec un bord ondulé par le bruit pour que ce soit des reflets et non un dégradé.
   // Le bleu est le premier de la palette et non le cyan : trop clair, il ne se voyait pas.
-  float top = smoothstep(-0.15, 0.85, q.y);
-  half3 tint = mix(pal(0.04), pal(0.34), half(smoothstep(0.02, 0.55, q.x + 0.45 * (grain - 0.48))));
+  float top = smoothstep(-0.15, 0.85, g.y);
+  half3 tint = mix(pal(0.04), pal(0.34), half(smoothstep(0.02, 0.55, g.x + 0.45 * (grain - 0.48))));
   half3 fcol = mix(mix(accent, half3(1.0), half(0.5)), tint, half(0.85 * top));
   fcol = mix(fcol, half3(1.0), half(0.18));
   fcol *= half(0.86 + 0.18 * irid);
   col = mix(col, fcol, half((0.03 + 0.62 * fres) * 0.45)) + fcol * half(fres * 0.08);
-  float2 r = 2.0 * z * q;
+  float2 r = 2.0 * z * g;
   float box = smoothstep(0.035, -0.02, sdBox(r - float2(-0.43, 0.5), float2(0.2, 0.085), 0.07));
-  float hot = pow(max(dot(float3(q, z), normalize(float3(-0.45, 0.55, 0.7))), 0.0), 220.0);
+  float hot = pow(max(dot(float3(g, z), normalize(float3(-0.45, 0.55, 0.7))), 0.0), 220.0);
   col += half(box * 0.7 + hot);
-  float2 dq = d > 1e-4 ? q / d : float2(0.0);
+  float2 dq = d > 1e-4 ? g / d : float2(0.0);
   col += mix(accent, half3(1.0), half(0.5)) * half(smoothstep(0.72, 1.0, d) * smoothstep(-0.1, 0.8, dot(dq, normalize(float2(0.6, -0.55)))) * 0.3);
-  col += accent * half(0.12 * smoothstep(0.1, 1.0, -q.y) * smoothstep(1.0, 0.75, d));
+  col += accent * half(0.12 * smoothstep(0.1, 1.0, -g.y) * smoothstep(1.0, 0.75, d));
   float edge = smoothstep(1.0, 1.006, d) * smoothstep(1.03, 1.0, d);
   col = mix(col, col * 0.86, half(edge));
   float alpha = 1.0 - smoothstep(1.0 - aa, 1.0 + aa, d);
@@ -181,23 +201,38 @@ private fun DrawScope.drawOrbAgsl(shader: RuntimeShader, c: Offset, r: Float, lo
     shader.setFloatUniform("uSee", look.see)
     shader.setFloatUniform("uAmp", look.amp)
     shader.setFloatUniform("uLevel", look.level)
+    shader.setFloatUniform("uSpin", Math.toRadians(look.spin.toDouble()).toFloat())
+    shader.setFloatUniform("uSlosh", look.slosh)
     drawCircle(brush = ShaderBrush(shader), radius = r * 1.01f, center = c)
 }
 
-/** Repli sans AGSL : verre en dégradé radial, liquide en bas, reflet en haut à gauche. */
+/**
+ * Rotation d'un décalage écran de [degrees] (horaire comme `rotate()` de Compose, l'axe
+ * y va vers le bas) : le repli fait orbiter le verre sans toucher au liquide. Pure :
+ * testée sur JVM.
+ */
+internal fun rotateXY(x: Float, y: Float, degrees: Float): Pair<Float, Float> {
+    val a = Math.toRadians(degrees.toDouble())
+    val c = cos(a).toFloat()
+    val s = sin(a).toFloat()
+    return (x * c - y * s) to (x * s + y * c)
+}
+
+/** Repli sans AGSL : le verre orbite ([OrbLook.spin]), le liquide reste à l'horizontale. */
 private fun drawOrbFallback(scope: DrawScope, c: Offset, r: Float, look: OrbLook) = with(scope) {
     val liquid = when {
         look.you > 0.5f -> listOf(Color(IseePortrait.PAL_YOU[3]), Color(IseePortrait.YOU))
         look.see > 0.5f -> listOf(Color(IseePortrait.PAL_SEE[3]), Color(IseePortrait.SEE))
         else -> listOf(Color(IseePortrait.IDLE[2]), Color(IseePortrait.IDLE[0]))
     }
-    drawCircle(Brush.radialGradient(listOf(Color.White, Color(0xFFE9EEF6)), Offset(c.x - r * 0.3f, c.y - r * 0.35f), r * 1.4f), r, c)
-    // Le liquide : le disque intérieur, coupé sous la surface.
+    val (gx, gy) = rotateXY(-0.3f, -0.35f, look.spin)
+    drawCircle(Brush.radialGradient(listOf(Color.White, Color(0xFFE9EEF6)), Offset(c.x + r * gx, c.y + r * gy), r * 1.4f), r, c)
+    // Le liquide : le disque intérieur, coupé sous la surface (horizontale : gravité).
     val top = c.y + r - 2f * r * look.level
     clipRect(top = top) {
         drawCircle(Brush.verticalGradient(liquid, startY = top, endY = c.y + r), r * 0.93f, c)
     }
-    drawCircle(Color.White.copy(alpha = 0.85f), r * 0.14f, Offset(c.x - r * 0.42f, c.y - r * 0.48f))
+    val (hx, hy) = rotateXY(-0.42f, -0.48f, look.spin)
+    drawCircle(Color.White.copy(alpha = 0.85f), r * 0.14f, Offset(c.x + r * hx, c.y + r * hy))
     drawCircle(Color(IseePortrait.INK).copy(alpha = 0.12f), r, c, style = androidx.compose.ui.graphics.drawscope.Stroke(r * 0.012f))
 }
-

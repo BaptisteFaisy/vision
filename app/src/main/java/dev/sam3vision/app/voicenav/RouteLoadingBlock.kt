@@ -17,8 +17,6 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
-import androidx.compose.ui.graphics.drawscope.rotate
-import androidx.compose.ui.graphics.drawscope.withTransform
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
@@ -41,10 +39,12 @@ private const val ROUTE_ORB_LEVEL = 0.45f
 internal const val FINDING_ROUTE_TEXT = "Finding the best route"
 
 /**
- * Le calcul d'itinéraire : la boule de verre iSee tourne vite pendant
- * que le moteur cherche la route, la phrase dessous ([textColor], noire
- * sur l'accueil), le motif d'erreur à la place en cas d'échec. Partagé
- * par l'accueil iSee et l'écran navigation (même moment, deux thèmes).
+ * Le calcul d'itinéraire : le verre de la boule iSee tourne vite pendant que
+ * le moteur cherche la route, le liquide reste à l'horizontale (gravité) avec
+ * un ballottement — il n'est pas scotché au verre. La phrase dessous
+ * ([textColor], noire sur l'accueil), le motif d'erreur à la place en cas
+ * d'échec. Partagé par l'accueil iSee et l'écran navigation (même moment,
+ * deux thèmes).
  */
 @Composable
 fun RouteLoadingBlock(
@@ -60,9 +60,7 @@ fun RouteLoadingBlock(
         verticalArrangement = Arrangement.Center,
     ) {
         Canvas(Modifier.size(ROUTE_ORB_SIZE)) {
-            withTransform({ rotate(spinAngle(seconds), center) }) {
-                paint(this, center, size.minDimension / 2f, OrbLook(seconds, 0f, 0f, 0f, ROUTE_ORB_LEVEL))
-            }
+            paint(this, center, size.minDimension / 2f, OrbLook(seconds, 0f, 0f, 0f, ROUTE_ORB_LEVEL, spin = spinAngle(seconds), slosh = 1f))
         }
         Spacer(Modifier.height(12.dp))
         val message = state.error ?: FINDING_ROUTE_TEXT
