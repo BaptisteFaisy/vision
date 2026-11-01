@@ -68,6 +68,17 @@ export function frozenFrameOf(shownAt, now = Date.now(), graceMs = DIRECT_FREEZE
   return Number.isFinite(shownAt) && shownAt > 0 && now - shownAt < graceMs;
 }
 
+/**
+ * L'image posée survit-elle à ce rendu ? Oui pendant la grâce qui suit une
+ * micro-coupure du direct : sans vue, toujours ; avec une photo lente
+ * fraîche, seulement si le direct s'affichait — sinon le rafraîchissement
+ * normal (toutes les 2 s) serait bloqué.
+ */
+export function freezeFrameOf(frameSrc, shownAt, showingDirect, view, now = Date.now()) {
+  if (!frameSrc || !frozenFrameOf(shownAt, now)) return false;
+  return !view || showingDirect;
+}
+
 /** Remplissage de la barre, en pourcentage borné 0..100. */
 export function tripPercent(trip) {
   const progress = Number(trip && trip.progress);

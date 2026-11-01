@@ -1,5 +1,5 @@
 import { NO_STREAM_TEXT, shareIdOf, stateOf, neverPublished } from './session.mjs';
-import { frameOf, frozenFrameOf, pictosOf, tripOf, tripPercent, tripRemaining } from './live-view.mjs';
+import { frameOf, freezeFrameOf, pictosOf, tripOf, tripPercent, tripRemaining } from './live-view.mjs';
 import { STREAM_FRESH_MS, watchStream } from './live-stream.mjs';
 import { startOrb } from './orb.mjs';
 import './settings.mjs';
@@ -113,10 +113,8 @@ function renderFrame(status) {
   const view = frameOf(live, status, Date.now(), cameraOff);
   // Micro-coupure du direct : l'image posée reste figée pendant la grâce, au
   // lieu d'être arrachée (reflow de toute la page) ou permutée avec la photo
-  // lente (flash + re-swap au retour). Avec une photo lente fraîche, on ne
-  // gèle que si le direct s'affichait — sinon le rafraîchissement normal
-  // (toutes les 2 s) serait bloqué.
-  if (frameSrc && frozenFrameOf(shownAt) && (!view || showingDirect)) {
+  // lente (flash + re-swap au retour).
+  if (freezeFrameOf(frameSrc, shownAt, showingDirect, view)) {
     noteEl.hidden = true;
     frameEl.hidden = false;
     viewEl.classList.remove('empty');

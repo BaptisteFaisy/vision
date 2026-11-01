@@ -1,6 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { frameOf, pictosOf, tripOf, tripPercent, tripRemaining, frozenFrameOf, PHOTO_FRESH_MS, PICTO_FRESH_MS, DIRECT_FREEZE_MS } from '../live-view.mjs';
+import { frameOf, pictosOf, tripOf, tripPercent, tripRemaining, frozenFrameOf, freezeFrameOf, PHOTO_FRESH_MS, PICTO_FRESH_MS, DIRECT_FREEZE_MS } from '../live-view.mjs';
 
 const now = 1_700_000_000_000;
 const photo = { jpeg: 'AAAA', atMs: now - 1000 };
@@ -67,6 +67,19 @@ test('micro-coupure du direct : l’image posée reste figée pendant la grâce'
   assert.equal(frozenFrameOf(now - DIRECT_FREEZE_MS - 1, now), false);
   // Jamais posée : rien à geler, la page efface comme avant.
   assert.equal(frozenFrameOf(0, now), false);
+});
+
+test('gel du direct : sans vue on gèle, avec photo lente seulement si le direct s’affichait', () => {
+  const young = now - 1000, old = now - DIRECT_FREEZE_MS - 1;
+  const slow = { src: 'data:image/jpeg;base64,BBBB' };
+  assert.equal(freezeFrameOf('blob:x', young, true, null, now), true);
+  assert.equal(freezeFrameOf('blob:x', young, true, slow, now), true);
+  // Photo lente seule : son rafraîchissement normal n'est jamais bloqué.
+  assert.equal(freezeFrameOf('data:y', young, false, slow, now), false);
+  // … mais un faux avis caméra ne l'efface pas pendant la grâce.
+  assert.equal(freezeFrameOf('data:y', young, false, null, now), true);
+  assert.equal(freezeFrameOf('blob:x', old, true, null, now), false);
+  assert.equal(freezeFrameOf('', young, true, null, now), false);
 });
 
 test('le reste du trajet se dit en mètres, kilomètres et heures', () => {
