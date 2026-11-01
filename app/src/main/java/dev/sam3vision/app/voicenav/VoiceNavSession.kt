@@ -66,7 +66,7 @@ sealed interface VoiceNavUiState {
  *
  * Même motif que `NavigationHook` : cette classe ne fait que déléguer —
  * [router] (transcript → demande, `null` si pas une navigation),
- * [launcher] (destination → `Result`), [announcer] + [voice] (phrases TTS),
+ * [announcer] + [voice] (phrases TTS),
  * [routeLoader] (destination → résumé). Elle-même ne parse que l'ordre stop
  * ([StopGuidanceParser]) et le oui/non ([ConfirmAnswerParser]), ne lance
  * rien, ne synthétise rien.
@@ -81,9 +81,9 @@ sealed interface VoiceNavUiState {
  * - [autoStartOnVoice] faux → écran de confirmation + question vocale
  *   (« Do you really want to go to X? … », [ConfirmAnswerParser] : « yes »
  *   = [confirmDestination], « no » = annuler) ;
- * - moteur en panne : pas de repli externe — repos + annonce
- *   d'indisponibilité (le lanceur ne sert qu'à la fiche lieu,
- *   guidage éteint) ;
+ * - moteur en panne ou guidage éteint : pas de repli externe (Google Maps
+ *   supprimé, SPEC v4) — repos + annonce d'indisponibilité ;
+ *   ([launcher] conservé pour compatibilité, ignoré) ;
  * - ordre stop en session ([Confirming] ou [Guiding]) → retour au repos +
  *   annonce « Guidage arrêté », `true` ; sur [Arrived] → fermé sans annonce
  *   (l'arrivée est déjà dite), `true` ; hors session → `false` ;
@@ -93,8 +93,8 @@ sealed interface VoiceNavUiState {
  *   « GPS activé », toujours consommé (le guidage reste à la demande) ;
  * - [confirmDestination] : guidage actif → moteur embarqué ([engineStart])
  *   puis écran de guidage ; moteur en panne → motif sur l'écran + annonce
- *   d'indisponibilité ; guidage éteint → fiche lieu + annonce
- *   « Voici la fiche de X » + repos ; hors [Confirming]
+ *   d'indisponibilité ; guidage éteint → repos + annonce
+ *   d'indisponibilité ; hors [Confirming]
  *   (dont [Arrived]) → rien ;
  * - [onGuidanceUpdate] : l'intégrateur pousse l'état du moteur ; arrivée
  *   signalée → écran [Arrived] + annonce « Arrivée à destination » (unique :
@@ -106,7 +106,7 @@ sealed interface VoiceNavUiState {
  *   suit sans discontinuité.
  *
  * Ne lève jamais : un collaborateur qui jetterait est replié (routeur qui
- * jette = pas d'intention, chargeur/lanceur qui jette = échec annoncé).
+ * jette = pas d'intention, chargeur qui jette = échec annoncé).
  */
 class VoiceNavSession(
     private val launcher: NavigationLauncher,
@@ -216,7 +216,7 @@ class VoiceNavSession(
      */
     private suspend fun startFromVoice(destination: String) {
         if (!guidanceEnabled()) {
-            openPlace(destination)
+            guidanceOff()
             return
         }
         val loading = VoiceNavUiState.Confirming(destination, null, true, null)
@@ -238,7 +238,7 @@ class VoiceNavSession(
     /**
      * Ouvre la confirmation, y charge le résumé, puis pose la question vocale
      * (« Do you really want to go to X? Travel time: Y. Answer yes or no. »,
-     * sans le temps si le résumé a échoué — le repli Maps reste possible).
+     * sans le temps si le résumé a échoué, jamais d'app externe).
      */
     private suspend fun openConfirmation(destination: String) {
         setState(VoiceNavUiState.Confirming(destination, null, true, null))
@@ -271,18 +271,18 @@ class VoiceNavSession(
         return true
     }
 
-    /** Bouton « Démarrer » : lance le guidage (ou la fiche lieu) depuis la confirmation. */
+    /** Bouton « Démarrer » : lance le guidage depuis la confirmation. */
     suspend fun confirmDestination() {
         val current = _state.value as? VoiceNavUiState.Confirming ?: return
         if (current.loading) return
         if (guidanceEnabled()) {
             confirmGuided(current)
         } else {
-            confirmPlace(current)
+            guidanceOff()
         }
     }
 
-    /** Confirmation manuelle : moteur si possible, sinon motif + annonce, jamais Maps. */
+    /** Confirmation manuelle : moteur si possible, sinon motif + annonce, jamais d'app externe. */
     private suspend fun confirmGuided(current: VoiceNavUiState.Confirming) {
         if (startEngine(current.destination, current.summary)) {
             setState(guiding(current.destination, current.summary))
@@ -302,28 +302,12 @@ class VoiceNavSession(
         }
     }
 
-    private suspend fun confirmPlace(current: VoiceNavUiState.Confirming) {
-        openPlace(current.destination, current)
-    }
 
-    /** Fiche lieu (guidage éteint) puis repos, ou motif si le lancement échoue. */
-    private suspend fun openPlace(
-        destination: String,
-        confirmation: VoiceNavUiState.Confirming? = null,
-    ) {
-        val outcome = runCatching {
-            launcher.openPlace(destination)
-        }.getOrElse { Result.failure(it) }
-        outcome.fold(
-            onSuccess = {
-                goIdle()
-                voice.announcePlace(destination)
-            },
-            onFailure = {
-                fail(confirmation)
-                announcer.announceGuidanceUnavailable()
-            },
-        )
+
+    /** Guidage interne uniquement (SPEC v4, Google Maps supprime) : guidage eteint = repos + annonce d'indisponibilite, jamais d'app externe. */
+    private suspend fun guidanceOff() {
+        goIdle()
+        announcer.announceGuidanceUnavailable()
     }
 
     /** Erreur affichable sur la confirmation, ou repos si aucun écran n'est ouvert. */
