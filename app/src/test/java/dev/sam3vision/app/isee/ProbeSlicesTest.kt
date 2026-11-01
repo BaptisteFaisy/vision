@@ -123,10 +123,9 @@ class ProbeSlicesTest {
     fun `deux frames, pixels et chiffres separes, voix identique`() = runTest {
         val fake = BlockingClient(mutableListOf())
         val probe = probe(this, fake)
-        // Tickers coupés : battements et prédictions en temps réel rendraient
-        // les comptes non déterministes (les clés pures les couvrent déjà).
+        // Battement coupé : le temps réel rendrait les comptes non déterministes
+        // (les clés pures le couvrent déjà).
         probe.pulse.stop()
-        probe.meters.stopPredictions()
 
         val pixelSeqs = mutableListOf<Int>()
         val restSnaps = mutableListOf<LiveProbeState>()

@@ -31,7 +31,7 @@ import kotlinx.coroutines.flow.distinctUntilChangedBy
  *
  * - pixels ([pixelKeyOf]) : écriture #1 + raz — couches masques et
  *   `FirstPixelWatcher`, invisibles aux chiffres, aux battements et à la voix ;
- * - chiffres ([restKeyOf]) : écriture #2 + battements (`pulse`), prédictions
+ * - chiffres ([restKeyOf]) : écriture #2 + battements (`pulse`), lectures SAM
  *   (`distanceLayer`) et Traversée — pastilles, flèche, consigne, feu, chip ;
  * - notice ([noticeKeyOf]) : ce que lit [liveProbeNotice] — centre de la rue.
  *
@@ -57,7 +57,7 @@ internal fun pixelKeyOf(s: LiveProbeState): ProbePixelKey =
 
 /**
  * Champs lus par les couches chiffres : écriture #2 (`frames` avance à chaque
- * frame, jamais en #1), battement 500 ms (`pulse`), prédictions profondeur
+ * frame, jamais en #1), battement 500 ms (`pulse`), lectures SAM
  * (`distanceLayer`) et mode Traversée. `width`/`height` n'y sont pas (stables
  * après la première frame, lus dans l'instantané au tick chiffres).
  */
@@ -105,7 +105,7 @@ internal fun StateFlow<LiveProbeState>.pixelStates(): Flow<LiveProbeState> =
 
 /**
  * Instantanés chiffres : le plein état, réémis quand les chiffres bougent
- * (écriture #2, battement, prédiction, Traversée) — jamais sur les pixels.
+ * (écriture #2, battement, lectures SAM, Traversée) — jamais sur les pixels.
  */
 internal fun StateFlow<LiveProbeState>.restStates(): Flow<LiveProbeState> =
     distinctUntilChangedBy(::restKeyOf)
