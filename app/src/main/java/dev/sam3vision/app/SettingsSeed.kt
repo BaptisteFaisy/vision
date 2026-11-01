@@ -84,14 +84,33 @@ private val sealLock = Mutex()
  * clé d'écriture naissent une seule fois, puis sont enregistrés. `seededFromBuild` seul
  * en fabriquait de nouveaux à chaque lancement — le relais liait alors la clé du premier
  * envoi et refusait tous les suivants (403), le symptôme même qu'on répare ici.
+ *
+ * Les clés venues du build (voix, dictée, LLM, narration) sont scellées de même dès
+ * qu'elles comblent un vide : elles ne vivaient qu'en mémoire, et une mise à jour vers
+ * un APK sans clés rendait l'app muette (01/11/2026 : texte affiché, silence total).
+ * Une valeur saisie dans Réglages n'est jamais écrasée (la graine ne comble que du vide).
  */
-suspend fun loadedSettings(store: SettingsStore): Settings = sealLock.withLock {
-    val loaded = store.load()
-    val seeded = seededFromBuild(loaded)
-    val identityChanged = seeded.shareId != loaded.shareId || seeded.shareWriteKey != loaded.shareWriteKey
-    if (identityChanged) store.save(seeded)
-    seeded
-}
+suspend fun loadedSettings(store: SettingsStore): Settings = loadedSettings(store, BuildDefaults.FromBuild)
+
+/** Même chose, avec les valeurs de build passées explicitement (tests JVM). */
+internal suspend fun loadedSettings(store: SettingsStore, build: BuildDefaults): Settings =
+    sealLock.withLock {
+        val loaded = store.load()
+        val seeded = seeded(loaded, build)
+        val identityChanged = seeded.shareId != loaded.shareId || seeded.shareWriteKey != loaded.shareWriteKey
+        if (identityChanged || secretsFilled(loaded, seeded)) store.save(seeded)
+        seeded
+    }
+
+/**
+ * Vrai quand la graine a comblé au moins un vide avec une clé du build : à sceller,
+ * sinon la clé ne vit qu'en mémoire jusqu'à la prochaine mise à jour sans clés.
+ */
+private fun secretsFilled(loaded: Settings, seeded: Settings): Boolean =
+    (loaded.ttsApiKey.isBlank() && seeded.ttsApiKey.isNotBlank()) ||
+        (loaded.asrApiKey.isBlank() && seeded.asrApiKey.isNotBlank()) ||
+        (loaded.llmApiKey.isBlank() && seeded.llmApiKey.isNotBlank()) ||
+        (loaded.liveLlmApiKey.isBlank() && seeded.liveLlmApiKey.isNotBlank())
 
 /** Clé d'écriture de ce téléphone : 32 hexadécimaux, liés au flux au premier envoi. */
 internal fun defaultShareKey(): String = java.util.UUID.randomUUID().toString().replace("-", "")
