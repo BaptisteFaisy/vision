@@ -43,26 +43,26 @@ import kotlinx.coroutines.withContext
 import kotlinx.coroutines.withTimeoutOrNull
 
 /**
- * Côté long de la frame envoyée à SAM par la page caméra (px) : [FramePolicy.EDGE].
+ * Côté long de la frame envoyée à SAM par la page caméra (px) : 320, jamais agrandi.
  *
- * Monté de 320 à 480 : SAM reçoit la même géométrie que le direct aidant, donc la
- * passe NV21 ne packe qu'une fois pour les deux (`encodeJpegPair`). Mesure d'époque
- * (à 320 px) : le coût **serveur** ne bougeait pas entre 256 et 448 px, mais les
- * masques reviennent à la taille envoyée — 18 Ko à 320 contre 32 Ko à 448 — et
- * chaque octet compte quand on vise 150 ms par frame.
+ * Mesuré depuis le téléphone : le coût **serveur** ne bouge pas entre 256 et 448 px,
+ * mais l'upload et les masques sont proportionnels — 18 Ko à 320 contre 32 Ko à 448.
+ * Le 01/11, un couplage unique à 480 px/q65 avec le direct aidant avait ajouté +88 ms
+ * de `capt` (campagne 6b) : SAM garde son 320/q55, l'aidant son 480 (encodé à part,
+ * seulement quand il regarde).
  */
-const val ISEE_FRAME_EDGE = FramePolicy.EDGE
+const val ISEE_FRAME_EDGE = 320
 
-/** Qualité JPEG de la frame iSee : [FramePolicy.QUALITY], allégée par le palier adaptatif. */
-const val ISEE_FRAME_QUALITY = FramePolicy.QUALITY
+/** Qualité JPEG de la frame iSee : 55 suffit très bien à SAM, et allège l'upload. */
+const val ISEE_FRAME_QUALITY = 55
 
 /**
- * Côté long de la frame du **direct aidant** (px) : alias de [ISEE_FRAME_EDGE].
+ * Côté long de la frame du **direct aidant** (px) : 480, lisible plein écran.
  *
- * Le 320 px de SAM, étiré plein écran par la page, restait flou ; à 480 px l'image
- * redevient lisible — et la passe NV21 unique impose la même géométrie aux deux.
+ * Encodé dans une passe NV21 séparée, seulement quand un aidant regarde
+ * (`shareDue`) : le chemin chaud SAM ne paie jamais ces pixels.
  */
-const val SHARE_FRAME_EDGE = ISEE_FRAME_EDGE
+const val SHARE_FRAME_EDGE = 480
 
 /** Qualité JPEG du direct aidant : 70 efface les aplats visibles à q65. */
 const val SHARE_FRAME_QUALITY = 70
@@ -299,20 +299,21 @@ class IseeCameraHost(private val context: Context) {
     }
 
     /**
-     * Passe unique : un seul pack NV21 (ou un seul `Bitmap` de repli) pour SAM et le
-     * direct aidant — la rotation et la réduction ne sont payées qu'une fois, seule
-     * la compression JPEG est doublée quand le direct est dû.
+     * SAM en 320 px à chaque frame admise, plus le direct aidant en 480 px seulement
+     * quand il regarde (`shareDue`, passe NV21 séparée — les lectures sont absolues,
+     * le second pack ne perturbe pas le premier).
      * La luminance NV21 part aussi à [onLuma] (compteur de marches), sur le même fil.
      */
     private fun encodeSinglePass(proxy: ImageProxy, quality: Int, shareDue: Boolean): SinglePass {
-        if (shareDue) {
-            val pair = encoder.encodeJpegPair(
-                proxy, ISEE_FRAME_EDGE, quality, SHARE_FRAME_QUALITY,
-            )
-            if (pair != null) return SinglePass(pair.first, pair.luma, pair.second, meanLuma(pair.luma))
-        }
         val framed = encoder.encodeJpegLuma(proxy, ISEE_FRAME_EDGE, quality)
-        if (framed != null) return SinglePass(framed.jpeg, framed.luma, null, meanLuma(framed.luma))
+        if (framed != null) {
+            val share = if (shareDue) {
+                encoder.encodeJpegLuma(proxy, SHARE_FRAME_EDGE, SHARE_FRAME_QUALITY)?.jpeg
+            } else {
+                null
+            }
+            return SinglePass(framed.jpeg, framed.luma, share, meanLuma(framed.luma))
+        }
         return bitmapFallback(
             proxy, quality, shareDue,
         )
