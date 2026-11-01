@@ -1,14 +1,12 @@
 package dev.sam3vision.app.isee
 
 import dev.sam3vision.app.BuildConfig
-import dev.sam3vision.core.curb.CurbCue
 import dev.sam3vision.core.curb.CurbSignal
 import dev.sam3vision.core.curb.CurbTier
 import dev.sam3vision.core.curb.CurbWatcher
-import dev.sam3vision.core.hazard.HazardCue
+import dev.sam3vision.core.distance.DistanceReading
 import dev.sam3vision.core.hazard.HazardSignal
 import dev.sam3vision.core.hazard.HazardWatcher
-import dev.sam3vision.core.distance.DistanceReading
 import dev.sam3vision.core.speech.SpeechLanguage
 import dev.sam3vision.core.traverse.FrameMotion
 import dev.sam3vision.core.traverse.VehicleStateCue
@@ -16,32 +14,15 @@ import dev.sam3vision.core.traverse.VehicleStateWatcher
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.sync.Mutex
-import kotlinx.coroutines.sync.withLock
+
+/** Portée parlée du mouvement : SPEC v4, voitures en mouvement < 20 m. */
+private const val MOVING_SPEAK_METERS = 20f
 
 /**
- * Alerte de sécurité de la frame : **parole du user devant tout** (ordre user
- * du 1/11) — l'alerte retenue attend le silence en file douce au lieu de couper
- * le micro. Rend vrai quand elle a été retenue ([ObstacleDecision.safety] non
- * nulle et le user parle). Extrait d'[obstacleFrame] (plafond 50 lignes).
- */
-private fun speakSafety(
-    phrase: String?,
-    voice: ProximityVoice,
-    safety: SafetyVoice,
-    watchers: ObstacleWatchers,
-    nowMs: Long,
-): Boolean {
-    if (phrase == null) return false
-    if (voice.userIsSpeaking()) return true
-    safety.speak(phrase)
-    watchers.lastSafetyMs = nowMs
-    return false
-}
-
-/**
- * Véhicule de la frame : **frames SAM seules** (ex-`observeVehicleState`), la
- * porte avance à chaque compteur vu, Traversée ou non. Extrait d'[obstacleFrame]
- * (plafond 50 lignes).
+ * Véhicule de la frame : **frames SAM seules** — la porte avance à chaque
+ * compteur vu, Traversée ou non (une réémission sans nouvelle frame rejoue
+ * des lectures figées et casserait la confirmation). En Traversée, rien :
+ * le verdict couvre les voitures. Portée 20 m (SPEC v4, niveau 0).
  */
 private fun vehicleCueOf(
     st: LiveProbeState,
@@ -55,7 +36,9 @@ private fun vehicleCueOf(
     watchers.lastVehicleFrames = st.frames
     if (!freshFrame || st.crossingActive) return null
     return watchers.vehicle.update(
-        detectionsOf(readings, st.width, st.height), readings, nowMs, lang, motion)
+        detectionsOf(readings, st.width, st.height), readings, nowMs, lang, motion,
+        movingMeters = MOVING_SPEAK_METERS,
+    )
         ?.also {
             logMotionTransition(
                 watchers.vehicle.cameraMoved, watchers.vehicle.lastMotionVerdicts.values,
@@ -65,51 +48,43 @@ private fun vehicleCueOf(
 }
 
 /**
- * Les trois guetteurs ordonnés (véhicules + bordure + mobilier) et l'instant
- * de la dernière alerte de sécurité dite (`null` si aucune : le doux attend
- * en file pendant [SAFETY_SPEECH_MS] au lieu de chevaucher).
+ * Les trois guetteurs obstacles (véhicules + bordure + mobilier) et le
+ * dernier compteur de frames SAM vu par les véhicules (`-1` = aucun).
  */
 internal class ObstacleWatchers(
     val vehicle: VehicleStateWatcher,
     val curb: CurbWatcher,
     val hazard: HazardWatcher,
 ) {
-    /** Dernière alerte de sécurité dite, `null` si aucune. */
-    var lastSafetyMs: Long? = null
-
     /**
      * Dernier compteur de frames SAM vu par les véhicules : une réémission
      * sans nouvelle frame rejoue des lectures figées et casserait la
-     * confirmation (garde reprise de l'ex-`observeVehicleState`, perdue au
-     * merge de la PR #690).
+     * confirmation (garde reprise de l'ex-`observeVehicleState`).
      */
     var lastVehicleFrames: Int = -1
 
-    /** Oublie les trois guetteurs et l'alerte (nouvelle séance). */
+    /** Oublie les trois guetteurs et la porte frames (nouvelle séance). */
     fun reset() {
         vehicle.reset()
         curb.reset()
         hazard.reset()
-        lastSafetyMs = null
         lastVehicleFrames = -1
     }
 }
 
 /**
- * Guetteur obstacles de la sonde : véhicules, bordure et mobilier calculés
- * sur la même frame, arbitrés ([decideObstacles]) — le mouvement gagnant
- * parle seul et coupe le doux (voiture > personne, § 31), le reste
- * fusionne dans l'ordre P1-P5. La sécurité ([SafetyVoice], jamais de
- * « Stop » hors Traversée) part aussitôt, en direct ; le doux part en
- * coroutine fille, sérialisé ([Mutex] : jamais de chevauchement doux,
- * jamais de frame bloquée par une synthèse) et tenu en file pendant la
- * sécurité ([safetyBusy]) — sauf le danger qui s'approche (`urgent`
- * véhicule : coupe, comme avant). Sans doux frais (hors Traversée), la
- * file est redite au silence ([ProximityVoice.flushPending]). En
- * Traversée, seul l'imminent bordure passe (sa voix rouge/vert est
- * propriétaire du son) et les guetteurs coupés n'avancent pas. Rend les
- * guetteurs pour le `reset()` de début de séance. `collect` séquentiel : une
- * alerte confirmée ne s'annule pas.
+ * Guetteur obstacles de la sonde, SPEC v4 : véhicules, bordure et mobilier
+ * calculés sur la même frame, **un seul gagnant** ([decideFrame] : le plus
+ * petit niveau — 0 voiture, 2 humain, 4 barrière, 5 bordure, 7 divers ;
+ * 101 humain et 102 bordure en Traversée) proposé au bus ([offer] :
+ * antirépétition puis [VoiceBus.post]). L'écrasé n'est jamais redit ; le
+ * bus écrase entre producteurs (escaliers, grillage, trottoir, GPS…).
+ * Les signaux des guetteurs core sont lus tels quels (autre mission).
+ *
+ * [voice], [playerIdle], [safety] et le mutex de parole douce sont le
+ * câblage historique, gardés pour la bascule : la parole passe par le bus,
+ * câblé une fois au démarrage — le parent les retire quand tous les
+ * producteurs postent au bus.
  */
 internal fun LiveProbe.observeObstacles(
     scope: CoroutineScope,
@@ -133,12 +108,12 @@ internal fun LiveProbe.observeObstacles(
 
 /**
  * Une frame d'obstacles : les trois signaux relus dans l'état (lectures de
- * distance + dimensions, déjà publiées par frame), arbitrés ([decideObstacles])
- * puis parlés — sécurité aussitôt, doux (mouvement préemptif, § 31) en
- * fille sérialisée, file au silence. Le mot seul d'une personne imminente
- * est exclu de l'arbitrage et part en clip ([launchImminentWord], jamais
- * fusionné — anti-collision, il parle même quand une voiture gagne).
+ * distance + dimensions, déjà publiées par frame), convertis en vœux
+ * ([vehicleWish], [hazardWish], [curbWish] — mot imminent humain en clip
+ * immédiat, niveau 2), arbitrés ([decideFrame]) puis proposés au bus
+ * ([offer]). `collect` séquentiel : une alerte confirmée ne s'annule pas.
  */
+@Suppress("UNUSED_PARAMETER")
 internal fun obstacleFrame(
     st: LiveProbeState,
     scope: CoroutineScope,
@@ -158,59 +133,15 @@ internal fun obstacleFrame(
     val curbCue = if (st.crossingActive && curbSignal.tier != CurbTier.NEAR) null
     else watchers.curb.onSignal(curbSignal, nowMs, lang)?.takeIf { shouldSpeakCurb(it, st.crossingActive) }
     if (BuildConfig.DEBUG) android.util.Log.d("CurbVoice", curbVoiceLine(readings, curbSignal, curbCue?.phrase, st.crossingActive))
-    val hazardSignal = HazardSignal.of(readings, st.width, st.height)
-    val hazardCue = if (st.crossingActive) null
-    else watchers.hazard.onSignal(hazardSignal, nowMs, lang)
-    if (BuildConfig.DEBUG) android.util.Log.d("HazardVoice", hazardVoiceLine(readings, hazardSignal, hazardCue?.phrase))
-    val wordClip = imminentWordClipId(hazardCue)
-    val decision = decideObstacles(vehicleCue, curbCue, hazardCue.takeUnless { wordClip != null })
-    val busy: () -> Boolean = { safetyBusy(System.currentTimeMillis(), watchers.lastSafetyMs) }
-    val heldForUser = speakSafety(decision.safety, voice, safety, watchers, nowMs)
-    launchImminentWord(scope, voice, playerIdle, softSpeech, lang, hazardCue, wordClip)
-    val soft = softOf(decision, heldForUser)
-    if (soft != null) {
-        scope.launch {
-            softSpeech.withLock {
-                // Clé de cadence par personne : une annonce « Attention à la
-                // personne » par piste, pas une par côté toutes les 20 s (audit
-                // foule du 01/11).
-                voice.onPhrase(
-                    soft, playerIdle(), urgent = decision.urgent && !heldForUser,
-                    queue = true, busy = busy, preempt = decision.preempt,
-                    trackId = hazardCue?.trackId,
-                )
-            }
-        }
-    } else if (!st.crossingActive) {
-        scope.launch { softSpeech.withLock { voice.flushPending(playerIdle(), busy) } }
-    }
+    val hazardCue = watchers.hazard.onSignal(HazardSignal.of(readings, st.width, st.height), nowMs, lang)
+    offer(
+        decideFrame(
+            listOf(
+                vehicleWish(vehicleCue),
+                hazardWish(hazardCue, st.crossingActive),
+                curbWish(curbCue, st.crossingActive),
+            ),
+        ),
+        nowMs,
+    )
 }
-
-/**
- * Mot seul d'une personne imminente : clip `guide_*` parlé en coroutine
- * fille sérialisée (miroir Traversée : clip immédiat si libre, file sinon)
- * — rien quand [wordClip] est `null` (chemin fusionné inchangé, défensif).
- */
-internal fun launchImminentWord(
-    scope: CoroutineScope,
-    voice: ProximityVoice,
-    playerIdle: () -> Boolean,
-    softSpeech: Mutex,
-    lang: SpeechLanguage,
-    hazard: HazardCue?,
-    wordClip: String?,
-) {
-    val word = hazard?.phrase
-    if (wordClip == null || word == null) return
-    scope.launch { softSpeech.withLock { voice.speakWord(wordClip, word, lang, playerIdle(), urgent = false, queue = true) } }
-}
-
-/**
- * Phrases douces de la frame : l'alerte de sécurité retenue pour la parole du
- * user ([heldForUser]) passe en doux, derrière sa phrase — elle attend le
- * silence au lieu de couper le micro (ordre user du 1/11). Sinon la frame dit
- * exactement ce que l'arbitre a décidé. Pur, testé en JVM.
- */
-internal fun softOf(decision: ObstacleDecision, heldForUser: Boolean): String? =
-    if (!heldForUser) decision.soft
-    else listOfNotNull(decision.soft, decision.safety).joinToString(" ").takeIf { it.isNotEmpty() }

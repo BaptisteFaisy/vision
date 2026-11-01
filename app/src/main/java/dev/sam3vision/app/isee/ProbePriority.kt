@@ -1,123 +1,150 @@
 package dev.sam3vision.app.isee
 
 import dev.sam3vision.core.curb.CurbCue
-import dev.sam3vision.core.curb.CurbTier
 import dev.sam3vision.core.hazard.HazardCue
 import dev.sam3vision.core.hazard.HazardKind
 import dev.sam3vision.core.live.GuidanceWord
 import dev.sam3vision.core.traverse.VehicleStateCue
 
 /**
- * Priorité voix des obstacles : la voiture en mouvement écrase tout doux,
- * la personne écrase tout doux sauf la voiture (ordre user du 01/11, §
- * 31) — sans mouvement, les rangs P1-P5 ordonnent la fusion comme avant
- * (bordure > barrière > reste, dans l'ordre de détection). Quand SAM
- * confirme plusieurs obstacles sur la même frame, l'arbitre
- * ([decideObstacles]) ne fusionne plus le mouvement : le gagnant parle
- * seul et coupe la parole douce ([VoicePreempt]) ; la sécurité (bordure
- * imminente, jamais de « Stop » hors Traversée, § 22) garde le dessus.
- * Extrait de `ProbeWiring` (plafond 500 lignes). Pur, testé en JVM.
+ * Échelle voix dehors SPEC v4 : 13 niveaux, le plus petit gagne —
+ * l'écrasé n'est jamais redit sauf re-détecté actuel. 0 voitures en
+ * mouvement (< 20 m, présence seule, pluriel si plusieurs) ; 1 parole du
+ * user (seul 0 la coupe) ; 2 humains (< 10 m, phrase + cadran + distance,
+ * imminent 2 m ou moins = mot immédiat) ; 3 rappel GPS (silence 15 s ou
+ * plus) ; 4 grillages, murs et barrières (< 6 m) ; 5 bordures (< 6 m) ;
+ * 6 escaliers (jalons 4/2/1, marches comptées) ; 7 poteaux, mobilier
+ * vertical et divers (< 6 m) ; 8 passages piétons (< 6 m) ; 9 réponses du
+ * chat ; 10 trottoirs ; 11 manœuvres et événements GPS ; 12 repli
+ * (gauche, droite ou tout droit).
  */
-internal enum class ObstacleRank { VEHICLE_MOVING, CURB, PERSON, BARRIER, OTHER }
+object OutdoorLevel {
+    /** Voitures en mouvement : présence seule, sans cadran ni distance. */
+    const val CAR_MOVING = 0
 
-/** Voix de sécurité en cours : une alerte couvre les 2,5 s qui suivent (sous les 3 s de la file douce, pour que le rattrapage parle encore frais — prior, à valider rue). */
-internal const val SAFETY_SPEECH_MS = 2_500L
+    /** Parole du user : tait tout, seul le niveau 0 la coupe. */
+    const val USER_SPEECH = 1
+
+    /** Humains : phrase + cadran + distance, mot imminent immédiat. */
+    const val HUMAN = 2
+
+    /** Rappel GPS sur silence (dernière consigne + distance restante). */
+    const val GPS_REMINDER = 3
+
+    /** Grillages, murs et barrières. */
+    const val FENCE = 4
+
+    /** Bordures. */
+    const val CURB = 5
+
+    /** Escaliers : jalons 4/2/1 + nombre de marches dit. */
+    const val STAIRS = 6
+
+    /** Poteaux, mobilier vertical (lampadaire, panneau) et divers. */
+    const val POLE = 7
+
+    /** Passages piétons (annonce, alignement, arrivée). */
+    const val CROSSWALK = 8
+
+    /** Réponses du chat (reprise depuis la coupure, seule file restante). */
+    const val CHAT = 9
+
+    /** Trottoirs (comportement actuel). */
+    const val SIDEWALK = 10
+
+    /** Manœuvres et événements GPS. */
+    const val GPS_EVENT = 11
+
+    /** Repli sur silence (gauche, droite ou tout droit). */
+    const val FALLBACK = 12
+}
 
 /**
- * Sécurité en cours à [nowMs] : alerte dite il y a moins de [SAFETY_SPEECH_MS] —
- * le doux attend alors en file au lieu de chevaucher. Pur, testé en JVM.
+ * Traversée exclusive : verdict (feu piéton puis voitures — rouge ou
+ * mouvement = ne passe pas, sinon passe), puis humains, puis bordures ;
+ * chat et GPS muets.
  */
-internal fun safetyBusy(nowMs: Long, lastSafetyMs: Long?): Boolean =
-    lastSafetyMs != null && nowMs - lastSafetyMs < SAFETY_SPEECH_MS
+object CrossingLevel {
+    /** Verdict : feu piéton puis voitures (voiture uniquement). */
+    const val VERDICT = 100
+
+    /** Humains en Traversée. */
+    const val HUMAN = 101
+
+    /** Bordures en Traversée. */
+    const val CURB = 102
+}
 
 /**
- * Parole d'une frame : [safety] les alertes fusionnées P2→P3 (`null` = rien
- * d'immédiat), [soft] la phrase douce (`null` = silence) — le mouvement
- * gagnant seul (voiture, sinon personne), ou les doux fusionnés par rang
- * sans mouvement —, [urgent] vrai quand le danger roule sur le user ou
- * que la bordure est imminente (0,7 m), le doux coupe comme avant,
- * [preempt] le rang qui coupe la parole douce (voiture > personne,
- * sécurité exceptée). Une alerte couverte par la sécurité n'est pas
- * redite en doux.
+ * Vœu de parole d'une frame : [level] son niveau sur l'échelle, [text] sa
+ * phrase, [key] sa clé d'antirépétition ([AntiRepeat]), [clipId] son clip
+ * quand il est connu (zéro réseau, départ immédiat).
  */
-internal data class ObstacleDecision(
-    val safety: String?,
-    val soft: String?,
-    val urgent: Boolean = false,
-    val preempt: VoicePreempt = VoicePreempt.NONE,
+internal data class VoiceWish(
+    val level: Int,
+    val text: String,
+    val key: String,
+    val clipId: String? = null,
 )
 
 /**
- * Arbitre d'une frame en mode normal : les sécurités (bordure, personne
- * imminente — jamais de « Stop » hors Traversée, § 22) fusionnent dans
- * l'ordre des rangs, puis le doux — le mouvement gagnant seul (voiture
- * en mouvement, sinon personne : il écrase bordure, barrière et reste
- * au lieu de fusionner, § 31), ou les doux fusionnés par rang sans
- * mouvement. Le véhicule ne fournit que du doux ici (son stop roulant
- * ne se dit qu'en Traversée, § 22) ; son `urgent` (danger qui
- * s'approche, bordure à 0,7 m) coupe le doux. `null` partout = silence.
- * Pur, testé en JVM.
+ * Décision d'une frame : le vœu de plus petit niveau gagne, les autres
+ * sont écrasés (jamais redits) ; `null` = silence. Pur, testé en JVM.
  */
-internal fun decideObstacles(
-    vehicle: VehicleStateCue?,
-    curb: CurbCue?,
-    hazard: HazardCue?,
-): ObstacleDecision {
-    val safety = listOfNotNull(curb?.safetyPhrase, hazard?.safetyPhrase)
-        .joinToString(" ").takeIf { it.isNotEmpty() }
-    val mover = vehicle?.takeIf { it.moving }
-    val person = hazard?.takeIf { it.kind == HazardKind.PERSON && it.safetyPhrase == null }
-    val soft = mover?.phrase
-        ?: person?.phrase
-        ?: softParts(vehicle, curb, hazard).joinToString(" ").takeIf { it.isNotEmpty() }
-    val preempt = when {
-        mover != null -> VoicePreempt.VEHICLE
-        person != null -> VoicePreempt.PERSON
-        else -> VoicePreempt.NONE
-    }
-    return ObstacleDecision(
-        safety,
-        soft,
-        urgent = vehicle?.urgent == true || curb?.urgent == true,
-        preempt = preempt,
-    )
-}
+internal fun decideFrame(wishes: List<VoiceWish?>): VoiceWish? =
+    wishes.filterNotNull().filter { it.text.isNotBlank() }.minByOrNull { it.level }
 
-/** Phrases douces de la frame, par rang (véhicule, bordure, mobilier à égalité). */
-private fun softParts(
-    vehicle: VehicleStateCue?,
-    curb: CurbCue?,
-    hazard: HazardCue?,
-): List<String> = listOfNotNull(
-    vehicle?.let { softRank(it) to it.phrase },
-    curb?.takeIf { it.safetyPhrase == null }?.let { softRank(it) to it.phrase },
-    hazard?.takeIf { it.safetyPhrase == null }?.let { softRank(it.kind) to it.phrase },
-).sortedBy { it.first }.map { it.second }
-
-/** Rang doux d'un état véhicule : le mouvement loin reste P1, l'arrêt rejoint le reste. */
-private fun softRank(cue: VehicleStateCue): ObstacleRank =
-    if (cue.moving) ObstacleRank.VEHICLE_MOVING else ObstacleRank.OTHER
-
-/** Rang doux d'une bordure : la pré-alerte à 1 m reste P2, le bateau rejoint le reste. */
-private fun softRank(cue: CurbCue): ObstacleRank =
-    if (cue.tier == CurbTier.FAR) ObstacleRank.CURB else ObstacleRank.OTHER
-
-/** Rang doux du danger : personne, barrière, puis divers avec le reste. */
-private fun softRank(kind: HazardKind): ObstacleRank = when (kind) {
-    HazardKind.PERSON -> ObstacleRank.PERSON
-    HazardKind.BARRIER -> ObstacleRank.BARRIER
-    HazardKind.OTHER -> ObstacleRank.OTHER
+/**
+ * Vœu véhicule : le mouvement seul parle (niveau 0, clip quand la phrase
+ * est fixe) — arrêt et stationnement muets (la spec ne dit que le
+ * mouvement). Pur, testé en JVM.
+ */
+internal fun vehicleWish(cue: VehicleStateCue?): VoiceWish? {
+    if (cue == null || !cue.moving) return null
+    return VoiceWish(OutdoorLevel.CAR_MOVING, cue.phrase, AntiRepeat.CAR_MOVING, recordedClipId(cue.phrase))
 }
 
 /**
- * Clip du mot seul d'une personne imminente : l'entrée `guide_*` quand
- * [hazard] est une personne urgente dont la phrase est un mot du guidage
- * (`null` sinon — doux, barrière, divers, sécurité, ou phrase qui n'est
- * pas un mot). Le mot part en clip immédiat, jamais fusionné : la fusion
- * casserait le clipId (départ < 100 ms exigé). Pur, testé en JVM.
+ * Vœu danger : personne (niveau 2 — le mot imminent part en clip immédiat,
+ * même niveau), barrière (niveau 4), divers (niveau 7) ; en Traversée, la
+ * personne seule parle (niveau 101). Pur, testé en JVM.
  */
-internal fun imminentWordClipId(hazard: HazardCue?): String? {
-    if (hazard == null || hazard.kind != HazardKind.PERSON) return null
-    if (!hazard.urgent || hazard.safetyPhrase != null) return null
-    return GuidanceWord.clipIdFor(hazard.phrase)
+internal fun hazardWish(cue: HazardCue?, crossingActive: Boolean = false): VoiceWish? {
+    if (cue == null) return null
+    if (crossingActive) {
+        if (cue.kind != HazardKind.PERSON) return null
+        return personWish(cue, CrossingLevel.HUMAN)
+    }
+    return when (cue.kind) {
+        HazardKind.PERSON -> personWish(cue, OutdoorLevel.HUMAN)
+        HazardKind.BARRIER -> VoiceWish(OutdoorLevel.FENCE, cue.phrase, AntiRepeat.FENCE)
+        HazardKind.OTHER -> VoiceWish(OutdoorLevel.POLE, cue.phrase, AntiRepeat.POLE)
+    }
+}
+
+/** Vœu personne : mot imminent en clip, sinon phrase douce (même niveau). */
+private fun personWish(cue: HazardCue, level: Int): VoiceWish =
+    if (cue.urgent) VoiceWish(level, cue.phrase, AntiRepeat.HUMAN_IMMINENT, GuidanceWord.clipIdFor(cue.phrase))
+    else VoiceWish(level, cue.phrase, AntiRepeat.HUMAN_SOFT)
+
+/**
+ * Vœu bordure : niveau 5 dehors, 102 en Traversée. Pur, testé en JVM.
+ */
+internal fun curbWish(cue: CurbCue?, crossingActive: Boolean = false): VoiceWish? {
+    if (cue == null) return null
+    return VoiceWish(
+        if (crossingActive) CrossingLevel.CURB else OutdoorLevel.CURB,
+        cue.phrase, AntiRepeat.CURB,
+    )
+}
+
+/**
+ * Propose un vœu au bus : tu par l'antirépétition ([AntiRepeat]) ou écrasé
+ * par le bus ([VoiceBus]) = `false` (jeté, jamais redit) ; sinon posté.
+ */
+internal fun offer(wish: VoiceWish?, nowMs: Long = System.currentTimeMillis()): Boolean {
+    if (wish == null || wish.text.isBlank()) return false
+    if (!AntiRepeat.allow(wish.key, nowMs)) return false
+    VoiceBus.post(wish.level, wish.text, wish.clipId)
+    return true
 }
