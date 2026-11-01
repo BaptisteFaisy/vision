@@ -28,9 +28,9 @@ if __name__ == "__main__": sys.modules.setdefault("test_units", sys.modules["__m
 
 from tests_units import (boot_tests, concepts_street_tests, crossing_concepts_tests,  # noqa: E402
                          depth_tests, detr_evict_tests, feux_guard_tests, latency_tests,
-                         live_fast_tests, live_fast_perf_tests, llm_tests, merge_tests,
-                         native_tests, post_tests, preproc_tests, tracking_tests, weights_tests,
-                         ws_binary_tests)
+                         live_fast_tests, live_fast_perf_tests, llm_tests, m1_vectors_tests,
+                         merge_tests, native_tests, post_tests, preproc_tests, tracking_tests,
+                         weights_tests, ws_binary_tests)
 
 BACKEND_DIR = Path(__file__).resolve().parent.parent / "backend"
 PASSED: list[str] = []
@@ -384,6 +384,7 @@ RUNNERS = (
     ("live_fast : WS binaire M1 (trame)", "timing", ws_binary_tests.test_ws_binary_frame),
     ("live_fast : WS binaire M1 (mixte)", "timing", ws_binary_tests.test_ws_binary_mixed),
     ("live_fast : WS binaire M1 (erreurs)", "timing", ws_binary_tests.test_ws_binary_errors),
+    ("live_fast : WS binaire M1 (vecteurs)", "timing", m1_vectors_tests.test_m1_contract_vectors),
     ("profondeur : contrat with_depth", "live_app_fast", depth_tests.test_depth_contract),
     ("profondeur : contrat with_depth binaire", "live_app_fast",
      depth_tests.test_depth_contract_binary),
