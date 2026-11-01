@@ -127,6 +127,17 @@ def test_post_parity(_module) -> None:
     check("post : parité bit-à-bit HF (100 graines + K=0 + K=tout)", True, "égalité exacte")
 
 
+def test_post_deploy(_module) -> None:
+    """Le levier est recuit dans l'env de l'image déployée (cf. FAST_PREPROCESS)."""
+    from test_units import check
+
+    app = _fresh("live_app_fast")
+    check("post : FAST_POST_KEPT_ONLY dans LEVER_NAMES",
+          "FAST_POST_KEPT_ONLY" in app.LEVER_NAMES, str(app.LEVER_NAMES))
+    check("post : lever_env() transmet le levier",
+          "FAST_POST_KEPT_ONLY" in app.lever_env(), "absent de lever_env()")
+
+
 def test_post_faster(_module) -> None:
     """Le fork bat le HF à taille réelle (mesure informative, seuil large)."""
     from test_units import check

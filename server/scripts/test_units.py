@@ -464,6 +464,8 @@ RUNNERS = (
      post_tests.test_post_parity),
     ("live_fast : post (gain mesuré)", "timing",
      post_tests.test_post_faster),
+    ("live_fast : post (levier recuit au déploiement)", "timing",
+     post_tests.test_post_deploy),
 )
 
 
