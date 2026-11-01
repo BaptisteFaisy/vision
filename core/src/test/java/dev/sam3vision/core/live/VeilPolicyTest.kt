@@ -22,6 +22,17 @@ class VeilPolicyTest {
     }
 
     @Test
+    fun `le mur ne voile dans aucune langue du contrat`() {
+        // Le label renvoyé est le prompt tel que saisi (contrat serveur) :
+        // le mur tapé en français voilait encore la rue en deux (01/11).
+        assertFalse(VeilPolicy.showsVeil("mur"))
+        assertFalse(VeilPolicy.showsVeil("murs"))
+        assertFalse(VeilPolicy.showsVeil("muret"))
+        assertFalse(VeilPolicy.showsVeil("murets"))
+        assertFalse(VeilPolicy.showsVeil("walls"))
+    }
+
+    @Test
     fun `les objets ordinaires voilent`() {
         assertTrue(VeilPolicy.showsVeil("person"))
         assertTrue(VeilPolicy.showsVeil("door"))
