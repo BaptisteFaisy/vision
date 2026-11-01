@@ -15,6 +15,31 @@ livré et ses preuves (tâche, fichiers, chiffres) dans l'arbre.
 - **Preuve** : 3 000+ tests `:core`/`:app`, portes vertes (`check-kotlin-limits`,
   voicepack, isee-design, voice-nav-doc, budget dérivé). Doc :
   `docs/VOIX-POSITIONS.md` § 9 « Rail trottoir ».
+## 2026-11-01 — iSee : faux « Stop » sur garées multi-voitures tué — gigue, verdicts, bordures, fusion stable (branche `voiture-donnees-reelles`)
+
+- **Fait** : retest mouvement-vs-arrêt sur 80 frames SAM 3.1 réelles (pan
+  S1 + dashcam S2, prompts/knobs de production) : le pan sur taxis garés
+  disait faussement « Stop, car moving. » par trois mécanismes, tous
+  corrigés — (1) croissance flicker (±7 % de surface entre deux frames)
+  prise pour une approche : tue quand la boîte suit la caméra
+  (`followingCamera`, miroir du veto arrêt) ; (2) approche/latéral sur
+  verdict flou ou absent sous fond franc : mouvement prouvé
+  (`VEHICLE_MOVED`) exigé (`verdictAllows`) ; (3) voiture qui entre au
+  bord du cadre sous pan (déclip = fausse croissance) : pistes au bord
+  ignorées sous fond franc (`onEdge`) ; (4) fusion max-surface qui
+  téléporte entre deux voitures : même instance gardée tant qu'elle se
+  recouvre (`pickStable`, IoU ≥ 0,3). Fichiers : `VehicleState.kt`,
+  `VehicleApproach.kt`, fixtures `real-motion/s1-pan.json` (393 boîtes)
+  + `s2-dash.json` (284 boîtes), test `CrossingRealMotionTest` (3 tests).
+- **Preuve** : `:app:testDebugUnitTest` 1 854 verts (0 échec, dont 3
+  nouveaux : S1 réel silencieux sous pan, S1 sans fond verrouillé sur
+  son faux Stop documenté, S2 réel annoncé sous 4 défilements) ;
+  `:core:testDebugUnitTest` 3 023 verts (0 échec) ;
+  `check-kotlin-limits.py` OK. Sans fond, la gigue S1 dit encore Stop
+  (frame 3) — attendu : aucun veto n'est possible sans signal fond.
+  Recette isee-sim toujours bloquée infra (qemu 75-90 % de morts/run,
+  tous APK/vidéos — flake, pas de crash app ; puce Traversée manuelle
+  repérée pour un futur e2e du fix feu quand l'infra sera saine).
 
 ## 2026-11-01 — voix : audit du pack, tous les MP3 sont bien en voix Laure (branche `feat/audit-voix-pack`)
 
