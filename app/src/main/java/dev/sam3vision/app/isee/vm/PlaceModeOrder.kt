@@ -8,8 +8,10 @@ import dev.sam3vision.core.settings.Settings
  * Ordre vocal « mode dedans/dehors » : bascule le lieu du picto et le
  * confirme à voix haute. Appelé sur le texte dicté en premier, avant la
  * maison et les pictos : la bascule marche même en mode dehors, où tout le
- * reste du picto est muet. Le texte qui n'est pas un ordre de lieu rend
- * `false` et poursuit son chemin (maison, picto, cap, navigation, LLM).
+ * reste du picto est muet. Vers dehors, l'état picto affiché est vidé
+ * (les repères restent armés pour le retour dedans). Le texte qui n'est
+ * pas un ordre de lieu rend `false` et poursuit son chemin (maison,
+ * picto, cap, navigation, LLM).
  */
 class PlaceModeOrder(
     private val settings: () -> Settings,
@@ -24,7 +26,18 @@ class PlaceModeOrder(
     suspend fun run(text: String): Boolean {
         val mode = CorePlaceModeOrder.parse(text) ?: return false
         val confirm = PlaceModeText.switched(mode, settings().speechLanguage)
-        update { it.copy(placeMode = mode, status = confirm) }
+        update {
+            it.copy(
+                placeMode = mode,
+                status = confirm,
+                picto = if (mode.pictoEnabled) it.picto else it.picto.copy(
+                    phase = PictoPhase.Idle,
+                    draftPng = null,
+                    draftLabel = "",
+                    hits = emptyList(),
+                ),
+            )
+        }
         speak(confirm)
         return true
     }

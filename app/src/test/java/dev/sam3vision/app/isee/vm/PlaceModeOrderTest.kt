@@ -1,12 +1,14 @@
 package dev.sam3vision.app.isee.vm
 
 import dev.sam3vision.app.isee.IseeUiState
+import dev.sam3vision.core.picto.PictoHit
 import dev.sam3vision.core.picto.PictoPlaceMode
 import dev.sam3vision.core.settings.Settings
 import dev.sam3vision.core.speech.SpeechLanguage
 import kotlinx.coroutines.runBlocking
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
+import org.junit.Assert.assertNull
 import org.junit.Assert.assertTrue
 import org.junit.Test
 
@@ -55,5 +57,39 @@ class PlaceModeOrderTest {
         assertEquals(PictoPlaceMode.DEDANS, state.placeMode)
         assertTrue(spoken.isEmpty())
         assertTrue(state.status == null)
+    }
+
+    @Test
+    fun `bascule dehors vide l'etat picto affiche, les armes restent armes`() = runBlocking {
+        state = IseeUiState(
+            picto = PictoUiState(
+                phase = PictoPhase.Review,
+                draftPng = byteArrayOf(1, 2),
+                draftLabel = "Objet",
+                hits = listOf(PictoHit("id-1", "Objet", 0f, 0f, 1f, 1f, 0.9f)),
+                armed = 2,
+            ),
+        )
+        assertTrue(order().run("mode dehors"))
+        assertEquals(PictoPlaceMode.DEHORS, state.placeMode)
+        assertEquals(PictoPhase.Idle, state.picto.phase)
+        assertNull(state.picto.draftPng)
+        assertTrue(state.picto.hits.isEmpty())
+        assertEquals(2, state.picto.armed)
+        assertEquals("Mode dehors activé.", state.status)
+    }
+
+    @Test
+    fun `bascule dedans garde l'etat picto`() = runBlocking {
+        val shown = PictoUiState(
+            phase = PictoPhase.Review,
+            draftPng = byteArrayOf(1, 2),
+            hits = listOf(PictoHit("id-1", "Objet", 0f, 0f, 1f, 1f, 0.9f)),
+            armed = 1,
+        )
+        state = IseeUiState(picto = shown)
+        assertTrue(order().run("mode dedans"))
+        assertEquals(PictoPlaceMode.DEDANS, state.placeMode)
+        assertEquals(shown, state.picto)
     }
 }
