@@ -13,6 +13,7 @@ import com.meta.wearable.dat.core.session.DeviceSession
 import com.meta.wearable.dat.core.types.DeviceSessionError
 import android.os.SystemClock
 import android.util.Log
+import dev.sam3vision.core.live.GlassesLinkStats
 import java.io.File
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Job
@@ -52,6 +53,8 @@ internal class GlassesCamera(
     private var framesJob: Job? = null
     private var pushed = 0L
     private var firstPushMs = 0L
+    /** Abandons du collecteur (étranglement, encodage), remis à zéro par session. */
+    private val linkStats = GlassesLinkStats()
 
     /** Micro des lunettes, créé avec le flux : `null` tant que rien n'est attaché. */
     var audio: GlassesAudio? = null
@@ -130,7 +133,7 @@ internal class GlassesCamera(
     private fun startFrameCollector(active: Stream) {
         val consumer = onFrame ?: return
         if (frameCollectionIdleReason(collectFrames, hasConsumer = true) != null) return
-        val pump = GlassesFrameCollector(onFrame = consumer, onLog = onFrameLog)
+        val pump = GlassesFrameCollector(onFrame = consumer, onLog = onFrameLog, onDrop = linkStats::drop)
         collector = pump
         collectorJob = scope.launch { pump.run(active.videoStream) }
         onNote(GlassesMessages.framesVoiceRoute())
@@ -209,6 +212,7 @@ internal class GlassesCamera(
         collectorJob = null
         collector?.close()
         collector = null
+        linkStats.reset()
         framesJob?.cancel()
         framesJob = null
         GlassesVideoLink.clear()

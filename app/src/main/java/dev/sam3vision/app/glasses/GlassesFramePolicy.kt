@@ -128,8 +128,17 @@ internal fun cropTo4x3(width: Int, height: Int): CropRect? {
 // Déplacés depuis `bench/GlassesSessionPolicy.kt` : le débit et le tri des
 // frames sont les mêmes des deux côtés, une seule définition fait foi.
 
-/** Étranglement du flux : une frame toutes les 1,5 s suffit au LLM, au-delà on paie pour rien. */
+/** Étranglement du flux (banc) : une frame toutes les 1,5 s suffit au LLM, au-delà on paie pour rien. */
 internal const val FRAME_THROTTLE_MS = 1_500L
+
+/**
+ * Étranglement du collecteur de production ([GlassesFrameCollector]) : une frame
+ * toutes les 400 ms. Le collecteur pipeline décodage et envoi (deux frames en
+ * vol), donc une fenêtre plus courte ne paie plus l'analyse au prix fort : elle
+ * rafraîchit la scène vue par le LLM sans attendre la fin de l'envoi précédent.
+ * Le banc garde [FRAME_THROTTLE_MS] (mesures à cadence fixe, comparables).
+ */
+internal const val COLLECTOR_THROTTLE_MS = 400L
 
 /**
  * Attente à respecter avant d'envoyer la frame suivante, en millisecondes

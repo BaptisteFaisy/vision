@@ -125,4 +125,38 @@ class LivePumpTest {
         assertTrue("à l'échéance suivante : elle part", pump.offer("a l'echeance", 33L, 34L))
         assertEquals(0, client.liveCalls)
     }
+
+    @Test
+    fun `les offres trop precoces sont comptees comme jetees`() {
+        val session = sessionOf(FrameGate(), averageMs = 240L)
+        val pump = LivePump({ session }, { now })
+
+        assertTrue(pump.offer("A", 1L, 2L))
+        assertFalse("juste après le créneau : trop tôt", pump.offer("B", 3L, 4L))
+        assertFalse("toujours trop tôt", pump.offer("C", 5L, 6L))
+        assertEquals("deux offres refusées par la cadence", 2L, pump.droppedFrames)
+
+        now += session.intervalMsContinuous()
+        assertTrue("à l'échéance : elle part", pump.offer("D", 7L, 8L))
+        assertEquals("une offre admise n'est pas un rejet", 2L, pump.droppedFrames)
+        assertEquals(0, client.liveCalls)
+    }
+
+    @Test
+    fun `reserve pleine et cadence cumulent leurs jetees`() {
+        val gate = FrameGate()
+        gate.tryStart()
+        val session = sessionOf(gate, averageMs = 240L)
+        val pump = LivePump({ session }, { now })
+
+        pump.offer("A", 1L, 2L)
+        pump.offer("B", 3L, 4L)
+        assertEquals("remplacement en réserve", 1L, pump.droppedFrames)
+
+        gate.finish()
+        assertTrue("créneau libre, sans échéance : elle part", pump.offer("C", 5L, 6L))
+        assertFalse("l'échéance vient d'être posée : trop tôt", pump.offer("D", 7L, 8L))
+        assertEquals("réserve + cadence", 2L, pump.droppedFrames)
+        assertEquals(0, client.liveCalls)
+    }
 }
