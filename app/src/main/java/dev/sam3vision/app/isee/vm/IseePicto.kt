@@ -66,7 +66,7 @@ data class PictoUiState(
  * — SAM muet (GPU froid), pas de picto clé, même si le motif matche.
  * Dehors, tout est muet (bouton, ordres, reconnaissance sur frames) : seul
  * dedans suit des pictos. Une génération lancée dedans mais livrée dehors
- * est jetée sans bruit ([dropLate]).
+ * est jetée sans bruit ([dropLate]) — comme une génération effacée entre-temps.
  */
 class IseePicto(
     private val media: MediaCacheStore,
@@ -102,6 +102,13 @@ class IseePicto(
 
     @Volatile
     private var busy = false
+
+    /**
+     * Génération de l'effacement : une livraison dont le numéro a vieilli
+     * (effacée entre-temps) est jetée sans stocker — comme une livraison tardive.
+     */
+    @Volatile
+    private var clearGen = 0
 
     @Volatile
     private var lastMatchAt = 0L
@@ -144,6 +151,24 @@ class IseePicto(
     /** PNG d'un repère pour l'overlay, `null` si inconnu. */
     fun pngOf(id: String): ByteArray? = pictos.firstOrNull { it.id == id }?.png
 
+    /**
+     * Efface tous les repères (Réglages) : fichiers supprimés, mémoire vidée,
+     * chasse abandonnée, overlay tombé. Une génération en vol garde son
+     * `busy` : à sa livraison, son numéro a vieilli et elle est jetée
+     * sans stocker — rien ne ressuscite.
+     */
+    fun clearAll() {
+        clearGen++
+        scope.launch(io) {
+            runCatching { store.clear() }
+            pictos = emptyList()
+            templateHits = emptyList()
+            liveHits = emptyList()
+            huntLabel = null
+            update { it.copy(picto = PictoUiState(armed = 0), status = IseeStatusText.PICTO_CLEARED) }
+        }
+    }
+
     /** Libellés armés : la chasse vocale vise l'un d'eux. */
     fun labels(): List<String> = pictos.map { it.label }
 
@@ -166,13 +191,14 @@ class IseePicto(
         if (busy) return
         busy = true
         update { it.copy(picto = PictoUiState(phase = PictoPhase.Shooting), status = null) }
+        val gen = clearGen
         launchGuarded {
             val shot = shoot()
             if (shot == null) {
                 fail(IseeStatusText.PICTO_PHOTO_FAILED)
             } else {
                 update { it.copy(picto = it.picto.copy(phase = PictoPhase.Generating)) }
-                generateAndArm(shot.first, shot.second, "")
+                generateAndArm(shot.first, shot.second, "", gen)
             }
         }
     }
@@ -246,13 +272,14 @@ class IseePicto(
             if (busy) return
             busy = true
             update { it.copy(picto = PictoUiState(phase = PictoPhase.Shooting, armed = pictos.size), status = null) }
+            val gen = clearGen
             launchGuarded {
                 val shot = shoot()
                 if (shot == null) {
                     fail(IseeStatusText.PICTO_PHOTO_FAILED)
                 } else {
                     update { it.copy(picto = it.picto.copy(phase = PictoPhase.Generating)) }
-                    generateAndArm(shot.first, shot.second, hunt)
+                    generateAndArm(shot.first, shot.second, hunt, gen)
                 }
             }
             return
@@ -288,10 +315,11 @@ class IseePicto(
     }
 
     /** Appel Muse puis stockage direct : l'overlay parle, pas d'avant-plan. */
-    private suspend fun generateAndArm(photo: ByteArray, template: PictoTemplate, label: String) {
+    private suspend fun generateAndArm(photo: ByteArray, template: PictoTemplate, label: String, gen: Int) {
         val result = clientOf(settings()).editToPictogram(photo, label)
         result.fold(
             onSuccess = { png ->
+                if (gen != clearGen) return@fold dropLate()
                 if (!placeMode().pictoEnabled) return@fold dropLate()
                 runCatching { store.save(label, png, template) }.onFailure {
                     fail(IseeStatusText.pictoFailed(it))
@@ -319,7 +347,8 @@ class IseePicto(
     }
 
     /**
-     * Livraison tardive (génération lancée dedans, bascule dehors entre-temps) :
+     * Livraison tardive (génération lancée dedans puis bascule dehors, ou repères
+     * effacés entre-temps) :
      * jetée sans bruit — ni stockage, ni statut (la confirmation de bascule
      * reste à l'écran). Les repères déjà armés le restent.
      */

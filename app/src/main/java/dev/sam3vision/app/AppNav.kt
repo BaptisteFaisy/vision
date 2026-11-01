@@ -273,7 +273,7 @@ private fun RouteHost(
         Route.Onboarding -> OnboardingGesturesScreen(onClose = pop)
         Route.Bench -> BenchScreen(onBack = pop)
         Route.VoiceNav -> VoiceNavRoute(isee, state.settings)
-        Route.Settings -> SettingsEntry(state, viewModel, glasses, push, pop, onHome)
+        Route.Settings -> SettingsEntry(isee, state, viewModel, glasses, push, pop, onHome)
     }
 }
 
@@ -392,6 +392,7 @@ private fun ChatRoute(state: UiState, viewModel: AppViewModel, pop: () -> Unit) 
  */
 @Composable
 private fun SettingsEntry(
+    isee: IseeViewModel,
     state: UiState,
     viewModel: AppViewModel,
     glasses: GlassesController,
@@ -406,6 +407,7 @@ private fun SettingsEntry(
             glasses = glasses,
             pop = pop,
             onOpenLive = { push(Route.Live) },
+            onClearPictos = isee.picto::clearAll,
             onOpenClassic = { push(Route.Capture) },
             onOpenGestures = { push(Route.Onboarding) },
             onPickRole = { next ->
@@ -451,6 +453,7 @@ private fun SettingsRoute(
     onOpenClassic: () -> Unit,
     onOpenGestures: () -> Unit,
     onPickRole: (Settings) -> Unit,
+    onClearPictos: () -> Unit,
 ) {
     val context = LocalContext.current
     val gpu by viewModel.gpu.collectAsState()
@@ -471,6 +474,7 @@ private fun SettingsRoute(
         onOpenLive = onOpenLive,
         onOpenClassic = onOpenClassic,
         onOpenGestures = onOpenGestures,
+        onClearPictos = onClearPictos,
         onPickRole = onPickRole,
         onStartTracking = { draft -> startParentTracking(viewModel, context, draft) },
         onStopTracking = {
