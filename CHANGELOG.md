@@ -3,6 +3,23 @@
 Le journal part du 2026-10-26 après 19 h : le commit de départ, puis une entrée par fait
 livré et ses preuves (tâche, fichiers, chiffres) dans l'arbre.
 
+## 2026-11-01 — iSee : compteur de marches répété toutes les 0,5 s (branche `compteur-marches-500ms`)
+
+- **Demande** : « passer à 500 ms les n marche » — le user, dans
+  l'escalier avec iSee, veut le compte deux fois plus souvent qu'aux
+  2 s de la v4.
+- **Fait** : `StairCountVoice.REPEAT_MS` 2 000 → 500 et nouvelle clé
+  `AntiRepeat` `stairs-count` (500 ms, paramétrée par compte : le
+  changement parle aussitôt) — le « N marches. » se redit toutes les
+  0,5 s tant que l'escalier reste vu, battement 300 ms inchangé.
+  Annonce, jalons 4/2/1 m, « Plus que N » et « Dernière marche. »
+  gardent la clé `stairs` à 2 s.
+- **Preuve** : `StairCountVoiceTest`, `AntiRepeatTest`,
+  `IseeSpecV4AntiRepeatTest`, `ProbeStairsCountVoiceTest`,
+  `ProbeHazardsTest` et `SeuilsDehorsV4Test` verts sur le r630
+  (suites `:core` + `:app` complètes + `assembleDebug`) ;
+  `check-kotlin-limits.py` vert. Recette téléphone **non mesurée**.
+
 ## 2026-11-01 — docs : spec v4 + revue des 14 branches (branche `feat/isee-docs-revue`)
 
 - **Fait** : réécriture voix (`docs/VOIX-DANGER.md` : échelle 0-12, traversée

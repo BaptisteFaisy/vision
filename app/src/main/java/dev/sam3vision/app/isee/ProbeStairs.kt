@@ -120,7 +120,7 @@ internal fun LiveProbe.stairsYieldToAvoidance(): Boolean {
  * Voix du compteur de marches : toutes les [tickMs] (300 ms), quand SAM nomme
  * un escalier et que la caméra voit des marches fraîches, dit combien
  * (« 5 marches. ») — changements aussitôt, même compte répété toutes les
- * 1 s ([StairCountVoice]), au niveau escaliers du bus (SPEC v4 : coupe la
+ * 0,5 s ([StairCountVoice]), au niveau escaliers du bus (SPEC v4 : coupe la
  * parole douce, chat compris — sécurité et parole du user exceptées), coupé
  * en Traversée comme en esquive ([stairsYieldToAvoidance]). Le battement ne
  * s'arrête jamais pour une synthèse lente (le bus écrase, dernier gagnant).
@@ -147,9 +147,9 @@ internal fun LiveProbe.observeStairsCount(
             val phrase = counter.onTick(
                 true, StairCannyCount.lineCount(), nowMs(), language(),
             ) ?: continue
-            // Cle par compte (stairs:5) : le changement parle aussitot, le
-            // meme compte attend 2 s (ordre user : escaliers a 2 s).
-            if (AntiRepeat.allow(AntiRepeat.KEY_STAIRS + ":" + phrase, nowMs())) {
+            // Cle par compte (stairs-count:5 marches.) : le changement parle
+            // aussitot, le meme compte attend 0,5 s (ordre user du 01/11).
+            if (AntiRepeat.allow(AntiRepeat.KEY_STAIRS_COUNT + ":" + phrase, nowMs())) {
                 VoiceBus.post(OutdoorLevel.STAIRS, phrase)
             }
         }
