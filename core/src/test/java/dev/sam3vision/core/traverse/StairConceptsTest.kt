@@ -55,7 +55,8 @@ class StairConceptsTest {
     fun `defauts dangers exterieur dont stairs, plafond dix huit`() {
         assertEquals(
             listOf(
-                "person", "car", "bus", "pedestrian traffic light", "pedestrian signal head",
+                "person", "car", "bus", "bicycle", "motorcycle",
+                "pedestrian traffic light", "pedestrian signal head",
                 "curb", "crosswalk", "pole", "stairs", "keys", "gate",
                 "souvenir shop", "beanie", "socks", "wall", "stroller", "child",
                 "dog",

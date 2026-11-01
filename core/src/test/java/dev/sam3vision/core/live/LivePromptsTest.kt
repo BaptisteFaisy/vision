@@ -10,11 +10,12 @@ import org.junit.Test
 class LivePromptsTest {
 
     @Test
-    fun `dix huit concepts exterieur par defaut, plafond client a vingt deux`() {
-        assertEquals(18, LivePrompts.default.size)
+    fun `vingt concepts exterieur par defaut, plafond client a vingt deux`() {
+        assertEquals(20, LivePrompts.default.size)
         assertEquals(
             listOf(
-                "person", "car", "bus", "pedestrian traffic light", "pedestrian signal head",
+                "person", "car", "bus", "bicycle", "motorcycle",
+                "pedestrian traffic light", "pedestrian signal head",
                 "curb", "crosswalk", "pole", "stairs", "keys", "gate",
                 "souvenir shop", "beanie", "socks", "wall", "stroller", "child",
                 "dog",
@@ -48,16 +49,18 @@ class LivePromptsTest {
     @Test
     fun `foule et souvenirs ensemble dans le defaut, plafond a vingt deux`() {
         // Ordres user du 01/11, dans l'ordre : « remets souvenir shop, beanie,
-        // socks, keys », « rajoute poussette/enfant/trottinette/chien », puis
-        // « vire electric scooter, bus, bicycle, sidewalk, fence ».
-        // Résultat : 17 concepts suivis, plafond toujours à 22 (client et
-        // serveur) — la marge sert à « Find the X », pas à la liste par défaut.
+        // socks, keys », « rajoute poussette/enfant/trottinette/chien »,
+        // « vire electric scooter, bus, bicycle, sidewalk, fence », puis
+        // « rajoute bus » et « bicycle moto je veux ».
+        // Résultat : 20 concepts suivis (les souvenirs, la foule, le bus, le
+        // vélo et la moto), plafond toujours à 22 (client et serveur).
         assertTrue("stroller" in LivePrompts.default)
         assertTrue("child" in LivePrompts.default)
         assertTrue("dog" in LivePrompts.default)
         assertFalse("electric scooter" in LivePrompts.default)
         assertTrue("bus" in LivePrompts.default)
-        assertFalse("bicycle" in LivePrompts.default)
+        assertTrue("bicycle" in LivePrompts.default)
+        assertTrue("motorcycle" in LivePrompts.default)
         assertFalse("sidewalk" in LivePrompts.default)
         assertFalse("fence" in LivePrompts.default)
         assertTrue("souvenir shop" in LivePrompts.default)
@@ -68,7 +71,6 @@ class LivePromptsTest {
         assertTrue("child" in LivePrompts.outdoor)
         assertTrue("electric scooter" in LivePrompts.outdoor)
         assertFalse("truck" in LivePrompts.default)
-        assertFalse("motorcycle" in LivePrompts.default)
         assertFalse("scooter" in LivePrompts.default)
     }
 
@@ -138,7 +140,7 @@ class LivePromptsTest {
     @Test
     fun `le mode exterieur iSee suit les defauts avec murs clotures et portails`() {
         val exterior = LivePrompts.forMode(true)
-        assertEquals(18, exterior.size)
+        assertEquals(20, exterior.size)
         assertTrue("wall" in exterior)
         assertTrue("gate" in exterior)
         // « vire … sidewalk, fence » puis « rajoute bus » (ordre user du 01/11) :
@@ -231,10 +233,10 @@ class LivePromptsTest {
 
     @Test
     fun `find the x sous le plafond s ajoute sans rien chasser`() {
-        // La liste par défaut est à 18, le plafond à 22 : « Find the X » ajoute
+        // La liste par défaut est à 20, le plafond à 22 : « Find the X » ajoute
         // (« wallet ») sans évincer personne — l'éviction ne commence qu'à 22.
         val next = LivePrompts.withConcept(LivePrompts.default, "wallet")
-        assertEquals(19, next.size)
+        assertEquals(21, next.size)
         assertTrue("wallet" in next)
         assertTrue("dog" in next)
         assertEquals(LivePrompts.default + "wallet", next)
