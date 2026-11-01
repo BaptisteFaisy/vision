@@ -360,7 +360,36 @@ run python3 "$REPLAY" --bogus
 expect_status 2 'route-replay --bogus sort 2'
 expect_grep 'argument inconnu' 'route-replay nomme l argument inconnu'
 
-# --- 12. hooks git : la branche part à jour --------------------------------
+# --- 12. latence-ab.sh : gardes de la campagne A/B --------------------------
+# Le script boote un émulateur : aucun test ne doit aller jusque-là. On
+# vérifie seulement qu'il refuse tôt, proprement, en nommant le coupable.
+echo "== 12. latence-ab.sh : gardes de la campagne =="
+AB="${HERE}/latence-ab.sh"
+run bash "$AB" --help
+expect_status 0 'latence-ab.sh --help sort 0'
+expect_grep 'text|binary' 'latence-ab.sh documente --leg'
+run bash "$AB" --bogus
+expect_status 2 'latence-ab.sh --bogus sort 2'
+run bash "$AB" --apk "${TMP}/faux.apk" --video "${TMP}/fausse-balade.mp4"
+expect_status 2 'latence-ab.sh exige --leg'
+expect_grep '\-\-leg' 'latence-ab.sh nomme --leg'
+run bash "$AB" --leg sms --apk "${TMP}/faux.apk" --video "${TMP}/fausse-balade.mp4"
+expect_status 2 'latence-ab.sh refuse une jambe inconnue'
+expect_grep 'text.*binary' 'latence-ab.sh nomme les jambes admises'
+run bash "$AB" --leg text --apk "${TMP}/absent.apk" --video "${TMP}/fausse-balade.mp4"
+expect_status 2 'latence-ab.sh refuse un APK absent'
+expect_grep 'APK absent' 'latence-ab.sh nomme l APK manquant'
+run bash "$AB" --leg text --apk "${TMP}/faux.apk" --video "${TMP}/balade-absente.mp4"
+expect_status 2 'latence-ab.sh refuse une vidéo absente'
+expect_grep 'vidéo absente' 'latence-ab.sh nomme la vidéo manquante'
+run bash "$AB" --leg text --apk "${TMP}/faux.apk" --video "${TMP}/fausse-balade.mp4" --frames abc
+expect_nonzero 'latence-ab.sh refuse un --frames non numérique'
+run bash "$AB" --leg text --apk "${TMP}/faux.apk" --video "${TMP}/fausse-balade.mp4" --frames 10 --skip 20
+expect_status 1 'latence-ab.sh refuse --frames sous --skip'
+run python3 "${HERE}/latence-ab-compare.py" --selftest
+expect_status 0 'latence-ab-compare.py --selftest passe'
+
+# --- 13. hooks git : la branche part à jour --------------------------------
 # Le détail (et les mesures) est dans tools/test-hooks.sh : hook pre-push et
 # installeur, sur des dépôts synthétiques, sans réseau.
 echo "== 12. tools/test-hooks.sh =="
