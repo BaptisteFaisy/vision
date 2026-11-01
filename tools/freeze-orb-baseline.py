@@ -8,7 +8,6 @@ user (docs/ISEE-DESIGN-PORTRAIT.md §6) : toute autre dérive du code gelé doit
 Usage : python3 tools/freeze-orb-baseline.py [racine]
 """
 import argparse
-import importlib.util
 import json
 import os
 import sys
@@ -18,12 +17,9 @@ import guard_lib
 
 
 def _design(root):
-    """Charge tools/check-isee-design.py (tirets : importlib, comme load_checker)."""
-    path = os.path.join(root, "tools", "check-isee-design.py")
-    spec = importlib.util.spec_from_file_location("_isee_design", path)
-    module = importlib.util.module_from_spec(spec)
-    spec.loader.exec_module(module)
-    return module
+    """Charge tools/check-isee-design.py (chargeur unique : guard_lib)."""
+    return guard_lib.load_py_module("_isee_design",
+                                  os.path.join(root, "tools", "check-isee-design.py"))
 
 
 def main(argv=None):
