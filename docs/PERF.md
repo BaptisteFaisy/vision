@@ -19,14 +19,14 @@ le relevé se rejoue avec `python3 tools/count-tree.py`, jamais à la main)
 
 | Grandeur | Valeur | Commande |
 |---|---|---|
-| Fichiers Kotlin | **1224** | `find . -name '*.kt' -not -path './.git/*' -not -path '*/build/*' \| wc -l` |
-| Lignes Kotlin | **153 303** | même `find`, `-exec cat {} + \| wc -l` |
-| Fichiers de test JVM | **577** (325 `:core` + 252 `:app`) | `find core/src/test app/src/test -name '*.kt' \| wc -l` |
-| `@Test` JVM `:core` | **2 957** | `grep -rho '@Test' core/src/test --include='*.kt' \| wc -l` |
-| `@Test` JVM `:app` | **1 838** | idem sur `app/src/test` (dont **98** dans `glasses/bench`) |
-| **Total JVM** | **4 795** | somme des deux lignes |
-| Tests instrumentés | **9** (8 `androidTest` + 1 `androidTestDebug` banc) | idem sur `src/androidTest` et `src/androidTestDebug` |
-| Garde de taille | **1 356** fichiers `.kt`/`.kts`/`.py` inspectés, **0** dépassement | `python3 tools/check-kotlin-limits.py` |
+| Fichiers Kotlin | **1215** | `find . -name '*.kt' -not -path './.git/*' -not -path '*/build/*' \| wc -l` |
+| Lignes Kotlin | **152 586** | même `find`, `-exec cat {} + \| wc -l` |
+| Fichiers de test JVM | **576** (327 `:core` + 249 `:app`) | `find core/src/test app/src/test -name '*.kt' \| wc -l` |
+| `@Test` JVM `:core` | **2 972** | `grep -rho '@Test' core/src/test --include='*.kt' \| wc -l` |
+| `@Test` JVM `:app` | **1 837** | idem sur `app/src/test` (dont **98** dans `glasses/bench`) |
+| **Total JVM** | **4 809** | somme des deux lignes |
+| Tests instrumentés | **8** (7 `androidTest` + 1 `androidTestDebug` banc) | idem sur `src/androidTest` et `src/androidTestDebug` |
+| Garde de taille | **1 349** fichiers `.kt`/`.kts`/`.py` inspectés, **0** dépassement | `python3 tools/check-kotlin-limits.py` |
 | Gardes de scripts | **177** tests, 177 ok | `bash scripts/test_scripts.sh` |
 | Tests de l'outillage | **138** tests, OK | `python3 -m unittest tools/test_check_kotlin_limits.py tools/test_check_budget_derive.py tools/test_check_voice_nav_doc.py tools/test_check_apk_keys.py tools/test_export_caregiver_orb.py` + `python3 .github/fireworks/test_conflict_agent.py` + `python3 .github/couche0/test_check_couche0.py` + `python3 .github/ci-budget/test_check_timeouts.py` (58 + 14 + 31 + 24 + 11) |
 | Tests backend | **639** tests, OK | `python3 server/scripts/test_units.py` (stubs stdlib, sans GPU) |
