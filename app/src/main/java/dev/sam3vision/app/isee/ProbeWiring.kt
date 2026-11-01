@@ -11,12 +11,13 @@ import dev.sam3vision.core.curb.CurbWatcher
 import dev.sam3vision.core.curb.RailState
 import dev.sam3vision.core.curb.SidewalkRail
 import dev.sam3vision.core.curb.SidewalkWatcher
-import dev.sam3vision.core.cycle.CycleWatcher
+
 import dev.sam3vision.core.distance.DistanceReading
 import dev.sam3vision.core.distance.LensSpec
 import dev.sam3vision.core.hazard.FenceOpeningSignal
 import dev.sam3vision.core.hazard.FenceOpeningWatcher
 import dev.sam3vision.core.hazard.HazardWatcher
+import dev.sam3vision.core.live.AntiRepeat
 import dev.sam3vision.core.live.FreeSpace
 import dev.sam3vision.core.live.FrameTimings
 import dev.sam3vision.core.live.GuidanceWord
@@ -30,6 +31,7 @@ import dev.sam3vision.core.live.TwinLiteWord
 import dev.sam3vision.core.model.Detection
 import dev.sam3vision.core.model.LiveFrame
 import dev.sam3vision.core.model.SegObject
+import dev.sam3vision.core.picto.PictoPlaceMode
 import dev.sam3vision.core.settings.Settings
 import dev.sam3vision.core.speech.SpeechLanguage
 import dev.sam3vision.core.stairs.StairConcepts
@@ -157,124 +159,58 @@ internal fun LiveProbe.ensureConcept(settings: Settings, label: String, sensorLe
 
 
 /**
- * Chaque phrase de la sonde est confiée à la voix, y compris redite à
- * l'identique (direction stable : [LiveProbeState.spokenSeq] distingue les
- * émissions). [playerIdle] vrai = aucune bulle du chat en cours de lecture.
- * La règle d'écrasement vit dans [observeSpokenEmissions] (répétition
- * identique en vol gardée, phrase fraîche dernier-gagnant). Les mots du
- * guidage partent en clips (< 100 ms), le reste (positions) en synthèse
- * réseau. L'urgence vient de l'état ([LiveProbeState.spokenUrgent], mot
- * stop) : seul le stop coupe la lecture en cours, chat compris — les mots
- * doux attendent le silence, en file (`queue`, redits au silence par le
- * guetteur obstacles).
+ * Voix parlée de la sonde (SPEC v4) : la dernière phrase décidée (`spoken`)
+ * lue dans l'état. Le mot stop part niveau 4 (blocage, sous clé `fence`) ;
+ * les mots du guidage vont au repli 12 ([FallbackVoice]) ; les positions ne
+ * parlent pas ici (niveaux 2 et 7). La parole du user passe par le bus
+ * ([VoiceBus.userSpeaking], câblé au ViewModel), pas par un coupeur local.
+ * Dehors uniquement : dedans, stop et repli se taisent (chaîne dedans :
+ * find, user, humain, chat, porte et murs).
  */
 internal fun LiveProbe.observeSpoken(
     scope: CoroutineScope,
-    voice: ProximityVoice,
-    playerIdle: () -> Boolean,
-    language: () -> SpeechLanguage,
+    placeMode: () -> PictoPlaceMode = { PictoPlaceMode.DEHORS },
 ) {
     scope.observeSpokenEmissions(
         state.map { SpokenEmission(it.spoken, it.spokenUrgent, it.spokenSeq) }.distinctUntilChanged(),
     ) { text, urgent ->
-        val clipId = spokenClipId(text)
-        if (clipId != null) voice.speakWord(clipId, text, language(), playerIdle(), urgent = urgent, queue = !urgent)
-        else voice.onPhrase(text, playerIdle(), urgent = urgent, queue = !urgent)
+        if (placeMode() != PictoPlaceMode.DEHORS) return@observeSpokenEmissions
+        if (urgent || GuidanceWord.isStopPhrase(text)) {
+            if (AntiRepeat.allow(AntiRepeat.KEY_FENCE, System.currentTimeMillis())) {
+                VoiceBus.post(OutdoorLevel.FENCE, text, spokenClipId(text))
+            }
+        } else {
+            FallbackVoice.offer(text)
+        }
     }
 }
 
 /**
- * Guetteur grillage de la sonde, miroir du mobilier : les pans suivis
- * ([dev.sam3vision.core.hazard.FenceOpeningConcepts]) lus dans l'état
- * (lectures de distance + dimensions, déjà publiées par frame), sans toucher
- * à `LiveProbe`. L'annonce (« Grillage fermé devant vous. », « Passage au
- * milieu. ») est douce (attend le silence) : iSee décrit, en douceur. Coupé
- * en mode Traversée (sa voix rouge/vert est propriétaire du son). Lecture
- * séquentielle, comme le trottoir : une alerte confirmée ne s'annule pas.
+ * Guetteur grillage de la sonde (SPEC v4, niveau 4) : les pans suivis lus
+ * dans l'état, postés au bus avec le niveau et la clé du signalement.
+ * Coupé en mode Traversée (le verdict y est propriétaire du son).
  */
 internal fun LiveProbe.observeFenceOpening(
     scope: CoroutineScope,
-    voice: ProximityVoice,
-    playerIdle: () -> Boolean,
     language: () -> SpeechLanguage,
+    placeMode: () -> PictoPlaceMode = { PictoPlaceMode.DEHORS },
 ): FenceOpeningWatcher {
     val watcher = FenceOpeningWatcher()
     scope.launch {
         state.collect { st ->
             if (st.crossingActive) return@collect
+            if (placeMode() != PictoPlaceMode.DEHORS) return@collect
             val readings = st.distanceLayer?.readings ?: return@collect
             val signal = FenceOpeningSignal.of(readings, st.width, st.height)
             val cue = watcher.onSignal(signal, System.currentTimeMillis(), language()) ?: return@collect
-            voice.onPhrase(cue.phrase, playerIdle(), urgent = false)
+            if (AntiRepeat.allow(cue.antiRepeatKey, System.currentTimeMillis())) {
+                VoiceBus.post(cue.level, cue.phrase)
+            }
         }
     }
     return watcher
 }
 
-/**
- * Guetteur véhicules-moteurs de la sonde, miroir du mobilier : mouvement et
- * arrêt (« Voiture en mouvement, à 5 mètres. », « Voiture à l'arrêt, à 2
- * mètres. ») lus dans l'état, sans toucher à `LiveProbe`. Jamais de
- * « Stop » ici (ordre user du 31/10 : le stop ne se dit qu'en Traversée,
- * voitures en mouvement — `CrossingVehicleWatch`) : mouvement comme arrêt
- * parlent doux (seul l'`urgent` du danger qui s'approche coupe). Parle en
- * Traversée comme ailleurs (audit voix 31/10 : les états moteurs ne sont
- * plus coupés — le feu garde sa voix, sans couvrir les moteurs).
- * Vélos et trottinettes exclus (voir [observeCycles]) : zéro double annonce.
- * Lecture séquentielle, comme le trottoir : une alerte confirmée ne s'annule pas.
- */
-internal fun LiveProbe.observeVehicleState(
-    scope: CoroutineScope,
-    voice: ProximityVoice,
-    playerIdle: () -> Boolean,
-    language: () -> SpeechLanguage,
-    watcher: VehicleStateWatcher = VehicleStateWatcher(),
-): VehicleStateWatcher {
-    scope.launch {
-        state.collect { st ->
-            val readings = st.distanceLayer?.readings ?: return@collect
-            val motion = ProbeBackgroundMotion.lastMotion
-            val cue = watcher.update(
-                detectionsOf(readings, st.width, st.height),
-                readings,
-                System.currentTimeMillis(),
-                language(),
-                motion,
-            ) ?: return@collect
-            logMotionTransition(watcher.cameraMoved, watcher.lastMotionVerdicts.values, st.width, motion?.dtMs ?: 0L)
-            voice.onPhrase(cue.phrase, playerIdle(), urgent = cue.urgent)
-        }
-    }
-    return watcher
-}
-
-/**
- * Guetteur cycles de la sonde, miroir des véhicules : vélos et trottinettes,
- * en mouvement ou arrêtés (« Attention, vélo en mouvement, à 2 heures. »),
- * lus dans l'état, sans toucher à `LiveProbe`. Doux et coupé en Traversée,
- * (coupé en Traversée, sans voix douce : le veto seul couvre les cycles).
- * Lecture séquentielle, comme le
- * trottoir : une alerte confirmée ne s'annule pas.
- */
-internal fun LiveProbe.observeCycles(
-    scope: CoroutineScope,
-    voice: ProximityVoice,
-    playerIdle: () -> Boolean,
-    language: () -> SpeechLanguage,
-): CycleWatcher {
-    val watcher = CycleWatcher()
-    scope.launch {
-        state.collect { st ->
-            if (st.crossingActive) return@collect
-            val readings = st.distanceLayer?.readings ?: return@collect
-            val cue = watcher.update(
-                detectionsOf(readings, st.width, st.height), readings, System.currentTimeMillis(), language())
-                ?: return@collect
-            voice.onPhrase(cue.phrase, playerIdle(), urgent = false)
-        }
-    }
-    return watcher
-}
 
 /**
  * Détections reconstruites des lectures de distance : boîtes pixels SAM déjà
@@ -399,11 +335,9 @@ internal fun LiveProbe.phraseOf(
     motion: FrameMotion? = null,
 ): String? {
     val guide = probeGuideFrameOf(ProbeTracks.tracker, at, state.value.timings, placed, hfovDeg)
-    if (state.value.crossingActive) {
-        return crossingPhraseOf(cross?.cue, placed, detections,
-            readings, at, language, frame.objects, frame.width, frame.height, scanTrigger,
-            cross?.noLight == true, steeringOf(placed, frame, at, hfovDeg), motion)
-    }
+    // Traversée : silence — le verdict parle au bus (niveau 100, nourri dans
+    // `computeRest`), humains et bordures via le guetteur obstacles (101/102).
+    if (state.value.crossingActive) return null
     resetCrossingWatches()
     val phrase = voice.phrase(at, guide.labels, state.value.steeringCap,
         frame.passage, hfovDeg = hfovDeg)
@@ -416,33 +350,32 @@ internal fun LiveProbe.phraseOf(
 }
 
 /**
- * Guetteur trottoir-nommé de la sonde, miroir des dangers : la position lue
+ * Guetteur trottoir-nommé de la sonde (SPEC v4, niveau 10) : la position lue
  * dans la voix guidée (rien dans l'état ne porte le plan du trottoir, non
- * mesuré), sans toucher à `LiveProbe`. L'annonce (« Trottoir à gauche. »)
- * est douce (attend le silence) : une info de navigation, jamais une
- * consigne — l'ordre de retour passe par les mots du guidage. Coupé en mode
- * Traversée et guidage coupé (la voix des positions nomme déjà le trottoir).
- * Lecture séquentielle, comme les dangers : une alerte confirmée ne s'annule pas.
+ * mesuré), postée au bus avec le niveau et la clé du signalement. Coupé en
+ * mode Traversée (le verdict y est propriétaire du son).
  */
 internal fun LiveProbe.observeSidewalk(
     scope: CoroutineScope,
-    voice: ProximityVoice,
-    playerIdle: () -> Boolean,
     language: () -> SpeechLanguage,
+    placeMode: () -> PictoPlaceMode = { PictoPlaceMode.DEHORS },
 ): SidewalkWatcher {
     val watcher = SidewalkWatcher()
     scope.launch {
         state.collect { st ->
             if (st.crossingActive) return@collect
+            if (placeMode() != PictoPlaceMode.DEHORS) return@collect
             val position = this@observeSidewalk.voice.lastSidewalk
             val cue = watcher.onPosition(position, System.currentTimeMillis(), language()) ?: return@collect
-            voice.onPhrase(cue.phrase, playerIdle(), urgent = false)
+            if (AntiRepeat.allow(cue.antiRepeatKey, System.currentTimeMillis())) {
+                VoiceBus.post(cue.level, cue.phrase)
+            }
         }
     }
     return watcher
 }
 
-/** Les huit guetteurs de la sonde (bordure + escaliers + compteur + mobilier + grillage + véhicules + cycles + trottoir), reset commun. */
+/** Les sept guetteurs de la sonde (bordure + escaliers + compteur + mobilier + grillage + véhicules + trottoir), reset commun. */
 internal class ProbeHazards(
     val curb: CurbWatcher,
     val stairs: StairWatcher,
@@ -450,10 +383,9 @@ internal class ProbeHazards(
     val hazard: HazardWatcher,
     val fence: FenceOpeningWatcher,
     val vehicle: VehicleStateWatcher,
-    val cycle: CycleWatcher,
     val sidewalk: SidewalkWatcher,
 ) {
-    /** Oublie les huit guetteurs, le compte caméra et les pistes de personnes (nouvelle séance). */
+    /** Oublie les sept guetteurs, le compte caméra et les pistes de personnes (nouvelle séance). */
     fun reset() {
         curb.reset()
         stairs.reset()
@@ -461,7 +393,6 @@ internal class ProbeHazards(
         hazard.reset()
         fence.reset()
         vehicle.reset()
-        cycle.reset()
         sidewalk.reset()
         StairCannyCount.clear()
         ProbeTracks.reset()
@@ -469,29 +400,24 @@ internal class ProbeHazards(
 }
 
 /**
- * Les huit guetteurs en un appel : le ViewModel n'y tient qu'une ligne
+ * Les sept guetteurs en un appel : le ViewModel n'y tient qu'une ligne
  * (plafond 500 — voir `observeSpoken`, même contrat). Véhicules, bordure et
- * mobilier partagent le guetteur obstacles (une frame, une parole P1-P5).
- * [stairsAudible] est la porte des deux voix escaliers (GPS coupé : parlent
- * quand même, sécurité — contrat `IseeVoiceGate`).
+ * mobilier partagent le guetteur obstacles (une frame, un seul gagnant au
+ * bus). Tous postent au bus ([VoiceBus]) : plus de voix directe ici.
  */
 internal fun LiveProbe.observeHazards(
     scope: CoroutineScope,
-    voice: ProximityVoice,
-    playerIdle: () -> Boolean,
     language: () -> SpeechLanguage,
-    safety: SafetyVoice,
-    stairsAudible: () -> Boolean = playerIdle,
+    placeMode: () -> PictoPlaceMode = { PictoPlaceMode.DEHORS },
 ): ProbeHazards {
-    val obstacles = observeObstacles(scope, voice, playerIdle, language, safety)
+    val obstacles = observeObstacles(scope, language, placeMode = placeMode)
     return ProbeHazards(
         obstacles.curb,
-        observeStairs(scope, voice, stairsAudible, language),
-        observeStairsCount(scope, voice, stairsAudible, language),
+        observeStairs(scope, language, placeMode = placeMode),
+        observeStairsCount(scope, language, placeMode = placeMode),
         obstacles.hazard,
-        observeFenceOpening(scope, voice, playerIdle, language),
+        observeFenceOpening(scope, language, placeMode = placeMode),
         obstacles.vehicle,
-        observeCycles(scope, voice, playerIdle, language),
-        observeSidewalk(scope, voice, playerIdle, language),
+        observeSidewalk(scope, language, placeMode = placeMode),
     )
 }

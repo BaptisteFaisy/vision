@@ -140,6 +140,17 @@ class LiveProbe(
     /** Porte « sans feu » : 4 frames sans boîte de feu → voix véhicules + « Traversez. ». */
     internal val noLightGate = NoLightGate()
 
+    /**
+     * Moteur du verdict traversée (SPEC v4) : feu piéton puis voitures en
+     * mouvement → « Cross. » / « Don't cross. » au bus (niveau 100),
+     * humains (101) et bordures (102) via le guetteur obstacles. Branché au
+     * bus une fois pour toutes ; nourri à chaque frame en Traversée
+     * ([computeRest]), remis à zéro à l'activation ([setCrossingActive]).
+     */
+    internal val verdictEngine = CrossingVerdictEngine(
+        poster = CrossingVerdictPoster { level, text, clipId -> VoiceBus.post(level, text, clipId) },
+    )
+
 /** Chronologie de la frame courante : capture du capteur → pixel affiché. */
     internal val chronology = ScreenTimings(clock)
 

@@ -1,5 +1,7 @@
 package dev.sam3vision.app.isee
 
+import dev.sam3vision.core.live.AntiRepeat
+import dev.sam3vision.core.picto.PictoPlaceMode
 import dev.sam3vision.core.speech.SpeechLanguage
 import dev.sam3vision.core.stairs.StairConcepts
 import dev.sam3vision.core.stairs.StairCountVoice
@@ -25,16 +27,14 @@ import kotlinx.coroutines.launch
  * marche, par compteur Canny frais de la caméra ([StairCannyCount] — 0 = non
  * compté, pas « zéro marche ») ou par profondeur (< 1 m, lue ici). Lecture
  * séquentielle, comme le trottoir : une alerte confirmée ne s'annule pas.
- * [stairsAudible] ne regarde que le chat (chat libre suffit) : la sécurité
- * passe avant le silence (porte GPS supprimée, SPEC v4). L'esquive en cours
- * ([stairsYieldToAvoidance]) tait l'annonce : les humains priment, même sur
- * les escaliers.
+ * L'annonce part au bus (niveau et clé du signalement, SPEC v4).
+ * L'esquive en cours ([stairsYieldToAvoidance]) tait l'annonce : les humains
+ * priment, même sur les escaliers.
  */
 internal fun LiveProbe.observeStairs(
     scope: CoroutineScope,
-    voice: ProximityVoice,
-    stairsAudible: () -> Boolean,
     language: () -> SpeechLanguage,
+    placeMode: () -> PictoPlaceMode = { PictoPlaceMode.DEHORS },
 ): StairWatcher {
     // Deux frames suffisent côté voix (le flux Canny d'affichage garde trois) :
     // un escalier nommé deux fois de suite n'est plus un clignotement.
@@ -42,6 +42,7 @@ internal fun LiveProbe.observeStairs(
     scope.launch {
         state.collect { st ->
             if (st.crossingActive) return@collect
+            if (placeMode() != PictoPlaceMode.DEHORS) return@collect
             if (this@observeStairs.stairsYieldToAvoidance()) return@collect
             // Lectures d'abord (sens + heure par la boîte), libellés bruts en
             // repli : un escalier nommé sans mesure reste un escalier.
@@ -73,7 +74,9 @@ internal fun LiveProbe.observeStairs(
                 )
             }
             cue ?: return@collect
-            voice.onPhrase(cue.phrase, stairsAudible(), urgent = false)
+            if (AntiRepeat.allow(cue.antiRepeatKey, System.currentTimeMillis())) {
+                VoiceBus.post(cue.level, cue.phrase)
+            }
         }
     }
     return watcher
@@ -118,23 +121,20 @@ internal fun LiveProbe.stairsYieldToAvoidance(): Boolean {
  * Voix du compteur de marches : toutes les [tickMs] (300 ms), quand SAM nomme
  * un escalier et que la caméra voit des marches fraîches, dit combien
  * (« 5 marches. ») — changements aussitôt, même compte répété toutes les
- * 1 s ([StairCountVoice]), en prioritaire ([VoicePreempt.STAIRS] : coupe la
+ * 1 s ([StairCountVoice]), au niveau escaliers du bus (SPEC v4 : coupe la
  * parole douce, chat compris — sécurité et parole du user exceptées), coupé
- * en Traversée comme en esquive ([stairsYieldToAvoidance]). La voix part en
- * coroutine fille : le battement ne s'arrête jamais pour une synthèse lente
- * (le lecteur coupe le précédent, dernier gagnant). Sans escalier nommé ou
- * sans compte frais : silence (auto-muet caméra coupée, séance finie). Rend
- * le compteur pour le `reset()` de séance. [stairsAudible] ne regarde que
- * le chat, comme l'annonce (sécurité). [nowMs] est l'horloge du compteur
- * (injectée en test).
+ * en Traversée comme en esquive ([stairsYieldToAvoidance]). Le battement ne
+ * s'arrête jamais pour une synthèse lente (le bus écrase, dernier gagnant).
+ * Sans escalier nommé ou sans compte frais : silence (auto-muet caméra
+ * coupée, séance finie). Rend le compteur pour le `reset()` de séance.
+ * [nowMs] est l'horloge du compteur (injectée en test).
  */
 internal fun LiveProbe.observeStairsCount(
     scope: CoroutineScope,
-    voice: ProximityVoice,
-    stairsAudible: () -> Boolean,
     language: () -> SpeechLanguage,
     tickMs: Long = StairCountVoice.COUNT_MS,
     nowMs: () -> Long = { System.currentTimeMillis() },
+    placeMode: () -> PictoPlaceMode = { PictoPlaceMode.DEHORS },
 ): StairCountVoice {
     val counter = StairCountVoice()
     scope.launch {
@@ -142,16 +142,16 @@ internal fun LiveProbe.observeStairsCount(
             delay(tickMs)
             val st = state.value
             if (st.crossingActive) continue
+            if (placeMode() != PictoPlaceMode.DEHORS) continue
             if (this@observeStairsCount.stairsYieldToAvoidance()) continue
             if (!stairsFoundOf(st).detected) continue
             val phrase = counter.onTick(
                 true, StairCannyCount.lineCount(), nowMs(), language(),
             ) ?: continue
-            scope.launch {
-                voice.onPhrase(
-                    phrase, stairsAudible(), urgent = false,
-                    dedupMs = StairCountVoice.REPEAT_MS, preempt = VoicePreempt.STAIRS,
-                )
+            // Cle par compte (stairs:5) : le changement parle aussitot, le
+            // meme compte attend 2 s (ordre user : escaliers a 2 s).
+            if (AntiRepeat.allow(AntiRepeat.KEY_STAIRS + ":" + phrase, nowMs())) {
+                VoiceBus.post(OutdoorLevel.STAIRS, phrase)
             }
         }
     }

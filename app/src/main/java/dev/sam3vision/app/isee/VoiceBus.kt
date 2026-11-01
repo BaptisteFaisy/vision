@@ -45,6 +45,16 @@ object VoiceBus {
     @Volatile
     var speaker: VoiceBusSpeaker? = null
 
+    /**
+     * Rappel de repos (`null` = personne : le chat ne reprend pas tout seul).
+     * Appelé hors verrou à chaque retour au repos réel (fin de lecture,
+     * fin de parole user, fin de lecture chat) : le ViewModel y relance la
+     * réponse coupée (reprise au rang 9, hors Traversée). Le rappel tourne
+     * sous le verrou du bus (réentrant) : il ne fait que lancer une lecture.
+     */
+    @Volatile
+    var onIdle: (() -> Unit)? = null
+
     /** Niveau de la parole en cours ([IDLE_LEVEL] = aucune). */
     private var activeLevel: Int = IDLE_LEVEL
 
@@ -88,7 +98,10 @@ object VoiceBus {
      */
     @Synchronized
     fun onSpeechIdle() {
-        if (!userHoldsMic && !chatReads) activeLevel = IDLE_LEVEL
+        if (userHoldsMic || chatReads) return
+        if (activeLevel == IDLE_LEVEL) return
+        activeLevel = IDLE_LEVEL
+        onIdle?.invoke()
     }
 
     /**
@@ -105,6 +118,7 @@ object VoiceBus {
             activeLevel = OutdoorLevel.USER_SPEECH
         } else if (activeLevel == OutdoorLevel.USER_SPEECH) {
             activeLevel = IDLE_LEVEL
+            onIdle?.invoke()
         }
     }
 
@@ -121,6 +135,7 @@ object VoiceBus {
             activeLevel = OutdoorLevel.CHAT
         } else if (activeLevel == OutdoorLevel.CHAT) {
             activeLevel = IDLE_LEVEL
+            onIdle?.invoke()
         }
     }
 

@@ -154,13 +154,18 @@ class IseePlayback(
     private suspend fun playAudio(file: File, row: MessageMultimedia, preferAi: Boolean) {
         val id = bubbleId(row.id, preferAi)
         update { it.copy(speakingEntryId = id, status = null) }
-        player.playFile(file).onFailure { cause ->
-            update { st ->
-                st.copy(
-                    speakingEntryId = if (st.speakingEntryId == id) null else st.speakingEntryId,
-                    status = playbackFailed(cause),
-                )
+        VoiceBus.chatSpeaking(true)
+        try {
+            player.playFile(file).onFailure { cause ->
+                update { st ->
+                    st.copy(
+                        speakingEntryId = if (st.speakingEntryId == id) null else st.speakingEntryId,
+                        status = playbackFailed(cause),
+                    )
+                }
             }
+        } finally {
+            VoiceBus.chatSpeaking(false)
         }
     }
 
@@ -215,16 +220,22 @@ class IseePlayback(
         played.fold(ByteArray(0)) { acc, slice -> acc + slice }
     }
 
-    /** Pose l'état parlant, sans voler celui d'une lecture plus récente. */
+    /**
+     * Pose l'état parlant, sans voler celui d'une lecture plus récente, et
+     * tient le rang 9 le temps de la tranche (entre deux tranches, pendant
+     * les synthèses, le bus est libre et le guidage peut parler).
+     */
     private fun markSpeaking(id: Long) {
         update { st ->
             if (st.speakingEntryId == null || st.speakingEntryId == id) st.copy(speakingEntryId = id) else st
         }
+        VoiceBus.chatSpeaking(true)
     }
 
-    /** Rend l'état parlant s'il est encore le nôtre. */
+    /** Rend l'état parlant s'il est encore le nôtre, et le rang 9 avec. */
     private fun clearSpeaking(id: Long) {
         update { st -> if (st.speakingEntryId == id) st.copy(speakingEntryId = null) else st }
+        VoiceBus.chatSpeaking(false)
     }
 
     /**
