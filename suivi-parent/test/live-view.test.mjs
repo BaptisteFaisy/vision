@@ -1,6 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { frameOf, pictosOf, tripOf, tripPercent, tripRemaining, PHOTO_FRESH_MS, PICTO_FRESH_MS } from '../live-view.mjs';
+import { frameOf, pictosOf, tripOf, tripPercent, tripRemaining, frozenFrameOf, PHOTO_FRESH_MS, PICTO_FRESH_MS, DIRECT_FREEZE_MS } from '../live-view.mjs';
 
 const now = 1_700_000_000_000;
 const photo = { jpeg: 'AAAA', atMs: now - 1000 };
@@ -58,6 +58,15 @@ test('la barre disparaît hors guidage, à la coupure, et ne dépasse jamais ses
   assert.equal(tripPercent({ progress: 4 }), 100);
   assert.equal(tripPercent({ progress: -2 }), 0);
   assert.equal(tripPercent({}), 0);
+});
+
+test('micro-coupure du direct : l’image posée reste figée pendant la grâce', () => {
+  assert.equal(DIRECT_FREEZE_MS, 2_500);
+  assert.equal(frozenFrameOf(now - 1000, now), true);
+  assert.equal(frozenFrameOf(now - DIRECT_FREEZE_MS, now), false);
+  assert.equal(frozenFrameOf(now - DIRECT_FREEZE_MS - 1, now), false);
+  // Jamais posée : rien à geler, la page efface comme avant.
+  assert.equal(frozenFrameOf(0, now), false);
 });
 
 test('le reste du trajet se dit en mètres, kilomètres et heures', () => {

@@ -55,6 +55,16 @@ class ShareStreamTest {
     }
 
     @Test
+    fun `un micro trou n eteint pas la camera des aidants`() {
+        // 15 tours vides ≈ 1 s de silence avant l'avis `false`.
+        assertEquals(15, STREAM_CAMERA_OFF_TURNS)
+        assertEquals(false, cameraOffReady(0))
+        assertEquals(false, cameraOffReady(14))
+        assertEquals(true, cameraOffReady(15))
+        assertEquals(true, cameraOffReady(60))
+    }
+
+    @Test
     fun `un message qui n est pas un avis d audience ne fait rien`() {
         assertNull(audienceCountOf("bonjour"))
         assertNull(audienceCountOf(""))
