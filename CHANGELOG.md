@@ -3,6 +3,19 @@
 Le journal part du 2026-10-26 après 19 h : le commit de départ, puis une entrée par fait
 livré et ses preuves (tâche, fichiers, chiffres) dans l'arbre.
 
+## 2026-11-01 — iSee : rail trottoir métrique, deux paliers (branche `feat/rail-trottoir`)
+
+- **Fait** : `SidewalkRail` (`core/.../curb/SidewalkRail.kt`) juge le maintien
+  trottoir en **mètres lus sur la bordure** (`curb`), plus en bande d'image
+  (`PositionText.SIDE_EDGE` : ±0,85 m de dérive muette à 4 m) — sous `DRIFT_M`
+  (0,50 m) « Serrez à gauche/droite » à l'opposé du bord, sous `EDGE_M` (0,30 m)
+  « Attention, bord du trottoir » sans côté ; sans bordure mesurée, silence. Câblé
+  dans l'app par `ProbeGuideFrame.rail` (`probeGuideFrameOf`, `ProbeWiring.kt`) vers
+  `GuidanceAnnouncer.onFrame(rail = …)`.
+- **Preuve** : 3 000+ tests `:core`/`:app`, portes vertes (`check-kotlin-limits`,
+  voicepack, isee-design, voice-nav-doc, budget dérivé). Doc :
+  `docs/VOIX-POSITIONS.md` § 9 « Rail trottoir ».
+
 ## 2026-11-01 — voix : audit du pack, tous les MP3 sont bien en voix Laure (branche `feat/audit-voix-pack`)
 
 - **Demande** : « je veux que tous les mp3 enregistrés soient avec la voix de

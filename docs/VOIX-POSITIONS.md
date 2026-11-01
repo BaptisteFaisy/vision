@@ -166,3 +166,24 @@ Attendu de la porte de sortie : **3 objets → 3 annonces distinctes, aucune ré
 
 Le comportement annoncé ci-dessus est donc **lu dans le code et verrouillé par les tests
 JVM**, pas mesuré sur appareil — c'est l'état réel au 26/10.
+
+## 9. Rail trottoir — le maintien trottoir en mètres (01/11/2026)
+
+Pourquoi : le maintien sur trottoir mesurait une **bande d'image**
+(`PositionText.SIDE_EDGE`, § 2) — une tolérance qui grandissait avec la distance :
+±0,32 m à 1,5 m, ±0,42 m à 2 m, ±0,64 m à 3 m, ±0,85 m à 4 m. À quatre mètres
+devant soi, on pouvait donc dériver de 85 cm **sans un mot** (constat utilisateur
+du 01/11).
+
+Ce qui a changé : tout est en **mètres**, lus sur la bordure (`curb`) —
+`core/.../curb/SidewalkRail.kt` ; le masque de sol est coupé par le cadre de
+l'image, son bord n'est pas la bordure. Deux paliers :
+
+- sous `DRIFT_M` (0,50 m) : « Serrez à gauche/droite », **l'opposé du bord**
+  (une bordure à gauche fait serrer à droite) ;
+- sous `EDGE_M` (0,30 m) : « Attention, bord du trottoir », **sans côté** — au
+  contact, un mauvais côté coûte plus qu'un silence.
+
+La limite : sans bordure mesurée, silence — une scène vide ne prouve pas une absence.
+Câblage : `ProbeGuideFrame.rail` (`probeGuideFrameOf`, `app/.../isee/ProbeWiring.kt`)
+→ `GuidanceAnnouncer.onFrame(rail = …)`, bouché > décalage > rail > voie libre.

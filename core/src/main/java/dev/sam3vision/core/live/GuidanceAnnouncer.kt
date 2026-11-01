@@ -1,6 +1,9 @@
 package dev.sam3vision.core.live
 
+import dev.sam3vision.core.curb.RailLevel
+import dev.sam3vision.core.curb.RailState
 import dev.sam3vision.core.curb.SidewalkPosition
+import dev.sam3vision.core.curb.SidewalkRail
 import dev.sam3vision.core.distance.LensSpec
 import dev.sam3vision.core.model.Passage
 import dev.sam3vision.core.speech.SpeechLanguage
@@ -27,6 +30,20 @@ import dev.sam3vision.core.speech.SpeechLanguage
  *   [AnnouncementGate] le retenait (redite récente) — on écrit par le chemin
  *   d'écriture existant ([AnnouncementGate.markSpoken]) et l'échéance de
  *   redite repart de cet instant.
+ *
+ * **Rail trottoir** (01/11) — quatrième règle, sous le bouché et le décalage :
+ * le maintien sur le trottoir se jugeait sur une **bande d'image**
+ * (`PositionText.SIDE_EDGE`), donc une tolérance qui grandissait avec la
+ * distance — ±0,32 m à 1,5 m, ±0,85 m à 4 m. À quatre mètres devant soi,
+ * l'utilisateur pouvait donc dériver de **80 cm sans un mot** (constat du
+ * 01/11 : « il peut passer à 80 cm du sidewalk »). [SidewalkRail] mesure la
+ * bordure en mètres et rend deux paliers : [SidewalkRail.DRIFT_M] (50 cm, on
+ * s'écarte — « Serrez à droite. ») et [SidewalkRail.EDGE_M] (30 cm, on est sur
+ * le fil — « Attention, bord du trottoir. »). Le rail parle **après** le
+ * couloir bouché et le décalage, et **jamais** sur une frame périmée
+ * ([Timing.isStale]) : on ne dit pas « serrez » sur une image de 1,5 s. Tant
+ * qu'il dérive il possède la frame — un « Tout droit. » le contredirait — et se
+ * redit toutes les [RAIL_REPEAT_MS] millisecondes, pas à chaque frame.
  *
  * La machine anti-répétition est [AnnouncementGate], partagée avec les
  * annonces de positions : ici, tout mot saute le délai **et la stabilité** —
@@ -107,8 +124,12 @@ class GuidanceAnnouncer(
      * venir de plus loin en marchant vite ; `null` = portée historique.
      * [free] est la place libre de part et d'autre de l'axe : `null` la fait
      * estimer ici ([FreeSpace.of]) — elle sert à marquer un décalage serré
-     * ([LateralNudge.tight]) que la voix ne peut pas promettre. Les trois
-     * ont une valeur par défaut : aucun appelant existant ne change.
+     * ([LateralNudge.tight]) que la voix ne peut pas promettre. [rail] est
+     * l'état du rail trottoir de la frame ([SidewalkRail.of], calculé par
+     * l'appelant comme [sidewalk]) : `null` = pas de rail, comportement
+     * d'avant ; il ne parle qu'après le bouché et le décalage, et jamais sur
+     * une frame périmée. Toutes ces valeurs ont un défaut : aucun appelant
+     * existant ne change.
      */
     fun onFrame(
         atMs: Long,
@@ -123,6 +144,7 @@ class GuidanceAnnouncer(
         ageMs: Long = 0L,
         speedMps: Float? = null,
         free: FreeSpace? = null,
+        rail: RailState? = null,
     ): String? {
         val effective = routeCap ?: cap
         val space = free ?: FreeSpace.of(labels, hfovDeg)
@@ -143,6 +165,10 @@ class GuidanceAnnouncer(
         val cue = nudgeOf(atMs, labels, hfovDeg, ageMs, speedMps, space)
         if (cue != null) return nudgeWord(atMs, cue, language)
         if (decision.blocked) return blockedWord(atMs, decision, language)
+        // Rail trottoir : sous la sécurité (bouché, décalage), devant la voie
+        // libre — une dérive ne se dit jamais « Tout droit. ».
+        val railCue = railCueOf(rail, language)
+        if (railCue != null) return railSpeak(atMs, railCue.first, railCue.second, ageMs)
         val word = clearedReturnWord(sidewalk, decision.cap, labels, hfovDeg, range)
         // Frame périmée : elle ne prouve pas que la voie est libre (« Tout
         // droit. » est une affirmation, pas une absence) ; un côté reste bon.
@@ -189,6 +215,32 @@ class GuidanceAnnouncer(
     /** Mot de voie libre (cap, retour trottoir) : redit à la cadence normale. */
     private fun sideWord(atMs: Long, word: GuidanceWord, language: SpeechLanguage): String? =
         speak(atMs, directionKey(word.text(language)), word.text(language), repeatMs)
+
+    /**
+     * Ce que le rail a à dire : le niveau et sa phrase, `null` quand il se tait
+     * (aucun rail, niveau [RailLevel.NONE], ou côté de bordure inconnu —
+     * [SidewalkRail.phrase] ne devine pas une direction). `null` rend la main à
+     * la voie libre : sans consigne de bordure, le cap reste valable.
+     */
+    private fun railCueOf(rail: RailState?, language: SpeechLanguage): Pair<RailLevel, String>? =
+        rail?.let { state ->
+            SidewalkRail.phrase(state, language)?.let { phrase -> state.level to phrase }
+        }
+
+    /**
+     * Clé d'anti-répétition du rail, par **niveau** : une dérive stable se redit
+     * toutes les [RAIL_REPEAT_MS], mais l'aggravation (DRIFT → EDGE) est un mot
+     * nouveau, donc dite aussitôt (overwrite), sans attendre l'échéance.
+     */
+    private fun railKey(level: RailLevel): String = "rail|" + level.name
+
+    /**
+     * Phrase du rail, **muette sur une frame périmée** : on ne dit pas
+     * « serrez » sur une image de 1,5 s. Le rail possède alors la frame — ni
+     * « Tout droit. », ni un côté qui contredirait la consigne.
+     */
+    private fun railSpeak(atMs: Long, level: RailLevel, phrase: String, ageMs: Long): String? =
+        if (Timing.isStale(ageMs)) null else speak(atMs, railKey(level), phrase, RAIL_REPEAT_MS)
 
     /**
      * Décision lue dans le passage SAM : bouché et côté viennent du serveur
@@ -353,5 +405,13 @@ class GuidanceAnnouncer(
          * bégayer. Injecté en test via [GuidanceAnnouncer.repeatMs].
          */
         const val DEFAULT_REPEAT_MS = 2_000L
+
+        /**
+         * Redite du rail (ms) : une dérive se dit **tant qu'elle dure**, pas à
+         * chaque frame — à 1,4 m/s, 3 s valent 4 m de marche, et c'est le temps
+         * d'une phrase courte à ×1,9. Plus court, la voix bégayerait sur une
+         * bordure qui tremble d'une frame à l'autre.
+         */
+        const val RAIL_REPEAT_MS = 3_000L
     }
 }
