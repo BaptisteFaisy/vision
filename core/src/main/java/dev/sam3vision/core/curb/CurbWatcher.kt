@@ -348,8 +348,8 @@ class CurbWatcher(
         /** Positifs consécutifs avant d'annoncer (un isolé = bruit). */
         const val DEFAULT_CONFIRM_FRAMES = 2
 
-        /** Silence entre deux annonces douces (le trottoir ne bouge pas). */
-        const val DEFAULT_COOLDOWN_MS = 10_000L
+        /** Silence entre deux annonces douces (4 s, audit 31/10 : re-parler vite rue). */
+        const val DEFAULT_COOLDOWN_MS = 4_000L
 
         /**
          * Tolérance au clignotement SAM : jusqu'à [GRACE_FRAMES] frames consécutives

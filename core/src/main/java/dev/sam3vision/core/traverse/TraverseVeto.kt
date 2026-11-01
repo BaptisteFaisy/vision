@@ -103,9 +103,10 @@ data class TraverseDecision(
  * sténopé sous [VETO_METERS]). L'approche se lit sur les boîtes seules — sans
  * focale, elle reste le seul critère ; la distance réutilise [KnownSizes] (déjà
  * calibré pour les sept véhicules) et [Pinhole]. Un véhicule confirmé à
- * l'arrêt (mesuré, centré, immobile, seau stable — voir [stoppedKeys]) ou qui
- * suit la caméra (pan — voir `VehicleApproach.cameraMovedKeys`) ne bloque plus :
- * le vert seul décide alors ; en mouvement ou doute bloque. L'approche suivie
+ * l'arrêt (mesuré, centré, immobile, seau stable — voir [stoppedKeys]) ne
+ * bloque plus : le vert seul décide alors ; en mouvement, proche ou doute
+ * bloque — sauf croissance expliquée par la caméra (pan suivi, voir
+ * [vetoCandidate]). L'approche suivie
  * (IoU + tau < 3 s — voir [approachVerdict]) bloque aussi, en ceinture et
  * bretelles.
  *
@@ -188,9 +189,8 @@ class TraverseVeto {
             .minByOrNull { it.meters ?: Float.MAX_VALUE }
 
     /**
-     * Candidature d'une détection au veto : véhicule confiant qui approche
-     * (croissance de boîte — la proximité seule ne bloque pas : une garée
-     * proche s'annonce, elle ne veto pas).
+     * Candidature d'une détection au veto : véhicule confiant qui approche ou proche
+     * (croissance de boîte, ou proximité mesurée sous [VETO_METERS]).
      *
      * @param stopped pistes neutralisées (arrêt confirmé [stoppedKeys] + suivi
      * caméra `VehicleApproach.cameraMovedKeys`), écartées de la sélection du
@@ -202,11 +202,13 @@ class TraverseVeto {
         val area = Box.fromProto(detection.box)?.area
         val previous = previousAreas[vehicleKey(detection.label)]
         val growing = area != null && previous != null && area > previous
-        if (!growing) return null
         val centerX = detection.normalizedBox()?.let { (it[0] + it[2]) / 2f } ?: 0.5f
         if (vehicleKey(detection.label) in stopped) return null
         if (VehicleApproach.instanceKeyOf(detection.label, centerX) in stopped) return null
-        return Blocking(detection.label, distanceOf(detection, focalPx))
+        val meters = distanceOf(detection, focalPx)
+        val near = meters != null && meters < VETO_METERS
+        if (!growing && !near) return null
+        return Blocking(detection.label, meters)
     }
 
     /**

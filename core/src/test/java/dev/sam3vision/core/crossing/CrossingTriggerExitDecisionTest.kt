@@ -51,9 +51,13 @@ class CrossingTriggerExitDecisionTest {
     fun `vert et vehicule confirme a l arret - You can cross`() {
         val veto = TraverseVeto()
         veto.update(true, listOf(detection("car", 0.9f, stoppedBox())), focalPx, 0L)
-        val decision = veto.update(true, listOf(detection("car", 0.9f, stoppedBox())), focalPx, 500L)
+        val confirmed = veto.update(true, listOf(detection("car", 0.9f, stoppedBox())), focalPx, 500L)
 
-        assertFalse("arrêt confirmé : pas de veto", decision.veto)
+        assertFalse("arrêt confirmé : pas de veto", confirmed.veto)
+        assertEquals(TraversePhase.PRET, confirmed.state)
+        val decision = veto.update(true, listOf(detection("car", 0.9f, stoppedBox())), focalPx, 1000L)
+
+        assertFalse(decision.veto)
         assertEquals("jamais de veto : le vert avance", TraversePhase.TRAVERSER, decision.state)
         assertEquals(CrossingState.Green, decision.crossingState())
         assertEquals("You can cross", CrossingText.phrase(decision.crossingState(), SpeechLanguage.En))

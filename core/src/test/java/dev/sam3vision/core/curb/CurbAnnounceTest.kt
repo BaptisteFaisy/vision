@@ -233,9 +233,7 @@ class CurbAnnounceTest {
         watcher.onSignal(CurbSignal.none(), 5_000L, SpeechLanguage.Fr)
 
         assertNull(watcher.onSignal(seen, 6_000L, SpeechLanguage.Fr))
-        assertNull(watcher.onSignal(seen, 7_000L, SpeechLanguage.Fr))
-        assertNull(watcher.onSignal(seen, 8_000L, SpeechLanguage.Fr))
-        assertEquals("Bordure détectée.", watcher.onSignal(seen, 12_000L, SpeechLanguage.Fr)!!.phrase)
+        assertEquals("Bordure détectée.", watcher.onSignal(seen, 7_000L, SpeechLanguage.Fr)!!.phrase)
     }
 
     @Test
@@ -295,12 +293,11 @@ class CurbAnnounceTest {
         assertNull(watcher.onSignal(CurbSignal.none(), 4_000L, SpeechLanguage.Fr))
         assertNull(watcher.onSignal(CurbSignal.none(), 5_000L, SpeechLanguage.Fr))
 
-        // Réarmé : re-détection exigée, bloquée par le cooldown (comportement historique).
+        // Réarmé : re-détection exigée, cooldown 4 s (audit 31/10).
         assertNull(watcher.onSignal(seen, 6_000L, SpeechLanguage.Fr))
-        assertNull(watcher.onSignal(seen, 7_000L, SpeechLanguage.Fr))
-        assertEquals("Bordure détectée.", watcher.onSignal(seen, 12_000L, SpeechLanguage.Fr)!!.phrase)
-        assertNull(watcher.onSignal(sig(2.0f), 13_000L, SpeechLanguage.Fr))
-        assertEquals("Bordure à 2 mètres.", watcher.onSignal(sig(2.0f), 14_000L, SpeechLanguage.Fr)!!.phrase)
+        assertEquals("Bordure détectée.", watcher.onSignal(seen, 7_000L, SpeechLanguage.Fr)!!.phrase)
+        assertNull(watcher.onSignal(sig(2.0f), 8_000L, SpeechLanguage.Fr))
+        assertEquals("Bordure à 2 mètres.", watcher.onSignal(sig(2.0f), 9_000L, SpeechLanguage.Fr)!!.phrase)
     }
 
 

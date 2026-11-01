@@ -84,11 +84,13 @@ class GuidanceAnnouncerSidewalkTest {
     }
 
     @Test
-    fun `retour trottoir vers une personne proche garde le cap`() {
+    fun `retour trottoir vers une personne proche devie`() {
+        // Nudge prioritaire sur le retour trottoir : à 1 m, la personne
+        // proche conseille dès la 1re frame (audit 31/10), on s'écarte.
         val announcer = GuidanceAnnouncer()
         val proche = listOf(PlacedLabel("personne", 0.3f, 0.5f, 1f))
 
-        assertEquals("Straight.", announcer.onFrame(0L, proche, sidewalk = SidewalkPosition.Left))
+        assertEquals("Right.", announcer.onFrame(0L, proche, sidewalk = SidewalkPosition.Left))
     }
 
     @Test

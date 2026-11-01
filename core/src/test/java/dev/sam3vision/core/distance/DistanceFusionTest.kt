@@ -95,9 +95,8 @@ class DistanceFusionTest {
         // (3,57 m sur une hauteur faussée) est écarté, pas fusionné
         val feet = posed.measure(WIDTH, HEIGHT, listOf(detection("personne", listOf(100f, 200f, 200f, 384f)))).firstOrNull()!!
         assertEquals(GroundPlane.forwardMeters(384f, CameraPose(1.5f, 0.2f), FOCAL_PX, 191.5f, HEIGHT)!!, feet.meters, 0.001f)
-        // tête coupée, pieds visibles : le bas de boîte reste la ligne des pieds (6,65 m)
-        val headless = posed.measure(WIDTH, HEIGHT, listOf(detection("licorne", listOf(100f, 0f, 200f, 200f)))).firstOrNull()!!
-        assertEquals(GroundPlane.forwardMeters(200f, CameraPose(1.5f, 0.2f), FOCAL_PX, 191.5f, HEIGHT)!!, headless.meters, 0.001f)
+        // tête coupée : pas de lecture (haut tronqué, sténopé impraticable — audit 31/10)
+        assertTrue(posed.measure(WIDTH, HEIGHT, listOf(detection("licorne", listOf(100f, 0f, 200f, 200f)))).isEmpty())
     }
 
     @Test
