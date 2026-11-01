@@ -33,18 +33,23 @@ def _gen():
         "gen_voicepack", os.path.join(here, "gen-voicepack.py"))
 
 
+def isee_expected(root: str) -> set:
+    """Noms vp_* du catalogue clips EN (même res/raw : un seul pack)."""
+    try:
+        with open(os.path.join(root, "tools/isee-clips-en-catalog.json"),
+                  encoding="utf-8") as fh:
+            isee = json.load(fh)["clips"]
+    except (OSError, ValueError, KeyError):
+        return set()
+    return {f"vp_{clip['id']}_en.mp3" for clip in isee}
+
+
 def failures(root: str, allow_missing: bool) -> list:
     problems = []
     gen = _gen()
     with open(os.path.join(root, "tools/voicepack-catalog.json"),
               encoding="utf-8") as fh:
         catalog = json.load(fh)["clips"]
-    try:
-        with open(os.path.join(root, "tools/isee-clips-en-catalog.json"),
-                  encoding="utf-8") as fh:
-            isee = json.load(fh)["clips"]
-    except (OSError, ValueError, KeyError):
-        isee = []
     laure = gen.default_voice(root, strict=False)
     expected = set()
     for clip in catalog:
@@ -69,8 +74,7 @@ def failures(root: str, allow_missing: bool) -> list:
             if not (os.path.isfile(mp3) and os.path.getsize(mp3)):
                 if not allow_missing:
                     problems.append(f"{cid}: {name} manquant/vide")
-    for clip in isee:
-        expected.add(f"vp_{clip['id']}_en.mp3")
+    expected |= isee_expected(root)
     raw_dir = os.path.join(root, "app/src/main/res/raw")
     if os.path.isdir(raw_dir):
         for name in sorted(os.listdir(raw_dir)):
