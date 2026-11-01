@@ -169,9 +169,13 @@ class PedLightGateTest {
     }
 
     @Test
-    fun `seuil bas - 50 pourcent accepte, 20 pourcent refuse`() {
+    fun `seuil bas - 50 pourcent accepte, 20 pourcent juge sur forme, 10 pourcent refuse`() {
         assertTrue(PedLightGate.acceptGreen(barAt(5), 20, 20))
-        assertFalse(PedLightGate.acceptGreen(barAt(2), 20, 20))
+        // 01/11 (ordre user : vert plus facile) : 20 % n'est plus un rejet
+        // dur — tel_g07 réel (bottom 0,23) basculait rouge sur 1 px de
+        // jitter de boîte. La forme tranche, une barre pleine passe.
+        assertTrue(PedLightGate.acceptGreen(barAt(2), 20, 20))
+        assertFalse(PedLightGate.acceptGreen(barAt(1), 20, 20))
     }
 
     @Test
@@ -264,6 +268,18 @@ class PedLightGateTest {
         assertEquals(CrossingState.Red, verdict3Of("tel_r04.ppm"))
     }
 
+    @Test
+    fun `jitter 1px - verts cadres haut restent verts (plancher 15)`() {
+        // 01/11 (ordre user : vert plus facile) : tel_g07 (bottom 0,23) et
+        // st_g02 tombaient au rouge quand la boîte montait de 1 px
+        // (jitter SAM d'une frame à l'autre) — le plancher 15 % + la forme
+        // les gardent verts, sans toucher aux rouges.
+        val (tel, telW, telH) = pixelsOf(javaClass.classLoader, "feuxfr3", "tel_g07.ppm")
+        assertEquals(CrossingState.Green, PedLightGate.verdict(shiftedUp(tel, telW, telH), telW, telH))
+        val (st, stW, stH) = pixelsOf(javaClass.classLoader, "feuxfr2", "st_g02.ppm")
+        assertEquals(CrossingState.Green, PedLightGate.verdict(shiftedUp(st, stW, stH), stW, stH))
+    }
+
     /** Barre verte verticale dans la moitié basse (bonhomme simplifié). */
     private fun barBottom(x0: Int = 8, x1: Int = 11): IntArray {
         val pixels = IntArray(20 * 20) { BLACK }
@@ -298,6 +314,15 @@ class PedLightGateTest {
             for (x in 8..11) pixels[y * 20 + x] = GREEN
         }
         return pixels
+    }
+
+    /** Crop décalé de 1 px vers le haut, rempli de noir (jitter de boîte). */
+    private fun shiftedUp(pixels: IntArray, width: Int, height: Int): IntArray {
+        val out = IntArray(pixels.size) { BLACK }
+        for (y in 0 until height - 1) {
+            System.arraycopy(pixels, (y + 1) * width, out, y * width, width)
+        }
+        return out
     }
 
     /** Verdict sur un crop réel `feuxfr/` (PPM ≤ 48 px, voir ATTRIBUTION.md). */
