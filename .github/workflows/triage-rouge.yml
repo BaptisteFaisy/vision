@@ -73,10 +73,14 @@ jobs:
         id: ctx
         run: |
           set -uo pipefail
-          SHA="$(gh api "repos/$REPO/pulls/$PR" --jq .head.sha)"
-          BRANCH="$(gh api "repos/$REPO/pulls/$PR" --jq .head.ref)"
+          # `bash -e` mène ce bloc : chaque lecture qui peut ne rien rendre est
+          # explicitement neutralisée (sinon `grep -c` sans correspondance sort 1
+          # et fait tomber l'étape — vu au premier essai à blanc, 01/11).
+          SHA="$(gh api "repos/$REPO/pulls/$PR" --jq .head.sha || true)"
+          BRANCH="$(gh api "repos/$REPO/pulls/$PR" --jq .head.ref || true)"
+          if [ -z "${SHA:-}" ]; then echo "PR #$PR introuvable, rien à faire"; exit 0; fi
           DEJA="$(gh api --paginate "repos/$REPO/issues/$PR/comments" \
-            --jq '.[].body' 2>/dev/null | grep -cF "<!-- triage sha=$SHA -->")"
+            --jq '.[].body' 2>/dev/null | grep -cF "<!-- triage sha=$SHA -->" || true)"
           DEJA="${DEJA:-0}"
           echo "sha=$SHA" >> "$GITHUB_OUTPUT"
           echo "branch=$BRANCH" >> "$GITHUB_OUTPUT"
