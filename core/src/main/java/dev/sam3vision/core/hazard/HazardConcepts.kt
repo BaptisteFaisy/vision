@@ -28,7 +28,6 @@ import dev.sam3vision.core.live.PersonLabels
  * Liste fermée : un concept = un nom FR/EN ([HazardName]) ; la personne y
  * entre par [PersonLabels], sans table à part. Le « etc. » de l'ordre
  * s'ajoute ici (clé canonique → nom), jamais en dur dans une phrase.
- *
  */
 object HazardConcepts {
 
@@ -129,15 +128,13 @@ object HazardConcepts {
      */
     fun isSpoken(label: String): Boolean = isHazard(label)
 
-    /** Vrai si [label] désigne une barrière (P4, après la personne P3). */
+    /** Vrai si [label] désigne une barrière (niveau 4, avec grillages et murs). */
     fun isBarrier(label: String): Boolean = nameOf(label)?.en == "barrier"
 
     /**
-     * Niveau VoiceBus v4 de [label] : 2 la personne et les corps qui
-     * s'évitent comme elle (enfant, poussette, fauteuil roulant, chien), 4
-     * les grillages, les murs et les barrières, 7 les poteaux, le mobilier
-     * vertical et les divers. Label inconnu = 7 (divers, jamais la priorité
-     * d'une personne).
+     * Niveau VoiceBus v4 de [label] : 2 la personne, 4 les grillages, les
+     * murs et les barrières, 7 les poteaux, le mobilier vertical et les
+     * divers. Label inconnu = 7 (divers, jamais la priorité d'une personne).
      */
     fun levelOf(label: String): Int {
         val en = nameOf(label)?.en ?: return HazardWatcher.LEVEL_POLE
@@ -150,9 +147,9 @@ object HazardConcepts {
 
     /**
      * Clé AntiRepeat v4 de [label] (annonce douce) : `human-soft` la
-     * personne et les corps (l'imminente dit `human-imminent`, voir
-     * [HazardWatcher]), `fence` les grillages, murs et barrières, `pole`
-     * le reste. Label inconnu = `pole`.
+     * personne (l'imminente dit `human-imminent`, voir [HazardWatcher]),
+     * `fence` les grillages, murs et barrières, `pole` le reste. Label
+     * inconnu = `pole`.
      */
     fun antiRepeatKey(label: String): String = when (levelOf(label)) {
         HazardWatcher.LEVEL_PERSON -> HazardWatcher.KEY_HUMAN_SOFT
@@ -176,14 +173,14 @@ object HazardConcepts {
 }
 
 /**
- * Sorte parlée, dans l'ordre de parole (personne P3 avant barrière P4,
- * divers avec le reste) : l'arbitre voix y lit le rang du guetteur danger.
+ * Sorte parlée : personne (niveau 2), barrière (niveau 4, avec les
+ * grillages et les murs), divers (niveau 7, avec le reste).
  */
 enum class HazardKind {
     /** Corps qui bloque et s'évite (personne, enfant, poussette, fauteuil roulant, chien : niveau 2). */
     PERSON,
 
-    /** Barrière : descriptive, après la personne (P4). */
+    /** Barrière : descriptive, niveau 4 (avec grillages et murs). */
     BARRIER,
 
     /** Divers : poteau, clôture, mur, lampadaire, panneau, animal, poubelle, souvenirs… (niveau 7). */

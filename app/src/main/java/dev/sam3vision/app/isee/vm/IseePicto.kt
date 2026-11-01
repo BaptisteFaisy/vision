@@ -135,7 +135,6 @@ class IseePicto(
     private var liveHits: List<PictoHit> = emptyList()
 
     /**
-    /**
      * Cadran du dernier trouvé signalé ([onFound]), `null` si désancré :
      * le trouvé ne se re-signale qu'au changement de cadran (le répéter au
      * même cadran est le travail de l'anti-répétition, autre mission).
