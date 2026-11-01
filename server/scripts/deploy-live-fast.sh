@@ -107,7 +107,7 @@ print("boot   :", "restore" if restored is True else
       "complet" if restored is False else "inconnu (backend trop vieux ?)")
 print("load   :", json.dumps(h.get("load_breakdown"), ensure_ascii=False, sort_keys=True))
 missing = [k for k, v in {"batch_prompts": True, "cuda_graph": True, "edge": 512,
-                           "snapshot": True, "detr_graph": False, "depth_every": 5,
+                           "snapshot": True, "detr_graph": True, "depth_every": 5,
                            "attn": "sdpa"}.items()
            if lev.get(k) != v]
 if "fast" not in str(h.get("model", "")).lower():
