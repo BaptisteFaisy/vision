@@ -110,19 +110,13 @@ object GlassesVideoLink {
     /** Photographie la rue des lunettes, ou `null` si elle ne regarde pas. */
     fun takeSnapshot(): android.graphics.Bitmap? = runCatching { snapshot?.invoke() }.getOrNull()
 
-    @Volatile
-    private var fallbackCsdField: ByteArray? = null
-
     /**
      * Paramètres H.265 hors bande (VPS/SPS/PPS) : le flux simulé n'envoie que des tranches,
      * le décodeur les prend ici faute de config dans le flux. Toujours `null` sur des
      * lunettes réelles (la config voyage dans le flux).
      */
-    var fallbackCsd: ByteArray?
-        get() = fallbackCsdField
-        set(value) {
-            fallbackCsdField = value
-        }
+    @Volatile
+    var fallbackCsd: ByteArray? = null
 
     /** Taille décodée, pour le recadrage de la vue (`null` = inconnue). */
     val videoSize: StateFlow<VideoSize?> = _videoSize.asStateFlow()
@@ -313,7 +307,7 @@ object GlassesVideoLink {
         setStreaming(false)
         // Ici, pas dans setStreaming(false) : le flux émet `false` en ouverture de
         // session, pile entre la pose du repli (mock) et sa lecture (décodeur).
-        fallbackCsdField = null
+        fallbackCsd = null
     }
 
     /** Taille annoncée par le décodeur (un changement de résolution recadre la vue). */

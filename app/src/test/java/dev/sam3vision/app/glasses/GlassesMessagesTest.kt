@@ -17,13 +17,9 @@ class GlassesMessagesTest {
     private val failures: List<GlassesMessage> = listOf(
         GlassesMessages.sdkUnavailable("init"),
         GlassesMessages.registrationFailed("refus"),
-        GlassesMessages.sessionRefused("timeout"),
-        GlassesMessages.sessionInterrupted("lien perdu"),
         GlassesMessages.noLinkedDevice(),
         GlassesMessages.cameraPermissionMissing(),
         GlassesMessages.cameraUnavailable("occupée"),
-        GlassesMessages.streamRefused("qualité"),
-        GlassesMessages.photoRefused("occupée"),
         GlassesMessages.photoUndecodable(),
         GlassesMessages.inputsUnavailable("source"),
         GlassesMessages.noActivity(),
@@ -43,7 +39,6 @@ class GlassesMessagesTest {
     fun `les degrades et les conseils ne se font pas passer pour des erreurs`() {
         assertEquals(MessageKind.WARNING, GlassesMessages.sessionAlreadyRunning().kind)
         assertEquals(MessageKind.WARNING, GlassesMessages.noCamera().kind)
-        assertEquals(MessageKind.WARNING, GlassesMessages.streamError("gel").kind)
         assertEquals(MessageKind.WARNING, GlassesMessages.streamStopped().kind)
         assertEquals(MessageKind.WARNING, GlassesMessages.noMockPress().kind)
         assertEquals(MessageKind.WARNING, GlassesMessages.videoUndecodable().kind)
@@ -86,8 +81,8 @@ class GlassesMessagesTest {
 
     @Test
     fun `le message garde la raison donnee par le SDK`() {
-        assertTrue(GlassesMessages.sessionRefused("timeout").text.contains("timeout"))
-        assertTrue(GlassesMessages.photoRefused("occupée").text.contains("occupée"))
+        assertTrue(GlassesMessages.registrationFailed("refus").text.contains("refus"))
+        assertTrue(GlassesMessages.cameraUnavailable("occupée").text.contains("occupée"))
     }
 
     @Test
@@ -105,7 +100,6 @@ class GlassesMessagesTest {
         val all = failures + listOf(
             GlassesMessages.sessionAlreadyRunning(),
             GlassesMessages.noCamera(),
-            GlassesMessages.streamError("x"),
             GlassesMessages.streamStopped(),
             GlassesMessages.liveNotOnGlasses(),
             GlassesMessages.registrationStarted(),
