@@ -453,5 +453,24 @@ class PorteCompilationTest(unittest.TestCase):
         self.assertIn("2 fichier(s) (core/a.kt, core/b.kt)", corps)
 
 
+class PlafondFichiersTest(unittest.TestCase):
+    """Plafond de fichiers par passe : 100 (était 8 avant le 01/11)."""
+
+    def test_neuf_fichiers_couverts(self):
+        # Non-régression : un conflit à >8 fichiers était refusé avant.
+        fichiers = ["f%02d.txt" % i for i in range(9)]
+        conflict_agent.check_round_files(fichiers)  # ne lève pas
+
+    def test_cent_fichiers_couverts(self):
+        fichiers = ["f%03d.txt" % i for i in range(100)]
+        conflict_agent.check_round_files(fichiers)  # ne lève pas
+
+    def test_cent_un_fichiers_refuses(self):
+        fichiers = ["f%03d.txt" % i for i in range(101)]
+        with self.assertRaises(conflict_agent.AgentError) as ctx:
+            conflict_agent.check_round_files(fichiers)
+        self.assertIn("plafond 100", str(ctx.exception))
+
+
 if __name__ == "__main__":
     unittest.main()
