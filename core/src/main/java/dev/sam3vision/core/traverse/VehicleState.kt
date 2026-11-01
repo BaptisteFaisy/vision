@@ -364,6 +364,8 @@ class VehicleStateWatcher(
             // Clé d'instance (label + seau L/C/R, miroir de l'approche) : deux
             // voitures se suivent séparément, le pluriel compte juste, et la
             // jeune qu'on n'a jamais jugée ne dort pas du sommeil des autres.
+            // Même instance qu'avant si elle se recouvre (IoU), sinon surface
+            // max : pas de téléportation entre deux voitures (voir pickStable).
             candidates.getOrPut(VehicleApproach.instanceKeyOf(detection.label, seen.cx ?: 0.5f)) { mutableListOf() } += box to seen
         }
         return candidates.mapValues { (key, boxes) -> pickStable(boxes, previous[key]?.box) }

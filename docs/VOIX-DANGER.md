@@ -5,7 +5,7 @@
 > table d'antirépétition, clips anglais, ordres dictée, listes de détection.
 > Tout ce qui contredit ce contrat dans un autre doc est périmé.
 > Historique pré-v4 (§ 1 à 15, guidage SAM/TwinLite, « Attention … » FR,
-> stop, TwinLiteNet) : `git show 4a3c2bcf:docs/VOIX-DANGER.md`.
+> stop, TwinLiteNet), puis ordres du 01/11 : `git show 0911017f:docs/VOIX-DANGER.md`.
 
 ## 0. Règles globales
 
@@ -30,7 +30,7 @@ chat (9) et GPS (3, 11) en synthèse réseau.
 |---|---|---|---|
 | 0 | Voitures en mouvement < 20 m | Présence seule, **sans cadran ni distance** ; pluriel si plusieurs | `car` « Car. », `cars` « Cars. » |
 | 1 | Parole du user | Tait tout ; **seul 0 la coupe** | — (micro) |
-| 2 | Humains < 10 m | Phrase + cadran + distance ; **imminent ≤ 2 m = mot immédiat** | `human_person` + `clock_*` + `meters_*` ; imminent `guide_stop` « Stop. » |
+| 2 | Humains < 10 m | **Mot seul d'évitement** « Droite. »/« Gauche. » (douce comme imminente ; imminente ≤ 2 m : immédiat, répété) | `guide_left`, `guide_right` |
 | 3 | Rappel GPS | Si silence depuis 15 s ou plus : répète la dernière consigne + distance restante | Synthèse réseau (GPS) |
 | 4 | Grillages + murs + barrières < 6 m | — | `fence`, `wall`, `barrier` |
 | 5 | Bordures < 6 m | Montée / descente | `curb_up`, `curb_down` |
@@ -146,11 +146,13 @@ frappe ne fait jamais taire une annonce).
 - Chaque guetteur pose `level` + `antiRepeatKey` sur son cue : le câblage
   les lit, il ne recalcule jamais le niveau depuis le type.
 
-## 9. État d'implémentation (branches v4, relevé du 01/11/2026)
+## 9. État d'implémentation (intégrée et mergée le 01/11/2026)
 
-Travail éclaté en 15 branches `feat/isee-*` sur base `6700e26d`
-(`origin/master` : `4a3c2bcf`). Détail et contradictions résiduelles :
-`docs/REVUE-V4.md` — à lire avant d'intégrer.
+Travail éclaté en 15 branches `feat/isee-*`, intégrées
+(`fix/isee-veto-arret-15m`) puis mergées sur `master` (`0911017f`). Fusion :
+personne douce = mot seul d'évitement (ordre du 01/11 18h03), poteaux parlés
+niveau 7 (spec v4). Détail et contradictions résiduelles : `docs/REVUE-V4.md`.
+Tableau des missions (registre d'origine des pièces) :
 
 | Mission | Branche | État |
 |---|---|---|

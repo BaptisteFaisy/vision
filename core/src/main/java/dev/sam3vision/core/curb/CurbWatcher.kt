@@ -22,7 +22,8 @@ enum class CurbEdge { Up, Down, Uncertain }
  * palier, [urgent] vrai pour les seuls paliers proches 0,7 / 0,5 m,
  * [safetyPhrase] l'alerte immédiate (« Bordure à 0,5 mètre. ») pour le seul
  * palier 0,5 m (`null` pour la détection et les paliers doux — info douce,
- * pas d'alerte).
+ * pas d'alerte), [level] le niveau VoiceBus v4 (5, bordures) et
+ * [antiRepeatKey] sa clé AntiRepeat v4 (`curb`, 2 s).
  */
 data class CurbCue(
     val phrase: String,
@@ -43,8 +44,8 @@ data class CurbCue(
  * 1 / 0,7 / 0,5 m (« Bordure à … » / « Curb at … », sans heure : courts
  * pour s'enchaîner), les marches sensées ([phrase] à 1 m, [stepPhrase]
  * imminente, [safetyStepPhrase] consigne — montée, descente ou sens
- * incertain, reel audit 31/10). Liste fermée : le préchauffage hors-ligne
- * sait quels clips générer.
+ * incertain, reel audit 31/10). Liste fermée : le préchauffage sait quels
+ * clips générer.
  */
 object CurbText {
     /** Détection confirmée : « Bordure détectée, à midi. » (`null` = sans heure). */
@@ -115,6 +116,7 @@ object CurbText {
         }
     }
 
+
     /**
      * Consigne immédiate d'un bord détecté : monter ou descendre le rebord
      * (« Attention bordure » si le sens est incertain), dans la langue de la
@@ -152,18 +154,19 @@ object CurbText {
  * silence à la place ; palier survolé entre deux frames = sauté sans
  * rattrapage (jamais de distance périmée) ; signal vraiment perdu (3 trous, voir
  * [GRACE_FRAMES]) = détection et paliers ré-armés. Sans distance, le compte à rebours attend.
+
  *
  * `sidewalk` segmente le plan entier, pas le bord : marcher **sur** un
- * trottoir ne parle pas d'un bord — seuls les plans à bord proche parlent
- * (montée : bas décollé ; descente : haut borné), le plan sous les pieds
- * reste muet. Seuils priors, à valider sur captures du téléphone : en cas
- * de doute le bord parle (« Attention bordure » en zone grise), jamais
- * l'inverse.
+ * trottoir ne parle pas d'un bord — le plan sous les pieds (bas collé en bas
+ * de l'image, haut vers l'horizon) est ignoré, seuls les plans à bord
+ * proche parlent (montée : bas décollé ; descente : haut borné). Seuils
+ * priors, à valider sur captures du téléphone : en cas de doute le bord
+ * parle (« Attention bordure » en zone grise), jamais l'inverse.
  *
  * Pur JVM et testé. Sécurité : le palier 0,5 m parle en alerte immédiate
  * ([CurbCue.safetyPhrase], voix de sécurité qui coupe tout, dictée du user
- * comprise) — détection et paliers doux attendent leur tour (pas d'alerte,
- * juste l'info).
+ * comprise) — détection et paliers doux attendent leur tour (pas
+ * d'alerte, juste l'info).
  */
 class CurbWatcher(
     private val confirmFrames: Int = DEFAULT_CONFIRM_FRAMES,
@@ -186,6 +189,7 @@ class CurbWatcher(
 
     /** Détection déjà dite pour la présence en cours. */
     private var detectedSpoken: Boolean = false
+
 
     /** Instant du dernier palier proche dit (0,7 / 0,5 m), [NO_INSTANT] si aucun. */
     private var lastNearAtMs: Long = NO_INSTANT
@@ -226,7 +230,8 @@ class CurbWatcher(
 
     /**
      * Approche en cours : détection en confirmation ([hits]), dite ([detectedSpoken]),
-     * ou paliers en jeu. Seuls les trous d'une approche sont graciés (voir [GRACE_FRAMES]).
+     * ou paliers en jeu. Seuls les trous d'une approche sont graciés (voir [GRACE_FRAMES]) :
+     * au repos, le traitement historique tourne et rend `null`.
      */
     private fun hasPendingDetection(): Boolean =
         hits != 0 || palierHits != 0 || palierTarget != null || detectedSpoken || spokenPaliers.isNotEmpty()
@@ -332,7 +337,7 @@ class CurbWatcher(
          * verrous et dernière annonce inchangés) et rendent `null` ; la 3e frame
          * consécutive sans détection ré-arme comme avant. Sans cette grâce, un
          * seul trou remettait la détection à zéro et la reprise retombait sur le
-         * cooldown 10 s : compte à rebours inaccessible pendant toute une approche.
+         * cooldown : compte à rebours inaccessible pendant toute une approche.
          */
         const val GRACE_FRAMES = 2
 
@@ -369,6 +374,13 @@ class CurbWatcher(
 
         /** Palier le plus proche : parlé en alerte immédiate (voix de sécurité). */
         const val SAFETY_PALIER_METERS = 0.5f
+
+
+        /** Niveau VoiceBus v4 : bordures (< 6 m). */
+        const val LEVEL = 5
+
+        /** Clé AntiRepeat v4 : bordures (2 s). */
+        const val KEY_CURB = "curb"
 
         /** Aucune annonce émise encore. */
         private const val NO_INSTANT = Long.MIN_VALUE
