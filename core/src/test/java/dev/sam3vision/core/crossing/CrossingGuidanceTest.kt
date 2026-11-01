@@ -263,7 +263,7 @@ class CrossingGuidanceTest {
     }
 
     @Test
-    fun `guidage traverse jusqu a 3 m, borne incluse`() {
-        assertEquals(3.0f, CrossingGuidance.GUIDE_METERS, 0f)
+    fun `guidage traverse jusqu a 6 m, borne incluse`() {
+        assertEquals(6.0f, CrossingGuidance.GUIDE_METERS, 0f)
     }
 }

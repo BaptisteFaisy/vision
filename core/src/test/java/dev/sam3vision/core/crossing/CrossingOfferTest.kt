@@ -72,12 +72,12 @@ class CrossingOfferTest {
     }
 
     @Test
-    fun `le guidage traverse voit a 3 m, pas au-dela`() {
+    fun `le guidage traverse voit a 6 m, pas au-dela`() {
         val at = { m: Float -> { _: SegObject -> m } }
         val max = CrossingGuidance.GUIDE_METERS
-        assertTrue(CrossingOffer.seesNearCrosswalk(walk, at(2.99f), h, maxMeters = max))
-        assertTrue(CrossingOffer.seesNearCrosswalk(walk, at(3.0f), h, maxMeters = max))
-        assertFalse(CrossingOffer.seesNearCrosswalk(walk, at(3.01f), h, maxMeters = max))
+        assertTrue(CrossingOffer.seesNearCrosswalk(walk, at(5.99f), h, maxMeters = max))
+        assertTrue(CrossingOffer.seesNearCrosswalk(walk, at(6.0f), h, maxMeters = max))
+        assertFalse(CrossingOffer.seesNearCrosswalk(walk, at(6.01f), h, maxMeters = max))
     }
 
     @Test
