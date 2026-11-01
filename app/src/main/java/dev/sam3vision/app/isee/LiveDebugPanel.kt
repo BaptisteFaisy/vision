@@ -8,6 +8,8 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.collectAsState
+import androidx.compose.runtime.getValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.font.FontWeight
@@ -32,10 +34,12 @@ private val PanelTimings = Color(0xFF7FD8A8)
  */
 @Composable
 fun LiveDebugPanel(
-    state: LiveProbeState,
+    probe: LiveProbe,
     modifier: Modifier = Modifier,
     dense: Boolean = false,
 ) {
+    // Mixte (chrono #1 + chiffres #2) : plein état ici, chaque Text saute si identique.
+    val state by probe.state.collectAsState()
     if (state.idle) return
     // En mode dense (fenêtre caméra, un peu moins d'un demi-écran), le panneau ne garde
     // que la ligne d'état et une éventuelle erreur : le détail complet masquait l'aperçu

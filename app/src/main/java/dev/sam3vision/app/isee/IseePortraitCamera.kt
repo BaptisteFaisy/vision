@@ -23,7 +23,6 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
-import dev.sam3vision.app.LiveDistanceLayer
 import dev.sam3vision.core.iseedesign.focusPull
 import dev.sam3vision.core.iseedesign.pictureAlpha
 
@@ -43,7 +42,7 @@ import dev.sam3vision.core.iseedesign.pictureAlpha
 internal fun BoxWithConstraintsScope.PortraitCamera(
     state: IseeUiState,
     glue: CameraGlue,
-    probe: LiveProbeState,
+    probe: LiveProbe,
     viewModel: IseeViewModel,
     open: Float,
     height: Dp,
@@ -76,7 +75,7 @@ internal fun BoxWithConstraintsScope.PortraitCamera(
                 onBounds = viewModel.picto::setChipBounds,
             )
         }
-        ProbeNoticeCard(probe)
+        ProbeNoticeScoped(probe)
         PictureFade(Modifier.fillMaxSize())
         CrossingToggle(probe, viewModel)
         // Dense = pas d'inset de barre d'état : posé en haut, le panneau passait sous
@@ -92,9 +91,10 @@ internal fun BoxWithConstraintsScope.PortraitCamera(
  * ex-puce de l'ancienne carte, remontée en haut-centre après le fondu.
  */
 @Composable
-private fun BoxScope.CrossingToggle(probe: LiveProbeState, viewModel: IseeViewModel) {
+private fun BoxScope.CrossingToggle(probe: LiveProbe, viewModel: IseeViewModel) {
+    // Chip chiffres : état Traversée seul, invisible aux pixels.
     CrossingChip(
-        probe,
+        probe.collectRest(),
         Modifier.align(Alignment.TopCenter).padding(top = 12.dp),
         onToggle = { viewModel.toggleCrossing() },
         onBounds = viewModel.crossingChip::setBounds,
@@ -109,7 +109,7 @@ private fun BoxScope.CrossingToggle(probe: LiveProbeState, viewModel: IseeViewMo
 private fun BoxScope.StreetFeed(
     state: IseeUiState,
     glue: CameraGlue,
-    probe: LiveProbeState,
+    probe: LiveProbe,
     viewModel: IseeViewModel,
     showGlasses: Boolean,
 ) {
@@ -118,15 +118,19 @@ private fun BoxScope.StreetFeed(
         GlassesPhotoStreet(photo, Modifier.fillMaxSize())
     } else if (showGlasses) {
         GlassesLive(Modifier.fillMaxSize())
-        GlassesMaskLayer(probe.masks, probe.width, probe.height)
-        LiveDistanceLayer(probe.distanceLayer, topInset = 0.dp, followed = probe.followed.toSet(), modifier = Modifier.fillMaxSize())
-        SteeringLayer(probe.steering)
-        InstructionLayer(probe.pulse)
-        CrossingOnVideo(probe)
+        GlassesMasksScoped(probe)
+        ProbeVideoRest(probe)
     } else {
         CameraLive(glue, probe, viewModel, Modifier.fillMaxSize())
         PictoLayer(state.picto.hits, viewModel.picto::pngOf)
     }
+}
+
+/** Masques des lunettes, scopés pixels : invisibles aux chiffres et à la voix. */
+@Composable
+private fun GlassesMasksScoped(probe: LiveProbe) {
+    val pixels = probe.collectPixels()
+    GlassesMaskLayer(pixels.masks, pixels.width, pixels.height)
 }
 
 /**

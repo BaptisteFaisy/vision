@@ -56,13 +56,15 @@ fun IseeScenePane(
     modifier: Modifier = Modifier,
 ) {
     val glue = rememberCameraGlue(viewModel)
-    val probe by viewModel.probe.state.collectAsState()
+    // Pas de collecte ici : la sonde descend telle quelle et chaque feuille collecte sa
+    // tranche (pixels/chiffres/notice, voir ProbeSlices) — sinon chaque écriture (deux par
+    // frame, plus les battements) réexécutait toute la scène.
     val glassesLive by GlassesVideoLink.live.collectAsState()
     val glassesStreaming by GlassesVideoLink.streaming.collectAsState()
     val entry = selectedEntry(state)
     val view = iseeSceneView(state, entry)
     BoxWithConstraints(modifier.fillMaxSize().background(Color.White)) {
-        PortraitScene(state, viewModel, glue, probe, view, maxWidth, maxHeight, glassesLive, glassesStreaming)
+        PortraitScene(state, viewModel, glue, viewModel.probe, view, maxWidth, maxHeight, glassesLive, glassesStreaming)
     }
 }
 
@@ -72,7 +74,7 @@ private fun BoxWithConstraintsScope.PortraitScene(
     state: IseeUiState,
     viewModel: IseeViewModel,
     glue: CameraGlue,
-    probe: LiveProbeState,
+    probe: LiveProbe,
     view: IseeSceneView,
     width: Dp,
     height: Dp,

@@ -28,6 +28,7 @@ import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
@@ -71,7 +72,7 @@ import java.io.File
 internal fun BoxWithConstraintsScope.VisionCard(
     state: IseeUiState,
     glue: CameraGlue,
-    probe: LiveProbeState,
+    probe: LiveProbe,
     viewModel: IseeViewModel,
     grid: PixelGrid,
     width: Dp,
@@ -80,6 +81,8 @@ internal fun BoxWithConstraintsScope.VisionCard(
     val w = width * 0.84f
     val h = height * 0.22f
     val veil = rememberPixelVeil(state)
+    // Ancienne carte (hors rue Portrait) : plein état collecté ici, comportement inchangé.
+    val snap by probe.state.collectAsState()
     Box(
         Modifier
             .align(Alignment.TopCenter)
@@ -93,13 +96,13 @@ internal fun BoxWithConstraintsScope.VisionCard(
         PixelMosaic(grid, veil.value, circle = false, modifier = Modifier.fillMaxSize())
         if (state.recordingVideo) RecordingChip()
         CrossingChip(
-            probe,
+            snap,
             Modifier.align(Alignment.BottomCenter),
             onToggle = { viewModel.toggleCrossing() },
             onBounds = viewModel.crossingChip::setBounds,
         )
         LiveDebugPanel(probe, Modifier.align(Alignment.TopStart), dense = true)
-        ProbeNoticeCard(probe)
+        ProbeNoticeCard(snap)
     }
 }
 
@@ -132,6 +135,12 @@ private fun rememberPixelVeil(state: IseeUiState): Animatable<Float, AnimationVe
 /** Durée d'effacement du voile de pixels à l'entrée de la carte (ms). */
 internal const val PIXEL_VEIL_MS = 1_100
 
+/** Notice scopée : ne recompose que quand frames/erreur/réveil bougent, jamais sur les pixels. */
+@Composable
+internal fun BoxScope.ProbeNoticeScoped(probe: LiveProbe) {
+    ProbeNoticeCard(probe.collectNotice())
+}
+
 /** Notice courte en centre de carte quand aucun masque n'est là (réveil GPU, etc). */
 @Composable
 internal fun BoxScope.ProbeNoticeCard(probe: LiveProbeState) {
@@ -149,11 +158,14 @@ internal fun BoxScope.ProbeNoticeCard(probe: LiveProbeState) {
     }
 }
 
-/** Aperçu vivant : masques SAM et notice « pourquoi la caméra ne voit rien ». */
+/** Aperçu vivant : masques scopés pixels ([collectPixels]), chiffres à part ([ProbeVideoRest]). */
 @Composable
-internal fun CameraLive(glue: CameraGlue, probe: LiveProbeState, viewModel: IseeViewModel, modifier: Modifier) {
+internal fun CameraLive(glue: CameraGlue, probe: LiveProbe, viewModel: IseeViewModel, modifier: Modifier) {
+    // Pixels seuls : le câblage (FirstPixelWatcher) et la surface ne voient que l'écriture
+    // #1 — la surface n'est plus reposée à l'écriture #2 avec les mêmes masques.
+    val pixels = probe.collectPixels()
     // SAM tourne quand la caméra est active (enregistrement et Traversée aussi) : le câblage vit avec la carte.
-    IseeCameraWiring(glue, viewModel, probe.pixelSeq)
+    IseeCameraWiring(glue, viewModel, pixels.pixelSeq)
     if (!glue.granted) {
         Text(
             "iSee needs the camera.",
@@ -165,13 +177,27 @@ internal fun CameraLive(glue: CameraGlue, probe: LiveProbeState, viewModel: Isee
     }
     AndroidView(
         factory = { ctx -> CameraSurface(ctx, glue.preview) },
-        update = { surface -> surface.setMasks(probe.masks) },
+        update = { surface -> surface.setMasks(pixels.masks) },
         modifier = modifier,
     )
-    LiveDistanceLayer(probe.distanceLayer, topInset = 0.dp, followed = probe.followed.toSet(), modifier = Modifier.fillMaxSize())
-    SteeringLayer(probe.steering)
-    InstructionLayer(probe.pulse)
-    CrossingOnVideo(probe)
+    ProbeVideoRest(probe)
+}
+
+/**
+ * Chiffres sur la vidéo, scopés chiffres : pastilles, flèche, consigne et feu ne
+ * recomposent qu'à l'écriture #2 (ou battement/prédiction), jamais sur les pixels.
+ * Partagée par la rue du téléphone ([CameraLive]) et celle des lunettes.
+ */
+@Composable
+internal fun ProbeVideoRest(probe: LiveProbe) {
+    val rest = probe.collectRest()
+    // Ensemble mémorisé : sans lui, chaque réexécution sur les pixels recréerait
+    // l'instance et rallumerait les pastilles pour rien.
+    val followed = remember(rest.followed) { rest.followed.toSet() }
+    LiveDistanceLayer(rest.distanceLayer, topInset = 0.dp, followed = followed, modifier = Modifier.fillMaxSize())
+    SteeringLayer(rest.steering)
+    InstructionLayer(rest.pulse)
+    CrossingOnVideo(rest)
 }
 
 /**
