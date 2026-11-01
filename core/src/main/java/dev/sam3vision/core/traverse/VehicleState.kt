@@ -5,6 +5,7 @@ import dev.sam3vision.core.distance.DistanceReading
 import dev.sam3vision.core.live.PositionText
 import dev.sam3vision.core.model.Detection
 import dev.sam3vision.core.predict.Box
+import dev.sam3vision.core.predict.EgoCompensator
 import dev.sam3vision.core.speech.SpeechLanguage
 
 /**
@@ -276,7 +277,8 @@ class VehicleStateWatcher(
                 if (fondFranc && (motion == null || backgroundVerdict(prev, seen, atMs, motion) != Verdict.CAMERA_MOVED)) return@filter false
                 val measured = meters[candidate]
                 if (measured != null && measured > PARKED_METERS) return@filter false
-                if (!still(prev, seen, atMs, motion) || seen.area > prev.area) return@filter false
+                val grown = seen.area > prev.area * (1f + EgoCompensator.AREA_REL_EPS)
+                if (!still(prev, seen, atMs, motion) || grown) return@filter false
                 PositionText.sceneBucket(measured) == prev.bucket
             }
             .minByOrNull { meters[it] ?: Float.MAX_VALUE }

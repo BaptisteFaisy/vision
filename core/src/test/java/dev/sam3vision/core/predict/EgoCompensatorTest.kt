@@ -144,6 +144,18 @@ class EgoCompensatorTest {
     }
 
     @Test
+    fun `discountGrowth - micro-croissance sans fond, decotee`() {
+        assertTrue(EgoCompensator.discountGrowth(0.01f, null, 200L).discounted)
+        assertFalse(EgoCompensator.discountGrowth(0.1f, null, 200L).discounted)
+    }
+
+    @Test
+    fun `areaGrowing - gigue pixel sans fond, pas de croissance`() {
+        assertFalse(EgoCompensator.areaGrowing(10000f, 10100f, 200L, null))
+        assertTrue(EgoCompensator.areaGrowing(10000f, 10600f, 200L, null))
+    }
+
+    @Test
     fun `areaGrowing - brut sans fond, decote sous zoom`() {
         assertTrue(EgoCompensator.areaGrowing(100f, 121f, 1000L, null))
         assertFalse(EgoCompensator.areaGrowing(100f, 90f, 1000L, null))
