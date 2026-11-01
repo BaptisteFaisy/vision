@@ -59,6 +59,11 @@ class PictoStore(private val root: File) {
             }
     }
 
+    /** Efface tous les repères (Réglages) : le dossier est vidé, jamais supprimé. */
+    fun clear() {
+        root.listFiles()?.forEach { it.deleteRecursively() }
+    }
+
     /** PNG d'un repère pour l'overlay, `null` si inconnu ou illisible. */
     fun pngOf(id: String): ByteArray? = readDir(File(root, id))?.png
 
@@ -117,7 +122,7 @@ class PictoStore(private val root: File) {
         private const val LABEL_FILE = "label.txt"
         private const val PNG_FILE = "picto.png"
         private const val TEMPLATE_FILE = "template.bin"
-        private const val PICTO_PREFIX = "picto-"
+        internal const val PICTO_PREFIX = "picto-"
 
         /** Nom quand aucun nom n'est donné (bouton : stockage direct). */
         const val DEFAULT_LABEL = "Object"

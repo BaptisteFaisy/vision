@@ -25,6 +25,9 @@ object IseeStatusText {
     /** Un repère vient d'être validé : la détection le cherche déjà sur la vidéo. */
     const val PICTO_SAVED = "Picto saved"
 
+    /** Tous les repères viennent d'être effacés (Réglages) : plus rien n'est armé. */
+    const val PICTO_CLEARED = "Pictos deleted"
+
     /** Micro jamais ouvert pour cette tenue (relâchement sans début d'enregistrement). */
     const val NOT_RECORDING = "Nothing was recorded"
 

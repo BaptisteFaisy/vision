@@ -32,6 +32,23 @@ livré et ses preuves (tâche, fichiers, chiffres) dans l'arbre.
   vols recouvrés via `onFrame` + client manuel) rouge avant le fix
   (signature exacte du crash), vert après ; `:core:testDebugUnitTest` +
   `:app:testDebugUnitTest` verts sur le r630 (BUILD SUCCESSFUL, 0 échec).
+## 2026-11-01 — iSee : les pictogrammes s'effacent et ne survivent plus aux mises à jour (branche `fix/isee-picto-reset`)
+
+- **Fait** : ordre user « ajoute un bouton dans les paramètres d'iSee qui permet
+  d'effacer les pictogrammes enregistrés + quand on installe une nouvelle version,
+  on ne doit pas hériter des pictogrammes créés + les pictogrammes des clés et des
+  autres objets ne doivent être ni dans le code ni dans les paquets de l'app ».
+  Nouvelle section PICTOGRAMS dans Réglages (bouton « Delete saved pictograms ») :
+  fichiers supprimés, mémoire vidée, chasse abandonnée, overlay tombé ; une
+  génération en vol livrée après coup est jetée sans stocker. À la première
+  ouverture après mise à jour (`SamApp`, version comparée), le magasin et les
+  égarés sont purgés avant tout chargement. Les 21 PNG `ic_home_*` intégrés et
+  leur table `HomeIcons` sont supprimés : les pastilles sont en texte seul.
+- **Preuve** : 6 tests ciblés (`PictoStoreTest` +1, `PictoUpgradePurgeTest` +3,
+  `IseePictoClearTest` +2), `:app:testDebugUnitTest` ciblé vert (36/36 avec
+  `IseePictoTest` inchangé), garde tailles Kotlin OK, `:app:assembleDebug` +
+  `:app:assembleRelease` + `:app:lintDebug` verts, 0 entrée `ic_home_|picto`
+  dans l'APK release.
 
 ## 2026-11-01 — iSee : fin du crash `IndexOutOfBounds` des trackers concurrents (branche `persontracker-race`)
 

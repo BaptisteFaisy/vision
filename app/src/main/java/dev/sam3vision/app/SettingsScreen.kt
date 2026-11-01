@@ -40,7 +40,7 @@ import dev.sam3vision.core.net.GpuStatus
 import dev.sam3vision.core.settings.CaregiverRole
 import dev.sam3vision.core.settings.Settings
 
-/** Settings in English, white page, black text: THE USER, META GLASSES, TECHNICAL SETTINGS. */
+/** Settings in English, white page, black text: THE USER, META GLASSES, PICTOGRAMS, TECHNICAL SETTINGS. */
 @Composable
 fun SettingsScreen(
     settings: Settings,
@@ -61,6 +61,7 @@ fun SettingsScreen(
     onPickRole: (Settings) -> Unit,
     onStartTracking: (Settings) -> Unit,
     onStopTracking: () -> Unit,
+    onClearPictos: () -> Unit,
     onBack: () -> Unit,
 ) {
     // Suit le seed async : sans clé, le brouillon garderait une clé vide.
@@ -84,6 +85,7 @@ fun SettingsScreen(
             onStartTracking = onStartTracking,
             onStopTracking = onStopTracking,
             nav = NavCallbacks(onOpenLive, onOpenClassic, onOpenGestures),
+            onClearPictos = onClearPictos,
             statusLine = statusLine,
         )
     }
@@ -230,6 +232,32 @@ private fun RoleSegmentCell(label: String, selected: Boolean, onClick: () -> Uni
             maxLines = 1,
             textAlign = androidx.compose.ui.text.style.TextAlign.Center,
         )
+    }
+}
+
+/** PICTOGRAMS: landmarks learned by iSee live on this phone only — this button forgets them all. */
+@Composable
+internal fun PictoSection(onClearPictos: () -> Unit) {
+    var cleared by remember { mutableStateOf(false) }
+    Column(Modifier.fillMaxWidth(), verticalArrangement = Arrangement.spacedBy(10.dp)) {
+        SectionTitle("PICTOGRAMS")
+        Text(
+            "Objects learned by iSee (keys and others) are stored on this phone only.",
+            color = SettingsLight.muted,
+            fontSize = 13.sp,
+        )
+        GlassButton(
+            "Delete saved pictograms",
+            true,
+            false,
+            onClick = {
+                onClearPictos()
+                cleared = true
+            },
+        )
+        if (cleared) {
+            Text("Saved pictograms deleted.", color = SettingsLight.muted, fontSize = 13.sp)
+        }
     }
 }
 

@@ -183,7 +183,7 @@ fun LiveBottomBar(
         val items = objectChipItems(state)
         if (items.isNotEmpty()) {
             Row(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
-                items.forEach { Chip(it.text, AppColors.primary, null, icon = HomeIcons.iconFor(it.label)) }
+                items.forEach { Chip(it.text, AppColors.primary, null) }
             }
         }
         BigButton(

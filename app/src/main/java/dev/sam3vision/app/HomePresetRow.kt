@@ -17,6 +17,7 @@ import dev.sam3vision.core.live.LivePrompts
  * (l'état du direct) : la pastille active est verte, les autres neutres. Un tap
  * relance le direct sur le preset ([onPreset]), sans quitter l'écran — comme
  * le champ « Follow », par le même chemin (`restartWith`, `LiveScreen`).
+ * Pastilles en texte seul : aucun pictogramme n'est intégré à l'app.
  */
 @Composable
 fun HomePresetRow(prompts: List<String>, onPreset: (List<String>) -> Unit) {
@@ -37,7 +38,6 @@ fun HomePresetRow(prompts: List<String>, onPreset: (List<String>) -> Unit) {
                 preset.label,
                 if (maison == preset.id) AppColors.success else AppColors.surfaceHigh,
                 { onPreset(preset.prompts) },
-                icon = HomeIcons.presetIcon(preset.id),
             )
         }
     }

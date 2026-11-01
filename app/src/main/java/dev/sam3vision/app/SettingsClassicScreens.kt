@@ -32,7 +32,7 @@ internal fun ClassicScreens(
     }
 }
 
-/** Sections USER + META GLASSES + TECHNICAL SETTINGS under the header. */
+/** Sections USER + META GLASSES + PICTOGRAMS + TECHNICAL SETTINGS under the header. */
 @Composable
 internal fun SettingsBody(
     draft: Settings,
@@ -51,11 +51,13 @@ internal fun SettingsBody(
     onStartTracking: (Settings) -> Unit,
     onStopTracking: () -> Unit,
     nav: NavCallbacks,
+    onClearPictos: () -> Unit,
     statusLine: String?,
 ) {
     Column(Modifier.fillMaxWidth().padding(horizontal = 28.dp), verticalArrangement = Arrangement.spacedBy(28.dp)) {
         UserSection(draft, onPickRole, onStartTracking, onStopTracking) { onDraft(it) }
         MetaGlassesSection(glasses = glasses)
+        PictoSection(onClearPictos)
         TechnicalSection(
             draft = draft,
             onChange = onDraft,

@@ -114,6 +114,16 @@ class PictoStoreTest {
         assertTrue(File(filesDir, "picto-vide").exists())
     }
 
+    @Test
+    fun `effacer supprime tous les reperes`() {
+        val store = store()
+        store.save("Médocs", byteArrayOf(1), template())
+        store.save("Clés", byteArrayOf(2), template())
+        assertEquals(2, store.list().size)
+        store.clear()
+        assertTrue(store.list().isEmpty())
+    }
+
     private fun templateBlob(): ByteArray {
         val blob = ByteArray(2 + TEMPLATE_EDGE * TEMPLATE_EDGE)
         blob[0] = (TEMPLATE_EDGE shr 8).toByte()
