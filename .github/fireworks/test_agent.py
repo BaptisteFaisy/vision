@@ -65,7 +65,8 @@ LABEL_HUMAN = "intervention-humaine"
 PREFIXE = "_fireworks · agent de test (zeroclaw `fw`)_"
 MOTIFS_JOURNAL = ("FAILED", "AssertionError", "Expected", "expected:",
                   "e: file", "error:", "Error:", "Caused by", "Caused by:",
-                  "Tests failed", "> Task")
+                  "Tests failed", "> Task", "Traceback", "File \"",
+                  "ERROR:", "FAIL:")
 
 
 def _charger(nom):
@@ -200,8 +201,9 @@ def prompt_fix(repo, pr, dossier, extrait, etapes=""):
         "- garde le style du dépôt (commentaires en français, phrases utiles) ;",
         "- si la correction propre sort du cadre (produit, contrat), ne modifie "
         "rien et réponds ABANDON.",
-        "- tu peux vérifier en local (`./gradlew :core:testDebugUnitTest "
-        "--tests \"*Nom*\"`), mais le temps est compté : la CI rejugera.",
+        "- tu peux vérifier en local (`python3 -m unittest tools/test_X.py` "
+        "ou `./gradlew :core:testDebugUnitTest --tests \"*Nom*\"`), mais le "
+        "temps est compté : la CI rejugera.",
         "",
         "Termine par une seule ligne : `CORRIGÉ <fichiers>` ou "
         "`ABANDON <raison>`.",
@@ -427,7 +429,9 @@ def livrer(repo, pr, args, fichiers, sortie):
     if not valide:
         return refuser(repo, pr, marque, "La branche reste intacte.", raison)
     if compilation_gate is not None:
-        ok, detail = compilation_gate.verifier_compilation()
+        # La porte juge les fichiers que l'agent a VRAIMENT touchés, pas le
+        # diff PR/master (un test jamais modifié par la PR y est invisible).
+        ok, detail = compilation_gate.verifier_compilation(fichiers)
         if not ok:
             return refuser(repo, pr, marque, detail, "il ne compile pas")
     commit_ok, erreur = commiter(pr)

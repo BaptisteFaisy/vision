@@ -29,6 +29,11 @@ class PromptTest(unittest.TestCase):
         prompt = test_agent.prompt_fix("O/R", "12", "/tmp/c", "")
         self.assertIn("indisponible", prompt)
 
+    def test_porte_verif_python_et_kotlin(self):
+        prompt = test_agent.prompt_fix("O/R", "12", "/tmp/clone", "FAILED x")
+        self.assertIn("python3 -m unittest", prompt)
+        self.assertIn("gradlew", prompt)
+
 
 class BinaireTest(unittest.TestCase):
     """Localisation du binaire : PATH, puis les emplacements des runners."""
@@ -122,6 +127,30 @@ class ChangementsTest(unittest.TestCase):
             self.assertEqual(test_agent.changements(), [])
 
 
+class JournalTest(unittest.TestCase):
+    """L'extrait garde les lignes de verdict, dont les tracebacks Python."""
+
+    def test_garde_traceback_fichier_et_erreur(self):
+        journal = "\n".join([
+            "ok   svg cases noires",
+            "ERROR: test_format_exact (tools.test_solve_glasses_mire.TestBloc)",
+            "Traceback (most recent call last):",
+            '  File "/home/r/tools/test_solve_glasses_mire.py", line 49, in x',
+            "KeyError: 'refW'",
+            "Ran 8 tests in 0.002s",
+            "FAILED (errors=1)",
+        ])
+        faux = mock.Mock(stdout=journal)
+        with mock.patch.object(test_agent, "_gh", return_value=faux):
+            extrait = test_agent.extrait_journal(["42"])
+        self.assertIn("Traceback (most recent call last):", extrait)
+        self.assertIn("line 49, in x", extrait)
+        self.assertIn("KeyError: 'refW'", extrait)
+        self.assertIn("FAILED (errors=1)", extrait)
+        self.assertNotIn("svg cases noires", extrait)
+        self.assertNotIn("Ran 8 tests", extrait)
+
+
 class FixTest(unittest.TestCase):
     """Le pilote : borné, jamais de push d'un arbre cassé, jamais silencieux."""
 
@@ -203,7 +232,7 @@ class FixTest(unittest.TestCase):
         rc, actifs = self._lancer(patchs)
         self.assertEqual(rc, 1)
         actifs["pousser"].assert_not_called()
-        gate.verifier_compilation.assert_called_once()
+        gate.verifier_compilation.assert_called_once_with(["core/a.kt"])
 
     def test_correctif_garde_refuse(self):
         patchs = self._patchs()
