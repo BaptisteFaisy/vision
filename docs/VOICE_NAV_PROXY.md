@@ -72,8 +72,8 @@ front Cloudflare Worker (motif `duello-api-relay`) — phase 2, pas maintenant.
 
 Défaut embarqué `routeBaseUrlDefault` (`app/build.gradle.kts`, = URL
 ci-dessus) → `BuildConfig.ROUTE_BASE_URL` → `seedRouteBaseUrl` (remplit le
-champ vide) → `Settings.routeBaseUrl` (persisté, parité des deux stores) →
-`resolveRouteEndpoint()` / `routeEndpoint()` → `HttpRouteClient`
+champ vide) → `Settings.routeBaseUrl` (persisté, parité des deux stores),
+relu et normalisé (`trim().trimEnd('/')`) par l'appelant → `HttpRouteClient`
 (`POST /route`, `GET /status`, socle `Http.kt` partagé). Surcharge possible
 via `route.base.url` (`local.properties`, gitignoré) ou Réglages →
 « Valhalla route URL ». Valhalla ne géocode pas : l'appelant fournit des
