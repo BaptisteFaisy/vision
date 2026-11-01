@@ -106,27 +106,19 @@ internal fun vehicleWish(cue: VehicleStateCue?): VoiceWish? {
 }
 
 /**
- * Vœu danger : personne (niveau 2 — le mot imminent part en clip immédiat,
- * même niveau), barrière (niveau 4), divers (niveau 7) ; en Traversée, la
- * personne seule parle (niveau 101). Pur, testé en JVM.
+ * Vœu danger : transfère le niveau et la clé du guetteur ([HazardCue.level],
+ * [HazardCue.antiRepeatKey] — personne 2, grillages/murs/barrières 4,
+ * poteaux et divers 7, imminent déjà clé `human-imminent`) ; le mot imminent
+ * part en clip. En Traversée, la personne seule parle (niveau 101). Pur,
+ * testé en JVM.
  */
 internal fun hazardWish(cue: HazardCue?, crossingActive: Boolean = false): VoiceWish? {
     if (cue == null) return null
-    if (crossingActive) {
-        if (cue.kind != HazardKind.PERSON) return null
-        return personWish(cue, CrossingLevel.HUMAN)
-    }
-    return when (cue.kind) {
-        HazardKind.PERSON -> personWish(cue, OutdoorLevel.HUMAN)
-        HazardKind.BARRIER -> VoiceWish(OutdoorLevel.FENCE, cue.phrase, AntiRepeat.KEY_FENCE)
-        HazardKind.OTHER -> VoiceWish(OutdoorLevel.POLE, cue.phrase, AntiRepeat.KEY_POLE)
-    }
+    if (crossingActive && cue.kind != HazardKind.PERSON) return null
+    val level = if (crossingActive) CrossingLevel.HUMAN else cue.level
+    val clip = GuidanceWord.clipIdFor(cue.phrase).takeIf { cue.urgent }
+    return VoiceWish(level, cue.phrase, cue.antiRepeatKey, clip)
 }
-
-/** Vœu personne : mot imminent en clip, sinon phrase douce (même niveau). */
-private fun personWish(cue: HazardCue, level: Int): VoiceWish =
-    if (cue.urgent) VoiceWish(level, cue.phrase, AntiRepeat.KEY_HUMAN_IMMINENT, GuidanceWord.clipIdFor(cue.phrase))
-    else VoiceWish(level, cue.phrase, AntiRepeat.KEY_HUMAN_SOFT)
 
 /**
  * Vœu bordure : niveau 5 dehors, 102 en Traversée. Pur, testé en JVM.

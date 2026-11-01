@@ -167,7 +167,7 @@ class EchelleOverwriteTest {
         assertNull(soft?.clipId)
 
         val word = GuidanceWord.fromCap(dev.sam3vision.core.live.SteeringCap.Right).text(SpeechLanguage.Fr)
-        val imminent = hazardWish(HazardCue(word, meters = 1f, urgent = true, kind = HazardKind.PERSON))
+        val imminent = hazardWish(HazardCue(word, meters = 1f, urgent = true, kind = HazardKind.PERSON, antiRepeatKey = AntiRepeat.KEY_HUMAN_IMMINENT))
 
         assertEquals(OutdoorLevel.HUMAN, imminent?.level)
         assertEquals(AntiRepeat.KEY_HUMAN_IMMINENT, imminent?.key)
@@ -179,15 +179,15 @@ class EchelleOverwriteTest {
     fun `barriere niveau 4, divers niveau 7`() {
         assertEquals(
             OutdoorLevel.FENCE,
-            hazardWish(HazardCue("Attention à la barrière.", meters = 2f, kind = HazardKind.BARRIER))?.level,
+            hazardWish(HazardCue("Attention à la barrière.", meters = 2f, kind = HazardKind.BARRIER, level = OutdoorLevel.FENCE, antiRepeatKey = AntiRepeat.KEY_FENCE))?.level,
         )
         assertEquals(
             AntiRepeat.KEY_FENCE,
-            hazardWish(HazardCue("Attention à la barrière.", meters = 2f, kind = HazardKind.BARRIER))?.key,
+            hazardWish(HazardCue("Attention à la barrière.", meters = 2f, kind = HazardKind.BARRIER, level = OutdoorLevel.FENCE, antiRepeatKey = AntiRepeat.KEY_FENCE))?.key,
         )
         assertEquals(
             OutdoorLevel.POLE,
-            hazardWish(HazardCue("Attention au lampadaire.", meters = 2f, kind = HazardKind.OTHER))?.level,
+            hazardWish(HazardCue("Attention au lampadaire.", meters = 2f, kind = HazardKind.OTHER, level = OutdoorLevel.POLE, antiRepeatKey = AntiRepeat.KEY_POLE))?.level,
         )
         assertNull(hazardWish(null))
     }
@@ -202,13 +202,13 @@ class EchelleOverwriteTest {
         assertEquals(CrossingLevel.HUMAN, person?.level)
         assertNull(
             hazardWish(
-                HazardCue("Attention à la barrière.", meters = 2f, kind = HazardKind.BARRIER),
+                HazardCue("Attention à la barrière.", meters = 2f, kind = HazardKind.BARRIER, level = OutdoorLevel.FENCE, antiRepeatKey = AntiRepeat.KEY_FENCE),
                 crossingActive = true,
             ),
         )
         assertNull(
             hazardWish(
-                HazardCue("Attention au lampadaire.", meters = 2f, kind = HazardKind.OTHER),
+                HazardCue("Attention au lampadaire.", meters = 2f, kind = HazardKind.OTHER, level = OutdoorLevel.POLE, antiRepeatKey = AntiRepeat.KEY_POLE),
                 crossingActive = true,
             ),
         )
