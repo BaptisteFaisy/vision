@@ -72,7 +72,7 @@ class IseeClipsEnTest {
         assertEquals("Aligned with the crosswalk.", all[IseeClipsEn.CROSSWALK_ALIGNED])
         assertEquals("On the crosswalk.", all[IseeClipsEn.CROSSWALK_ARRIVED])
         assertEquals("Sidewalk ahead.", all[IseeClipsEn.SIDEWALK_AHEAD])
-        assertEquals("Cross now.", all[IseeClipsEn.VERDICT_CROSS])
+        assertEquals("Cross.", all[IseeClipsEn.VERDICT_CROSS])
         assertEquals("Don't cross.", all[IseeClipsEn.VERDICT_WAIT])
         assertEquals("Left.", all[IseeClipsEn.GO_LEFT])
         assertEquals("Right.", all[IseeClipsEn.GO_RIGHT])
