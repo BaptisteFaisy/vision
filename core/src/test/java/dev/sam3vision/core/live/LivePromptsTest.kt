@@ -10,13 +10,13 @@ import org.junit.Test
 class LivePromptsTest {
 
     @Test
-    fun `vingt concepts exterieur par defaut, plafond client a vingt deux`() {
-        assertEquals(20, LivePrompts.default.size)
+    fun `vingt et un concepts exterieur par defaut, plafond client a vingt deux`() {
+        assertEquals(21, LivePrompts.default.size)
         assertEquals(
             listOf(
                 "person", "car", "bus", "bicycle", "motorcycle",
                 "pedestrian traffic light", "pedestrian signal head",
-                "curb", "crosswalk", "pole", "stairs", "keys", "gate",
+                "curb", "sidewalk", "crosswalk", "pole", "stairs", "keys", "gate",
                 "souvenir shop", "beanie", "socks", "wall", "stroller", "child",
                 "dog",
             ),
@@ -61,7 +61,7 @@ class LivePromptsTest {
         assertTrue("bus" in LivePrompts.default)
         assertTrue("bicycle" in LivePrompts.default)
         assertTrue("motorcycle" in LivePrompts.default)
-        assertFalse("sidewalk" in LivePrompts.default)
+        assertTrue("sidewalk" in LivePrompts.default)
         assertFalse("fence" in LivePrompts.default)
         assertTrue("souvenir shop" in LivePrompts.default)
         assertTrue("beanie" in LivePrompts.default)
@@ -140,14 +140,13 @@ class LivePromptsTest {
     @Test
     fun `le mode exterieur iSee suit les defauts avec murs clotures et portails`() {
         val exterior = LivePrompts.forMode(true)
-        assertEquals(20, exterior.size)
+        assertEquals(21, exterior.size)
         assertTrue("wall" in exterior)
         assertTrue("gate" in exterior)
-        // « vire … sidewalk, fence » puis « rajoute bus » (ordre user du 01/11) :
-        // ces deux-là ne sont plus suivis au repos, ni dans le défaut ni dans
-        // le monde iSee ; le bus, si.
+        // Ordres user du 01/11 : « vire fence » puis « go sidewalk » — le
+        // trottoir est revenu (rail du maintien), la clôture non.
         assertFalse("fence" in exterior)
-        assertFalse("sidewalk" in exterior)
+        assertTrue("sidewalk" in exterior)
     }
 
     @Test
@@ -233,10 +232,10 @@ class LivePromptsTest {
 
     @Test
     fun `find the x sous le plafond s ajoute sans rien chasser`() {
-        // La liste par défaut est à 20, le plafond à 22 : « Find the X » ajoute
+        // La liste par défaut est à 21, le plafond à 22 : « Find the X » ajoute
         // (« wallet ») sans évincer personne — l'éviction ne commence qu'à 22.
         val next = LivePrompts.withConcept(LivePrompts.default, "wallet")
-        assertEquals(21, next.size)
+        assertEquals(22, next.size)
         assertTrue("wallet" in next)
         assertTrue("dog" in next)
         assertEquals(LivePrompts.default + "wallet", next)
