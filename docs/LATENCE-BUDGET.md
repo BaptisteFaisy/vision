@@ -78,7 +78,7 @@ Trois remarques qui commandent la suite :
   hors attente de 57,6–78,4 ms à 123,6–141,4 ms (§ 4).
 - `QUEUE` n'est pas un coût technique mais un **coût de politique** : la frame attend un créneau
   d'envoi. Le modèle de campagne prend une attente ≈ intervalle ÷ 2 (phase uniforme) alors que la
-  cadence prudente de cet arbre est de **350 / 500 / 900 ms** (`core/live/LiveSession.kt:34`) : les
+  cadence prudente de cet arbre est de **350 / 500 / 900 ms** (`core/live/LiveSession.kt:35`) : les
   lignes cloud du § 4 sont donc des **bornes basses**, pas des promesses. C'est le seul étage que le
   passage au local supprime intégralement (0 ms).
 - `DECODE` a perdu son coût d'allocation (3,4 Mo/frame → 0 octet, mesuré sur JVM) mais garde un coût
