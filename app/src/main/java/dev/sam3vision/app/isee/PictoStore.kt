@@ -119,7 +119,7 @@ class PictoStore(private val root: File) {
         private const val TEMPLATE_FILE = "template.bin"
         private const val PICTO_PREFIX = "picto-"
 
-        /** Nom quand l'aidant valide sans rien saisir. */
+        /** Nom quand aucun nom n'est donné (bouton : stockage direct). */
         const val DEFAULT_LABEL = "Object"
     }
 }

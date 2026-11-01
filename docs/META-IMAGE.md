@@ -6,7 +6,7 @@ documentation publique de Meta couvre les endpoints, pas ce chemin exact —
 les constats marqués « non mesuré » restent à vérifier sur le téléphone.
 
 La photo d'un objet filmé devient son pictogramme noir sur jaune
-(`core/picto/PictoPrompt.kt`), relu par l'aidant, puis reconnu sur la vidéo
+(`core/picto/PictoPrompt.kt`), stocké et armé aussitôt, puis reconnu sur la vidéo
 (`core/picto/PictoMatcher.kt`, local, sans réseau). La géométrie vient de la
 photo, jamais d'une invention : le modèle ne fait que redessiner.
 
@@ -57,7 +57,7 @@ Sur l'accueil iSee, « Find the keys » (`PictoVoiceOrder.parseFind`, verbe
 anglais `find`/`locate` en premier mot) ajoute « keys » aux concepts SAM de
 la sonde (`LiveProbe.ensureConcept`, sauf en Traversée) puis crée le
 pictogramme (`IseePicto.findObject`, routé par `IseePictoVoice`) : même appel
-Muse (`muse-image-1.0`, jaune/noir), mais stocké et armé sans relecture —
+Muse (`muse-image-1.0`, jaune/noir), stocké et armé aussitôt, comme le bouton —
 l'utilisateur est seul. « Where are my keys » (`parseWhere`, objets maison
 ou « my ») prend le même chemin, sauf repère déjà armé (chassé, jamais
 régénéré) ; toute autre question « where » reste pour le LLM. Le matcher
@@ -80,7 +80,7 @@ caméra iSee, à son emplacement — le premier reconnu aussi en grand au-dessus
 | Orchestration écran | `app/.../isee/vm/IseePicto.kt` (+ état dans `IseeState.kt`) |
 | Magasin persistant | `app/.../isee/PictoStore.kt` (`filesDir/pictos`, hors purge) |
 | Pont Bitmap (frames, photo) | `app/.../isee/PictoFrames.kt` |
-| Bouton, overlay, relecture | `app/.../isee/PictoLayer.kt`, `PictoDialog.kt`, `IseePortraitCamera.kt` |
+| Bouton, overlay | `app/.../isee/PictoLayer.kt`, `IseePortraitCamera.kt` |
 
 ## Suivis (hors V1)
 

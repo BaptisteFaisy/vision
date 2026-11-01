@@ -52,7 +52,7 @@ data class IseeUiState(
      * ([IseeHome] consomme le drapeau via `settingsOpened`).
      */
     val openSettings: Boolean = false,
-    /** Repères visuels : génération en cours, relecture aidant, objets reconnus. */
+    /** Repères visuels : génération en cours, objets reconnus sur l'image. */
     val picto: PictoUiState = PictoUiState(),
     /** Lieu du picto (dedans par défaut) : dehors, les pictos sont muets et invisibles ; bascule à la voix uniquement, sans témoin visuel. */
     val placeMode: PictoPlaceMode = PictoPlaceMode.DEDANS,

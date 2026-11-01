@@ -114,9 +114,6 @@ private fun BoxWithConstraintsScope.PortraitScene(
         state,
         Modifier.align(Alignment.BottomCenter).padding(bottom = navInsetDp() + 10.dp),
     )
-    // Relecture aidant : survit à la rue (génération lancée, vidéo coupée),
-    // jamais dehors (aucun picto affiché ni généré).
-    if (state.placeMode.pictoEnabled) PictoDialog(state.picto, viewModel)
 }
 
 /** Boucle du temps de la scène : 10 minutes, comme l'ancienne transition infinie. */

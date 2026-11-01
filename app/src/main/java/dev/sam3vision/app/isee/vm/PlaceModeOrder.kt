@@ -32,8 +32,6 @@ class PlaceModeOrder(
                 status = confirm,
                 picto = if (mode.pictoEnabled) it.picto else it.picto.copy(
                     phase = PictoPhase.Idle,
-                    draftPng = null,
-                    draftLabel = "",
                     hits = emptyList(),
                 ),
             )
