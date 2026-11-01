@@ -4,6 +4,7 @@ import dev.sam3vision.core.model.LiveFrame
 import dev.sam3vision.core.model.ObjectLimits
 import dev.sam3vision.core.net.LiveClient
 import dev.sam3vision.core.net.WsLiveClient
+import java.util.concurrent.atomic.AtomicInteger
 
 /**
  * Cadence d'envoi des frames : trois paliers déduits de la latence moyenne.
@@ -101,6 +102,13 @@ class LiveSession(
     private val gate: FrameGate = gate ?: FrameGate(cadence.concurrency)
 
     /**
+     * Moyennes consécutives sous le budget : le régulateur ne rouvre qu'après
+     * [REOPEN_AFTER]. Compteur atomique : [regulate] tombe sur les threads réseau
+     * (deux créneaux = deux réponses concurrentes).
+     */
+    private val belowBudget = AtomicInteger()
+
+    /**
      * Concepts normalisés **une fois** : [prompts] est figé à la construction, or la
      * normalisation (découpe, minuscules, dédup) tournait à chaque frame — du CPU payé
      * deux fois par seconde pour une liste qui ne change jamais en séance.
@@ -126,6 +134,7 @@ class LiveSession(
         if (next == cadence) return
         cadence = next
         gate.capacity = next.concurrency
+        belowBudget.set(0)
     }
 
     /** Le socket du direct est-il ouvert ? `false` pour un client sans transport socket. */
@@ -139,22 +148,34 @@ class LiveSession(
 
     /**
      * Régulateur de latence : referme à un créneau dès que la moyenne dépasse le budget,
-     * ne rouvre que si elle est **franchement** en dessous ([RELAX_RATIO]). L'hystérésis
-     * évite le va-et-vient : sans elle, on rouvrirait, la latence doublerait, on
-     * refermerait — en boucle.
+     * ne rouvre qu'après [REOPEN_AFTER] moyennes consécutives **sous** le budget.
+     * La durée (et non un seuil bas) fait l'hystérésis : l'ancien seuil de réouverture
+     * (moitié du budget, 105 ms) passait sous le plancher du signal (rtt ~176 ms —
+     * dump 01/11, N=1081 : fermeture trame 184, jamais rouverte), toute fermeture
+     * devenait définitive. Rouvrir coûte un entier, pas une frame : le va-et-vient
+     * résiduel module le débit, il ne perd rien.
      */
     fun regulate() {
         val budget = cadence.latencyBudgetMs
-        if (budget <= 0L || cadence.concurrency <= 1) return
+        if (budget <= 0L || cadence.concurrency <= 1) {
+            belowBudget.set(0)
+            return
+        }
         // La première frame paie le démarrage du conteneur (mesuré : 17 s en WebSocket).
         // Réguler dessus ouvrirait/fermerait les créneaux sur un seul chiffre : on attend
         // trois mesures pour parler de cadence.
         if (stats.samples < REGULATE_MIN_SAMPLES) return
         val average = stats.averageMs
         if (average <= 0L) return
-        when {
-            average > budget -> gate.capacity = 1
-            average < budget * RELAX_RATIO -> gate.capacity = cadence.concurrency
+        if (average > budget) {
+            belowBudget.set(0)
+            gate.capacity = 1
+            return
+        }
+        if (average < budget) {
+            if (belowBudget.incrementAndGet() >= REOPEN_AFTER) gate.capacity = cadence.concurrency
+        } else {
+            belowBudget.set(0)
         }
     }
 
@@ -248,6 +269,7 @@ class LiveSession(
         gate.invalidate()
         stats.reset()
         serverStats.reset()
+        belowBudget.set(0)
     }
 
     /**
@@ -260,8 +282,13 @@ class LiveSession(
     }
 
     companion object {
-        /** Marge de réouverture : on ne rouvre un créneau que sous la moitié du budget. */
-        const val RELAX_RATIO = 0.5
+        /**
+         * Moyennes consécutives sous le budget avant réouverture (~1 s à un créneau) :
+         * assez pour ne pas rouvrir sur un creux, assez court pour repipeliner vite
+         * après une congestion (dump 01/11 : réouverture 30 trames après la fin du
+         * passage lent, le temps que la fenêtre de 20 évacue).
+         */
+        const val REOPEN_AFTER = 5
 
         /** Mesures minimum avant que le régulateur se prononce. */
         const val REGULATE_MIN_SAMPLES = 3
