@@ -318,6 +318,7 @@ internal fun TechnicalSection(
         GpuRegionSettings(draft, gpu) { onChange(it) }
         DistanceSettings(draft) { onChange(it) }
         LightCropCollectSettings(draft) { onChange(it) }
+        CameraHalSettings(draft) { onChange(it) }
         PerceptionSettings(draft, onTestDepth) { onChange(it) }
         TtsSettings(
             draft = draft,

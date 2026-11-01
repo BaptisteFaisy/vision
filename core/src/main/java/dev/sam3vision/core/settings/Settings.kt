@@ -202,6 +202,15 @@ data class Settings(
      * vers DA2 par fromName.
      */
     val depthBackend: DepthBackend = DepthBackend.DA2,
+    /**
+     * Post-traitements HAL coupés (interrupteur TECHNICAL SETTINGS, mesure
+     * latence : `age` = expo + readout + HAL + livraison). **`false` par
+     * défaut** : éteint, la liaison caméra est inchangée. Allumé, chaque
+     * étage n'est coupé que si le HAL annonce son mode OFF (`*_AVAILABLE_*`),
+     * sinon repli silencieux — voir `CameraHalProcessing` côté `:app`.
+     * L'AE/AWB/AF ne sont jamais touchés.
+     */
+    val cameraHalBareEnabled: Boolean = false,
 ) {
     companion object {
         /**

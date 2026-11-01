@@ -21,6 +21,7 @@ import kotlinx.coroutines.launch
  */
 internal fun LiveProbe.stop() {
     resetPipeline()
+    wifiLock.release() // fin du direct (caméra coupée, fond, onCleared) : la radio redort.
     closeSessions()
     releaseOnCameraOff(state.value.endpoint)
     clear()

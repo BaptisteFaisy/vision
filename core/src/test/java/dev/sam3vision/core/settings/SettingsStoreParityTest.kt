@@ -52,6 +52,7 @@ class SettingsStoreParityTest {
         samRegion = SamRegion.Us,
         speechLanguage = SpeechLanguage.En,
         routeBaseUrl = "https://route.test",
+        cameraHalBareEnabled = true,
     )
 
     @Test
@@ -75,6 +76,7 @@ class SettingsStoreParityTest {
         assertEquals(SamRegion.Us, relu.samRegion)
         assertEquals(SpeechLanguage.En, relu.speechLanguage)
         assertEquals("https://route.test", relu.routeBaseUrl)
+        assertEquals(true, relu.cameraHalBareEnabled)
     }
 
     @Test
