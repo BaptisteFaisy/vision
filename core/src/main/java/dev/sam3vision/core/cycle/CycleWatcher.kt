@@ -25,14 +25,38 @@ data class CycleCue(
  * consigne (ordre user : iSee décrit, en douceur).
  */
 object CycleText {
-    /** « Attention, vélo en mouvement… » situé à [centerX] (`null` = sans heure). */
-    fun movingPhrase(
-        name: CycleConcepts.CycleName,
-        language: SpeechLanguage,
-        centerX: Float? = null,
-    ): String = when (language) {
-        SpeechLanguage.Fr -> PositionText.withHour("Attention, ${name.fr} en mouvement", centerX, language)
-        SpeechLanguage.En -> PositionText.withHour("Attention, ${name.en} moving", centerX, language)
+    /**
+     * « Attention, vélo en mouvement. » — **sans heure** : un engin qui roule n'a
+     * pas de position qui tienne le temps d'être dite (ordre user du 01/11, même
+     * règle que les voitures). La phrase étant fixe, elle est enregistrée
+     * ([movingClipId]).
+     */
+    fun movingPhrase(name: CycleConcepts.CycleName, language: SpeechLanguage): String = when (language) {
+        SpeechLanguage.Fr -> "Attention, ${name.fr} en mouvement."
+        SpeechLanguage.En -> "Attention, ${name.en} moving."
+    }
+
+    /** Clip du pack voix du mouvement (`cycle_velo_moving`, `cycle_trott_moving`). */
+    fun movingClipId(name: CycleConcepts.CycleName): String = "cycle_${name.clipKey}_moving"
+
+    /** Clip du pack voix de l'arrêt (`cycle_velo_stopped`, `cycle_trott_stopped`). */
+    fun stoppedClipId(name: CycleConcepts.CycleName): String = "cycle_${name.clipKey}_stopped"
+
+    /**
+     * Clip d'une phrase **fixe** de cycle (`null` = variable, à synthétiser) :
+     * mouvements toujours, arrêts seulement sans heure. Pure, testée en JVM.
+     */
+    fun clipIdFor(phrase: String): String? = CLIPS[phrase]
+
+    private val CLIPS: Map<String, String> by lazy {
+        CycleConcepts.names().flatMap { name ->
+            listOf(
+                movingPhrase(name, SpeechLanguage.Fr) to movingClipId(name),
+                movingPhrase(name, SpeechLanguage.En) to movingClipId(name),
+                stoppedPhrase(name, SpeechLanguage.Fr, null) to stoppedClipId(name),
+                stoppedPhrase(name, SpeechLanguage.En, null) to stoppedClipId(name),
+            )
+        }.toMap()
     }
 
     /** « Vélo arrêté… » situé à [centerX] (`null` = sans heure). */
@@ -127,7 +151,7 @@ class CycleWatcher(
         if (pick.state == State.MOVING) lastMovingAtMs = atMs else lastStoppedAtMs = atMs
         hits = 0
         val phrase = when (pick.state) {
-            State.MOVING -> CycleText.movingPhrase(pick.name, language, pick.centerX)
+            State.MOVING -> CycleText.movingPhrase(pick.name, language)
             State.STOPPED -> CycleText.stoppedPhrase(pick.name, language, pick.centerX)
         }
         return CycleCue(phrase, pick.meters, pick.urgent)

@@ -23,13 +23,26 @@ object CycleConcepts {
     /**
      * Nom parlé du concept : [fr] le nom nu (« vélo », « trottinette »),
      * [en] le nom anglais (« bicycle », « scooter »), [stoppedFr] l'adjectif
-     * d'arrêt accordé (« arrêté », « arrêtée »).
+     * d'arrêt accordé (« arrêté », « arrêtée ») et [clipKey], la clé du pack
+     * voix (`cycle_<clipKey>_moving`, `cycle_<clipKey>_stopped`).
      */
-    data class CycleName(val fr: String, val en: String, val stoppedFr: String)
+    data class CycleName(
+        val fr: String,
+        val en: String,
+        val stoppedFr: String,
+        val clipKey: String,
+    )
 
-    private val VELO = CycleName("vélo", "bicycle", "arrêté")
-    private val TROTTINETTE = CycleName("trottinette", "scooter", "arrêtée")
-    private val DEUX_ROUES = CycleName("deux-roues", "two-wheeler", "arrêté")
+    private val VELO = CycleName("vélo", "bicycle", "arrêté", "velo")
+    private val TROTTINETTE = CycleName("trottinette", "scooter", "arrêtée", "trott")
+
+    /**
+     * Les concepts, une fois chacun (le pack voix s'en sert). « deux-roues »
+     * n'a pas encore de clips : son mouvement retombe en synthèse.
+     */
+    fun names(): List<CycleName> = listOf(VELO, TROTTINETTE, DEUX_ROUES)
+
+    private val DEUX_ROUES = CycleName("deux-roues", "two-wheeler", "arrêté", "deuxroues")
 
     private val NAMES: Map<String, CycleName> = mapOf(
         "bicycle" to VELO,
