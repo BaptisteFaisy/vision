@@ -2,6 +2,7 @@ package dev.sam3vision.app.isee.vm
 
 import dev.sam3vision.core.picto.PlaceModeOrder as CorePlaceModeOrder
 import dev.sam3vision.core.picto.PlaceModeText
+import dev.sam3vision.core.picto.PictoPlaceMode
 import dev.sam3vision.core.settings.Settings
 
 /**
@@ -19,6 +20,7 @@ class PlaceModeOrder(
     private val speak: suspend (String) -> Unit,
     private val update: StateUpdate,
     private val onLeaveIndoor: () -> Unit = {},
+    private val onPlaceMode: (PictoPlaceMode) -> Unit = {},
 ) {
 
     /**
@@ -39,6 +41,7 @@ class PlaceModeOrder(
                 ),
             )
         }
+        onPlaceMode(mode)
         speak(confirm)
         return true
     }

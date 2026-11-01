@@ -17,7 +17,7 @@ internal fun runFindOrder(
     lensFeeds: IseeLensFeeds,
     picto: IseePicto,
     label: String,
-) {
+): Boolean {
     probe.ensureConcept(settings, label, lensSpec, lensFeeds::note, lensFeeds.mire())
-    picto.findObject(label)
+    return picto.findObject(label)
 }

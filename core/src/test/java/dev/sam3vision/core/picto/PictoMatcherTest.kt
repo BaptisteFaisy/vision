@@ -135,6 +135,26 @@ class PictoMatcherTest {
         assertEquals(30f / 96f, hit!!.x, 0.001f)
         assertEquals(40f / 96f, hit.y, 0.001f)
     }
+
+    @Test
+    fun `gabarit cadre sur la boite, pas sur le centre`() {
+        val photo = geometric(64, 40, 16, 6)
+        val boxed = buildTemplateFromBox(photo, listOf(0.55f, 0.55f, 0.95f, 0.95f))
+        assertEquals(TEMPLATE_EDGE, boxed.edge)
+        val hit = matchTemplate(photo, boxed, "p1", "objet")
+        assertTrue(hit != null)
+        val cx = (hit!!.x + hit.w / 2) * 64
+        val cy = (hit.y + hit.h / 2) * 64
+        assertEquals(48.0, cx.toDouble(), 4.0)
+        assertEquals(48.0, cy.toDouble(), 4.0)
+    }
+
+    @Test
+    fun `boite degeneree garde le carre central`() {
+        val photo = geometric(64, 22, 20, 8)
+        assertTrue(buildTemplateFromBox(photo, emptyList()).gray.contentEquals(buildTemplate(photo).gray))
+        assertTrue(buildTemplateFromBox(photo, listOf(0f, 0f, 0f, 0f)).gray.contentEquals(buildTemplate(photo).gray))
+    }
 }
 
 class PictoPromptTest {

@@ -38,6 +38,37 @@ fun buildTemplate(photo: GrayImage): PictoTemplate {
 }
 
 /**
+ * Le gabarit d'une photo cadre sur la boite SAM normalisee [box]
+ * (`x1,y1,x2,y2` en 0..1) : l'objet excentre donne un motif de l'objet, pas
+ * du fond central. Carre centre sur la boite (cote = max des cotes),
+ * borne a la photo, reduit a [TEMPLATE_EDGE] px. Boite degeneree ou hors
+ * champ : repli sur [buildTemplate] (carre central). Pur et teste.
+ */
+fun buildTemplateFromBox(photo: GrayImage, box: List<Float>): PictoTemplate {
+    if (box.size >= 4 && photo.width > 0 && photo.height > 0) {
+        val x1 = (box[0] * photo.width).toInt().coerceIn(0, photo.width - 1)
+        val y1 = (box[1] * photo.height).toInt().coerceIn(0, photo.height - 1)
+        val x2 = (box[2] * photo.width).toInt().coerceIn(0, photo.width)
+        val y2 = (box[3] * photo.height).toInt().coerceIn(0, photo.height)
+        if (x2 - x1 >= 4 && y2 - y1 >= 4) {
+            val side = max(8, max(x2 - x1, y2 - y1))
+            val cx = (x1 + x2) / 2
+            val cy = (y1 + y2) / 2
+            val sx0 = (cx - side / 2).coerceIn(0, max(0, photo.width - side))
+            val sy0 = (cy - side / 2).coerceIn(0, max(0, photo.height - side))
+            val edge = min(side, min(photo.width - sx0, photo.height - sy0))
+            if (edge >= 8) {
+                val crop = IntArray(edge * edge) { i ->
+                    photo.gray[(sy0 + i / edge) * photo.width + sx0 + i % edge]
+                }
+                return PictoTemplate(resizeGray(crop, edge, TEMPLATE_EDGE), TEMPLATE_EDGE)
+            }
+        }
+    }
+    return buildTemplate(photo)
+}
+
+/**
  * Meilleure occurrence du gabarit dans la frame, `null` si rien ne dépasse le
  * seuil avec une marge distinctive. Corrélation croisée normalisée
  * multi-échelle, moyennes et variances de fenêtre en O(1) par images

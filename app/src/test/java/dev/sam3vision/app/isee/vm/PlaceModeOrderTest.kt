@@ -96,4 +96,18 @@ class PlaceModeOrderTest {
         assertEquals(PictoPlaceMode.DEDANS, state.placeMode)
         assertEquals(shown, state.picto)
     }
+
+    @Test
+    fun `la bascule previent la sonde`() = runBlocking {
+        val modes = mutableListOf<PictoPlaceMode>()
+        val orders = PlaceModeOrder(
+            settings = { Settings.Default },
+            speak = { spoken += it },
+            update = { fn -> state = fn(state) },
+            onPlaceMode = { modes += it },
+        )
+        assertTrue(orders.run("mode dehors"))
+        assertTrue(orders.run("mode dedans"))
+        assertEquals(listOf(PictoPlaceMode.DEHORS, PictoPlaceMode.DEDANS), modes)
+    }
 }

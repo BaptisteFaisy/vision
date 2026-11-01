@@ -124,6 +124,14 @@ class PictoStoreTest {
         assertTrue(store.list().isEmpty())
     }
 
+    @Test
+    fun `echec de sauvegarde ne laisse aucun dossier partiel`() {
+        val fileRoot = Files.createTempFile("isee-picto-file", null).toFile().apply { deleteOnExit() }
+        val store = PictoStore(fileRoot)
+        assertTrue(runCatching { store.save("Cles", byteArrayOf(1), template()) }.isFailure)
+        assertTrue(store.list().isEmpty())
+    }
+
     private fun templateBlob(): ByteArray {
         val blob = ByteArray(2 + TEMPLATE_EDGE * TEMPLATE_EDGE)
         blob[0] = (TEMPLATE_EDGE shr 8).toByte()

@@ -150,4 +150,10 @@ class FindIndoorTest {
         val tie = FindIndoorPriority.Candidate(FindIndoorLevels.HUMAN, "second", null)
         assertEquals(human, FindIndoorPriority.decide(listOf(human, tie)))
     }
+
+    @Test
+    fun `clef et clefs visent les cles`() {
+        assertEquals(FindIndoorTarget.KEYS, FindIndoorTarget.fromSpoken("clef"))
+        assertEquals(FindIndoorTarget.KEYS, FindIndoorTarget.fromSpoken("clefs"))
+    }
 }

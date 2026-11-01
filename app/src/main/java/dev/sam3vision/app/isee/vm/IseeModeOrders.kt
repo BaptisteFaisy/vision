@@ -34,9 +34,10 @@ class IseeModeOrders(
     placeMode: () -> PictoPlaceMode = { PictoPlaceMode.DEDANS },
     onFindOff: () -> Unit = {},
     post: (level: Int, text: String, clipId: String?) -> Unit = { _, _, _ -> },
+    onPlaceMode: (PictoPlaceMode) -> Unit = {},
 ) {
 
-    private val place = PlaceModeOrder(settings, speak, update, onLeaveIndoor = onFindOff)
+    private val place = PlaceModeOrder(settings, speak, update, onLeaveIndoor = onFindOff, onPlaceMode = onPlaceMode)
     private val find = FindIndoorVoice(update, onFind = onFind, onFindOff = onFindOff, placeMode = placeMode, post = post)
     private val picto = IseePictoVoice(pictoLabels, settings, speak, update, onFind = onFind, onCreate = onCreate, hits = pictoHits, placeMode = placeMode)
 

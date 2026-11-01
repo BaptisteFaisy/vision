@@ -7,6 +7,7 @@ import dev.sam3vision.app.decodeScaledExact
 import dev.sam3vision.core.picto.GrayImage
 import dev.sam3vision.core.picto.PictoTemplate
 import dev.sam3vision.core.picto.buildTemplate
+import dev.sam3vision.core.picto.buildTemplateFromBox
 import java.io.ByteArrayOutputStream
 import java.io.File
 import kotlin.math.max
@@ -70,10 +71,17 @@ fun photoToJpeg(file: File, edge: Int = PICTO_PHOTO_EDGE): ByteArray? {
 }
 
 /** Photo → gabarit de reconnaissance (carré central réduit, voir [buildTemplate]). */
-fun templateFromPhoto(file: File): PictoTemplate? {
+fun templateFromPhoto(file: File): PictoTemplate? = templateFromPhoto(file, null)
+
+/**
+ * Photo -> gabarit cadre sur la boite SAM [box] (`x1,y1,x2,y2` normalises,
+ * voir [buildTemplateFromBox]) ; `null` = carre central. `null` si illisible.
+ */
+fun templateFromPhoto(file: File, box: List<Float>?): PictoTemplate? {
     val bitmap = runCatching { decodeScaledExact(file, PICTO_PHOTO_EDGE) }.getOrNull() ?: return null
     return try {
-        buildTemplate(bitmapGray(bitmap, PICTO_PHOTO_EDGE))
+        val gray = bitmapGray(bitmap, PICTO_PHOTO_EDGE)
+        if (box == null) buildTemplate(gray) else buildTemplateFromBox(gray, box)
     } finally {
         bitmap.recycle()
     }

@@ -184,4 +184,19 @@ class DictationOrderTest {
         assertFalse(DictationOrders.isOrder("mode outdoor please"))
         assertFalse(DictationOrders.isOrder("décris-moi la pièce"))
     }
+
+    @Test
+    fun `ou imparfait sans mode cherche dans les 10`() {
+        assertEquals(DictationOrder.Find("keys"), DictationOrders.parse("où étaient mes clés"))
+        assertEquals(DictationOrder.Find("phone"), DictationOrders.parse("où était mon téléphone"))
+    }
+
+    @Test
+    fun `ou pronom reprend la chasse en cours, sinon llm`() {
+        assertEquals(DictationOrder.Find("keys"), DictationOrders.parse("où étaient-elles", hunting = "keys"))
+        assertEquals(DictationOrder.Find("keys"), DictationOrders.parse("où étaient-elles ?", hunting = "cles"))
+        assertNull(DictationOrders.parse("où étaient-elles"))
+        assertNull(DictationOrders.parse("où étaient-elles", hunting = "doudou"))
+    }
+
 }
