@@ -105,6 +105,8 @@ class ProximityVoice(
             player.playFile(file).onFailure { onSpeaking("") }
             return true
         }
+        // v4 : seuls les niveaux GPS synthétisent ; sans clip, les autres se taisent.
+        if (level != OutdoorLevel.GPS_REMINDER && level != OutdoorLevel.GPS_EVENT) return false
         if (!current.ttsConfigured) return false
         val bytes = synthesize(current.ttsApiKey, current.ttsVoiceId, text).getOrElse { return false }
         coroutineContext.ensureActive()
@@ -144,6 +146,8 @@ class ProximityVoice(
             player.playFile(file).onFailure { onSpeaking("") }
             return true
         }
+        // v4 : seuls les niveaux GPS synthétisent ; sans clip, les autres se taisent.
+        if (level != OutdoorLevel.GPS_REMINDER && level != OutdoorLevel.GPS_EVENT) return false
         if (!current.ttsConfigured) return false
         val bytes = synthesize(current.ttsApiKey, current.ttsVoiceId, text).getOrElse { return false }
         coroutineContext.ensureActive()
