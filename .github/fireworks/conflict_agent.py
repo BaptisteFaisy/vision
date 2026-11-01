@@ -52,7 +52,7 @@ compilation_gate = _charger("compilation_gate")
 
 MODEL_DEFAULT = "accounts/fireworks/models/minimax-m3p1-flash"
 API_DEFAULT = "https://api.fireworks.ai/inference/v1/chat/completions"
-MAX_FILES = 8
+MAX_FILES = 100
 MAX_FILE_BYTES = 200_000
 MAX_HUNKS = 20
 HUNK_MAX_CHARS = 12_000
