@@ -144,7 +144,7 @@ object HazardText {
      * le mot imminent ([HazardWatcher]).
      */
     fun avoidSide(centerX: Float?): SteeringCap =
-        if (centerX == null || centerX < AXIS_MID) SteeringCap.Right else SteeringCap.Left
+        if (centerX == null || centerX <= AXIS_MID) SteeringCap.Right else SteeringCap.Left
 
     /** Consigne d'évitement : le côté opposé à la personne (droite par défaut). */
     private fun avoidText(centerX: Float?, language: SpeechLanguage): String {
