@@ -85,9 +85,10 @@ object CropGeometry {
      * `null` quand on ne peut pas conclure (spec inutilisable, crop hors
      * source ou vide, champ post-crop hors bornes [LensSpec], centre optique
      * hors crop) — l'appelant garde alors son ancien calibrage
-     * (`DistanceMeter.setLens` ignore `null`). La distorsion n'est pas
-     * propagée (`null` : sa base de normalisation, la demi-diagonale, change
-     * avec le crop ; non mesurée sur lunettes de toute façon).
+     * (`DistanceMeter.setLens` ignore `null`). La distorsion est propagée
+     * ([propagatedDistortion] : renormalisée à la demi-diagonale du crop,
+     * exacte — le recentrage ne casse rien, `r` part du centre optique
+     * remappé) ; `null` sans mesure mire, comme avant.
      */
     fun afterCrop(spec: LensSpec, srcW: Int, srcH: Int, crop: Window): LensSpec? {
         if (!spec.usable || srcW <= 0 || srcH <= 0) return null
@@ -109,8 +110,33 @@ object CropGeometry {
             sensorLandscape = crop.width >= crop.height,
             principalXFrac = principalX,
             principalYFrac = principalY,
-            distortion = null,
+            distortion = propagatedDistortion(spec.distortion, srcW, srcH, crop.width, crop.height),
         )
+    }
+
+    /**
+     * Distorsion [d] (mesurée sur la source [srcW]×[srcH]) renormalisée au
+     * repère du crop [cropW]×[cropH] : `k1' = k1·(n'/n)²`,
+     * `k2' = k2·(n'/n)⁴` (`n`, `n'` = demi-diagonales via [Distortion.normPx]).
+     * Exacte quel que soit le recentrage : `r` part du centre optique, lui-même
+     * remappé par [afterCrop], et la translation conserve les distances —
+     * redresser puis cropper = cropper puis redresser (pinné à 0,01 px).
+     * `null` sans mesure (pas de distorsion inventée) ; coeffs nuls mesurés
+     * propagés non-nuls (mesuré sans distorsion ≠ non mesuré).
+     */
+    private fun propagatedDistortion(
+        d: RadialDistortion?,
+        srcW: Int,
+        srcH: Int,
+        cropW: Int,
+        cropH: Int,
+    ): RadialDistortion? {
+        if (d == null) return null
+        val source = Distortion.normPx(srcW, srcH)
+        val cropped = Distortion.normPx(cropW, cropH)
+        if (source <= 0f || cropped <= 0f) return null
+        val r2 = (cropped / source).let { it * it }
+        return RadialDistortion(d.k1 * r2, d.k2 * r2 * r2)
     }
 
     /**
