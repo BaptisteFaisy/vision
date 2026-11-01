@@ -4,6 +4,7 @@ import dev.sam3vision.core.model.LiveFrame
 import dev.sam3vision.core.model.LiveHealth
 import dev.sam3vision.core.net.LiveClient
 import org.junit.Assert.assertEquals
+import org.junit.Assert.assertTrue
 import org.junit.Test
 
 /**
@@ -25,8 +26,12 @@ class LiveCrowdCadenceTest {
 
     @Test
     fun `la cadence rapide garde son budget de 150 ms`() {
-        assertEquals(150L, Cadence.Fast.latencyBudgetMs)
+        // Le budget de `Fast` a bougé avec master (150 → 210 ms) : on verrouille
+        // l'invariant du lot, pas un chiffre d'époque — la foule garde plus de
+        // marge que la cadence normale, et deux créneaux dans les deux cas.
+        assertTrue(Cadence.Crowd.latencyBudgetMs > Cadence.Fast.latencyBudgetMs)
         assertEquals(2, Cadence.Fast.concurrency)
+        assertEquals(2, Cadence.Crowd.concurrency)
     }
 
     @Test

@@ -491,15 +491,3 @@ _state.update { it.cleared() }
  * RTT (poste `up`), pour ~3 encodages jetés par cycle au pire.
  */
 private const val STALE_RESERVE_MS = 50L
-
-/**
- * Hystérésis de foule ([LiveProbe.crowd]) : on entre au **premier** corps, on ne sort
- * qu'après [CROWD_EXIT_MS] sans corps. Sans elle l'état clignote au rythme des frames
- * (1,4-1,7 décisions/s : une frame sans corps suffit) et le second vol se refermerait
- * au moment du contact. [sinceMs] = instant du dernier corps vu.
- */
-internal fun crowdOf(previous: Boolean, bodies: Int, sinceMs: Long, nowMs: Long): Boolean =
-    if (bodies > 0) true else previous && nowMs - sinceMs < CROWD_EXIT_MS
-
-/** Sortie de foule : 3 s sans corps, soit ~4 décisions au rythme mesuré le plus lent. */
-private const val CROWD_EXIT_MS = 3_000L
