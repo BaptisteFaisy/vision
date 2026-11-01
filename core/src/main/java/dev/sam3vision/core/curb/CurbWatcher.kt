@@ -203,8 +203,8 @@ object CurbText {
  * les enchaîne en ~2 s, un cooldown les tuerait. Verrous + hystérésis
  * ([REARM_MARGIN_METERS] : recul au-delà = le palier reparle) tiennent le
  * silence à la place ; palier survolé entre deux frames = sauté sans
- * rattrapage (jamais de distance périmée) ; signal perdu = détection et
- * paliers ré-armés. Sans distance, le compte à rebours attend.
+ * rattrapage (jamais de distance périmée) ; signal vraiment perdu (3 trous, voir
+ * [GRACE_FRAMES]) = détection et paliers ré-armés. Sans distance, le compte à rebours attend.
  * Le bateau ([CurbSignal.flatPass]) se dit doux, une fois par présence, jamais
  * juste après un palier proche (traversée du bord, pas un bateau).
  *
@@ -224,10 +224,13 @@ class CurbWatcher(
     private val confirmFrames: Int = DEFAULT_CONFIRM_FRAMES,
     private val cooldownMs: Long = DEFAULT_COOLDOWN_MS,
 ) {
-    /** Détections consécutives en cours (un trou remet à zéro). */
+    /** Détections consécutives en cours (3 trous remettent à zéro, voir [GRACE_FRAMES]). */
     private var hits: Int = 0
 
-    /** Frames consécutives sous le palier visé (autre chose remet à zéro). */
+    /** Frames non-détectées consécutives (clignotement SAM, voir [GRACE_FRAMES]). */
+    private var misses: Int = 0
+
+    /** Frames consécutives sous le palier visé (autre palier remet à zéro, trous graciés voir [GRACE_FRAMES]). */
     private var palierHits: Int = 0
 
     /** Palier visé en cours de confirmation, `null` si aucun. */
@@ -266,9 +269,15 @@ class CurbWatcher(
      */
     fun onSignal(signal: CurbSignal, nowMs: Long, language: SpeechLanguage = SpeechLanguage.DEFAULT): CurbCue? {
         if (signal.detected) {
+            misses = 0
             flatHits = 0
             flatSpoken = false
             return onDetected(signal, nowMs, language)
+        }
+        // Clignotement SAM nominal : 1-2 trous gardent l'approche en cours (voir GRACE_FRAMES).
+        if (misses < GRACE_FRAMES && hasPendingDetection()) {
+            misses++
+            return null
         }
         hits = 0
         palierHits = 0
@@ -291,6 +300,14 @@ class CurbWatcher(
         flatHits = 0
         return CurbCue(CurbText.flatPhrase(language), signal.meters, CurbTier.NONE, urgent = false)
     }
+
+    /**
+     * Approche en cours : détection en confirmation ([hits]), dite ([detectedSpoken]),
+     * ou paliers en jeu. Seuls les trous d'une approche sont graciés (voir [GRACE_FRAMES]) :
+     * au repos, le traitement historique tourne et le bateau parle comme avant.
+     */
+    private fun hasPendingDetection(): Boolean =
+        hits != 0 || palierHits != 0 || palierTarget != null || detectedSpoken || spokenPaliers.isNotEmpty()
 
     /**
      * Bordure en vue : le recul ré-arme les paliers dépassés, puis la
@@ -362,6 +379,7 @@ class CurbWatcher(
     /** Oublie les comptes, les verrous et l'annonce (nouvelle séance de direct). */
     fun reset() {
         hits = 0
+        misses = 0
         palierHits = 0
         palierTarget = null
         spokenPaliers.clear()
@@ -378,6 +396,16 @@ class CurbWatcher(
 
         /** Silence entre deux annonces douces (le trottoir ne bouge pas). */
         const val DEFAULT_COOLDOWN_MS = 10_000L
+
+        /**
+         * Tolérance au clignotement SAM : jusqu'à [GRACE_FRAMES] frames consécutives
+         * non-détectées ([CurbSignal.detected] faux, plan bateau compris) ne réarment rien
+         * (comptes, verrous et dernière annonce inchangés) et rendent `null` ; la 3e frame
+         * consécutive sans détection ré-arme comme avant, puis le bateau se traite comme avant.
+         * Sans cette grâce, un seul trou remettait la détection à zéro et la reprise retombait
+         * sur le cooldown 10 s : compte à rebours inaccessible pendant toute une approche.
+         */
+        const val GRACE_FRAMES = 2
 
         /** Au-delà de cette distance (m), un bord n'est même plus suivi (détection dite dès confirmée). */
         const val CURB_METERS = 3f

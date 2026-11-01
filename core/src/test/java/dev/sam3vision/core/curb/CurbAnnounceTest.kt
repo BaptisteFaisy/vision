@@ -209,7 +209,10 @@ class CurbAnnounceTest {
         val seen = sig(2.5f)
         watcher.onSignal(seen, 1_000L, SpeechLanguage.Fr)
         watcher.onSignal(seen, 2_000L, SpeechLanguage.Fr)
+        // 1-2 trous = clignotement SAM nominal (graciés) : il faut 3 trous pour ré-armer.
         assertNull(watcher.onSignal(CurbSignal.none(), 3_000L, SpeechLanguage.Fr))
+        assertNull(watcher.onSignal(CurbSignal.none(), 4_000L, SpeechLanguage.Fr))
+        assertNull(watcher.onSignal(CurbSignal.none(), 5_000L, SpeechLanguage.Fr))
 
         // Cooldown écoulé : la détection puis le palier reparlent.
         assertNull(watcher.onSignal(seen, 13_000L, SpeechLanguage.Fr))
@@ -224,11 +227,14 @@ class CurbAnnounceTest {
         val seen = sig(2.5f)
         watcher.onSignal(seen, 1_000L, SpeechLanguage.Fr)
         assertNotNull(watcher.onSignal(seen, 2_000L, SpeechLanguage.Fr))
+        // 1-2 trous = clignotement SAM nominal (graciés) : il faut 3 trous pour ré-armer.
         watcher.onSignal(CurbSignal.none(), 3_000L, SpeechLanguage.Fr)
+        watcher.onSignal(CurbSignal.none(), 4_000L, SpeechLanguage.Fr)
+        watcher.onSignal(CurbSignal.none(), 5_000L, SpeechLanguage.Fr)
 
-        assertNull(watcher.onSignal(seen, 4_000L, SpeechLanguage.Fr))
-        assertNull(watcher.onSignal(seen, 5_000L, SpeechLanguage.Fr))
         assertNull(watcher.onSignal(seen, 6_000L, SpeechLanguage.Fr))
+        assertNull(watcher.onSignal(seen, 7_000L, SpeechLanguage.Fr))
+        assertNull(watcher.onSignal(seen, 8_000L, SpeechLanguage.Fr))
         assertEquals("Bordure détectée.", watcher.onSignal(seen, 12_000L, SpeechLanguage.Fr)!!.phrase)
     }
 
@@ -238,10 +244,65 @@ class CurbAnnounceTest {
         val seen = sig(2.5f)
 
         watcher.onSignal(seen, 1_000L)
+        // 1-2 trous = clignotement SAM nominal (graciés) : il faut 3 trous pour remettre à zéro.
         watcher.onSignal(CurbSignal.none(), 2_000L)
-        assertNull(watcher.onSignal(seen, 3_000L))
-        assertNotNull(watcher.onSignal(seen, 4_000L))
+        watcher.onSignal(CurbSignal.none(), 3_000L)
+        watcher.onSignal(CurbSignal.none(), 4_000L)
+        assertNull(watcher.onSignal(seen, 5_000L))
+        assertNotNull(watcher.onSignal(seen, 6_000L))
     }
+
+    @Test
+    fun `un trou unique ne casse pas le compte a rebours`() {
+        val watcher = CurbWatcher()
+        val seen = sig(2.5f)
+        watcher.onSignal(seen, 1_000L, SpeechLanguage.Fr)
+        assertEquals("Bordure détectée.", watcher.onSignal(seen, 2_000L, SpeechLanguage.Fr)!!.phrase)
+
+        // Un seul trou (clignotement SAM nominal) : muet, sans réarmer.
+        assertNull(watcher.onSignal(CurbSignal.none(), 3_000L, SpeechLanguage.Fr))
+
+        // Reprise : le countdown continue — pas de re-détection, pas de blocage cooldown.
+        assertNull(watcher.onSignal(sig(2.0f), 4_000L, SpeechLanguage.Fr))
+        assertEquals("Bordure à 2 mètres.", watcher.onSignal(sig(2.0f), 5_000L, SpeechLanguage.Fr)!!.phrase)
+        assertEquals(5_000L, watcher.lastAlertMs)
+    }
+
+    @Test
+    fun `deux trous dont un bateau ne cassent pas le compte a rebours`() {
+        val watcher = CurbWatcher()
+        val seen = sig(2.5f)
+        watcher.onSignal(seen, 1_000L, SpeechLanguage.Fr)
+        assertEquals("Bordure détectée.", watcher.onSignal(seen, 2_000L, SpeechLanguage.Fr)!!.phrase)
+
+        // Deux trous, dont un plan bateau : muets, sans réarmer.
+        val flatHole = CurbSignal(detected = false, meters = 0.4f, centerX = 0.5f, flatPass = true)
+        assertNull(watcher.onSignal(flatHole, 3_000L, SpeechLanguage.Fr))
+        assertNull(watcher.onSignal(CurbSignal.none(), 4_000L, SpeechLanguage.Fr))
+
+        assertNull(watcher.onSignal(sig(2.0f), 5_000L, SpeechLanguage.Fr))
+        assertEquals("Bordure à 2 mètres.", watcher.onSignal(sig(2.0f), 6_000L, SpeechLanguage.Fr)!!.phrase)
+        assertEquals(6_000L, watcher.lastAlertMs)
+    }
+
+    @Test
+    fun `trois trous re-arment comme avant`() {
+        val watcher = CurbWatcher()
+        val seen = sig(2.5f)
+        watcher.onSignal(seen, 1_000L, SpeechLanguage.Fr)
+        watcher.onSignal(seen, 2_000L, SpeechLanguage.Fr)
+        assertNull(watcher.onSignal(CurbSignal.none(), 3_000L, SpeechLanguage.Fr))
+        assertNull(watcher.onSignal(CurbSignal.none(), 4_000L, SpeechLanguage.Fr))
+        assertNull(watcher.onSignal(CurbSignal.none(), 5_000L, SpeechLanguage.Fr))
+
+        // Réarmé : re-détection exigée, bloquée par le cooldown (comportement historique).
+        assertNull(watcher.onSignal(seen, 6_000L, SpeechLanguage.Fr))
+        assertNull(watcher.onSignal(seen, 7_000L, SpeechLanguage.Fr))
+        assertEquals("Bordure détectée.", watcher.onSignal(seen, 12_000L, SpeechLanguage.Fr)!!.phrase)
+        assertNull(watcher.onSignal(sig(2.0f), 13_000L, SpeechLanguage.Fr))
+        assertEquals("Bordure à 2 mètres.", watcher.onSignal(sig(2.0f), 14_000L, SpeechLanguage.Fr)!!.phrase)
+    }
+
 
     @Test
     fun `sans distance le compte a rebours attend`() {
