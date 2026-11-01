@@ -1,9 +1,8 @@
 #!/usr/bin/env bash
-# Harnais iSee : rejoue une balade enregistrée sur l'émulateur Android, sans
-# téléphone. Transcode la vidéo en profil caméra stable (cache par empreinte),
-# crée ou réutilise l'AVD, boote avec `-camera-back videofile:…`, installe
-# l'APK, ouvre l'écran iSee, rejoue le trajet GPS, enregistre l'écran, rapatrie
-# la vidéo et le logcat, puis éteint l'émulateur qu'il a démarré.
+# Harnais iSee : rejoue une balade enregistrée sur l'émulateur Android, sans téléphone.
+# Transcode la vidéo (cache par empreinte), boote avec `-camera-back videofile:…`,
+# installe l'APK, ouvre iSee, rejoue le trajet GPS, enregistre l'écran, rapatrie
+# vidéo + logcat, puis éteint l'émulateur qu'il a démarré.
 # Env : APK, ADB, EMULATOR, FFMPEG, ISEESIM_SIZE, BOOT_TIMEOUT, ISEESIM_CACHE.
 set -euo pipefail
 export LC_ALL=C.UTF-8 LANG=C.UTF-8
@@ -29,13 +28,10 @@ Options :
   --help              cette aide
 
 Variables d'environnement :
-  APK            APK à installer (défaut : app/build/outputs/apk/debug/app-debug.apk)
-  ADB            binaire adb (défaut : PATH, sinon $ANDROID_HOME/platform-tools/adb)
-  EMULATOR       binaire emulator (défaut : PATH, sinon le SDK Android)
-  FFMPEG         binaire ffmpeg (défaut : PATH, sinon $HOME/.local/bin/ffmpeg)
-  ISEESIM_SIZE   640x480 (défaut) ou 1280x720
-  ISEESIM_CACHE  cache de transcodage (défaut : $XDG_CACHE_HOME/isee-sim)
-  BOOT_TIMEOUT   attente maximale du boot en secondes (défaut : 240)
+  APK, ADB, EMULATOR, FFMPEG   binaires (défauts : PATH puis le SDK Android)
+  ISEESIM_SIZE    640x480 (défaut) ou 1280x720
+  ISEESIM_CACHE   cache de transcodage (défaut : $XDG_CACHE_HOME/isee-sim)
+  BOOT_TIMEOUT    attente maximale du boot en secondes (défaut : 240)
 
 Le harnais ne touche jamais un émulateur qu'il n'a pas démarré : il prend un
 port libre, note `adb devices` avant le boot, et n'éteint que la série apparue
@@ -238,20 +234,14 @@ port_busy() {
     awk -v s="emulator-$port" '$1 == s { found = 1 } END { exit !found }'; then
     return 0
   fi
-  if (exec 3<>"/dev/tcp/127.0.0.1/$port") 2>/dev/null; then
-    return 0
-  fi
-  return 1
+  (exec 3<>"/dev/tcp/127.0.0.1/$port") 2>/dev/null
 }
 
 # pick_port : premier port libre de la plage 5554-5600, jamais celui d'un autre.
 pick_port() {
   local candidate
   for candidate in $(seq 5554 2 5600); do
-    if ! port_busy "$candidate"; then
-      PORT="$candidate"
-      return 0
-    fi
+    port_busy "$candidate" || { PORT="$candidate"; return 0; }
   done
   die "aucun port libre entre 5554 et 5600 : éteignez un émulateur avant de relancer"
 }
@@ -280,7 +270,6 @@ boot_emulator() {
 
 # emu_alive : vrai si le processus d'émulateur démarré par ce script est vivant.
 emu_alive() { kill -0 "$EMU_PID" 2>/dev/null; }
-
 # wait_serial : attend la série dans adb devices, refuse un émulateur préexistant.
 wait_serial() {
   local waited=0
@@ -336,16 +325,19 @@ install_apk() {
     die "installation sans 'Success' : $(printf '%s' "$out" | tail -2 | tr '\n' ' ')"
 }
 
-# grant_perms : accorde les permissions de la recette (sans effet si déjà faites).
+# grant_perms : permissions de la recette + droit EFFECTIF de la position simulée.
+# Sans `appops … mock_location`, le test provider est refusé (tag iSeeSim) : le
+# trajet n'arrive jamais au guidage, la caméra n'est pas concernée.
 grant_perms() {
   local perm
-  for perm in CAMERA RECORD_AUDIO ACCESS_FINE_LOCATION ACCESS_COARSE_LOCATION; do
-    if adb_emu 30 shell pm grant "$PKG" "android.permission.$perm" >/dev/null 2>&1; then
-      echo "→ pm grant $perm"
-    else
+  for perm in CAMERA RECORD_AUDIO ACCESS_FINE_LOCATION ACCESS_COARSE_LOCATION \
+    BLUETOOTH_SCAN BLUETOOTH_CONNECT POST_NOTIFICATIONS; do
+    adb_emu 30 shell pm grant "$PKG" "android.permission.$perm" >/dev/null 2>&1 ||
       warn "pm grant $perm ignoré (déjà accordée ou refusée par l'OS)"
-    fi
   done
+  adb_emu 30 shell appops set "$PKG" android:mock_location allow >/dev/null 2>&1 ||
+    warn "appops mock_location refusée : le rejeu GPS restera sans effet"
+  adb_emu 20 shell settings put secure location_mode 3 >/dev/null 2>&1 || :
 }
 
 # start_app : ouvre l'écran iSee par l'extra adb documenté (--es route isee)
@@ -364,6 +356,21 @@ start_app() {
     waited=$((waited + 2))
   done
   warn "l'application n'a pas pris le focus en 30 s (focus : ${focus:-inconnu})"
+}
+
+# wait_frames : attend la première frame convertie par iSee — la preuve que la
+# caméra de l'émulateur alimente bien l'analyseur avant de filmer l'écran.
+wait_frames() {
+  local waited=0
+  while (( waited < 60 )); do
+    if adb_emu 20 logcat -d -s sam3vision 2>/dev/null | grep -q 'conversion:'; then
+      echo "→ caméra reliée : 1re frame convertie après ${waited}s"
+      return 0
+    fi
+    sleep 2
+    waited=$((waited + 2))
+  done
+  warn "aucune frame convertie en 60 s (écran iSee ouvert ? caméra liée ?)"
 }
 
 # start_route : rejeu GPS en tâche de fond (1 Hz), arrêté par le trap.
@@ -403,11 +410,8 @@ collect_logs() {
     warn "logcat filtré indisponible"
   adb_emu 60 logcat -d -v threadtime -b crash >"$OUT_DIR/crash.txt" 2>&1 ||
     warn "tampon crash indisponible"
-  if adb_emu 30 shell pidof "$PKG" >/dev/null 2>&1; then
-    echo "→ l'application tourne encore en fin d'enregistrement"
-  else
+  adb_emu 30 shell pidof "$PKG" >/dev/null 2>&1 ||
     warn "l'application n'était plus en vie en fin d'enregistrement (voir crash.txt)"
-  fi
 }
 
 # stop_emulator : n'éteint que la série apparue pendant CE boot.
@@ -485,6 +489,7 @@ main() {
   install_apk
   grant_perms
   start_app
+  wait_frames
   start_route
   record_screen
   collect_logs

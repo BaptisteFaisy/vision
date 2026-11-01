@@ -41,6 +41,28 @@ livré et ses preuves (tâche, fichiers, chiffres) dans l'arbre.
   augmentation photométrique ×5 et ×20, filtrage PTL par domaine K=100-1000)
   donnent tous au mieux 18/20 : l'arbre ne peut pas dépasser le plafond de la
   porte, et le seuil actuel est déjà atteint par une souche d'un seul trait.
+## 2026-11-01 — Balade enregistrée rejouée sur l'émulateur (`scripts/isee-sim.sh`)
+
+- **Ordre user** : « mettre iSee sur un émulateur, avec la vidéo que j'enregistre dehors, pour
+  qu'un agent teste ses modifs — et la vidéo doit simuler le flux en temps réel ».
+- **Fait** : `scripts/isee-sim.sh` (une commande) transcode la balade en profil caméra
+  (H.264 yuv420p 640x480/30 fps, rotation appliquée, cache par empreinte), boote l'émulateur
+  headless avec `-camera-back videofile:<vidéo>`, installe l'APK debug, ouvre iSee
+  (`--es route isee`), attend la **première frame convertie** (`conversion:` au logcat),
+  rejoue un trajet CSV/GPX, filme l'écran, rapatrie `logcat` + tampon `crash`, et n'éteint que
+  l'émulateur qu'il a démarré. `scripts/sim/route-replay.py` pousse les positions par le
+  receiver debug `dev.sam3vision.app.sim.LOCATION` (test provider `gps` **et** `network`,
+  précision 8 m) et retombe sur `adb emu geo fix` s'il est absent.
+- **Mesuré** : caméra vidéo à **30 images/s temps réel** (compteur incrusté : 192 images entre
+  deux captures à 6,33 s d'écart), **bouclage indéfini**, boot 19-40 s, `conversion:` à
+  12-27 ms par frame (capteur 640×480, JPEG 5 Ko) dans iSee.
+- **Pourquoi pas `adb emu geo fix` seul** : il livre un fix **sans précision**, et iSee rejette
+  en silence au-delà de `NavTuning.maxAccM` (25 m) — guidage muet sans aucune erreur.
+- **Preuves** : `bash scripts/test_scripts.sh` 176/176, `tools/check-kotlin-limits.py` OK
+  (`isee-sim.sh` 499 lignes), `:app:testDebugUnitTest` 1 776 tests / 0 échec, trois passes
+  réelles du harnais (vidéo d'écran + logcat + 0 ligne fatale). Doc : `docs/TESTING.md` § 3.
+- **Limites assumées** : rendu logiciel (aucune mesure de latence réelle), services distants
+  nécessaires pour la sonde/LLM, pas de caméra avant ni de photo/enregistrement réels.
 
 ## 2026-11-01 — iSee : le mouvement écrase tout, voiture devant humain (branche `feat/isee-mouvement-overwrite`)
 
