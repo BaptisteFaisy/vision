@@ -44,6 +44,7 @@ class SettingsStoreParityTest {
         navigationGuidanceEnabled = false,
         outdoorMode = false,
         cameraFovDeg = 63.5f,
+        glassesFovDeg = 62.5f,
         caregiverRole = CaregiverRole.Caregiver,
         caregiverInvite = "https://suivi-parent.vercel.app/?share=marie",
         googleMapsApiKey = "cle-google-persistee",
@@ -63,6 +64,7 @@ class SettingsStoreParityTest {
         assertEquals("cle-complete-tts", relu.ttsApiKey)
         assertEquals("cle-complete-asr", relu.asrApiKey)
         assertEquals(63.5f, relu.cameraFovDeg, 0.001f)
+        assertEquals(62.5f, relu.glassesFovDeg, 0.001f)
         assertEquals(false, relu.distanceOverlayEnabled)
         assertEquals(false, relu.navigationGuidanceEnabled)
         assertEquals(false, relu.outdoorMode)

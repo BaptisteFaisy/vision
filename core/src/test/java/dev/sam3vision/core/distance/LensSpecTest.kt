@@ -67,6 +67,28 @@ class LensSpecTest {
     }
 
     @Test
+    fun `repli lunettes, 100 degres diagonaux en 9 16 portrait`() {
+        val glasses = LensSpec.Glasses
+        assertEquals(60.6f, glasses.horizontalFovDeg, 0.01f)
+        assertEquals(92.18f, glasses.verticalFovDeg, 0.2f)
+        assertFalse(glasses.sensorLandscape)
+        assertTrue(glasses.usable)
+        // Image portrait : la largeur porte l'horizontal du flux
+        assertEquals(60.6f, glasses.widthFovDeg(225, 320), 0.01f)
+    }
+
+    @Test
+    fun `calibrage lunettes des Reglages, champ force sinon repli`() {
+        val forced = LensSpec.fromGlassesSettings(70f)
+        assertEquals(70f, forced.horizontalFovDeg, 0.01f)
+        assertEquals(102.45f, forced.verticalFovDeg, 0.2f)
+        assertFalse(forced.sensorLandscape)
+        assertTrue(forced.usable)
+        assertEquals(LensSpec.Glasses, LensSpec.fromGlassesSettings(0f))
+        assertEquals(LensSpec.Glasses, LensSpec.fromGlassesSettings(150f))
+    }
+
+    @Test
     fun `centre optique par defaut au milieu des pixels`() {
         val (cx, cy) = LensSpec.Default.principalPx(512, 384)
         assertEquals(255.5f, cx, 0.001f)

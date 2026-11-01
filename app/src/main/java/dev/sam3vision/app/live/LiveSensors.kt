@@ -56,8 +56,9 @@ internal class LiveSensors(
 /**
  * Ticker des prédictions (miroir de `ProbePulse` : scope + rappel, cadence
  * propre) : toutes les [TICK_MS], [tick] reçoit l'heure — à l'appelant de
- * republier `distances.predictions(now)`. À 1 image/s, ~8 rafraîchissements par
- * frame : l'info ne vieillit jamais de plus de 150 ms, exigence d'usage.
+ * republier `distances.predictions(now)`. À 10 images/s, un rafraîchissement
+ * entre deux frames ; à 1 image/s, ~12 : l'info ne vieillit jamais de plus de
+ * 150 ms, exigence d'usage.
  * [dispatcher] n'est injectable que pour les tests directs du ticker : la
  * production garde le défaut (temps réel), un dispatcher virtuel y ferait
  * boucler `advanceUntilIdle` des tests appelants.
@@ -99,10 +100,11 @@ internal class DistanceTicker(
 
     companion object {
         /**
-         * Pas du ticker : 120 ms, sous les 150 ms exigés avec la marge du
-         * jitter d'ordonnancement (`delay` ne réveille jamais en avance).
+         * Pas du ticker : 80 ms — 10 Hz nominaux avec la marge du jitter
+         * d'ordonnancement (`delay` ne réveille jamais en avance), et sous
+         * les 150 ms exigés.
          */
-        const val TICK_MS = 120L
+        const val TICK_MS = 80L
     }
 }
 

@@ -33,6 +33,12 @@ data class CameraPose(
 
         /** Pose de repli : aucune inclinaison connue, hauteur d'épaule. */
         val Default = CameraPose(DEFAULT_HEIGHT_M)
+
+        /** Hauteur des yeux : lunettes portées, tête droite. */
+        const val GLASSES_HEIGHT_M = 1.6f
+
+        /** Pose lunettes : hauteur des yeux, tête droite (pitch 0, sans IMU téléphone). */
+        val Glasses = CameraPose(GLASSES_HEIGHT_M, 0f)
     }
 }
 
