@@ -22,8 +22,10 @@ import dev.sam3vision.core.live.SteeringCue
 import dev.sam3vision.core.live.TwinLiteWord
 import dev.sam3vision.core.model.Detection
 import dev.sam3vision.core.model.LiveFrame
+import dev.sam3vision.core.model.SegObject
 import dev.sam3vision.core.settings.Settings
 import dev.sam3vision.core.speech.SpeechLanguage
+import dev.sam3vision.core.stairs.StairConcepts
 import dev.sam3vision.core.stairs.StairCountVoice
 import dev.sam3vision.core.stairs.StairWatcher
 import dev.sam3vision.core.settings.resolveSamEndpoint
@@ -303,10 +305,28 @@ internal fun LiveProbe.steeringCueOf(): SteeringCue? =
     if (state.value.crossingActive) null else voice.cue()
 
 /**
+ * Compteur de marches actif sur cette frame : SAM nomme l'escalier
+ * (lectures d'abord, libellés bruts en repli — miroir [stairsFoundOf]) et
+ * la caméra compte des marches fraîches ([lineCount] > 0, 0 = non compté).
+ * Pur, testé en JVM.
+ */
+internal fun stairsCounterActive(
+    readings: List<DistanceReading>,
+    objects: List<SegObject>,
+    lineCount: Int,
+): Boolean {
+    if (lineCount <= 0) return false
+    if (readings.any { StairConcepts.isStairs(it.label) }) return true
+    return objects.any { StairConcepts.isStairs(it.label) }
+}
+
+/**
  * Phrase à dire pour la frame (`null` = silence) : voix rouge/vert en
  * Traversée — sauf ordre d'évitement du guidage ([steeringOf], § 25),
- * sinon guidage (cap route, sinon cap manuel) puis positions. Extraite
- * de `LiveProbe.publish` (plafond 50 lignes/fonction).
+ * sinon guidage (cap route, sinon cap manuel) puis positions. Compteur de
+ * marches actif : seul l'évitement parle (virage, stop), le reste se tait
+ * devant le compte (1 s). Extraite de `LiveProbe.publish` (plafond 50
+ * lignes/fonction).
  */
 internal fun LiveProbe.phraseOf(
     cross: CrossingPatch?,
@@ -326,7 +346,13 @@ internal fun LiveProbe.phraseOf(
             cross?.noLight == true, steeringOf(placed, frame, at, hfovDeg), motion)
     }
     resetCrossingWatches()
-    return voice.phrase(at, placed, state.value.steeringCap, frame.passage, hfovDeg = hfovDeg)
+    val phrase = voice.phrase(at, placed, state.value.steeringCap, frame.passage, hfovDeg = hfovDeg)
+    if (phrase != null && !preemptsCrossing(phrase) &&
+        stairsCounterActive(readings, frame.objects, StairCannyCount.lineCount())
+    ) {
+        return null
+    }
+    return phrase
 }
 
 /**
