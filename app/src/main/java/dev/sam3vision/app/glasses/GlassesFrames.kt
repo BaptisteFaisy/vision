@@ -34,6 +34,10 @@ internal fun ByteBuffer.readRemainingBytes(): ByteArray? {
     return bytes
 }
 
+/** Les octets copiés revus comme une frame SDK : le décodage bitmap reste unifié. */
+internal fun GlassesFrame.asSdkFrame(): VideoFrame =
+    VideoFrame(ByteBuffer.wrap(bytes), width, height, presentationTimeUs, compressed, codecConfig)
+
 /** Frame du flux vidéo → Bitmap, ou null si le format n'est pas décodable ici. */
 fun VideoFrame.toBitmapOrNull(): Bitmap? {
     if (isCodecConfig) return null

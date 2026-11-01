@@ -478,12 +478,11 @@ class IseeViewModel(app: Application) : AndroidViewModel(app) {
         session.onClosed()
     }
 
-    /** L'app part derrière : minuteur armé (option C), sonde arrêtée net (carte éteinte). */
+    /** L'app part derrière : minuteur armé (option C), sonde arrêtée sauf session lunettes. */
     fun onBackground() {
         onHoldCancel()
         session.onBackground()
-        probe.onBackground()
-        probe.stop()
+        IseeBackground.enter(probe)
         // Guidage affiché sur l'accueil : GPS + voix maintenus par le service (W1).
         if (voiceNav.state.value is VoiceNavUiState.Guiding) GuidanceLifecycle.startBackground(getApplication())
     }

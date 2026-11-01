@@ -77,6 +77,20 @@ livré et ses preuves (tâche, fichiers, chiffres) dans l'arbre.
   `PeriodicGuidanceTest` verts ; `check-kotlin-limits.py` OK ; recette rue
   **non mesurée** (exige un parcours réel avec GPS).
 
+## 2026-11-01 — Lunettes-iSee : la session survit à la veille du téléphone (branche `fix/isee-lunettes-veille-session`)
+
+- **Ordre user** : « quand le téléphone est en veille et que j'utilise iSee avec les lunettes
+  Meta, la session lunettes-iSee doit continuer, ne doit pas être coupée ».
+- **Fait** : service de premier plan `connectedDevice` (`GlassesSessionService`, notification
+  « Session lunettes iSee active » avec bouton « Arrêter la session ») piloté par le pont
+  lunettes (`GlassesSessionLifecycle.wantsBackground` : session `STARTED`/`STARTING`) ; en
+  veille, la sonde SAM et ses sessions ne sont plus arrêtées (`IseeBackground`), la carte GPU
+  n'est plus éteinte (`MainActivity`), et la sonde continue sur le flux décodé hors écran
+  (`GlassesBackgroundFrames`, repli quand la rue ne se photographie plus).
+- **Preuve** : `:app:testDebugUnitTest` 1 797 verts (0 échec, 0 sauté, dont 10 nouveaux
+  `GlassesSessionLifecycleTest` + `GlassesBackgroundFramesTest`) ; `check-kotlin-limits.py`
+  OK ; `assembleDebug` OK ; recette rue + vraie veille **non mesurée**, exige une marche
+  réelle avec les lunettes.
 ## 2026-11-01 — iSee : guidage vers le trou de grillage, humains prioritaires (branche `guidage-trou-humains`)
 
 - **Fait** : sur couloir bouché sans chemin optimal, un grillage ouvert à

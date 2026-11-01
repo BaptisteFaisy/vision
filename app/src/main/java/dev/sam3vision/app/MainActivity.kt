@@ -24,6 +24,7 @@ import com.meta.wearable.dat.core.types.Permission
 import dev.sam3vision.app.glasses.EXTRA_GLASSES_MOCK_CONNECT
 import dev.sam3vision.app.glasses.EXTRA_GLASSES_TALK
 import dev.sam3vision.app.glasses.GlassesController
+import dev.sam3vision.app.glasses.GlassesSessionLifecycle
 import dev.sam3vision.app.glasses.bench.BenchEntryPoint
 import dev.sam3vision.app.glasses.bench.EXTRA_ANALYZE
 import dev.sam3vision.app.glasses.bench.EXTRA_MOCK
@@ -208,7 +209,8 @@ class MainActivity : ComponentActivity() {
         // L'app n'est plus visible (bouton home, changement d'app, écran éteint) : on coupe
         // le GPU ici et pas à onStop — sur ce téléphone, home ne déclenche pas toujours onStop
         // et un minuteur ne servirait à rien, Android gèle le processus en arrière-plan.
-        if (!isChangingConfigurations) viewModel.releaseGpu()
+        // Session lunettes-iSee en cours : la carte reste allumée, la veille ne coupe rien.
+        if (!isChangingConfigurations && !glassesKeepAlive()) viewModel.releaseGpu()
         isee.onBackground()
         super.onPause()
     }
@@ -222,7 +224,14 @@ class MainActivity : ComponentActivity() {
         // Micro mains libres : armé **ici**, seul moment où Android autorise un service de
         // premier plan à démarrer (app visible). Il survit ensuite à l'écran verrouillé.
         LockedMicBridge.arm(this)
+        // Session lunettes : un démarrage du maintien refusé en fond (Android 12+)
+        // se rejoue ici, au premier plan.
+        if (glassesKeepAlive()) GlassesSessionLifecycle.startBackground(this)
     }
+
+    /** Session lunettes-iSee en cours : la veille ne coupe ni la session ni la carte. */
+    private fun glassesKeepAlive(): Boolean =
+        GlassesSessionLifecycle.wantsBackground(glasses.state.value.phase)
 
     /**
      * Split-screen : l'app n'est plus en plein écran, on éteint la GPU comme à
@@ -231,7 +240,7 @@ class MainActivity : ComponentActivity() {
      */
     override fun onMultiWindowModeChanged(isInMultiWindowMode: Boolean, newConfig: Configuration) {
         super.onMultiWindowModeChanged(isInMultiWindowMode, newConfig)
-        if (isInMultiWindowMode) viewModel.releaseGpu()
+        if (isInMultiWindowMode && !glassesKeepAlive()) viewModel.releaseGpu()
     }
 
     /**

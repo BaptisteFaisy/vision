@@ -8,7 +8,6 @@ import android.media.MediaFormat
 import android.os.SystemClock
 import android.util.Log
 import android.view.Surface
-import com.meta.wearable.dat.camera.types.VideoFrame
 import java.io.ByteArrayOutputStream
 import java.nio.ByteBuffer
 
@@ -214,10 +213,6 @@ class GlassesLiveDecoder(
         }
         return feedCodec(target, frame)
     }
-
-    /** Les octets copiés revus comme une frame SDK : le décodage bitmap reste unifié. */
-    private fun GlassesFrame.asSdkFrame(): VideoFrame =
-        VideoFrame(ByteBuffer.wrap(bytes), width, height, presentationTimeUs, compressed, codecConfig)
 
     /**
      * Dessin bitmap : l'image remplit le canvas à taille vidéo en gardant son ratio
