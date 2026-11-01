@@ -77,9 +77,8 @@ class LiveProbe(
     private val openClient = clientFor ?: { base: String, timeout: Long, marks: WireMarks? ->
         LiveMaskTransport.clientFor(base, timeout, marks, withDepth = true)
     }
-    /** Profondeur embarquée de la sonde : mêmes frames capturées, resets communs. */
-    internal val meters = ProbeMeters(scope, depthMeter,
-        onPredictions = { layer -> _state.update { it.copy(distanceLayer = layer, motion = ProbeBackgroundMotion.lastDebug) } })
+    /** Profondeur de la sonde (serveur en production) : affine les lectures SAM. */
+    internal val meters = ProbeMeters(depthMeter)
     internal val pulse = ProbePulse(scope) { p -> _state.update { it.copy(pulse = p) } }
 
     /** Radio tenue éveillée pendant le direct : acquis à la 1re frame, rendu par `stop`. */
@@ -259,14 +258,14 @@ class LiveProbe(
 resetPipeline()
         _state.update { it.cleared() }
         markWarming()
-        pulse.start(); meters.startPredictions(distances)
+        pulse.start()
     }
 
     /** Masques et chiffres remis à zéro (sortie d'écran) sans oublier l'endpoint. */
     fun clear() {
         chronology.reset()
 _state.update { it.cleared() }
-        pulse.stop(); meters.stopPredictions()
+        pulse.stop()
         ProbeBackgroundMotion.reset()
         MotionLog.reset()
     }

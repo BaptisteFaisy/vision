@@ -200,9 +200,10 @@ class DistanceMeter(
     /**
      * Distances à [atMs] pour les objets connus, sans mesure nouvelle : pistes
      * Kalman extrapolées par leur vitesse + objets non suivis maintenus tels quels
-     * (la sonde ne suit pas : sans maintien, ses pastilles s'éteindraient entre deux
-     * inférences). L'info reste fraîche entre deux frames (à 1 image/s, un tick à
-     * 80 ms donne ~12 rafraîchissements). Vide sans Kalman ([kalmanEnabled]), sans
+     * (le direct ne suit pas : sans maintien, ses pastilles s'éteindraient entre deux
+     * inférences ; la sonde iSee n'utilise plus les prédictions). L'info reste
+     * fraîche entre deux frames (à 1 image/s, un tick à 80 ms donne ~12
+     * rafraîchissements). Vide sans Kalman ([kalmanEnabled]), sans
      * objet vivant, ou mesures coupées. Confiance dégradée par l'âge, oubli au
      * [DistanceKalman.timeoutMs] — jamais de prédiction au-delà.
      */
