@@ -286,7 +286,7 @@ internal fun crossingOfferMeters(
     height: Int,
 ): (SegObject) -> Float? {
     val focalPx = lens.focalPx(width, height)
-    return { obj -> crossingMetersOf(obj.box, readings, pose, focalPx, height / 2f, height) }
+    return { obj -> crossingMetersOf(obj.box, readings, pose, focalPx, lens.principalPx(width, height).second, height) }
 }
 
 /**
@@ -317,7 +317,7 @@ internal fun crossingLateralPatchOf(
     }
     val centerX = CrossingGuidance.centerXOf(best.box, width) ?: return null
     val focalPx = lens.focalPx(width, height)
-    val meters = crossingMetersOf(best.box, readings, pose, focalPx, height / 2f, height)
+    val meters = crossingMetersOf(best.box, readings, pose, focalPx, lens.principalPx(width, height).second, height)
     val lateralPhrase = lateral.onFrame(atMs, centerX, language)
     val clip = lateralPhrase?.let { GuidanceWord.clipIdFor(it) }
     val arrived = CrossingGuidance.isArrivedPx(best.box, height, meters)

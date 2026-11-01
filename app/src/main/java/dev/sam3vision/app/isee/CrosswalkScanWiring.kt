@@ -1,6 +1,7 @@
 package dev.sam3vision.app.isee
 
 import android.content.Context
+import dev.sam3vision.app.glasses.GlassesVideoLink
 import dev.sam3vision.app.pose.YawMeter
 import dev.sam3vision.core.crossing.CrossingGuidance
 import dev.sam3vision.core.crossing.CrosswalkScan
@@ -30,7 +31,7 @@ internal fun scanTriggerOf(
 ): Boolean {
     if (width <= 0 || height <= 0) return false
     val best = CrossingGuidance.selectBest(objects) ?: return false
-    val meters = crossingMetersOf(best.box, readings, pose, lens.focalPx(width, height), height / 2f, height)
+    val meters = crossingMetersOf(best.box, readings, pose, lens.focalPx(width, height), lens.principalPx(width, height).second, height)
     if (meters != null && meters >= CrosswalkScan.SCAN_METERS) return false
     return CrossingGuidance.isArrivedPx(best.box, height, meters)
 }
@@ -94,6 +95,8 @@ internal object CrosswalkScanWatch {
 
     /** Lacet frais (degrés) ou `null` (sans capteur, coupé, fou ou périmé). */
     fun yawDeg(nowMs: Long = System.currentTimeMillis()): Float? {
+        // Lunettes-live : le cap du téléphone (en poche) ne prouve aucun virage de tête.
+        if (GlassesVideoLink.live.value) return null
         val sample = meter?.yawDeg
         val atMs = meter?.lastAtMs ?: 0L
         if (sample == null || !sample.isFinite()) return null
@@ -122,7 +125,7 @@ internal object CrosswalkScanWatch {
         val prev = scan.phase
         val phrase = scan.update(atMs, trigger, yawDeg(atMs), movingNow, feu, language)
         noteScanReport(prev, scan.phase, phrase, language)
-        if (trigger && scan.phase != CrosswalkScanPhase.Idle && scan.phase != CrosswalkScanPhase.Done) {
+        if (!GlassesVideoLink.live.value && trigger && scan.phase != CrosswalkScanPhase.Idle && scan.phase != CrosswalkScanPhase.Done) {
             meter?.start()
         } else {
             meter?.stop()
