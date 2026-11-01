@@ -292,7 +292,8 @@ qui remplace l'urgence du § 10 (gardée pour mémoire) :
   + `TwinLiteWord.isStopPhrase` depuis § 12) ;
 - **« Attention à … »** : trottoir (« Attention à la marche. », ex-« levez la
   jambe »), escaliers (« Escalier montant. », inchangé), personne proche
-  (« Attention à la personne, passez à droite. », `HazardConcepts` :
+  (« Attention à la personne, passez à droite. » à l'époque — mot seul
+  depuis le 01/11, § 34 ; `HazardConcepts` :
   personne, barrière, borne, clôture, portail — FR/EN, 4 m la personne,
   3 m le reste, 2 frames, 10 s de silence ; le poteau ne parle plus, § 26)
   et mobilier suivi parlent en douceur (`urgent = false`, synthèse réseau,
@@ -649,7 +650,7 @@ Nouveau contrat, qui amende les § 16-19 :
   `VehicleStateCue.movingCount`) ;
 - **personne + évitement** : phrase douce (2-4 m) « Attention à la
   personne, à 2 heures, passez à gauche. » / « Attention, person, at 2
-  o'clock, pass on the left. » — le côté conseillé est l'opposé de la
+  o'clock, pass on the left. » (mot seul depuis le 01/11, § 34) — le côté conseillé est l'opposé de la
   personne (personne à gauche de l'axe = on passe à droite) ; axe pile
   ou heure inconnue = droite par défaut (prior, à valider rue : on serre
   à droite) (`HazardText.personPhrase`, `avoidSide` seule source du
@@ -936,7 +937,8 @@ Nouveau contrat, qui amende les § 16, § 18 et § 20 dans le cadre du § 22
   changement de mot) ; le mot contourne le verrou dit-une-fois (doux
   puis approche = il parle) et ne consomme pas le cooldown doux (la
   barrière suit sans attendre 10 s) ; la phrase douce 2-4 m
-  (« Attention à la personne, …, passez à … ») est inchangée ;
+  (« Attention à la personne, …, passez à … ») est inchangée (mot seul
+  depuis le 01/11, § 34) ;
 - **personne avant barrière** : même frame, la personne parle d'abord
   (signal préféré), la barrière suit en repli dès la personne dite
   (compteurs de confirmation séparés par sorte, cooldown doux partagé) ;
@@ -1241,3 +1243,33 @@ Recette téléphone : bulle du chat en lecture + escalier nommé → la
 bulle est coupée, « N marches. » parle puis se répète chaque seconde ;
 voiture en mouvement + escalier → le compte d'abord — **non mesuré**,
 exige un APK de cette branche sur appareil réel.
+
+## 34. Personne douce en mot seul : « Droite. »/« Gauche. », plus de phrase (ordre user du 01/11)
+
+Le user marche avec l'app : la personne à 2-4 m dit encore toute la
+phrase (« Attention, person, at 2 o'clock, pass on the left. ») alors
+qu'il ne veut entendre que le côté — « right » ou « left ». Nouveau
+contrat, qui amende les § 21 (personne + évitement) et 26 (phrase
+douce) : la douce dit le même mot seul que l'imminente.
+
+- **mot seul partout** (`HazardText.personPhrase`, sans nom : le côté
+  suffit) : « Droite. »/« Gauche. » / « Right. »/« Left. »
+  (`GuidanceWord`, côté opposé à la personne, `avoidSide` seule source
+  inchangée — axe pile ou heure inconnue = droite) ; la douce garde sa
+  cadence (2 frames, dite une fois, 10 s de silence, ré-armement) et sa
+  voix (synthèse, attend le silence) — seule l'imminente part en clip
+  `guide_*` (< 100 ms, répétée toutes les 300 ms) ;
+- **consigne « passez à … » supprimée** : `avoidText` n'existe plus, et
+  les deux clips poteau morts (`hazard_pole_right/left` — le poteau ne
+  parle plus depuis le § 26, le garde voicepack exigeait leurs morceaux
+  dans le Kotlin) sortent du catalogue avec leurs MP3 ;
+- **hors cadence « Attention … »** : le mot ne dit plus « Attention »,
+  il ne consomme plus le budget partagé (§ 30) — comme le mot imminent
+  avant lui ; l'anti-spam reste le dit-une-fois + 10 s du guetteur.
+
+Verrouillé par `HazardWatchTest` (personne douce = mot seul FR/EN,
+défaut droite, axe pile ; doux confirmé en 2 frames, ré-armement).
+`check-voicepack.py` et `check-kotlin-limits.py` verts.
+
+Recette téléphone : personne à 3 m à gauche → « Right. » — **non
+mesuré**, exige un APK de cette branche sur appareil réel.
