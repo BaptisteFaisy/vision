@@ -106,6 +106,5 @@ venait de passer libérait le verdict aussitôt.
 - **avec feu** : inchangé — le vert confirmé + veto trafic décide, cette
   règle ne couvre que la branche sans-feu ;
 - **preuves** : `NoLightCrossingTest` :core (silence avant 3 s, fenêtre
-  rouverte par un danger, phrase calme qui ne rouvre pas) et :app
-  (câblage : calme, garée proche, pan sur garée lointaine, voiture qui
-  démarre).
+  rouverte par un danger, phrase calme qui ne rouvre pas). Le câblage
+  :app (`NoLightCrossingVoice`, supprimé par la v4) n'est plus testé.
