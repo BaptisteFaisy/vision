@@ -103,25 +103,27 @@ object LivePrompts {
     )
 
     /**
-     * Concepts d'intérieur : **9** objets d'appartement pour la sonde iSee en
+     * Concepts d'intérieur : **10** objets d'appartement pour la sonde iSee en
      * mode maison — la personne et ce qui structure une pièce (portes,
      * escaliers, murs, fenêtres) plus le mobilier courant (chaises, tables),
-     * le passage piéton (reel audit 31/10) et la poussette (audit foule du
+     * le passage piéton (reel audit 31/10), la poussette (audit foule du
      * 01/11 : la personne qui se déplace chez elle avec une poussette ou un
      * déambulateur — c'est un corps qui bloque, pas du décor ; le déambulateur
-     * n'a pas de concept propre, la poussette est le plus proche voisin).
+     * n'a pas de concept propre, la poussette est le plus proche voisin) et
+     * les clés (ordre du 01/11 : SAM juge l'affichage du picto clé, dedans
+     * comme dehors — le gabarit seul ne l'affiche plus).
      * Bien sous [MAX] ; les pastilles du mode Maison ([HomeModes]) gardent
-     * leurs petits objets (clés, médicaments…) : ici le décor est suivi, pas
-     * le mot parlé.
+     * leurs autres petits objets (médicaments…) : ici les clés sont suivies
+     * comme le décor, pas seulement sur le mot parlé.
      */
     val indoor: List<String> = listOf(
         "person", "stroller", "door", "chair", "table", "stairs", "wall", "window",
-        "crosswalk",
+        "crosswalk", "keys",
     )
 
     /**
      * Liste du monde sensoriel : dehors = [default] (les 21 concepts
-     * extérieurs, foule incluse), dedans = [indoor] (les 9 objets
+     * extérieurs, foule incluse), dedans = [indoor] (les 10 objets
      * d'intérieur). V1 : seuls les prompts basculent, la portée reste 4 m
      * dans les deux mondes. À ne pas confondre avec le preset [outdoor]
      * (18 concepts de cheminement, pastille « Extérieur » du direct) : la

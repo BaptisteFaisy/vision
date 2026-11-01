@@ -218,6 +218,55 @@ class IseePictoTest {
     }
 
     @Test
+    fun `hors chasse le picto cle suit sam, jamais le gabarit seul`() = runTest {
+        var now = 10_000L
+        val root = tempDir("isee-picto-sam-gate")
+        val first = picto(storeRoot = root)(this)
+        first.findObject("keys")
+        first.onDetections(listOf(keysAt(0.2f, 0.3f, 0.5f, 0.6f)))
+        advanceUntilIdle()
+        assertTrue(first.armed())
+        val second = picto(storeRoot = root, now = { now })(this)
+        second.refresh()
+        advanceUntilIdle()
+        // SAM muet (GPU froid) : le gabarit matche en sourdine, rien à l'écran.
+        second.onFrame("frame-sans-sam")
+        advanceUntilIdle()
+        assertTrue(state.value.picto.hits.isEmpty())
+        // SAM voit les clés : le gabarit s'affiche, sans chasse ni régénération.
+        second.onDetections(listOf(keysAt(0.6f, 0.1f, 0.8f, 0.3f)))
+        now += 600
+        second.onFrame("frame-avec-cles")
+        advanceUntilIdle()
+        assertEquals("keys", state.value.picto.hits.single().label)
+        // SAM ne les voit plus : le picto tombe aussitôt, sans attendre la frame.
+        second.onDetections(emptyList())
+        advanceUntilIdle()
+        assertTrue(state.value.picto.hits.isEmpty())
+        assertEquals(1, client.calls)
+    }
+
+    @Test
+    fun `findObject ne fait pas clignoter le gabarit des cles`() = runTest {
+        var now = 10_000L
+        val coordinator = picto(now = { now })(this)
+        coordinator.findObject("keys")
+        coordinator.onDetections(listOf(keysAt(0.2f, 0.3f, 0.5f, 0.6f)))
+        advanceUntilIdle()
+        coordinator.onDetections(emptyList())
+        advanceUntilIdle()
+        assertTrue(state.value.picto.hits.isEmpty())
+        now += 600
+        coordinator.onFrame("frame-avec-motif")
+        advanceUntilIdle()
+        assertTrue(state.value.picto.hits.isEmpty())
+        // Une seconde demande ne fait pas clignoter le gabarit stocké.
+        coordinator.findObject("keys")
+        advanceUntilIdle()
+        assertTrue(state.value.picto.hits.isEmpty())
+    }
+
+    @Test
     fun `find sur label deja arme reprend la chasse sans regenerer`() = runTest {
         val coordinator = picto()(this)
         coordinator.findObject("keys")

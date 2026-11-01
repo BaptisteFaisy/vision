@@ -61,6 +61,9 @@ data class PictoUiState(
  * juge tant que dure la chasse — objet hors champ (passage gabarit muet)
  * ou SAM muet, le picto tombe aussitôt et revient avec l'objet, sans
  * jamais régénérer.
+ * Les clés sont jugées par SAM en permanence, chasse ou pas : SAM les
+ * traque dedans comme dehors, et le gabarit seul ne les affiche jamais
+ * — SAM muet (GPU froid), pas de picto clé, même si le motif matche.
  * Dehors, tout est muet (bouton, ordres, reconnaissance sur frames) : seul
  * dedans suit des pictos. Une génération lancée dedans mais livrée dehors
  * est jetée sans bruit ([dropLate]).
@@ -122,6 +125,14 @@ class IseePicto(
     @Volatile
     private var liveHits: List<PictoHit> = emptyList()
 
+    /**
+     * SAM voit les clés sur sa dernière publication : le gabarit des clés
+     * ne s'affiche que dans ce cas — SAM muet, pas de picto clé. Lu avant
+     * le repli dehors, donc frais dans tous les modes.
+     */
+    @Volatile
+    private var samKeysSeen: Boolean = false
+
     /** Charge les repères validés (ouverture de l'écran) et arme la détection. */
     fun refresh() {
         scope.launch(io) { load() }
@@ -179,7 +190,7 @@ class IseePicto(
         if (busy || label.isBlank()) return
         huntLabel = label.trim()
         liveHits = emptyList()
-        update { it.copy(picto = it.picto.copy(hits = templateHits, armed = pictos.size), status = null) }
+        update { it.copy(picto = it.picto.copy(hits = mergedHits(), armed = pictos.size), status = null) }
     }
 
     /**
@@ -219,11 +230,16 @@ class IseePicto(
      * confirmation — l'utilisateur est seul devant la caméra. Repère armé :
      * l'overlay s'ancre sur la boîte détectée ; les clés sorties du
      * champ, le picto disparaît, et il réapparaît avec elles, sans
-     * régénérer. Muet dehors et sans chasse en cours.
+     * régénérer. Muet dehors ; sans chasse, la publication ne fait que juger les clés.
      */
     fun onDetections(dets: List<Detection>) {
+        samKeysSeen = dets.any { matchesHunt(KEYS_LABEL, it.label) }
         if (!placeMode().pictoEnabled) return
-        val hunt = huntLabel ?: return
+        val hunt = huntLabel
+        if (hunt == null) {
+            publishHits()
+            return
+        }
         val armed = armedFor(hunt)
         val seen = dets.firstOrNull { matchesHunt(hunt, it.label) }
         if (seen != null && armed == null) {
@@ -325,15 +341,28 @@ class IseePicto(
         KnownSizes.canonical(hunt) == KnownSizes.canonical(label) ||
             PictoVoiceOrder.matches(label, hunt) || PictoVoiceOrder.matches(hunt, label)
 
-    /** Les deux sources fusionnées : l'ancrage live gagne sur le gabarit, et le picto chassé n'est jamais montré par le gabarit seul. */
+    /** Les deux sources fusionnées (voir [mergedHits]), publiées à l'écran. */
     private fun publishHits() {
+        update { it.copy(picto = it.picto.copy(hits = mergedHits())) }
+    }
+
+    /**
+     * Overlay affichable : l'ancrage live d'abord, puis les gabarits ni
+     * ancrés ni chassés — et les clés seulement quand SAM les voit,
+     * chasse ou pas : le gabarit seul ne les montre jamais, même si le
+     * motif matche.
+     */
+    private fun mergedHits(): List<PictoHit> {
         val live = liveHits
         // Chasse : l'ancrage live est seul juge pour le picto chassé — le
         // passage gabarit précédent ne le ressuscite pas quand SAM dit parti.
         val huntedId = huntLabel?.let { armedFor(it)?.id }
-        val templates = templateHits.filter { hit -> live.none { it.pictoId == hit.pictoId } && hit.pictoId != huntedId }
-        val merged = live + templates
-        update { it.copy(picto = it.picto.copy(hits = merged)) }
+        val keysId = armedFor(KEYS_LABEL)?.id
+        val templates = templateHits.filter { hit ->
+            live.none { it.pictoId == hit.pictoId } && hit.pictoId != huntedId &&
+                (hit.pictoId != keysId || samKeysSeen)
+        }
+        return live + templates
     }
 
     /** Échec : repos, motif affiché. */
@@ -345,5 +374,11 @@ class IseePicto(
     companion object {
         /** Cadence max de la reconnaissance : 2 Hz, sur le thread d'I/O. */
         const val MATCH_EVERY_MS = 500L
+
+        /**
+         * Label jugé par SAM : les clés sont un concept SAM suivi dedans
+         * comme dehors, le seul repère dont l'affichage exige SAM.
+         */
+        const val KEYS_LABEL = "keys"
     }
 }
