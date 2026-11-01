@@ -1,6 +1,9 @@
 package dev.sam3vision.core.live
 
+import dev.sam3vision.core.curb.RailLevel
+import dev.sam3vision.core.curb.RailState
 import dev.sam3vision.core.curb.SidewalkPosition
+import dev.sam3vision.core.curb.SidewalkRail
 import dev.sam3vision.core.model.Passage
 import dev.sam3vision.core.speech.SpeechLanguage
 import org.junit.Assert.assertEquals
@@ -426,5 +429,71 @@ class GuidanceAnnouncerTest {
         val centre = listOf(PlacedLabel("personne", 0.5f, 0.5f, 1f))
 
         assertEquals("left.", announcer.onFrame(0L, centre, samPassage = sam))
+    }
+
+    private fun dire(rail: RailState?, lang: SpeechLanguage = SpeechLanguage.Fr): String? =
+        GuidanceAnnouncer().onFrame(0L, libre, lang, rail = rail)
+
+    private fun bordG(m: Float, level: RailLevel) = RailState(GuidanceSide.Left, m, level)
+
+    @Test
+    fun `rail drift a gauche fait serrer a droite`() {
+        // Bordure à 40 cm de l'axe : la bande d'image la laissait passer (±0,32 m à 1,5 m).
+        val etat = SidewalkRail.of(listOf(PlacedLabel("curb", 0.3f, 0.5f, 1.5f)))
+        assertEquals(GuidanceSide.Left, etat.side)
+        assertEquals(RailLevel.DRIFT, etat.level)
+        assertEquals("Serrez à droite.", dire(etat))
+    }
+
+    @Test
+    fun `rail edge alerte et prime sur tout droit`() {
+        assertEquals("Attention, bord du trottoir.", dire(bordG(0.2f, RailLevel.EDGE)))
+    }
+
+    @Test
+    fun `decalage lateral gagne sur le rail`() {
+        val announcer = GuidanceAnnouncer()
+        val etat = bordG(0.4f, RailLevel.DRIFT)
+        announcer.onFrame(0L, listOf(personneDroite(3.0f)), SpeechLanguage.Fr, rail = etat)
+        announcer.onFrame(250L, listOf(personneDroite(2.6f)), SpeechLanguage.Fr, rail = etat)
+        assertEquals("Gauche.", announcer.onFrame(500L, listOf(personneDroite(2.2f)), SpeechLanguage.Fr, rail = etat))
+        assertNotNull("décalage attendu devant le rail", announcer.lastNudge)
+    }
+
+    @Test
+    fun `couloir bouche gagne sur le rail`() {
+        assertEquals("left.", GuidanceAnnouncer().onFrame(0L, listOf(personne(2f)), rail = bordG(0.2f, RailLevel.EDGE)))
+    }
+
+    @Test
+    fun `rail muet laisse la voie libre inchangee`() {
+        assertEquals("Tout droit.", dire(RailState(null, null, RailLevel.NONE)))
+        assertEquals("Straight.", dire(RailState(null, 0.4f, RailLevel.DRIFT), SpeechLanguage.En))
+    }
+
+    @Test
+    fun `rail redit toutes les trois secondes, pas a chaque frame`() {
+        val announcer = GuidanceAnnouncer()
+        val etat = bordG(0.4f, RailLevel.DRIFT)
+        fun frame(atMs: Long) = announcer.onFrame(atMs, libre, SpeechLanguage.Fr, rail = etat)
+        assertEquals("Serrez à droite.", frame(0L))
+        assertNull(frame(1_000L))
+        assertNull(frame(2_000L))
+        assertEquals("Serrez à droite.", frame(3_000L))
+    }
+
+    @Test
+    fun `frame perimee rend le rail muet`() {
+        val etat = bordG(0.2f, RailLevel.EDGE)
+        assertNull(GuidanceAnnouncer().onFrame(0L, libre, SpeechLanguage.Fr, ageMs = 1_500L, rail = etat))
+    }
+
+    @Test
+    fun `reset fait reparler le rail tout de suite`() {
+        val announcer = GuidanceAnnouncer()
+        val etat = bordG(0.4f, RailLevel.DRIFT)
+        assertEquals("Serrez à droite.", announcer.onFrame(0L, libre, SpeechLanguage.Fr, rail = etat))
+        announcer.reset()
+        assertEquals("Serrez à droite.", announcer.onFrame(200L, libre, SpeechLanguage.Fr, rail = etat))
     }
 }

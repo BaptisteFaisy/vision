@@ -1,6 +1,7 @@
 package dev.sam3vision.app.isee
 
 import dev.sam3vision.core.curb.SidewalkKeep
+import dev.sam3vision.core.curb.SidewalkRail
 import dev.sam3vision.core.curb.SidewalkPosition
 import dev.sam3vision.core.distance.LensSpec
 import dev.sam3vision.core.hazard.FenceOpeningSignal
@@ -104,6 +105,8 @@ internal class ProbeVoice(
             return guidance.onFrame(
                 atMs, safe, language, manualCap, routeCap,
                 sidewalk = sidewalk, samPassage = passage, hfovDeg = hfovDeg, holeSide = hole,
+                // Rail trottoir en mètres (bordure) : deux paliers, 50 cm et 30 cm.
+                rail = SidewalkRail.of(safe, hfovDeg),
             )
         }
         if (!announce) return null
