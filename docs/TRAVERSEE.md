@@ -478,9 +478,9 @@ même si l'user bouge/panote la caméra.
   plus le verdict sans feu (champ `veto` du patch supprimé) — une garée
   proche se dit (« Voiture à l'arrêt… », info douce) sans bloquer ;
 - **pan compensé** : le signal fond (`ProbeBackgroundMotion`, déjà utilisé
-  en mode normal) juge les pistes sans feu seul — une boîte qui suit la
-  caméra conclut `CAMERA_MOVED`, pas le mouvement ; avec feu : inchangé
-  (`null`, aucun comportement modifié) ;
+  en mode normal) juge les pistes avec feu comme sans feu — une boîte qui
+  suit la caméra conclut `CAMERA_MOVED`, pas le mouvement (`null` = pas
+  de signal : repli géométrie, comportement historique) ;
 - **limites** : une trottinette/un vélo reste muet en traversée (politique
   cycles) ; avance franche vers une garée (zoom) : décote via
   `EgoCompensator`, à valider rue.
