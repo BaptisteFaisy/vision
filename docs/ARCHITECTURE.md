@@ -258,8 +258,9 @@ Choisir une région **n'allume aucune carte** : elle élit seulement l'URL appel
 - **Cadence** (`core/live/LiveSession.kt`) : le Direct garde **350 / 500 / 900 ms**
   (`Cadence.Direct`, `:33`) ; la page caméra iSee part sur `Cadence.Fast` (`:42-47`) : pas de
   plancher, **deux créneaux**, budget de latence 210 ms, hystérésis à 3 mesures
-  (`REGULATE_MIN_SAMPLES = 3`, `:171`) et réouverture seulement sous `RELAX_RATIO = 0,5` du
-  budget (`:168`). Créneau pris = frame **jetée** (`runFrame` renvoie `null`), jamais mise en
+  (`REGULATE_MIN_SAMPLES = 3`, `:171`) et réouverture après 5 moyennes consécutives sous
+  le budget (`REOPEN_AFTER = 5`). Créneau pris = frame **jetée** (`runFrame` renvoie `null`),
+  jamais mise en
   attente.
 - **Réveil** : le conteneur est réveillé par la **première frame** ; `LiveProbe.markWarming()`
   ne pose qu'un drapeau d'affichage, aucun appel réseau (`app/isee/LiveProbe.kt:480`). Côté
