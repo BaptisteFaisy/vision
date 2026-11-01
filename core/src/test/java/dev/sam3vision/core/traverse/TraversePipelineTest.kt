@@ -115,9 +115,11 @@ class TraversePipelineTest {
     fun `veto en pleine traversee - retour au rouge urgent et preemptif`() = runBlocking {
         val player = FakePlayer()
         val pipe = pipeline(player = player)
-        repeat(5) { i -> pipe.frame(emptyList(), green = true, index = i + 1) }
-        val small = listOf(0f, 0f, 100f, 100f)
-        val repeat = pipe.frame(listOf(seg(box = small)), green = true, index = 6)
+        repeat(4) { i -> pipe.frame(emptyList(), green = true, index = i + 1) }
+        // Piste vue à 5 (cachée, non confirmée), visible à 6 : la croissance
+        // ne se lit qu'à 7 — le veto suit d'une frame la confirmation.
+        pipe.frame(listOf(seg(box = listOf(0f, 0f, 100f, 100f)))), green = true, index = 5)
+        val repeat = pipe.frame(listOf(seg(box = listOf(0f, 0f, 150f, 150f)))), green = true, index = 6)
         assertNull("pas d'approche : vert maintenu, répétition pas encore due", repeat.cue)
         val alert = pipe.frame(listOf(seg()), green = true, index = 7)
         assertNull("croissance : veto force le rouge, une seule frame ne suffit pas", alert.cue)

@@ -24,7 +24,7 @@ private class FakeDriver(var fail: Boolean = false) : TtsDriver {
 
     override val speaking: Boolean get() = speakingValue
 
-    override fun speak(text: String, flush: Boolean, locale: Locale, rate: Float): Boolean {
+    override fun speak(text: String, flush: Boolean, locale: Locale, rate: Float, pitch: Float): Boolean {
         calls += Call(text, flush)
         return !fail
     }
