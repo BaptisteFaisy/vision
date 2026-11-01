@@ -28,3 +28,15 @@ AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
 LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
 OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
 SOFTWARE.
+
+
+Profondeur monoculaire (`server/backend/live_fast/depth.py`)
+: **Depth Anything V2 Small** — LiheYoung / HKU, licence Apache-2.0.
+  Modèle `depth-anything/Depth-Anything-V2-Small-hf`, exécuté **côté serveur**
+  (`transformers`, une carte par 8 frames, médianes jointes aux objets sous
+  `with_depth`). Le variant Small est Apache-2.0 (Base/Large/Giant sont
+  CC-BY-NC-4.0 et ne sont pas utilisés). Texte complet de la licence :
+  https://www.apache.org/licenses/LICENSE-2.0
+  Aucun poids n'est embarqué dans l'APK depuis le 01/11/2026 : l'inférence
+  embarquée a été supprimée (voir `docs/DEPTH.md`). Les anciens poids restent
+  sur la release `depth-models-v1`, que plus rien ne télécharge.

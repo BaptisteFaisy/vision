@@ -7,16 +7,15 @@
 >
 > - **SAM 3.1** (`facebook/sam3.1`, via the `unsloth/sam3.1` mirror) — segmentation
 >   model, loaded with Hugging Face `transformers`
-> - **Depth Anything V2 Small** (`depth-anything/Depth-Anything-V2-Small`, Apache-2.0) —
->   on-device depth model, via `onnx-community/depth-anything-v2-small`
+> - **Depth Anything V2 Small** (`depth-anything/Depth-Anything-V2-Small-hf`,
+>   Apache-2.0) — depth model, run **on the GPU server** (`transformers`)
 > - **Valhalla** — open-source routing engine (CPU backend)
 > - Standard open-source libraries: AndroidX (Compose, CameraX, Room, WorkManager),
->   OkHttp, ONNX Runtime, PyTorch, FastAPI
+>   OkHttp, PyTorch, FastAPI
 > - **Meta Wearable Device Access SDK** — camera and microphone access on Ray-Ban Meta
 >   glasses
 >
-> Third-party attributions and licences: `NOTICE` (code) and
-> `app/src/main/assets/NOTICE-depth.txt` (depth model).
+> Third-party attributions and licences: `NOTICE` (code and reused models).
 
 # iSee — eyes that speak
 
@@ -82,8 +81,9 @@ An ordinary phone, a remote GPU card, and voice as the only interface:
 2. **Segment** — frames go to SAM 3.1 on a Modal GPU (Europe), which returns
    objects, boxes, and masks, in photo and live alike.
 3. **Measure** — distances are computed **on the phone** from the boxes SAM
-   returns (pinhole model, refined by the on-device depth model). No extra
-   network request is made for a distance.
+   returns (pinhole model, refined by the depth medians the server attaches to
+   each object — `with_depth`, one map per 8 frames). No extra network request
+   is made for a distance; nothing is inferred on the phone.
 4. **Describe and answer** — a vision LLM describes the scene and answers
    questions. The thread stays on the phone, capped at 20 turns
    (`AskUseCase.MAX_HISTORY_TURNS`); stored media live in a local Room database
@@ -161,7 +161,7 @@ An ordinary phone, a remote GPU card, and voice as the only interface:
 | Block | Role |
 |---|---|
 | `:core` | Android library (`dev.sam3vision.core`, minSdk 26): network clients (LLM, SAM, live WebSocket, tracker, video, Valhalla), pacing and frame gate, masks, distances, pure depth, gestures, crossing/traverse, navigation, voice, encrypted settings, design tokens (`iseedesign`) |
-| `:app` | The APK (`dev.sam3vision.app`, minSdk 29): Compose + CameraX, iSee home, legacy screens, tap mode, glasses + bench, depth (ONNX), in-app map (MapLibre), voice navigation, companion share, capture purge |
+| `:app` | The APK (`dev.sam3vision.app`, minSdk 29): Compose + CameraX, iSee home, legacy screens, tap mode, glasses + bench, in-app map (MapLibre), voice navigation, companion share, capture purge |
 | `server/` | Deployed backend: live/photo (`backend/live_fast/`, app `sam3-eu-a100`), Valhalla CPU routing (`backend/valhalla_cpu.py`, app `valhalla-idf-cpu`), tracker (`backend/track_app.py`, manual deploy), the photo-era app (`backend/modal_app.py`, not called by the current app), Baseten host config (`backend/baseten/` — `config.yaml` + `src/server.py` versioned, `data/` synced at push time by `server/scripts/baseten_sync.py`), GPU probes, and `scripts/` (deploy, benches, probes, unit tests) |
 | `suivi-parent/` | Companion page (static, zero npm dependencies) embedded in every APK (`caregiverAssets`, `app/build.gradle.kts:197`); its Vercel deployment is abandoned, but `api/` still serves the local preview tests |
 | `suivi-relais/` | The relay actually used (Cloudflare Worker + D1 + one Durable Object per stream): `POST /api/share`, `GET /api/state`, `GET /ws` (live camera frames) |
@@ -181,7 +181,7 @@ An ordinary phone, a remote GPU card, and voice as the only interface:
 | Data | Room 2.8.5 (KSP), WorkManager 2.12.0 (hourly capture purge), security-crypto 1.1.0, core-ktx 1.18.0, Guava 33.3.1-android (Room transitive pin, no direct import) |
 | Network | OkHttp 4.12.0 (a single client, a single pool), `org.json` (shipped with Android; real `org.json` only in JVM tests), coroutines 1.10.2 |
 | Voice / audio | ElevenLabs (`eleven_v4_turbo` TTS, `scribe_v1` STT fallback), Meta ASR batch + realtime (dictation), jump3r 1.0.4 (pure-Java MP3 for the media cache) |
-| Glasses / on-device AI | Meta `mwdat-*` 1.0.0 (the only version served by the glasses), ONNX Runtime 1.18.0 (depth) |
+| Glasses | Meta `mwdat-*` 1.0.0 (the only version served by the glasses) |
 | Map | MapLibre 13.7.1 (guidance screen, OSM raster tiles, `docs/CARTE-OSM.md`) |
 | Version | `versionName = 1.0.<commits>-<sha>`, `versionCode` = commit date (a stale APK cannot overwrite the phone) |
 
@@ -190,7 +190,7 @@ An ordinary phone, a remote GPU card, and voice as the only interface:
 | Item | Value |
 |---|---|
 | Runtime | Python 3.12 in the Modal image, FastAPI (`fastapi[standard]==0.162.0`), Modal CLI 1.6.2 |
-| Model | `unsloth/sam3.1` (ungated mirror of `facebook/sam3.1`), `transformers==5.20.2`, `torch==2.14.1`, `torchvision==0.29.1` |
+| Model | `unsloth/sam3.1` (ungated mirror of `facebook/sam3.1`), `transformers==5.20.2`, `torch==2.14.1`, `torchvision==0.29.1` ; Depth Anything V2 Small (`depth-anything/Depth-Anything-V2-Small-hf`, Apache-2.0) for `with_depth` |
 | Deployed | `sam3-eu-a100` (A100-40GB, `eu-west`) from `server/backend/live_fast/` — `/health`, `/segment`, `/live`, `/live/ws`, `/release`; redeployed by CI on every push that touches it, with its levers (CUDA graph, memory snapshot, `scaledown_window=60`) |
 | Routing | `valhalla-idf-cpu` (CPU, zero GPU, Île-de-France tiles) — `/health`, `/route`, `/signals` (pedestrian-light points; the app does not call `/signals`) |
 | Other | `modal_app.py` (photo era: `/health`, `/segment`, `/analyze`, `/ask` — kept and unit-tested, not called by the current app), `track_app.py` (tracker `/health`, `/session`, `/frame`, `/session/close` — manual deploy, used only when the Direct runs on the tracker), `baseten/` (host config), `probe_*.py` (measurement probes, never routinely deployed) |
@@ -238,7 +238,7 @@ Prerequisites: JDK 17 + Android SDK (`JAVA_HOME`, `ANDROID_HOME`), Python 3 (gua
 Node (companion page, no `npm install`).
 
 ```bash
-./gradlew :core:testDebugUnitTest :app:testDebugUnitTest   # JVM tests (4,795 @Test: 2,957 + 1,838)
+./gradlew :core:testDebugUnitTest :app:testDebugUnitTest   # JVM tests (4,809 @Test: 2,972 + 1,837)
 ./gradlew :app:assembleDebug                               # debug APK
 python3 tools/check-kotlin-limits.py                       # file < 500 lines, function < 50
 python3 tools/check-isee-design.py                         # mandatory Portrait design
@@ -254,22 +254,22 @@ python3 tools/count-tree.py                                # the Figure table be
 
 ## Figures
 
-Measured on `origin/master` (`2387cd4f`) with this cleanup applied, 01/11/2026 — `python3 tools/count-tree.py`
+Measured on `origin/master` (`d9d7b8b5`), 01/11/2026 — `python3 tools/count-tree.py`
 prints exactly this table (`--json` for scripts). The census is a script, not a habit:
 recopied numbers had drifted three times in one day.
 
 | Mesure | Valeur | Commande |
 |---|---|---|
-| Fichiers `.kt` | **1224** | `find . -name '*.kt' -not -path './.git/*' -not -path '*/build/*' \| wc -l` |
-| Lignes Kotlin | **153,303** | idem, `-exec cat {} + \| wc -l` |
-| Lignes de prod (`*/src/main`) | **79,608** — `:core` 258 f. / 34,344 l. · `:app` 376 f. / 45,264 l. | idem sous `core/src/main`, `app/src/main` |
-| `@Test` JVM | **4,795** — `:core` 2,957 · `:app` 1,838 | `grep -rho '@Test' core/src/test app/src/test --include='*.kt' \| wc -l` |
-| Tests instrumentés | **9** (appareil requis) | idem sous `app/src/androidTest*` |
+| Fichiers `.kt` | **1215** | `find . -name '*.kt' -not -path './.git/*' -not -path '*/build/*' \| wc -l` |
+| Lignes Kotlin | **152,586** | idem, `-exec cat {} + \| wc -l` |
+| Lignes de prod (`*/src/main`) | **78,831** — `:core` 257 f. / 34,397 l. · `:app` 370 f. / 44,434 l. | idem sous `core/src/main`, `app/src/main` |
+| `@Test` JVM | **4,809** — `:core` 2,972 · `:app` 1,837 | `grep -rho '@Test' core/src/test app/src/test --include='*.kt' \| wc -l` |
+| Tests instrumentés | **8** (appareil requis) | idem sous `app/src/androidTest*` |
 | `@Preview` Compose | **11** | idem, `@Preview` |
 | Backend Python (`server/backend`) | **43** fichiers, **9,043** lignes | `find server/backend -name '*.py' \| wc -l` |
-| Docs | **61** fichiers dans `docs/` | `ls docs/*.md \| wc -l` |
+| Docs | **62** fichiers dans `docs/` | `ls docs/*.md \| wc -l` |
 | Workflows CI | **7** | `ls .github/workflows/*.yml \| wc -l` |
-| Plus gros fichier de prod | `app/src/main/java/dev/sam3vision/app/glasses/GlassesController.kt` — **499** lignes (plafond 500) | `find core app -path '*/src/main/*' -name '*.kt' \| xargs wc -l \| sort -rn \| head` |
+| Plus gros fichier de prod | `app/src/main/java/dev/sam3vision/app/glasses/GlassesController.kt` — **499** lignes | `find core app -path '*/src/main/*' -name '*.kt' \| xargs wc -l \| sort -rn \| head` |
 
 Details (constants, budgets, thresholds) are in `docs/PERF.md`; recipes in
 `docs/TESTING.md`. The guards are green on this tree; Gradle tests are the only ones not
