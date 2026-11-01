@@ -61,6 +61,28 @@ livré et ses preuves (tâche, fichiers, chiffres) dans l'arbre.
   `check-kotlin-limits.py` et `scripts/test_scripts.sh` inchangés (aucun code
   Kotlin touché). Doc : `docs/VOICEPACK.md`, section « Vérifier que le pack est
   bien en voix Laure ».
+## 2026-11-01 — iSee : le picto clé jugé par SAM, clés suivies dedans (branche `fix/isee-picto-cles-fantome`)
+
+- **Fait** : ordre user « utilise SAM plutôt pour reconnaître les clés ».
+  Constaté en démo : GPU froid, SAM muet, et pourtant le picto clé apparu
+  plusieurs fois sans clés à l'image — fantôme du gabarit local
+  (corrélation 0,72 sur imagettes grises, aucun appel SAM). (1) Les clés
+  rejoignent les prompts d'intérieur (`LivePrompts.indoor`, 9 → 10
+  concepts) : SAM les traque dedans comme dehors. (2) `IseePicto` ne montre
+  le repère « keys » que si la dernière publication SAM les voit
+  (`samKeysSeen`, chasse ou pas) ; hors chasse, une publication SAM vide
+  fait tomber le picto aussitôt. (3) `findObject` publie la fusion filtrée
+  (`mergedHits`) au lieu du gabarit brut : plus de clignotement à
+  l'armement de la chasse. Les autres repères gardent l'affichage gabarit.
+  Effet assumé : masques, pastilles et annonce générale voient les clés
+  dedans ; `LIVE-SPEC.md` (liste d'intérieur, déjà en retard d'une version)
+  recalé sur le code.
+- **Preuve** : `LivePromptsTest` 23/23, `IseePictoTest` 22/22 (dont 2 neufs :
+  `hors chasse le picto cle suit sam, jamais le gabarit seul`,
+  `findObject ne fait pas clignoter le gabarit des cles`),
+  `ProbeEnsureConceptTest` 7/7 — échecs observés avant implémentation
+  (fantôme reproduit) puis verts ; `check-kotlin-limits` OK (1381 fichiers).
+  Recette téléphone **non mesurée**.
 
 ## 2026-11-01 — iSee : cycles sans heure, et mouvements joués en mp3 enregistré (branche `fix/mouvement-clip-mp3`)
 

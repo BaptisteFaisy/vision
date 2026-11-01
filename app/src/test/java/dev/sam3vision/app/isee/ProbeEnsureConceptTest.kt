@@ -15,11 +15,11 @@ class ProbeEnsureConceptTest {
     @Test
     fun `concept absent rejoint les masques sam`() = runTest {
         val (probe, _) = probeHarness(this)
-        // Liste d'intérieur (9 concepts) : il reste de la place sous le plafond.
+        // Liste d'intérieur (10 concepts, clés incluses) : il reste de la place sous le plafond.
         probe.configure(PROBE_TEST_ENDPOINT, prompts = LivePrompts.indoor)
-        probe.ensureConcept(Settings.Default, "keys")
+        probe.ensureConcept(Settings.Default, "wallet")
         advanceUntilIdle()
-        assertTrue(probe.state.value.conceptsSent.contains("keys"))
+        assertTrue(probe.state.value.conceptsSent.contains("wallet"))
     }
 
     @Test
@@ -36,9 +36,9 @@ class ProbeEnsureConceptTest {
         val (probe, _) = probeHarness(this)
         val indoor = Settings.Default.copy(outdoorMode = false)
         probe.configure(PROBE_TEST_ENDPOINT, prompts = LivePrompts.indoor)
-        probe.ensureConcept(indoor, "keys")
+        probe.ensureConcept(indoor, "wallet")
         advanceUntilIdle()
-        assertEquals(listOf("keys"), probe.state.value.followed)
+        assertEquals(listOf("wallet"), probe.state.value.followed)
     }
 
     @Test

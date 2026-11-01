@@ -268,8 +268,9 @@ OkHttp ne le rejoue jamais, donc pas de seconde inférence facturée (`Http.kt:9
   "electric scooter"]` (18 concepts de cheminement : mobilier +
   trottoir, animaux, feu piéton et sa tête — détecté en permanence hors
   traversée ; pastille « Extérieur » du direct, `LivePrompts.outdoor`).
-- Liste d'intérieur : `["person", "door", "chair", "table", "stairs", "wall",
-  "window"]` (7 objets d'appartement, `LivePrompts.indoor`) — la sonde iSee
+- Liste d'intérieur : `["person", "stroller", "door", "chair", "table", "stairs",
+  "wall", "window", "crosswalk", "keys"]` (10 objets d'appartement,
+  `LivePrompts.indoor`) — la sonde iSee
   la suit quand le monde est « dedans » (`Settings.outdoorMode = false`,
   `LivePrompts.forMode`) ; une liste vide ou un défaut passé à
   `configureFrom` bascule sur le monde, une liste explicite (Traversée,

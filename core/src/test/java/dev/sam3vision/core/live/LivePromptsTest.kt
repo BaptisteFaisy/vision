@@ -123,16 +123,17 @@ class LivePromptsTest {
     }
 
     @Test
-    fun `neuf objets d interieur dedans, poussette incluse, dix huit dangers dehors`() {
+    fun `dix objets d interieur dedans, cles et poussette incluses, dix huit dangers dehors`() {
         assertEquals(
             listOf(
                 "person", "stroller", "door", "chair", "table", "stairs", "wall",
-                "window", "crosswalk",
+                "window", "crosswalk", "keys",
             ),
             LivePrompts.indoor,
         )
-        assertEquals(9, LivePrompts.indoor.size)
+        assertEquals(10, LivePrompts.indoor.size)
         assertTrue("stroller" in LivePrompts.indoor)
+        assertTrue("keys" in LivePrompts.indoor)
         assertEquals(LivePrompts.default, LivePrompts.forMode(true))
         assertEquals(LivePrompts.indoor, LivePrompts.forMode(false))
     }
@@ -225,8 +226,8 @@ class LivePromptsTest {
     @Test
     fun `find the x rejoint la liste sous le plafond`() {
         assertEquals(
-            LivePrompts.indoor + "keys",
-            LivePrompts.withConcept(LivePrompts.indoor, "keys"),
+            LivePrompts.indoor + "phone",
+            LivePrompts.withConcept(LivePrompts.indoor, "phone"),
         )
     }
 
@@ -258,6 +259,6 @@ class LivePromptsTest {
     @Test
     fun `suivis explicites dedans hors liste du monde`() {
         assertEquals(emptyList<String>(), LivePrompts.followedOf(LivePrompts.indoor, false))
-        assertEquals(listOf("keys"), LivePrompts.followedOf(LivePrompts.withConcept(LivePrompts.indoor, "keys"), false))
+        assertEquals(listOf("phone"), LivePrompts.followedOf(LivePrompts.withConcept(LivePrompts.indoor, "phone"), false))
     }
 }
