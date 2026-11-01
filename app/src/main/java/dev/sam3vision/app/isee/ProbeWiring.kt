@@ -8,6 +8,8 @@ import dev.sam3vision.app.live.LensOrigin
 import dev.sam3vision.app.live.chooseLens
 import dev.sam3vision.app.speech.VoicePack
 import dev.sam3vision.core.curb.CurbWatcher
+import dev.sam3vision.core.curb.RailState
+import dev.sam3vision.core.curb.SidewalkRail
 import dev.sam3vision.core.curb.SidewalkWatcher
 import dev.sam3vision.core.cycle.CycleWatcher
 import dev.sam3vision.core.distance.DistanceReading
@@ -340,22 +342,23 @@ internal object ProbeTracks {
 
 /**
  * Une frame prête à **décider** : les étiquettes de la scène recopiées avec leur
- * `trackId` et leur `closingMps` ([labels], par [PersonTracker]), et les trois
- * chiffres que le guidage en tire — [ageMs] ([frameAgeMsOf]), [speedMps] (aucun GPS
- * ici : [Timing.WALK_MPS]) et [free] ([FreeSpace.of]). Matière de `GuidanceAnnouncer`.
+ * `trackId` et leur `closingMps` ([labels], par [PersonTracker]), les trois chiffres
+ * que le guidage en tire — [ageMs], [speedMps], [free] — et le rail [rail]
+ * ([SidewalkRail.of], mètres lus sur la bordure). Matière de `GuidanceAnnouncer`.
  */
 internal data class ProbeGuideFrame(
     val labels: List<PlacedLabel>,
     val ageMs: Long,
     val speedMps: Float,
     val free: FreeSpace,
+    val rail: RailState = RailState.none(),
 )
 
 /**
  * Frame de décision : alimente le suivi à [atMs], puis en tire les étiquettes
- * identifiées, l'âge, la vitesse de marche et la place libre. Pure hors du tracker
- * (horloge et chronologie fournies), donc testée en JVM : deux frames de la même
- * personne rendent le même `trackId`, une chronologie de 700 ms un `ageMs` de 700.
+ * identifiées, l'âge, la vitesse de marche, la place libre et le rail trottoir. Pure
+ * hors du tracker (horloge et chronologie fournies), donc testée en JVM : deux frames de
+ * la même personne rendent le même `trackId`, 700 ms de chronologie un `ageMs` de 700.
  */
 internal fun probeGuideFrameOf(
     tracker: PersonTracker,
@@ -370,6 +373,7 @@ internal fun probeGuideFrameOf(
         ageMs = frameAgeMsOf(atMs, timings),
         speedMps = Timing.WALK_MPS,
         free = FreeSpace.of(placed, hfovDeg),
+        rail = SidewalkRail.of(placed, hfovDeg),
     )
 }
 
@@ -380,8 +384,8 @@ internal fun probeGuideFrameOf(
  * marches actif : seul l'évitement parle (virage, stop), le reste se tait
  * devant le compte (1 s). Extraite de `LiveProbe.publish` (plafond 50
  * lignes/fonction). Le suivi alimente **chaque** frame, Traversée comprise ; le
- * guidage reçoit les étiquettes identifiées ([ProbeGuideFrame.labels]), la
- * Traversée sa liste brute.
+ * guidage reçoit les étiquettes identifiées ([ProbeGuideFrame.labels]) et le rail
+ * trottoir de la frame ([ProbeGuideFrame.rail]), la Traversée sa liste brute.
  */
 internal fun LiveProbe.phraseOf(
     cross: CrossingPatch?,
@@ -402,7 +406,8 @@ internal fun LiveProbe.phraseOf(
             cross?.noLight == true, steeringOf(placed, frame, at, hfovDeg), motion)
     }
     resetCrossingWatches()
-    val phrase = voice.phrase(at, guide.labels, state.value.steeringCap, frame.passage, hfovDeg = hfovDeg)
+    val phrase = voice.phrase(at, guide.labels, state.value.steeringCap,
+        frame.passage, hfovDeg = hfovDeg)
     if (phrase != null && !preemptsCrossing(phrase) &&
         stairsCounterActive(readings, frame.objects, StairCannyCount.lineCount())
     ) {
