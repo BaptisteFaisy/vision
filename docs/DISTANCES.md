@@ -213,7 +213,7 @@ La phrase effectivement dite reste visible dans le panneau iSee sous `dit : …`
 - `app.live.DistanceTickerTest` (**6**) : pas 80 ms (10 Hz) ≤ 150 ms, ticks virtuels, double start, couche (vide, champ).
 - `app.live.LiveLensTest` (**15**) : forcé > capteur > repli côté téléphone, forcé 9:16 > mire > repli estimé côté lunettes, provenance (`LensOrigin`).
 - `app.live.GlassesMireTest` (**7**) : validation des champs mire, parsing du bloc solveur, ligne de statut.
-- `app.isee.ProbeMetersPredictionsTest` (**1**) : ticker sonde insensible au temps virtuel (non-régression `advanceUntilIdle`).
+- `app.isee.LiveProbeSamOnlyTest` (**3**) : pastilles = lectures SAM (dernière frame, frame vide, gelées entre deux inférences).
 - `core.distance.CalibrationSolverTest` (**3**) : focale retrouvée, tolérance par taille, refus.
 - `app.live.CalibrationSnapshotsTest` (**3**) : plus grande personne, coupures/vide, fraîcheur.
 - `app.DistanceLayoutTest` (+2) : saisie métrique, résolution (visée/saisie).

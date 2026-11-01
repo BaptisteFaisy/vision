@@ -91,7 +91,7 @@ internal fun LiveProbe.computeRest(frame: LiveFrame, jpegB64: String, at: Long):
     val phrase = phraseOf(cross, placed, readings, rawDetections, frame, at, speechLanguage,
         distances.lensSpec.widthFovDeg(frame.width, frame.height), scanTrigger, ProbeBackgroundMotion.lastMotion)
     feedCrossingLateral(_state.value.crossingActive, frame.objects, frame.width, frame.height, readings, distances.effectivePose(), distances.lensSpec, at, speechLanguage)
-    pulse.feed(at, voice.lastDecision, placed); meters.noteFrame(frame.width, frame.height)
+    pulse.feed(at, voice.lastDecision, placed)
     // Compteur de marches : le masque exact borne les frames suivantes (repli boîte sinon).
     StairCannyCount.setMaskPlane(stairsMaskPlaneOf(frame.objects, frame.width, frame.height))
     return ProbeRest(rawDetections, readings, placed, cross, phrase)
@@ -116,6 +116,7 @@ internal fun LiveProbe.publishRest(active: LiveSession, frame: LiveFrame, rest: 
             crossing = rest.cross?.state ?: current.crossing, crossingBox = rest.cross?.box,
             traversePhase = rest.cross?.phase,
             scanLines = CrosswalkScanWatch.display(speechLanguage),
+            motion = ProbeBackgroundMotion.lastDebug,
         )
     }
 }
