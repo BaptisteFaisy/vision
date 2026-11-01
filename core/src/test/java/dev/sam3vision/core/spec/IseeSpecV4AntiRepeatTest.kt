@@ -46,6 +46,15 @@ class IseeSpecV4AntiRepeatTest {
     }
 
     @Test
+    fun `poteau evitement = immediat`() {
+        val gate = SpecAntiRepeat()
+
+        assertTrue(gate.allow("pole-avoid", 0L))
+        assertTrue(gate.allow("pole-avoid", 1L))
+        assertTrue(gate.allow("pole-avoid", 100L))
+    }
+
+    @Test
     fun `grillages = 4s`() {
         val gate = SpecAntiRepeat()
 
@@ -115,7 +124,7 @@ class IseeSpecV4AntiRepeatTest {
         assertEquals(
             setOf(
                 "car-moving", "human-soft", "human-imminent", "fence", "curb",
-                "stairs", "pole", "sidewalk", "verdict",
+                "stairs", "pole", "pole-avoid", "sidewalk", "verdict",
             ),
             TIMED_KEYS,
         )
@@ -141,6 +150,7 @@ class IseeSpecV4AntiRepeatTest {
             "car-moving" to 4_000L,
             "human-soft" to 2_000L,
             "human-imminent" to 0L,
+            "pole-avoid" to 0L,
             "fence" to 4_000L,
             "curb" to 2_000L,
             "stairs" to 2_000L,
@@ -186,7 +196,7 @@ class IseeSpecV4AntiRepeatTest {
     companion object {
         val TIMED_KEYS = setOf(
             "car-moving", "human-soft", "human-imminent", "fence", "curb",
-            "stairs", "pole", "sidewalk", "verdict",
+            "stairs", "pole", "pole-avoid", "sidewalk", "verdict",
         )
         val CROSSWALK_KEYS = setOf("crosswalk-announce", "crosswalk-align", "crosswalk-arrival")
     }

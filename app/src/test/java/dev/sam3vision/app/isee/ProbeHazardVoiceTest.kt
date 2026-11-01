@@ -25,7 +25,7 @@ class ProbeHazardVoiceTest {
         assertTrue(line.contains("lectures=3"))
         assertTrue(line.contains("person/12.0m/cx=320.0"))
         assertTrue(line.contains("poteau/14.0m/cx=320.0"))
-        assertTrue(line.contains("signal=true/12.0m/person/cx=0.5/alt=null"))
+        assertTrue(line.contains("signal=true/12.0m/person/cx=0.5"))
         assertTrue(line.contains("phrase=Droite."))
     }
 

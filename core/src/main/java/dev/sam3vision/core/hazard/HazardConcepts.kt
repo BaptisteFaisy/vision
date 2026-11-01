@@ -4,10 +4,11 @@ import dev.sam3vision.core.distance.KnownSizes
 import dev.sam3vision.core.live.PersonLabels
 
 /**
- * Concepts qui font parler le guetteur danger : la personne proche (le seul
- * mot d'évitement « Droite. »/« Gauche. », ordre user du 01/11), les
- * grillages, les murs et les barrières (niveau 4, moins de 6 m), les poteaux,
- * le mobilier vertical (lampadaire, panneau) et les divers (niveau 7, moins
+ * Concepts qui font parler le guetteur danger : la personne et le poteau
+ * (mot d'évitement « Droite. »/« Gauche. » en continu — niveaux 2 et 7,
+ * ordre user du 01/11 : la position optimale se dit en permanence), les
+ * grillages, les murs et les barrières (niveau 4, moins de 6 m), le
+ * mobilier vertical (lampadaire, panneau) et les divers (niveau 7, moins
  * de 6 m, spec v4). Dire « Attention … » — iSee décrit, en douceur ; les
  * mots du guidage disent où aller, l'attention dit quoi éviter.
  *
@@ -147,9 +148,9 @@ object HazardConcepts {
 
     /**
      * Clé AntiRepeat v4 de [label] (annonce douce) : `human-soft` la
-     * personne (l'imminente dit `human-imminent`, voir [HazardWatcher]),
-     * `fence` les grillages, murs et barrières, `pole` le reste. Label
-     * inconnu = `pole`.
+     * personne (le mot continu dit `human-imminent` / `pole-avoid`, voir
+     * [HazardWatcher]), `fence` les grillages, murs et barrières, `pole`
+     * le reste. Label inconnu = `pole`.
      */
     fun antiRepeatKey(label: String): String = when (levelOf(label)) {
         HazardWatcher.LEVEL_PERSON -> HazardWatcher.KEY_HUMAN_SOFT
@@ -160,21 +161,24 @@ object HazardConcepts {
     /**
      * Sorte parlée de [label] : personne (tout ce qui se contourne comme un
      * corps — personne, enfant, poussette, fauteuil roulant, chien),
-     * barrière, ou divers (poteau, clôture, mur, animal, poubelle…).
+     * barrière, poteau (mot d'évitement continu, niveau 7), ou divers
+     * (clôture, mur, animal, poubelle…).
      */
     fun kindOf(label: String): HazardKind {
         val en = nameOf(label)?.en ?: return HazardKind.OTHER
         return when (en) {
             "person", "child", "stroller", "wheelchair", "dog" -> HazardKind.PERSON
             "barrier" -> HazardKind.BARRIER
+            "pole" -> HazardKind.POLE
             else -> HazardKind.OTHER
         }
     }
 }
 
 /**
- * Sorte parlée : personne (niveau 2), barrière (niveau 4, avec les
- * grillages et les murs), divers (niveau 7, avec le reste).
+ * Sorte parlée : personne (niveau 2, mot continu), barrière (niveau 4,
+ * avec les grillages et les murs), poteau (niveau 7, mot continu),
+ * divers (niveau 7, avec le reste).
  */
 enum class HazardKind {
     /** Corps qui bloque et s'évite (personne, enfant, poussette, fauteuil roulant, chien : niveau 2). */
@@ -183,6 +187,9 @@ enum class HazardKind {
     /** Barrière : descriptive, niveau 4 (avec grillages et murs). */
     BARRIER,
 
-    /** Divers : poteau, clôture, mur, lampadaire, panneau, animal, poubelle, souvenirs… (niveau 7). */
+    /** Poteau : mot d'évitement continu comme la personne (niveau 7). */
+    POLE,
+
+    /** Divers : clôture, mur, lampadaire, panneau, animal, poubelle, souvenirs… (niveau 7). */
     OTHER,
 }

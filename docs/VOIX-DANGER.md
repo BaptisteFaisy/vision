@@ -30,12 +30,12 @@ chat (9) et GPS (3, 11) en synthèse réseau.
 |---|---|---|---|
 | 0 | Voitures en mouvement < 20 m | Présence seule, **sans cadran ni distance** ; pluriel si plusieurs | `car` « Car. », `cars` « Cars. » |
 | 1 | Parole du user | Tait tout ; **seul 0 la coupe** | — (micro) |
-| 2 | Humains < 10 m | **Mot seul d'évitement** « Droite. »/« Gauche. » (douce comme imminente ; imminente ≤ 2 m : immédiat, répété) | `guide_left`, `guide_right` |
+| 2 | Humains ≤ 15 m droit devant (plein axe ≤ 2 m) | **Mot d'évitement en continu** « Droite. »/« Gauche. », répété toutes les 300 ms (§ 36) | `guide_left`, `guide_right` |
 | 3 | Rappel GPS | Si silence depuis 15 s ou plus : répète la dernière consigne + distance restante | Synthèse réseau (GPS) |
 | 4 | Grillages + murs + barrières < 6 m | — | `fence`, `wall`, `barrier` |
 | 5 | Bordures < 6 m | Montée / descente | `curb_up`, `curb_down` |
 | 6 | Escaliers | **Jalons 4 / 2 / 1 m** + **nombre de marches dit** | `stairs_up/down_4/2/1`, `n_1..12` + `stairs_steps` |
-| 7 | Poteaux + mobilier vertical (lampadaire, panneau) + divers (animal, poubelle, souvenirs) < 6 m | — | `pole`, `lamp`, `sign`, `animal`, `bin`, `keepsake` |
+| 7 | Poteau ≤ 15 m droit devant : **mot continu** (§ 36) ; mobilier vertical + divers < 6 m : doux confirmé | `guide_left`, `guide_right` (poteau) ; `pole`, `lamp`, `sign`, `animal`, `bin`, `keepsake` (divers) |
 | 8 | Passages piétons < 6 m | Annonce **1 fois par vue** + alignement **au changement** + arrivée **1 fois** | `cross_approach_*`, `crosswalk_aligned`, `cross_arrived` |
 | 9 | Réponses du chat | **Attente + reprise depuis la coupure** (tranche interrompue rejouée) ; **seule file restante** | Synthèse réseau (chat) |
 | 10 | Trottoirs | Comportement actuel (rail : ne parle que si dérive) | `sidewalk_*` (existants) |
@@ -91,7 +91,8 @@ une annonce avalée ne consomme pas son tour).
 |---|---|---|
 | `car-moving` | 0 voitures | 4 s |
 | `human-soft` | 2 humains | 2 s |
-| `human-imminent` | 2 imminent ≤ 2 m | **immédiat** (toujours autorisé) |
+| `human-imminent` | 2 mot humain continu 0-15 m | **immédiat** (toujours autorisé) |
+| `pole-avoid` | 7 mot poteau continu 0-15 m | **immédiat** (toujours autorisé, § 36) |
 | `gps-reminder` | 3 rappel | sans antirépétition (le 15 s est le déclencheur, pas une fenêtre) |
 | `fence` | 4 grillages/murs/barrières | 4 s |
 | `curb` | 5 bordures | 2 s |
@@ -181,23 +182,55 @@ jusqu'à 15 m.
 
 - **palier loin** (`HazardWatcher.PERSON_FAR_METERS` et `POLE_FAR_METERS`,
   15 m, couloir strict `SIDE_EDGE` — hors couloir = silence, au-delà de
-  15 m = silence) : la personne dit le même mot d'évitement qu'en proche
-  (§ 34, côté opposé, doux, 2 frames, dit-une-fois, 10 s de silence) ;
-  le poteau dit « Attention au poteau, à … heures. » / « Attention,
-  pole, at … o'clock. » (doux, 2 frames, 10 s de silence, sorte
-  `OTHER` — fusion douce, jamais de préemption) ;
-- **poteau proche** : « Attention au poteau … » dès 3 m et moins, comme
-  la barrière (`HazardConcepts.isSpoken` ne le tait plus) ;
-- **inchangé** : personne imminente ≤ 2 m (mot seul urgent en clip),
-  barrière et reste à 3 m, cadence « Attention … » (§ 30), parole du
-  user devant tout, traversée (le repli haut-de-poteau garde
-  `isPole`).
+  15 m = silence, seuils repris par la v4) : la personne dit le mot
+  d'évitement (continu depuis le § 36) ; le poteau dit « Attention au
+  poteau, à … heures. » (mot continu, sorte `POLE`, depuis le § 36) ;
+- **poteau proche** : reparle (mot d'évitement continu depuis le § 36) ;
+- **inchangé alors** : personne imminente ≤ 2 m (mot seul urgent en
+  clip), parole du user devant tout, traversée (le repli haut-de-poteau
+  garde `isPole`).
 
-Verrouillé par `HazardConceptsTest` (poteau parlé) et `HazardWatchTest`
-(+8 : personne/poteau à 15 m détectés, à 16 m muets, hors couloir
-muets, poteau proche et lointain dits en doux, personne lointaine en
-mot d'évitement). `check-kotlin-limits.py` vert.
+Verrouillé alors par `HazardConceptsTest` et `HazardWatchTest`
+(contrat § 36 depuis). `check-kotlin-limits.py` vert.
 
 Recette téléphone : personne et poteau à 12-15 m droit devant → mot
-d'évitement puis « Attention au poteau … » — **non mesuré**, exige un
-APK de cette branche sur appareil réel.
+d'évitement en continu — **non mesuré**, exige un APK sur appareil réel.
+
+## 36. Position optimale en permanence : mot continu gens + poteaux, 300 ms (ordre user du 01/11)
+
+Le user refuse le dit-une-fois : tant qu'un gens ou un poteau est
+devant (0-15 m), iSee dit la position optimale en permanence. Nouveau
+contrat, qui amende le § 35 et la table v4 (§ 1, § 5) : proche comme
+loin, les deux disent le côté où aller, en boucle.
+
+- **mot continu** (`HazardWatcher.onContinuous`, dès la 1re frame — plus
+  de confirmation, plus de cooldown, plus de ré-armement, plus de repli
+  `HazardAlt`) : personne (niveau 2, clé `human-imminent`) et poteau
+  (niveau 7, clé `pole-avoid`, sorte `POLE`) disent « Droite. » /
+  « Gauche. » (`HazardText.avoidWord`, côté opposé, droite par défaut),
+  répété toutes les 300 ms (`AVOID_REPEAT_MS`, immédiat au changement
+  de mot), urgent, en clip `guide_*` via `hazardWish` (tout mot urgent
+  part en clip, barrière et divers exclus car jamais urgents) ;
+- **aval v4 inchangé** : `AntiRepeat` laisse passer `human-imminent` et
+  `pole-avoid` (toujours autorisés), le bus arbitre par niveau (la
+  personne écrase le poteau, la voiture écrase tout) ; en traversée,
+  seule la personne parle (niveau 101) ; dedans, seule la personne
+  parle ; la parole du user coupe le mot ;
+- **inchangé** : seuils (15 m droit devant gens + poteaux, 10 m personne
+  hors couloir, 6 m le reste, plein axe ≤ 2 m), douce confirmée des
+  autres dangers (2 frames, 4 s grillages/murs/barrières, 2 s divers),
+  repli haut-de-poteau (`isPole`).
+
+Verrouillé par `HazardWatchTest` (mot 1re frame gens + poteaux proche
+et loin, niveaux 2/7, clés, répétition 300 ms, immédiat au changement,
+sans cooldown ni ré-armement, barrière tue puis parlante au départ),
+`HazardConceptsTest` (sorte `POLE`), `SeuilsDehorsV4Test` (humain 9 m
+et poteau en continu), `EchelleOverwriteTest` (personne et poteau
+postés niveau 2/7 en clip dès la 1re frame), `AntiRepeatTest` +
+`IseeSpecV4AntiRepeatTest` (clé `pole-avoid` immédiate) et
+`ProbeHazardVoiceTest` (ligne sans repli). `check-kotlin-limits.py` et
+`check-voicepack.py` verts.
+
+Recette téléphone : gens ou poteau droit devant → « Droite. »/« Gauche. »
+répété en continu jusqu'à son départ — **non mesuré**, exige un APK sur
+appareil réel.

@@ -116,14 +116,14 @@ class HazardConceptsTest {
     }
 
     @Test
-    fun `sorte par label - personne, barriere, divers`() {
+    fun `sorte par label - personne, barriere, poteau, divers`() {
         assertEquals(HazardKind.PERSON, HazardConcepts.kindOf("person"))
         assertEquals(HazardKind.PERSON, HazardConcepts.kindOf("Personnes"))
         assertEquals(HazardKind.PERSON, HazardConcepts.kindOf("humain"))
         assertEquals(HazardKind.BARRIER, HazardConcepts.kindOf("barrier"))
         assertEquals(HazardKind.BARRIER, HazardConcepts.kindOf("Barrières"))
-        assertEquals(HazardKind.OTHER, HazardConcepts.kindOf("poteau"))
-        assertEquals(HazardKind.OTHER, HazardConcepts.kindOf("poles"))
+        assertEquals(HazardKind.POLE, HazardConcepts.kindOf("poteau"))
+        assertEquals(HazardKind.POLE, HazardConcepts.kindOf("poles"))
         assertEquals(HazardKind.OTHER, HazardConcepts.kindOf("borne"))
         assertEquals(HazardKind.OTHER, HazardConcepts.kindOf("clôture"))
     }

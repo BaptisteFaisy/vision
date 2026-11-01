@@ -162,6 +162,16 @@ class EchelleOverwriteTest {
     }
 
     @Test
+    fun `poteau mot continu niveau 7 en clip`() {
+        val pole = hazardWish(HazardCue("Droite.", meters = 9f, urgent = true, kind = HazardKind.POLE, level = OutdoorLevel.POLE, antiRepeatKey = AntiRepeat.KEY_POLE_AVOID))
+
+        assertEquals(OutdoorLevel.POLE, pole?.level)
+        assertEquals(AntiRepeat.KEY_POLE_AVOID, pole?.key)
+        assertEquals(GuidanceWord.clipIdFor("Droite."), pole?.clipId)
+        assertNotNull(pole?.clipId)
+    }
+
+    @Test
     fun `barriere niveau 4, divers niveau 7`() {
         assertEquals(
             OutdoorLevel.FENCE,
@@ -342,18 +352,31 @@ class EchelleOverwriteTest {
     )
 
     @Test
-    fun `personne confirmee postee niveau 2`() = runTest {
+    fun `personne postee niveau 2 en clip des la premiere frame`() = runTest {
         val guetteurs = rig()
         val personne = lecture("person", 100f, 3f)
 
         obstacleFrame(etat(1, personne), { SpeechLanguage.Fr }, guetteurs)
-        assertTrue(speaker.said.isEmpty())
-        obstacleFrame(etat(2, personne), { SpeechLanguage.Fr }, guetteurs)
 
         assertEquals(1, speaker.said.size)
         assertEquals(OutdoorLevel.HUMAN, speaker.said.single().level)
         assertEquals("Droite.", speaker.said.single().text)
-        assertNull(speaker.said.single().clipId)
+        assertEquals(GuidanceWord.clipIdFor("Droite."), speaker.said.single().clipId)
+        assertNotNull(speaker.said.single().clipId)
+    }
+
+    @Test
+    fun `poteau poste niveau 7 en clip des la premiere frame`() = runTest {
+        val guetteurs = rig()
+        val poteau = lecture("pole", 40f, 9f)
+
+        obstacleFrame(etat(1, poteau), { SpeechLanguage.Fr }, guetteurs)
+
+        assertEquals(1, speaker.said.size)
+        assertEquals(OutdoorLevel.POLE, speaker.said.single().level)
+        assertEquals("Droite.", speaker.said.single().text)
+        assertEquals(GuidanceWord.clipIdFor("Droite."), speaker.said.single().clipId)
+        assertNotNull(speaker.said.single().clipId)
     }
 
     @Test
