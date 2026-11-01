@@ -262,11 +262,14 @@ class VehicleStateWatcher(
                 if (candidate in hushed || labelPart(candidate) in hushed) return@filter false
                 val prev = previous[candidate]
                 val seen = current.getValue(candidate)
-                val tauHit = tauKey != null && tauKey == labelPart(candidate)
+                // Fraîcheur : un tau/latéral porté par une piste morte (objet sorti,
+                // coupe de scène) ne s'impute pas à la garée présente — le veto
+                // garde le maintien stale (fail-safe), la voix exige le frais.
+                val tauHit = tauKey != null && tauKey == labelPart(candidate) && tau.tauFresh
                 // Attribution : un latéral ne s'impute qu'à la candidate qui glisse
                 // elle-même — sinon une piste qui churn entre voitures voisines
                 // fait annoncer la garée d'à côté (faux « Stop », Times Square).
-                val lateralHit = tau.lateralMoving && tau.lateralLabel?.let(::vehicleKey) == labelPart(candidate) &&
+                val lateralHit = tau.lateralMoving && tau.lateralLabel?.let(::vehicleKey) == labelPart(candidate) && tau.lateralFresh &&
                     prev != null && !still(prev, seen, atMs, motion, gyro)
                 // Tronqué au cadre (entrée/sortie de champ) : la croissance est
                 // un artefact de (dé)clip, pas une approche (doctrine onEdge).
