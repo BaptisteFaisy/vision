@@ -33,6 +33,7 @@ class IseePortraitTest {
                 assertTrue(g.textTop < h)
             }
             val spoken = portraitGeometry(w, h, 1f, 1f)
+            assertEquals(h * IseePortrait.PICTURE_SPEAKING_H, spoken.pictureH, 0.01f)
             assertTrue(spoken.pictureH < h * IseePortrait.PICTURE_H)
             assertTrue(spoken.textTop + h * 0.14f < h)
         }

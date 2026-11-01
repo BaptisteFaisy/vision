@@ -1,8 +1,6 @@
 package dev.sam3vision.app.isee
 
 import android.os.SystemClock
-import androidx.compose.animation.core.animateFloatAsState
-import androidx.compose.animation.core.tween
 import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Box
@@ -93,15 +91,16 @@ private fun BoxWithConstraintsScope.PortraitScene(
     )
     val open = rememberCameraOpen(layers.cameraCard || layers.glassesFeed || layers.photoFeed)
     val position = rememberSpeechPosition(viewModel, state.speakingEntryId)
-    val talking = position != null || (state.holding && state.userSpeaking)
-    val speech by animateFloatAsState(if (talking) 1f else 0f, tween(420), label = "camera-speech")
     val showGlasses = rememberGlassesFeed(layers, open)
     val density = LocalDensity.current
-    val geo = with(density) { portraitGeometry(width.toPx(), (height - navInsetDp()).toPx(), open, speech) }
+    // Rue toujours à la taille parole (50 %) quand elle est affichée : la voix
+    // qui se met à parler ne fait plus respirer l'image.
+    val geo = with(density) { portraitGeometry(width.toPx(), (height - navInsetDp()).toPx(), open, 1f) }
     with(density) { PortraitCamera(state, glue, probe, viewModel, open, geo.pictureH.toDp(), showGlasses, layers.glassesGhost) }
     GlassesProbeWiring(viewModel.probe, glassesLive && state.glassesPhoto == null)
     Header(view.scene, onPicture = open > 0.5f, modifier = Modifier.fillMaxWidth())
-    SceneGuidanceLayer(viewModel, open, with(density) { geo.pictureH.toDp() }) {
+    val navState by viewModel.voiceNavState.collectAsState()
+    SceneGuidanceLayer(viewModel) {
         OrbClockLayer(view.scene, geo, open)
         with(density) {
             SpokenLine(currentCaption(state, position), state.holding && state.userSpeaking, geo.textTop.toDp(), compact = open > 0.5f)
@@ -111,7 +110,7 @@ private fun BoxWithConstraintsScope.PortraitScene(
     // Ligne de statut + pill d'instructions : sans elle, `IseeUiState.status`
     // (échecs de dictée, LLM, micro) n'est lu par aucun composable et l'écran
     // reste figé sur l'attente. Câblage d'origine (0db26f2), perdu par 580b2e5.
-    SceneBottomBar(
+    if (!isGuidanceOverlay(navState)) SceneBottomBar(
         state,
         Modifier.align(Alignment.BottomCenter).padding(bottom = navInsetDp() + 10.dp),
     )
