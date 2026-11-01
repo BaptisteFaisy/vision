@@ -73,6 +73,8 @@ class LiveProbe(
     internal val appContext: Context? = null,
     /** Mètre de profondeur : les tests y branchent un faux, sans modèle ni Android. */
     depthMeter: DepthMeter? = null,
+    /** Fabrique du verrou Wi-Fi haute-perf : les tests y branchent un faux, sans radio. */
+    wifiLockFactory: WifiLockFactory? = null,
 ) {
 
     private val openClient = clientFor ?: { base: String, timeout: Long, marks: WireMarks? ->
@@ -82,6 +84,9 @@ class LiveProbe(
     internal val meters = ProbeMeters(scope, background, appContext, depthMeter, { depthEngine },
         onPredictions = { layer -> _state.update { it.copy(distanceLayer = layer, motion = ProbeBackgroundMotion.lastDebug) } })
     internal val pulse = ProbePulse(scope) { p -> _state.update { it.copy(pulse = p) } }
+
+    /** Radio tenue éveillée pendant le direct : acquis à la 1re frame, rendu par `stop`. */
+    internal val wifiLock = LiveWifiLock(appContext, wifiLockFactory ?: androidWifiLockFactory())
 
     internal val _state = MutableStateFlow(LiveProbeState())
     val state: StateFlow<LiveProbeState> = _state
@@ -375,6 +380,7 @@ _state.update { it.cleared() }
         encodedAtNs: Long,
         at: Long,
     ) {
+        wifiLock.hold() // direct ouvert : la radio ne dort plus (repli silencieux sinon).
         rate.record(at)
         // Échéance posée par l'appelant (`admits`/`markSent`) : `dispatch` envoie, il ne décide pas.
         // Nouvelle frame : la chronologie repart de l'exposition du capteur.
