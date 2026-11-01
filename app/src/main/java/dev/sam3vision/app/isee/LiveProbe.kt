@@ -212,6 +212,10 @@ class LiveProbe(
         closeSessions()
         session = openSession(clean, prompts, maxObjects, DEFAULT_TIMEOUT_SECONDS)
         coldSession = openSession(clean, prompts, maxObjects, COLD_TIMEOUT_SECONDS)
+        // Handshake froid pendant la liaison caméra : la 1re frame part sans attendre.
+        // La session chaude préconnecte à `goWarm` (un socket ouvert ici idlerait 45 s
+        // pendant le boot et serait fermé par le serveur avant sa première frame).
+        coldSession?.preconnect()
     }
 
     /**
@@ -436,6 +440,8 @@ _state.update { it.cleared() }
         // lien chaud à ~180 ms, et fausserait aussi le régulateur de créneaux.
         (if (warmed) session else coldSession)?.let { it.stats.reset(); it.serverStats.reset() }
         warmed = true
+        // La session chaude ouvre son socket pendant que la 1re réponse se publie.
+        session?.preconnect()
         if (warming) {
             warming = false
             _state.update { it.copy(warming = false, timeoutSec = DEFAULT_TIMEOUT_SECONDS) }
