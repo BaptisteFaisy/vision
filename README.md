@@ -111,7 +111,7 @@ An ordinary phone, a remote GPU card, and voice as the only interface:
   only the current sentence below the bubble. Tap = video, long-press = speak; the
   whole surface is the interface (`app/src/main/java/dev/sam3vision/app/isee/`,
   `docs/ISEE-DESIGN-PORTRAIT.md`).
-- **Live** — **17 tracked concepts** by default (`person`, `car`,
+- **Live** — **18 tracked concepts** by default (`person`, `car`, `bus`,
   `pedestrian traffic light`, `pedestrian signal head`, `curb`, `crosswalk`,
   `pole`, `stairs`, `keys`, `gate`, `wall`, `souvenir shop`, `beanie`, `socks`,
   `stroller`, `child`, `dog`), **22 at most**
