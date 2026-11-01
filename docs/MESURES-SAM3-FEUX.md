@@ -299,6 +299,39 @@ Après correctifs (rejoué, mêmes approximations) : **7/7** sur les scènes à
 boîte, 0 inversion. Restent hors portée : bandeaux LED au sol, nuit/pluie
 (non calibrés), feux multi-lentilles ambigus.
 
+## 11. Relevé du 01/11 (2) : piétons seuls — veto caisson adopté, veto disque rejeté
+
+Objectif : ne reconnaître que les feux piétons, jamais les tricolores
+voiture (`fr_vichy_red` lisait le tricolore vert = ordre de traverser).
+
+### Veto caisson adopté (`CarHousingVeto`, h/w ≥ 3,0)
+
+168 boîtes SAM mesurées (16 photos × 6 prompts + têtes, §10) : piétons
+0,49–2,67, tricolores francs et profils 3,75–8,04 — le seuil 3,0 tombe
+dans le vide (marges 12 % / 25 %). Les 36 boîtes vetoées sont toutes des
+tricolores, profils, dos de boîtiers, mâts ou éclats ; aucune boîte
+piétonne. Effet rejoué : `fr_vichy_red` et `ru_moscow_03` corrigés (vert
+voiture écarté, rouge piéton relu), 7/7 étiquetées maintenues.
+
+### Veto disque par crop REJETÉ (recouvrement prouvé)
+
+Un veto tache ronde+pleine+symétrique tue 8–20 des 454 verts reconnus,
+dont des ancres téléphone (`tel_g01/03/04/06`), `fr_green_widepose_355`
+(rappel exigé) et `st_g01` : disque voiture et bonhomme dodu se
+recouvrent sur élancement, remplissage et symétrie (ex. disque 2,25 /
+0,60 / 0,76 contre bonhomme 1,64 / 0,61 / 0,70). De plus l'élancement du
+même disque varie de 1,2 à 2,25 selon rééchantillonnage/décodeur : aucun
+seuil n'est robuste. Ne pas rouvrir sans nouveau trait discriminant.
+
+### Serveur et traversée
+
+Réserve anti-éviction au piéton seul (`traffic light` ne vole plus la
+place du feu faible score) ; `signal` seul plus routé vers le feu
+(ambigu, slot fantôme) ; base traversée filtrée des wordings voiture
+(veto fantôme interdit). Tricolores compacts ou de profil serré (h/w <
+3) : résiduels — filets actuels = porte bas + R1b ; arbitrage multi-feux
+en phase 2 (dossier mesuré, 6/6 en simulation).
+
 ### Corpus couleur : le bruit est dans les labels, pas dans la porte
 
 - 2 771 crops PTL (noms de fichiers) : 872 « verts » à pixels rouges et 44

@@ -159,7 +159,9 @@ object CrossingPrompts {
      * de 384 px ne bat jamais un caisson, §5a) sont écartés avant le tri
      * au score, **par classe** : une petite tête ne se fait jamais écarter
      * comme un éclat du caisson. Avant tout : le veto tricolore
-     * ([CarLightVeto]) écarte les boîtes inscrites dans un caisson voiture.
+     * ([CarLightVeto]) écarte les boîtes inscrites dans un caisson voiture,
+     * et le veto caisson ([CarHousingVeto]) écarte les boîtes trois fois
+     * plus hautes que larges (tricolores francs, jamais des piétons — 01/11).
      * La normalisation suit [Detection.normalizedBox] : la boîte se reporte
      * sur le Bitmap décodé côté `:app`, quelle que soit sa taille.
      */
@@ -178,6 +180,7 @@ object CrossingPrompts {
         val carBoxes = CarLightVeto.carBoxes(objects)
         val lights = objects.filter { isLightLabel(it.label) }
             .filterNot { CarLightVeto.isVetoed(it.box, carBoxes) }
+            .filterNot { CarHousingVeto.isVetoed(it.box) }
         if (lights.isEmpty()) return emptyList()
         val (heads, housings) = lights.partition { isHeadLabel(it.label) }
         return listOfNotNull(bestBox(heads, width, height), bestBox(housings, width, height))

@@ -307,6 +307,44 @@ class CrossingStateTest {
     }
 
     @Test
+    fun `veto caisson - elance 3 et plus ecarte, pieton 2,67 garde`() {
+        // Ratios mesurés 01/11 : piétons 0,49–2,67, tricolores 3,75–8,04.
+        assertTrue(CarHousingVeto.isVetoed(listOf(0f, 0f, 48f, 180f)))
+        assertTrue(CarHousingVeto.isVetoed(listOf(0f, 0f, 100f, 300f)))
+        assertTrue(CarHousingVeto.isVetoed(listOf(440f, 310f, 664f, 2112f)))
+        assertFalse(CarHousingVeto.isVetoed(listOf(0f, 0f, 120f, 320f)))
+        assertFalse(CarHousingVeto.isVetoed(listOf(488f, 370f, 524f, 430f)))
+        assertFalse(CarHousingVeto.isVetoed(listOf(0f, 0f, 100f, 100f)))
+    }
+
+    @Test
+    fun `veto caisson - boite illisible jamais vetoe`() {
+        assertFalse(CarHousingVeto.isVetoed(listOf(10f, 10f)))
+        assertFalse(CarHousingVeto.isVetoed(listOf(10f, 10f, 10f, 50f)))
+        assertFalse(CarHousingVeto.isVetoed(listOf(50f, 10f, 10f, 50f)))
+        assertFalse(CarHousingVeto.isVetoed(listOf(0f, 0f, Float.NaN, 100f)))
+    }
+
+    @Test
+    fun `veto caisson - tricolore au meilleur score ecarte, pieton relu`() {
+        val objects = listOf(
+            light("pedestrian traffic light", 0.914f, listOf(1064f, 556f, 1112f, 736f)),
+            light("pedestrian traffic light", 0.855f, listOf(548f, 376f, 584f, 436f)),
+        )
+        assertEquals(listOf(548f / 1920f, 376f / 1280f, 584f / 1920f, 436f / 1280f), CrossingPrompts.selectLightBox(objects, 1920, 1280))
+    }
+
+    @Test
+    fun `veto prompt - wordings voiture oui, pieton non`() {
+        listOf("feu tricolore", "feu voiture", "vehicle traffic light", "traffic light", "traffic signal", "stoplight").forEach {
+            assertTrue(it, CarLightVeto.isVetoPrompt(it))
+        }
+        listOf("pedestrian traffic light", "pedestrian signal head", "feu pieton", "car", "pole", "").forEach {
+            assertFalse(it, CarLightVeto.isVetoPrompt(it))
+        }
+    }
+
+    @Test
     fun `veto tricolore - etiquettes voiture reconnues, le reste non`() {
         listOf(
             "vehicle traffic light", "Vehicle Traffic Light", "vehicle traffic lights",

@@ -58,21 +58,21 @@ def _entries(feu_label="feu piéton"):
 
 
 def _labels(guard, check) -> None:
-    """Famille « feu » reconnue, le reste (dont piéton) exclu."""
+    """Famille « feu » = piéton seul, voiture et ambigu exclus (01/11)."""
     for label in ["feu piéton", "Feux Piétons", "un feu pieton", "signal piéton",
-                  "feu tricolore", "feu rouge", "feu vert", "traffic light",
-                  "pedestrian traffic light", "pedestrian light", "Pedestrian Signal",
-                  "signal", "a signal"]:
+                  "pedestrian traffic light", "pedestrian light", "Pedestrian Signal"]:
         check(f"feux: label feu reconnu ({label})", guard.is_feu_label(label), label)
-    for label in ["car", "person", "piéton", "pedestrian", "passant", "stop",
+    for label in ["feu tricolore", "feu rouge", "feu vert", "traffic light",
+                  "signal", "a signal",
+                  "car", "person", "piéton", "pedestrian", "passant", "stop",
                   "panneau", "", "   ", None, 42, ["feu"]]:
         check(f"feux: pas un feu ({label!r})", not guard.is_feu_label(label), repr(label))
 
 
 def _routing(guard, check) -> None:
     """Variantes EN routées vers le modèle, table déployée et inconnus intacts."""
-    check("feux: signal -> pedestrian traffic light",
-          guard.routed_concept("signal") == "pedestrian traffic light")
+    check("feux: signal seul passe tel quel (ambigu, plus route)",
+          guard.routed_concept("signal") == "signal")
     check("feux: Pedestrian Light (casse) routé",
           guard.routed_concept("Pedestrian Light") == "pedestrian traffic light")
     check("feux: feu piéton inchangé (table déployée)",
@@ -124,9 +124,16 @@ def _finalize(guard, seg, check) -> None:
     check("feux: max_objects=1 -> tri pur, pas de réserve",
           [item["label"] for item in one["objects"]] == ["car0"])
     sig = guard.finalize_guarded(seg.finalize, _entries("signal"), (16, 16), 3, "none")
-    check("feux: label 'signal' acheminé (pas évincé)",
-          any(item["label"] == "signal" for item in sig["objects"]),
+    check("feux: label 'signal' ambigu evince (plus de reserve)",
+          all(item["label"] != "signal" for item in sig["objects"]),
           str([item["label"] for item in sig["objects"]]))
+    mixed = _entries("feu piéton")
+    mixed.append({"label": "feu tricolore", "score": 0.95,
+                  "box": [1.0, 1.0, 4.0, 4.0], "mask": mixed[0]["mask"]})
+    kept_car = guard.finalize_guarded(seg.finalize, mixed, (16, 16), 4, "none")
+    check("feux: tricolore dans le top ne vole pas la reserve du pieton",
+          any(item["label"] == "feu piéton" for item in kept_car["objects"]),
+          str([item["label"] for item in kept_car["objects"]]))
     rle = guard.finalize_guarded(seg.finalize, _entries(), (512, 512), 3, "png",
                                  mask_format="rle", mask_edge=256)
     check("feux: RLE garde le feu + mask_scale par objet",
@@ -160,8 +167,8 @@ def _payload_wiring(check) -> None:
                        ["signal", "chaise"], 512, 3, True, mask_encoding="none")
     finally:
         core._preprocess, core._vision, core._collect = saved
-    check("feux: run_frame route signal vers le modèle",
-          seen.get("concepts") == ["pedestrian traffic light", "chair"], str(seen))
+    check("feux: run_frame ne route plus signal vers le modèle",
+          seen.get("concepts") == ["signal", "chair"], str(seen))
     check("feux: labels intacts pour le client",
           seen.get("prompts") == ["signal", "chaise"], str(seen))
 

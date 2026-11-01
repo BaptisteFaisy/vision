@@ -66,6 +66,22 @@ object CarLightVeto {
         objects.filter { isCarLightLabel(it.label) }.mapNotNull { Box.fromProto(it.box) }
 
     /**
+     * Vrai si [prompt] (brut, champ Follow ou base traversée) demande un
+     * concept feu **voiture** : wordings du veto ([CAR_LABELS]) plus les
+     * génériques ambigus (`traffic light`, `traffic signal`, `stoplight` —
+     * jamais envoyés, jamais reconnus, sauf ici pour les filtrer). La
+     * traversée ne suit jamais un concept voiture (veto fantôme interdit,
+     * `docs/MESURES-SAM3-FEUX.md` §10) : `traversePrompts` s'en sert.
+     * `pedestrian traffic light` n'est pas un prompt veto (canoniques
+     * distincts, testé).
+     */
+    fun isVetoPrompt(prompt: String): Boolean {
+        val key = KnownSizes.canonical(prompt)
+        if (CAR_LABELS.contains(key)) return true
+        return key == "traffic light" || key == "traffic signal" || key == "stoplight"
+    }
+
+    /**
      * Vrai si la boîte piéton [pedBox] (pixels) est pour moitié au moins dans
      * une boîte voiture : recouvrement partiel, pas total (feu piéton voisin
      * préservé). Boîte illisible ⇒ pas de veto (l'aval la rejette).
