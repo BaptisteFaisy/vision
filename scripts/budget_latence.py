@@ -43,18 +43,28 @@ def plage_str(bornes):
 
 
 # --- étages du chemin client (dixièmes de ms) --------------------------------
-CAPTURE = (250, 250)                  # u07, simulation (jamais lu sur un appareil)
-ENCODE = (50, 80)                     # u02, estimé après la refonte NV21
+CAPTURE = (810, 810)                  # mesuré 01/11/2026 : capsplit `age` (chemin Direct)
+CAPTURE_LOCAL = (250, 250)            # u07, hypothèse locale (rien à encoder par frame)
+ENCODE = (270, 270)                   # mesuré 01/11/2026 : enc 24 + b64 3
+ENCODE_HYPOTHESE = (50, 80)           # u02, estimé après la refonte NV21 (avant mesure)
 DECODE = (100, 250)                   # u07, simulation
 COMPOSE = (9, 30)                     # u03, mesuré 0,93 ms/frame (JVM)
 DISPLAY = (167, 174)                  # 1 vsync 60 Hz, ± 1 frame
 PROPAGATION = (40, 100)               # u11, cible < 8 ms/frame à 512×206
 CLIENT_CLOUD = (CAPTURE[0] + ENCODE[0] + DECODE[0] + COMPOSE[0] + DISPLAY[0],
                 CAPTURE[1] + ENCODE[1] + DECODE[1] + COMPOSE[1] + DISPLAY[1])
-HORS_PROPAGATION = (CAPTURE[0] + COMPOSE[0] + DISPLAY[0],
-                    CAPTURE[1] + COMPOSE[1] + DISPLAY[1])
+# Ce que ce document publiait avant la campagne du 01/11 : CAPTURE 25 (simulation) et
+# ENCODE 5–8 (estimation). Gardé pour chiffrer l'écart, jamais publié comme un budget.
+CLIENT_CLOUD_AVANT = (CAPTURE_LOCAL[0] + ENCODE_HYPOTHESE[0] + DECODE[0] + COMPOSE[0] + DISPLAY[0],
+                      CAPTURE_LOCAL[1] + ENCODE_HYPOTHESE[1] + DECODE[1] + COMPOSE[1] + DISPLAY[1])
+HORS_PROPAGATION = (CAPTURE_LOCAL[0] + COMPOSE[0] + DISPLAY[0],
+                    CAPTURE_LOCAL[1] + COMPOSE[1] + DISPLAY[1])
 CLIENT_LOCAL = (HORS_PROPAGATION[0] + PROPAGATION[0],
                 HORS_PROPAGATION[1] + PROPAGATION[1])
+# Chemin local qui garde l'encode par frame (donc la file de l'analyseur) : le scénario que
+# la mesure du 01/11 rend visible, et qui ne tient pas la cible.
+CLIENT_LOCAL_MESURE = (CAPTURE[0] + COMPOSE[0] + DISPLAY[0] + PROPAGATION[0],
+                       CAPTURE[1] + COMPOSE[1] + DISPLAY[1] + PROPAGATION[1])
 
 # --- planchers mesurés (dixièmes de ms) -------------------------------------
 RESEAU_FILAIRE = 930                  # 93 ms : plus petit A/R observé (banc filaire)
@@ -68,10 +78,12 @@ COUT_MONTANT = "≈ 0,12 ms/Ko"
 
 # --- architecture locale (§ 4, dernière ligne) et allocation (§ 7) -----------
 LOCAL_AR = (0, 0)                     # aucun aller-retour réseau sur le chemin perçu
-LAN_PERÇU = (836, 1431)               # boîte GPU dans le LAN, téléphone ↔ LAN
+LAN_PERÇU = (1616, 2181)              # boîte GPU dans le LAN, téléphone ↔ LAN
 ALLOCATION = (
     ("CAPTURE", 250,
-     "hypothèse u07 à valider sur l'appareil — **le premier chiffre à mesurer**, il occupe 36 % du budget"),
+     "cible locale : les 81 ms **mesurés** sur le chemin Direct (§ 2) sont un backlog d'analyseur, "
+     "supposé disparaître quand le chemin local n'encode plus de JPEG par frame — le pari le plus "
+     "fragile du document"),
     ("PROPAGATION (u10+u11)", 100,
      "cible u11 < 8 ms/frame à 512×206 ; 33,3 ms de débit disponible à 30 fps"),
     ("COMPOSE", 30, "0,93 ms mesuré (u03) — 3 ms laisse la place aux 12 objets"),
@@ -94,26 +106,29 @@ CIBLES_MESURES = ((300, 500), (250, 500))   # (moyenne, max) : défauts du parse
 # --- § 2 : étages du chemin Direct ------------------------------------------
 ETAGES_DOC = (
     ("CAPTURE", plage_str(CAPTURE), "capteur → callback de l'analyseur CameraX",
-     "u07 **simulation** (25 ms de centre, jamais lu sur un appareil)",
-     "période caméra : 33,3 ms à 30 fps, 16,7 ms à 60 fps"),
+     "**mesuré** 81 ms le 01/11/2026 (`ISEE_LAT` capsplit `age`, téléphone ; N non archivé) "
+     "— l'essentiel est la file de l'analyseur, pas l'exposition",
+     "période caméra : 33,3 ms à 30 fps — 81 ms ≈ 2,5 périodes, donc un backlog "
+     "d'`ImageAnalysis` que la politique de flux peut réduire"),
     ("ENCODE", plage_str(ENCODE), "NV21 → JPEG q65 → base64 du corps de requête",
-     "u02 **estimé** (17–32 ms avant la refonte NV21, 3 bitmaps/frame)",
-     "≈ 2 ms pour un 512×206 (non mesuré ici)"),
+     "**mesuré** 27 ms le 01/11/2026 (`ISEE_LAT` capsplit `enc` 24 + `b64` 3, téléphone ; "
+     "N non archivé)",
+     "≈ 2 ms pour un 512×206 (non mesuré ici) ; u02 donnait 5–8 ms, base64 exclu"),
     ("QUEUE", "calculée", "attente du créneau d'envoi (`intervalMsAdaptive`)",
      "u01 + hypothèse de phase uniforme (attente ≈ intervalle ÷ 2) ; cadence prudente de cet arbre : 350 / 500 / 900 ms",
      "0 ms si la frame est traitée sans tick (chemin local)"),
     ("HTTP", f"{dix_str(AR_MEDIAN)} (médian mesuré)",
      "requête émise → réponse complète lue par le client (**= A/R**)",
-     "notes de campagne (12 appels keep-alive, A100 eu-west, 512×206, 4 concepts)",
+     "**mesuré** (notes de campagne, 12 appels keep-alive, A100 eu-west, 512×206 ; date non consignée)",
      f"plancher {dix_str(PLANCHER_CLOUD)} ms = réseau 93 + serveur 30,7 (meilleur cas mesuré des deux côtés)"),
     ("DECODE", plage_str(DECODE), "base64 + PNG des masques → tampons gris",
-     "u07 simulation ; u03 a supprimé 3,4 Mo/frame d'allocation (mesuré JVM)",
+     "u07 **simulation** (10–25 ms, jamais lu sur un appareil) ; u03 a retiré 3,4 Mo/frame d'allocation (banc JVM, date non consignée) — le décodage PNG, lui, n'est pas instrumenté",
      "0 ms quand le masque est déjà en mémoire (propagation)"),
     ("COMPOSE", plage_str(COMPOSE), "recoloration + composition dans une seule surface",
-     "u03 **mesuré** 0,93 ms/frame (JVM de CI, 8 objets, 512×206 ; 1,79 ms avant)",
+     "u03 **mesuré** 0,93 ms/frame (banc JVM `MaskOverlayBenchTest`, 8 objets, 512×206 ; date non consignée)",
      "≈ 0,9 ms (le mesuré JVM est déjà proche du plancher)"),
     ("DISPLAY", plage_str(DISPLAY), "publication de l'état → composition Compose (vsync)",
-     "plancher physique 1 vsync ; u07 sim 17,4 ms (± 1 frame, ± 16 ms)",
+     "**calculé** (1 vsync à 60 Hz) ; u07 simulait 17,4 ms (± 1 frame, ± 16 ms)",
      "16,7 ms à 60 Hz, 11,1 ms à 90 Hz, 8,3 ms à 120 Hz"),
 )
 
@@ -162,14 +177,16 @@ PLANCHERS_DOC = (
 
 # --- § 4 : budget par architecture (nom, contexte, A/R, client, attente, verdict) ---
 ARCHITECTURES = (
-    ("Cloud A100 eu-west, 4 concepts", "téléphone", (4440, 5780), (1686, 2229), "quart", "cloud"),
-    ("Cloud A100 eu-west, 4 concepts", "banc filaire r630", (3870, 5280), (1543, 2104), "quart", "cloud"),
-    ("Cloud H200, 8 concepts", "téléphone", (3940, 4970), (1561, 2026), "quart", "cloud"),
-    ("Cloud B200 /live, 1 concept", "téléphone", (1910, 2910), (1053, 1511), "quart", "cloud"),
-    ("Cloud B200 + tracker vidéo 720p", "téléphone", (1807, 2807), (1027, 1486), "quart", "cloud"),
-    ("Cloud B200 + tracker vidéo 720p", "banc filaire r630", (1237, 1237), (576, 951), "vsync", "cloud"),
-    ("Boîte GPU dans le LAN (4090/5090)", "téléphone ↔ LAN", (260, 480), (576, 951), "vsync", "limite"),
+    ("Cloud A100 eu-west, 4 concepts", "téléphone", (4440, 5780), (2466, 2979), "quart", "cloud"),
+    ("Cloud A100 eu-west, 4 concepts", "banc filaire r630", (3870, 5280), (2324, 2854), "quart", "cloud"),
+    ("Cloud H200, 8 concepts", "téléphone", (3940, 4970), (2341, 2777), "quart", "cloud"),
+    ("Cloud B200 /live, 1 concept", "téléphone", (1910, 2910), (1834, 2262), "quart", "cloud"),
+    ("Cloud B200 + tracker vidéo 720p", "téléphone", (1807, 2807), (1808, 2236), "quart", "cloud"),
+    ("Cloud B200 + tracker vidéo 720p", "banc filaire r630", (1237, 1237), (1356, 1701), "vsync", "cloud"),
+    ("Boîte GPU dans le LAN (4090/5090)", "téléphone ↔ LAN", (260, 480), (1356, 1701), "vsync", "limite"),
     ("Keyframe cloud + propagation locale (30 fps)", "téléphone", LOCAL_AR, CLIENT_LOCAL, "local", "local"),
+    ("Le même, capture et encode mesurés (01/11)", "téléphone", LOCAL_AR, CLIENT_LOCAL_MESURE,
+     "local", "local-mesure"),
 )
 
 
@@ -183,8 +200,12 @@ def attente_de(ar, mode):
 
 
 def base_de(mode):
-    """Coût client hors attente : tous les étages (cloud) ou capture+compose+affichage (local)."""
-    return HORS_PROPAGATION if mode == "local" else CLIENT_CLOUD
+    """Coût client hors attente : tous les étages (cloud), ou capture+compose+affichage."""
+    if mode == "local":
+        return HORS_PROPAGATION
+    if mode == "local-mesure":
+        return (CAPTURE[0] + COMPOSE[0] + DISPLAY[0], CAPTURE[1] + COMPOSE[1] + DISPLAY[1])
+    return CLIENT_CLOUD
 
 
 def percee_de(ar, client):
@@ -196,7 +217,7 @@ def cellule_verdict(percu, mode):
     """Colonne « < 100 ms ? » du § 4."""
     if mode == "local":
         return f"**oui** (marge {dix_str(CIBLE_DIX - percu[1])} ms)"
-    if mode == "limite":
+    if mode == "limite" and percu[0] < CIBLE_DIX:
         return f"à la limite ({plage_str(percu)} ms, non garanti)"
     return f"non (+{plage_str((percu[0] - CIBLE_DIX, percu[1] - CIBLE_DIX))} ms)"
 
@@ -349,12 +370,18 @@ def limites():
 
 def verdict():
     local = percee_de(LOCAL_AR, CLIENT_LOCAL)
+    mesure = percee_de(LOCAL_AR, CLIENT_LOCAL_MESURE)
     marge = CIBLE_DIX - local[1]
     print(f"keyframe + propagation locale : {plage_str(local)} ms perçus → "
           f"verdict : < 100 ms (marge {dix_str(marge)} ms)")
-    print(f"  étages locaux : CAPTURE {dix_str(CAPTURE[0])} + PROPAGATION "
+    print(f"  étages locaux : CAPTURE {dix_str(CAPTURE_LOCAL[0])} + PROPAGATION "
           f"{plage_str(PROPAGATION)} + COMPOSE {plage_str(COMPOSE)} + DISPLAY "
           f"{plage_str(DISPLAY)} = {plage_str(local)} ms")
+    print(f"  capture mesurée sur appareil : {dix_str(CAPTURE[0])} ms ; si le chemin local la "
+          f"garde (encode par frame conservé) : {plage_str(mesure)} ms → cible NON tenue, "
+          f"manque {plage_str((mesure[0] - CIBLE_DIX, mesure[1] - CIBLE_DIX))} ms")
+    print(f"  budget client du § 4 : {plage_str(CLIENT_CLOUD)} ms hors attente, contre "
+          f"{plage_str(CLIENT_CLOUD_AVANT)} publiés avant la campagne du 01/11")
     print(f"  allocation locale : {dix_str(ALLOC_TOTAL)} ms alloués "
           f"(capture 25, propagation 10, compose 3, affichage 17, aléas 15) → "
           f"{dix_str(CIBLE_DIX - ALLOC_TOTAL)} ms de marge")
@@ -369,12 +396,12 @@ def assertions():
     local = percee_de(LOCAL_AR, CLIENT_LOCAL)
     base, post = CAMPAGNES
     gain_moyenne, gain_max = base[2] - post[2], base[4] - post[4]
-    ecart_max = max(abs(client[i] - (base_de(mode)[i] + attente_de(ar, mode)[i]))
-                    for _, _, ar, client, mode, _ in ARCHITECTURES
+    ecart_max = max(abs(client[i] - (base_de(sorte)[i] + attente_de(ar, attente)[i]))
+                    for _, _, ar, client, attente, sorte in ARCHITECTURES
                     for i in (0, 1))
     lignes, pire = limites()
     return (
-        (f"sommes étages cloud : {plage_str(CLIENT_CLOUD)}", lambda: CLIENT_CLOUD == (576, 784)),
+        (f"sommes étages cloud : {plage_str(CLIENT_CLOUD)}", lambda: CLIENT_CLOUD == (1356, 1534)),
         (f"sommes keyframe + propagation : {plage_str(local)}", lambda: local == (466, 554)),
         (f"plancher A/R cloud {dix_str(PLANCHER_CLOUD)} ms > 100 ms", lambda: PLANCHER_CLOUD > CIBLE_DIX),
         ("les 6 architectures cloud dépassent 100 ms", lambda: len(cloud) == 6 and min(haut for _, haut in cloud) > CIBLE_DIX),
@@ -385,8 +412,8 @@ def assertions():
          lambda: ecart_max <= 1),
         (f"A/R médian mesuré {dix_str(AR_MEDIAN)} ms ∈ [{dix_str(AR_BANDE[0])} ; {dix_str(AR_BANDE[1])}]",
          lambda: AR_BANDE[0] <= AR_MEDIAN <= AR_BANDE[1]),
-        (f"la boîte LAN franchit la cible en bas de plage seulement ({plage_str(LAN_PERÇU)} ms)",
-         lambda: LAN_PERÇU[0] < CIBLE_DIX < LAN_PERÇU[1]),
+        (f"la boîte LAN ne franchit plus la cible ({plage_str(LAN_PERÇU)} ms)",
+         lambda: LAN_PERÇU[0] > CIBLE_DIX),
         ("la propagation locale est la seule ligne sous 100 ms",
          lambda: min(haut for _, haut in cloud) > CIBLE_DIX and local[1] < CIBLE_DIX
                  and LAN_PERÇU[1] > CIBLE_DIX),

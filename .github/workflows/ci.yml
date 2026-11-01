@@ -195,6 +195,8 @@ jobs:
           python3 scripts/gen_mask_golden.py --check
           python3 scripts/budget_latence.py --check-doc
           python3 scripts/parse_isee_lat.py --selftest
+          python3 scripts/check-budget-provenance.py --selftest
+          python3 scripts/check-budget-provenance.py
           python3 tools/export-caregiver-orb.py --check
           python3 -m unittest tools/test_export_caregiver_orb.py
 
