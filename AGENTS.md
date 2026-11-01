@@ -77,6 +77,33 @@ Cache Gradle local, pas d'Android Studio, `--offline`. Toute commande Gradle pas
 (`TestHttpServer` maison, pas de MockWebServer) ; pas d'instrumentation sans demande explicite
 (les 9 tests `androidTest` exigent un appareil).
 
+### Recette sans téléphone : rejouer une balade enregistrée sur l'émulateur
+
+Quand une modification touche la caméra, la détection, l'UI iSee ou le guidage, la preuve
+attendue est une **passe complète sur émulateur** — une balade filmée dehors devient le flux
+de la caméra arrière, en temps réel (mesuré 30 im/s, bouclage indéfini) :
+
+```bash
+bash scripts/isee-sim.sh --video ~/Vidéos/balade.mp4 --route ~/Vidéos/balade.csv --seconds 30
+```
+
+Ce que le harnais fait, dans l'ordre : transcodage normalisé (cache par empreinte) → AVD
+`isee-sim` → boot headless `-camera-back videofile:<vidéo>` → `install -r` → permissions +
+`appops mock_location` → `am start --es route isee` → **attente de la première frame
+convertie** (`conversion:` au logcat) → rejeu du trajet CSV/GPX à 1 Hz → `screenrecord` →
+`logcat` + `crash.txt` → extinction de l'émulateur qu'il a démarré (jamais celui d'un autre).
+Options : `--record`, `--avd`, `--no-build`, `--keep`, `--help`. Il sort en **code non nul**
+au premier échec, en nommant le coupable.
+
+- La caméra de l'émulateur **est** le fichier : aucun code caméra n'est modifié, `analyse()`
+  reçoit des `ImageProxy` normaux.
+- Le trajet passe par le receiver **debug** `dev.sam3vision.app.sim.LOCATION` (test provider
+  `gps` + `network`, précision 8 m) ; `adb emu geo fix` seul est inutilisable, sa position
+  n'annonce aucune précision et `NavTuning.maxAccM` (25 m) rejette le fix **en silence**.
+- Ce que ça ne prouve **pas** : latence et performances réelles (rendu logiciel), photo et
+  enregistrement vidéo réels, caméra avant. Détail et mesures : `docs/TESTING.md` § 3.
+
+
 ## 3. Règles strictes — la CI échoue si elles sont violées
 
 1. **Tailles Kotlin** : fichier `.kt` < 500 lignes, fonction/composable < 50 lignes
