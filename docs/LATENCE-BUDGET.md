@@ -34,7 +34,7 @@ annexe B, et `docs/PERF.md` reste la référence de ce qui est mesuré dans cet 
   réseau (TLS, montée, descente, edge).
 - **Débit ≠ latence** : à 30 fps, chaque étage doit rendre la main en **33,3 ms**, sinon des frames
   sont sautées ; la latence perçue, elle, peut dépasser un cycle — c'est le cas aujourd'hui
-  (695,6–880,9 ms calculés, § 4). Le problème à traiter est donc la latence, pas le débit.
+  (678,6–863,9 ms calculés, § 4). Le problème à traiter est donc la latence, pas le débit.
 
 ## 2. Budget par étage
 
@@ -44,8 +44,8 @@ Chemin Direct, frame 512×206 JPEG q65 = 20,7 Ko (27 Ko en base64), 4 concepts, 
 | étage | ce qu'il couvre | valeur (ms) | provenance | plancher |
 |---|---|---:|---|---|
 | `CAPTURE` | capteur → callback de l'analyseur CameraX | 86 | **mesuré** 86 ms le 01/11/2026 (`ISEE_LAT` capsplit `age` p50, téléphone SM-G780G, build `1.0.1139-da6531a`, n = 38) — cause établie : délai du **pipeline capteur** (exposition + readout + ISP + buffers du HAL), indépendant de la durée d'analyse et du nombre de flux liés | `int` p50 33 ms (30 fps tenus, l'app n'affame pas la caméra) et corrélation `age` ↔ `total` +0,18 : la durée d'analyse n'explique pas l'âge, le délai est en amont de l'analyseur |
-| `ENCODE` | NV21 → JPEG q65 → base64 du corps de requête | 27 | **mesuré** 27 ms le 01/11/2026 (`ISEE_LAT` capsplit `enc` 24 + `b64` 3, SM-G780G, n = 38) — le relevé à `int` du même dump donne `enc` p50 9 ms ; écart non tranché, la valeur haute est publiée | ≈ 2 ms pour un 512×206 (non mesuré ici) ; u02 donnait 5–8 ms, base64 exclu |
-| `QUEUE` | attente du créneau d'envoi (`intervalMsAdaptive`) | calculée | u01 + hypothèse de phase uniforme (attente ≈ intervalle ÷ 2) ; cadence prudente de cet arbre : 350 / 500 / 900 ms | 0 ms si la frame est traitée sans tick (chemin local) |
+| `ENCODE` | NV21 → JPEG q65 → base64 du corps de requête | 10 | **mesuré** 10 ms le 01/11/2026 (`ISEE_LAT` capsplit `enc` p50 + `b64` p50 0, 30 fps tenus, n = 343 sur 3 sessions ; le 27 venait d'un micro-échantillon n = 2, tranché) | ≈ 2 ms pour un 512×206 (non mesuré ici) ; u02 donnait 5–8 ms, base64 exclu |
+| `QUEUE` | attente du créneau d'envoi (`intervalMsAdaptive`) | calculée | u01 + hypothèse de phase uniforme (attente ≈ intervalle ÷ 2), confirmée le 01/11/2026 (`up` p50 19 ms = phase caméra, file serveur 0 ms, n = 1081) ; cadence prudente de cet arbre : 350 / 500 / 900 ms | 0 ms si la frame est traitée sans tick (chemin local) |
 | `HTTP` | requête émise → réponse complète lue par le client (**= A/R**) | 422 (médian mesuré) | **mesuré** (notes de campagne, 12 appels keep-alive, A100 eu-west, 512×206 ; date non consignée) | plancher 123,7 ms = réseau 93 + serveur 30,7 (meilleur cas mesuré des deux côtés) |
 | `DECODE` | base64 + PNG des masques → tampons gris | 10–25 | u07 **simulation** (10–25 ms, jamais lu sur un appareil) ; u03 a retiré 3,4 Mo/frame d'allocation (banc JVM, date non consignée) — le décodage PNG, lui, n'est pas instrumenté | 0 ms quand le masque est déjà en mémoire (propagation) |
 | `COMPOSE` | recoloration + composition dans une seule surface | 0,9–3 | u03 **mesuré** 0,93 ms/frame (banc JVM `MaskOverlayBenchTest`, 8 objets, 512×206 ; date non consignée) | ≈ 0,9 ms (le mesuré JVM est déjà proche du plancher) |
@@ -68,13 +68,14 @@ Trois remarques qui commandent la suite :
   mesurée au même protocole — `age` p50 95 ms, `int` p50 34 ms, **aucun gain** : ce n'est pas
   l'application qui retarde la frame. Ces 86 ms ne sont donc pas réductibles depuis elle ; détail
   et protocole au § 10 bis.
-- `ENCODE` non plus : **27 ms mesurés** (`enc` 24 + `b64` 3), contre 5–8 ms estimés — l'estimation
-  u02 avait été faite avant d'inclure le base64. **Réserve, et elle est sérieuse** : la campagne à
-  `int` du même jour, sur le même téléphone, donne `enc` p50 **9 ms** ; une autre session du matin
-  donne 32 ms de moyenne. L'écart n'est pas tranché et c'est la valeur haute qui est publiée — un
-  budget se lit pessimiste — mais cet étage varie du simple au triple avec la charge, et il faudra
-  le p95 d'une campagne longue pour le fixer. Avec `CAPTURE`, cela déplace le budget client hors
-  attente de 57,6–78,4 ms à 140,6–158,4 ms (§ 4).
+- `ENCODE` non plus : **10 ms mesurés** (`enc` p50 + `b64` p50 0, n = 343 sur 3 sessions
+  à 30 fps tenus le 01/11/2026), contre 5–8 ms estimés — l'estimation u02 avait été faite
+  avant d'inclure le base64. **Écart tranché** : le 27 venait d'un micro-échantillon
+  (n = 2, valeurs de fixture des tests unitaires) et le 32 d'une session CPU-saturée
+  (`total` p50 74 ms) qui mesurait la contention, pas le JPEG ; ni l'un ni l'autre ne
+  survivent aux ~480 lignes réelles (`b64` p50 0, max 1). L'étage reste sensible à la
+  charge (p95 11–26 ms selon la session). Avec `CAPTURE`, cela déplace le budget client
+  hors attente de 57,6–78,4 ms à 123,6–141,4 ms (§ 4).
 - `QUEUE` n'est pas un coût technique mais un **coût de politique** : la frame attend un créneau
   d'envoi. Le modèle de campagne prend une attente ≈ intervalle ÷ 2 (phase uniforme) alors que la
   cadence prudente de cet arbre est de **350 / 500 / 900 ms** (`core/live/LiveSession.kt:34`) : les
@@ -139,13 +140,13 @@ soustraction** (328 − 234 − 7) : un `breakdown_ms` sur un appel réel doit l
 <!-- table:architectures -->
 | architecture | contexte | A/R (ms) | attente (ms) | client hors HTTP (ms) | **perçu (ms)** | < 100 ms ? |
 |---|---|---:|---:|---:|---:|---|
-| Cloud A100 eu-west, 4 concepts | téléphone | 444–578 | 111–144,5 | 251,6–302,9 | **695,6–880,9** | non (+595,6–780,9 ms) |
-| Cloud A100 eu-west, 4 concepts | banc filaire r630 | 387–528 | 96,8–132 | 237,4–290,4 | **624,4–818,4** | non (+524,4–718,4 ms) |
-| Cloud H200, 8 concepts | téléphone | 394–497 | 98,5–124,3 | 239,1–282,7 | **633,1–779,7** | non (+533,1–679,7 ms) |
-| Cloud B200 /live, 1 concept | téléphone | 191–291 | 47,8–72,8 | 188,4–231,2 | **379,4–522,2** | non (+279,4–422,2 ms) |
-| Cloud B200 + tracker vidéo 720p | téléphone | 180,7–280,7 | 45,2–70,2 | 185,8–228,6 | **366,5–509,3** | non (+266,5–409,3 ms) |
-| Cloud B200 + tracker vidéo 720p | banc filaire r630 | 123,7 | 0–16,7 | 140,6–175,1 | **264,3–298,8** | non (+164,3–198,8 ms) |
-| Boîte GPU dans le LAN (4090/5090) | téléphone ↔ LAN | 26–48 | 0–16,7 | 140,6–175,1 | **166,6–223,1** | non (+66,6–123,1 ms) |
+| Cloud A100 eu-west, 4 concepts | téléphone | 444–578 | 111–144,5 | 234,6–285,9 | **678,6–863,9** | non (+578,6–763,9 ms) |
+| Cloud A100 eu-west, 4 concepts | banc filaire r630 | 387–528 | 96,8–132 | 220,4–273,4 | **607,4–801,4** | non (+507,4–701,4 ms) |
+| Cloud H200, 8 concepts | téléphone | 394–497 | 98,5–124,3 | 222,1–265,7 | **616,1–762,7** | non (+516,1–662,7 ms) |
+| Cloud B200 /live, 1 concept | téléphone | 191–291 | 47,8–72,8 | 171,4–214,2 | **362,4–505,2** | non (+262,4–405,2 ms) |
+| Cloud B200 + tracker vidéo 720p | téléphone | 180,7–280,7 | 45,2–70,2 | 168,8–211,6 | **349,5–492,3** | non (+249,5–392,3 ms) |
+| Cloud B200 + tracker vidéo 720p | banc filaire r630 | 123,7 | 0–16,7 | 123,6–158,1 | **247,3–281,8** | non (+147,3–181,8 ms) |
+| Boîte GPU dans le LAN (4090/5090) | téléphone ↔ LAN | 26–48 | 0–16,7 | 123,6–158,1 | **149,6–206,1** | non (+49,6–106,1 ms) |
 | Keyframe cloud + propagation locale (30 fps) | téléphone | 0 | 4–10 | 46,6–55,4 | **46,6–55,4** | **oui** (marge 44,6 ms) |
 | Le même, capture mesurée sur appareil (01/11) | téléphone | 0 | 4–10 | 107,6–116,4 | **107,6–116,4** | non (+7,6–16,4 ms) |
 <!-- /table:architectures -->
@@ -160,13 +161,13 @@ Comment lire, et ce que le modèle ne prouve pas :
   déplace.
 - **Calibrage** : le modèle suppose les optimisations de la vague 1 appliquées (composition
   0,93 ms, cadence adaptative) mais **plus** l'encode de 5–8 ms ni la capture de 25 ms : ces deux
-  étages valent 27 et 86 ms mesurés depuis le 01/11/2026. Les relevés terrain antérieurs restent
+  étages valent 10 et 86 ms mesurés depuis le 01/11/2026. Les relevés terrain antérieurs restent
   **plus hauts** encore : 1 220–1 260 ms affichés avec 6 frames en vol. L'écart est attribué
   (file d'attente GPU et créneau d'envoi), pas inexpliqué.
 - La ligne **banc filaire** est la plus favorable au cloud (plus petit réseau mesuré) : c'est une
   borne basse, pas un scénario produit.
 - La ligne **LAN** suppose une carte achetée (décision utilisateur) et 60 fps : elle ne franchit
-  plus la cible (166,6–223,1 ms), car capture et affichage y pèsent à eux seuls 102,7 ms
+  plus la cible (149,6–206,1 ms), car capture et affichage y pèsent à eux seuls 102,7 ms
   (86 + 16,7), soit plus que la cible entière. Un réseau local cinq fois plus court ne rattrape pas
   un coût client mesuré.
 - La dernière ligne compte plus que les autres : elle remplace l'hypothèse de 25 ms par la capture
@@ -177,17 +178,17 @@ Comment lire, et ce que le modèle ne prouve pas :
   de 25 ms **que rien ne mesure**. Faire disparaître l'encode par frame ne suffira pas si le
   pipeline capteur reste à 86 ms — c'est la conclusion du § 2, et c'est elle qui déplace le
   chantier du client vers le capteur.
-- **Ce qui n'est pas dans le modèle** : la gigue (p95), les frames jetées, et le surcoût d'un
-  décodage PNG à 12 objets. Le budget est donc optimiste par construction ; c'est voulu — un budget
-  bâti sur les p50 doit laisser la marge pour les p95.
+- **Ce qui n'est pas dans le modèle** : les frames jetées, et le surcoût d'un décodage PNG
+  à 12 objets. La gigue est relevée au § 10 (R1 : 75,1 ms) mais le budget reste bâti sur les
+  p50 — un budget bâti sur les p50 doit laisser la marge pour les p95.
 
 ## 5. Verdict chiffré sur les 100 ms
 
 <!-- table:verdict -->
 - plancher d'A/R cloud (banc filaire, serveur le plus rapide mesuré) : 123,7 ms → déjà > 100 ms
-- meilleur perçu cloud calculé : 264,3 ms (banc filaire + tracker B200, hypothèse la plus favorable) ; état mesuré aujourd'hui côté téléphone : 695,6–880,9 ms
+- meilleur perçu cloud calculé : 247,3 ms (banc filaire + tracker B200, hypothèse la plus favorable) ; état mesuré aujourd'hui côté téléphone : 678,6–863,9 ms
 - propagation locale : 46,6–55,4 ms perçus → **sous 100 ms avec 44,6 ms de marge**
-- boîte GPU dans le LAN : 166,6–223,1 ms → franchit la cible en bas de plage, la dépasse en haut
+- boîte GPU dans le LAN : 149,6–206,1 ms → franchit la cible en bas de plage, la dépasse en haut
 - budget de calcul laissable à un modèle **local sur l'appareil** (u15) : ≤ 55 ms par frame pour tenir 100 ms perçus à 60 Hz
 - débit : à 30 fps, tout étage de calcul doit tenir 33,3 ms par frame (sinon des frames sont sautées) — contrainte distincte de la latence
 <!-- /table:verdict -->
@@ -196,10 +197,10 @@ En une phrase : **la cible de 100 ms n'est atteignable qu'en local**, et à deux
 l'encode JPEG par frame disparaisse, et que la capture descende sous les 86 ms mesurés. En
 propageant sur l'appareil le masque d'un keyframe SAM on obtient 46,6–55,4 ms calculés, mais avec
 les 25 ms de capture **supposés** ; dès qu'on met la capture mesurée à la place, le même chemin
-coûte 107,6–116,4 ms et rate la cible. La boîte GPU dans le LAN sort désormais à 166,6–223,1 ms :
+coûte 107,6–116,4 ms et rate la cible. La boîte GPU dans le LAN sort désormais à 149,6–206,1 ms :
 elle ne la franchit plus. Toute architecture cloud reste au-dessus, non pas à cause de l'inférence
 mais du seul A/R : **123,7 ms au plancher absolu** (93 ms de réseau + 30,7 ms de serveur, les deux
-meilleurs chiffres mesurés séparément), et 140,6–158,4 ms de coût client mesuré s'y ajoutent.
+meilleurs chiffres mesurés séparément), et 123,6–141,4 ms de coût client mesuré s'y ajoutent.
 
 ## 6. Ce qui reste impossible (et pourquoi)
 
@@ -251,11 +252,15 @@ Règles d'usage :
 
 | grandeur | mesure manquante | unité | attendu |
 |---|---|---|---|
-| `CAPTURE` / `ENCODE` (86 / 27 ms) : p95 et max | percentiles hauts, sur n = 38 seulement | instrument | campagne longue : n ≥ 100, p95 publié |
-| `DECODE`, `DISPLAY` réels, `CAPTURE` local | valeurs terrain (le banc est une simulation) | instrument | `--capsplit` en campagne longue, p50/p95 |
+| `ENCODE` (10 ms) : tranché | écart 27/32 résolu (n = 343 nominal, p95 11–26 selon charge) | § 2 | clos le 01/11/2026 |
+| `CAPTURE` (86 ms) : p95 et max | percentiles hauts sur n = 38 seulement ; R1 donne p95 477 / p99 573 / gigue 75,1 (N = 323, build combi) | instrument | campagne longue sur master HEAD : n ≥ 1000, p95/p99/jetées (bloquée le 01/11 : téléphone + bail GPU ; protocole et analyseur `lat_stats` prêts) |
+| `DECODE`, `DISPLAY` réels, `CAPTURE` local | valeurs terrain (le banc est une simulation) ; `DECODE` instrumenté par la PR #907 (ligne `decsplit`) | instrument | `--capsplit` + `--decsplit` en campagne longue, p50/p95 |
 | distribution d'A/R (N = 20, keep-alive, p50/p95) | reproductibilité de l'A/R médian | banc réseau | un banc sans campagne payante |
 | propagation locale (ms/frame) | cible < 8 ms à 512×206 | banc JVM | ms/frame par étape de warp |
-| part vision / détection du serveur | attribution par soustraction à confirmer | backend | un appel `/live` réel avec `breakdown_ms` |
+| part vision / détection du serveur | attribution par soustraction à confirmer ; champ `breakdown_ms` livré par la PR #904 (banc `bench_breakdown`, repli `timings_ms`) | backend | un appel `/live` réel (~1 min GPU après libération du bail) |
+| froid / snapshot : temps muraux | boot complet et restauration non remesurés depuis la vague 1 (25–38 s / 2–7 s) | backend | `GET /warm` chronométré après gel 60 s (restore) puis `POST /release` (boot), 2–3 cycles |
+| transport M1 binaire : gain mesuré | contrat figé et prouvé byte-exact (16 vecteurs, PR #900 ; harnais A/B PR #912) | instrument | baseline base64 puis jambe binaire, N ≥ 500 chacune, sur `isee-sim` |
+| régulateur : réouverture (PR #905) | 83 % → 7,1 % de trames bridées en simulation sur dump N = 1081 | terrain | confirmation en campagne (ips ×~2 attendus) |
 | poids montant ⇄ octets ⇄ ms | modèle qualité ↔ latence | transport | tableau octets ↔ ms |
 | dérive du masque ⇄ fréquence de keyframe | erreur de reprojection | simulation | courbe erreur ↔ intervalle |
 
@@ -264,9 +269,10 @@ Tant que ces mesures ne sont pas faites, ce budget est **exact en planchers** (m
 
 ## 9. Ce que ce document n'affirme pas
 
-- **Hors `CAPTURE` et `ENCODE`** (§ 2, mesurés sur téléphone le 01/11/2026, n = 38) et hors
-  § 10, les coûts client sont des simulations ou des estimations reprises de la campagne, pas des
-  relevés d'appareil. `DECODE`, `DISPLAY` et la capture du chemin local restent des hypothèses.
+- **Hors `CAPTURE`** (§ 2, mesuré sur téléphone le 01/11/2026, n = 38), **`ENCODE`**
+  (§ 2, n = 343) et hors § 10, les coûts client sont des simulations ou des estimations
+  reprises de la campagne, pas des relevés d'appareil. `DECODE`, `DISPLAY` et la capture
+  du chemin local restent des hypothèses.
 - Les chiffres marqués `uNN` viennent de notes **hors de ce dépôt** : ils décrivent le backend et
   les patchs de la vague 1, pas le code d'ici.
 - Le partage vision / détection du serveur est **calculé**, pas mesuré (§ 2 bis).
@@ -279,16 +285,18 @@ Tant que ces mesures ne sont pas faites, ce budget est **exact en planchers** (m
 
 ## 10. Campagnes ISEE_LAT mesurées
 
-Deux campagnes `ISEE_LAT` (une ligne logcat par frame complète, `LiveLatencyLog`) : la moyenne
+Trois campagnes `ISEE_LAT` (une ligne logcat par frame complète, `LiveLatencyLog`) : la moyenne
 et le max portent sur `latency`, les postes sont les moyennes par poste. Les verdicts suivent
 la règle de `scripts/parse_isee_lat.py` (`moyenne <= --mean` et `max <= --max`), sous les
 seuils par défaut (300 / 500) et sous l'objectif (moyenne < 250 ms, max ≤ 500 ms).
+La troisième (R1 Redmi combi, N = 323) est la première à publier p95, p99 et gigue.
 
 <!-- table:mesures -->
 | campagne | N | moyenne (ms) | capt | up | srv | rtt | mask | pixel | max (ms) | p95 | p99 | gigue | jetées | 300 / 500 ? | 250 / 500 ? | conditions |
 |---|---:|---:|---:|---:|---:|---:|---:|---:|---:|---:|---:|---:|---:|---|---|---|
 | baseline pré-PR2 | 1257 | 454 | 171 | 38 | 102 | 165 | 5 | 78 | 1677 | — | — | — | — | non (+154 en moyenne, +1177 en max) | non (+204 en moyenne, +1177 en max) | référence avant PR2 |
 | post-PR2 | 1500 | 380 | 119 | 38 | 100 | 164 | 1 | 58 | 713 | — | — | — | — | non (+80 en moyenne, +213 en max) | non (+130 en moyenne, +213 en max) | scène vide (0 masque), app à 430 % CPU |
+| R1 Redmi combi | 323 | 343 | 151 | 30 | 96 | 107 | 20 | 45 | 722 | 477 | 573 | 75.1 | — | non (+43 en moyenne, +222 en max) | non (+93 en moyenne, +222 en max) | Redmi, combi HAL+wifilock+cb, 01/11/2026 15:47–15:49, serveur sam3-eu-a100 ; 323 chaudes (328 brutes, skip 5) |
 
 Règle des verdicts : celle de `scripts/parse_isee_lat.py` (`moyenne <= --mean` et `max <= --max`, défauts 300 / 500) ; `250 / 500` = objectif (moyenne < 250 ms, max ≤ 500 ms). Les colonnes `p95`, `p99`, `gigue`, `jetées` portent les mesures brutes (« — » = non relevé) ; les seuils `--p95`, `--p99`, `--jitter`, `--drop` du parseur les contrôlent quand ils sont posés.
 <!-- /table:mesures -->
@@ -301,7 +309,14 @@ Lecture :
   plus la radio et le parse (`LiveTimings.kt`), et chaque moyenne de poste ignore les frames
   où il vaut `—` (`parse_isee_lat.py`) ;
 - la campagne post-PR2 est une scène vide (0 masque) avec l'app à 430 % CPU : un contenu
-  réel (masques à décoder, § 2 `DECODE`) coûterait plus cher.
+  réel (masques à décoder, § 2 `DECODE`) coûterait plus cher ;
+- la campagne R1 (Redmi, combi HAL + verrou Wi-Fi + rappel allégé, 01/11/2026 15:47–15:49)
+  ne tient ni 300/500 ni 250/500 : moyenne 343 ms (+93 sur l'objectif), max 722 ms (+222),
+  p95 477, p99 573, gigue 75,1 — avec deux réserves : session courte (~109 s à ~13 fps,
+  N = 323 < 1000) et SHA exact du build non prouvé (combi-équivalent) ;
+- R1 confirme le modèle de file côté client : `up` p50 19 ms = phase caméra (attente ≈
+  intervalle ÷ 2), file serveur 0 ms sur tout le dump — et motive la PR #905 (réouverture
+  après 5 moyennes sous budget : 83 % → 7,1 % de trames bridées en simulation).
 
 ### 10 bis. Campagne `capsplit` du 01/11/2026 — ce qui était mesuré nulle part, et ce que `int` tranche
 
@@ -344,17 +359,18 @@ l'application qui retarde la frame**, et aucune optimisation du chemin caméra c
 
 Lectures restantes, dans l'ordre d'importance :
 
-- **l'encode pèse 27 ms publiés, pas 5–8** : l'estimation u02 datait d'avant l'inclusion du
-  base64. Le relevé à `int` du même dump donne `enc` p50 9 ms et 11,4 en moyenne : l'écart avec les
-  27 ms publiés n'est pas tranché, la valeur haute est conservée au § 2 (elle ne peut pas flatter
-  le budget) ;
-- **`cb` n'est plus négligeable** : 18 ms en p50, 22,3 en moyenne, 67 en p95 — la première lecture
-  (« 2 ms, ne pèse rien ») venait d'un échantillon plus court. Ce coût vit dans l'analyseur, pas
-  dans l'âge de la frame : `total` p50 32 ms tient dans la période de 33 ms, et sa moyenne (42,4)
-  est tirée par 3 frames lentes sur 38 ;
-- **le `p95` de `cb` (67 ms) dépasse la période** : c'est du débit perdu, pas de la latence
-  ajoutée — la distinction du § 1, et la raison pour laquelle `age` reste stable quand l'analyse
-  ralentit.
+- **l'encode pèse 10 ms publiés, pas 5–8 ni 27** : le 27 venait d'un micro-échantillon
+  (n = 2, valeurs de fixture des tests unitaires) et le 32 d'une session CPU-saturée ;
+  trois sessions nominales à 30 fps tenus (n = 343) donnent `enc` p50 9–10 et `b64` p50 0.
+  Le § 2 publie 10 ms, avec un p95 de 11–26 ms selon la charge ;
+- **`cb` est résolu, pas seulement mesuré** : les 18 ms en p50 et 67 en p95 venaient de
+  l'estimation du mouvement synchrone sur le fil de l'analyseur, sortie depuis (`be6ca9ac`,
+  dans master) — sous plein trafic, `cb` tombe à p50 0 / p95 1 (n = 37), et le reste sur
+  master est en O(1) sans allocation. Le p95 de 67 reste au tableau comme coût pré-split,
+  pas comme coût courant ;
+- **le `p95` de `cb` (67 ms) dépassait la période** : c'était du débit perdu, pas de la
+  latence ajoutée — la distinction du § 1, et la raison pour laquelle `age` restait stable
+  quand l'analyse ralentissait.
 
 C'est aussi la leçon de fond : `CAPTURE` était publié à 25 ms avec l'étiquette *simulation* et
 rien ne reliait cette étiquette à une campagne. `scripts/check-budget-provenance.py` existe pour
@@ -375,6 +391,7 @@ fait échouer la CI.
 | cadence adaptative, réserve 1 frame | `LiveSession`, `LivePump` (vague 1) ; puis `Cadence.Direct` régulée (latence/2, 33-900 ms ; plancher 350 ms abandonné) | u01, O8 |
 | 7 étages, perçu ≠ A/R, coût d'instrumentation borné | `LatencyProfile`, `LatencyTrace` (vague 1) | u07 |
 | 1 220–1 260 ms affichés (6 en vol) · 599–775 ms (1 en vol) | notes de campagne, terrain | terrain |
+| R1 Redmi combi : N = 323, moyenne 343 ms, p95 477, p99 573, gigue 75,1, max 722 ms | dump `ISEE_LAT` 01/11/2026 15:47–15:49 (hors dépôt) | R1 |
 
 ## Annexe B — ce que cet arbre-ci permet de vérifier
 
@@ -387,4 +404,7 @@ fait échouer la CI.
 | instrument côté client | `core/live/LiveStats.kt`, banc JVM `LiveFrameBudgetTest` | coûts CPU mesurés en microsecondes, hors JPEG et hors radio |
 | décomposition du poste `capt` | `core/live/TimingsText.kt` (`capsplit`), `app/isee/IseeCameraPane.kt` | `age` / `enc` / `b64` / `cb` / `total`, 1 frame sur 20, même dump `ISEE_LAT` |
 | agrégation de cette décomposition | `scripts/parse_isee_lat.py --capsplit` | moyenne/p50/p95/p99/max par poste, `somme` et écart au `capt` de la sonde |
+| contrat de transport binaire M1 | `server/scripts/tests_units/m1_ws_vectors.json` (16 vecteurs) + `docs/LATENCE-M1-VECTEURS.md` | byte-exact des deux côtés (58 checks serveur, 3 JVM) |
+| colonnes p95/p99/gigue/jetées du § 10 | `scripts/parse_isee_lat.py`, `scripts/budget_latence.py` | seuils optionnels `--p95/--p99/--jitter/--drop` ; « — » = non relevé |
+| analyseur de campagne longue | `scripts/lat_stats.py` | p99/gigue/jetées/DECODE-vs-N + CSV, 14 asserts `--selftest` |
 | une hypothèse peut-elle survivre à une mesure ? | `scripts/check-budget-provenance.py` | non : étiquette fermée, « mesuré » daté, contradiction archive ↔ doc = échec |
