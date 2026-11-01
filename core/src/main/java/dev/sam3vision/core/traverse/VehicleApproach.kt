@@ -262,6 +262,12 @@ class VehicleApproach {
         return bestId
     }
 
+    /** Piste autorisée à conclure : sous fond franc, mouvement véhicule prouvé exigé (le doute — verdict flou ou absent — ne crie jamais Stop). */
+    private fun verdictAllows(id: Int): Boolean {
+        if (!fondFranc) return true
+        return lastVerdicts[id]?.verdict == Verdict.VEHICLE_MOVED
+    }
+
     /** Oublie les pistes sans observation récente (objet sorti ou perdu). */
     private fun dropStale(atMs: Long) {
         val stale = tracks.filterValues { atMs - it.lastSeenMs > STALE_MS }.keys
@@ -295,6 +301,7 @@ class VehicleApproach {
         for ((id, track) in tracks) {
             if (!track.motion.velocityReliable) continue
             if (lastVerdicts[id]?.verdict == Verdict.CAMERA_MOVED) continue
+            if (!verdictAllows(id)) continue
             // PISTE2 : expansion à profondeur constante = pan/zoom caméra, pas une approche.
             if (DepthConfirm.contradicts(track.firstCloseness, track.lastCloseness)) continue
             val width = track.motion.anchorBox.width
@@ -331,6 +338,7 @@ class VehicleApproach {
         for ((id, track) in tracks) {
             if (!track.motion.velocityReliable) continue
             if (lastVerdicts[id]?.verdict == Verdict.CAMERA_MOVED) continue
+            if (!verdictAllows(id)) continue
             if (track.motion.anchorBox.width < frameWidth * MIN_WIDTH_FRACTION) continue
             val speed = abs(track.motion.velocity.x)
             if (speed <= frameWidth * LATERAL_RATIO) continue
@@ -348,6 +356,7 @@ class VehicleApproach {
         for ((id, track) in tracks) {
             if (!track.motion.velocityReliable) continue
             if (lastVerdicts[id]?.verdict == Verdict.CAMERA_MOVED) continue
+            if (!verdictAllows(id)) continue
             val width = track.motion.anchorBox.width
             if (width < frameWidth * MIN_WIDTH_FRACTION) continue
             lateralTtcOf(track, width, frameWidth)?.let { ttc ->
