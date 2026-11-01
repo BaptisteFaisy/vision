@@ -26,7 +26,6 @@ json = "20240303"
 # START_ERROR_DAT_APP_ON_THE_GLASSES_UPDATE_REQUIRED, absent du SDK 1.0.0). Garde : DatPinTest.
 mwdat = "1.0.0"
 guava = "33.3.1-android"
-onnxAndroid = "1.18.0"
 
 [libraries]
 androidx-core-ktx = { module = "androidx.core:core-ktx", version.ref = "coreKtx" }
@@ -64,7 +63,6 @@ mwdat-camera = { module = "com.meta.wearable:mwdat-camera", version.ref = "mwdat
 mwdat-inputs = { module = "com.meta.wearable:mwdat-inputs", version.ref = "mwdat" }
 mwdat-mockdevice = { module = "com.meta.wearable:mwdat-mockdevice", version.ref = "mwdat" }
 guava = { module = "com.google.guava:guava", version.ref = "guava" }
-onnxruntime-android = { module = "com.microsoft.onnxruntime:onnxruntime-android", version.ref = "onnxAndroid" }
 
 [plugins]
 android-application = { id = "com.android.application", version.ref = "agp" }

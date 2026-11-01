@@ -44,7 +44,7 @@ plus l'arbre — bandeau ajouté).
 | `docs/T8-PREDICTION.md` | **périmée → corrigée** (27/10) | §4 réécrit : le module **est** branché derrière `Settings.boxPredictionEnabled` (`LiveViewModel.kt:94,235,368,373`), §1/§6 recalés |
 | `docs/TRACK-PERF.md` | **à jour** (relu 27/10) | `TrackClient`/`TrackRunner`, constantes de cadence, `FrameGate` — relus à l'identique ; chiffres serveur marqués « relevé antérieur » |
 | `docs/VOIX-POSITIONS.md` | **périmée → corrigée** (27/10) | `LiveProbe.phraseOf` → `:418-423`, `Settings.kt:28` → `:36`, `:148` → `:184` ; seuils, machine d'annonce et 5 suites de tests relus à l'identique |
-| `docs/DEPTH.md` | **cohérent avec l'arbre** (28/10) | Paquets `core/depth` + `app/depth`, dep ONNX au toml, release `depth-models-v1` ; chiffres Redmi repris du doc (non rejoués ici) |
+| `docs/DEPTH.md` | **réécrit** (01/11) | Profondeur = serveur GPU seul ; inférence embarquée, modèle `.ort`, banc et réglage `depthBackend` supprimés (PR du 01/11) |
 | `docs/VOICE_NAV_PROXY.md` | **à jour** (28/10) | URL = fumée du workflow, volume et rollback vérifiés ; câblage app relu (`routeBaseUrlDefault`, `ROUTE_BASE_URL`, `routeBaseUrl`, `HttpRouteClient`) |
 | `docs/RECETTE-NAVIGATION-VOCALE.md` | **cohérent** (28/10) | Cites vérifiées (`handleDictated`, `NavigationHook`, `nav_confirm_destination`, sha ancêtre de `master`) ; non rejoué sur appareil (le doc le dit) |
 | `docs/MESURES-u11c.txt` | **généré** (28/10) | Fixtures dorées : `gen_mask_golden.py --check` OK (ne pas éditer à la main) |

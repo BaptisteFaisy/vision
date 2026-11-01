@@ -1,93 +1,79 @@
-# Profondeur monoculaire embarquée (bêta)
+# Profondeur monoculaire (serveur GPU)
 
-Estimation de profondeur **100 % sur le téléphone** (0 GPU Modal) : une carte
-de proximité par image, fusionnée aux masques SAM (médiane par masque, ordre
-proche/loin, occlusion), calibrée en mètres par une ancre sténopé.
-En direct, les médianes fusionnées par le serveur (`with_depth`, même carte
-Modal que SAM, +10-30 ms) gagnent quand la frame les porte — l'embarqué reste
-le repli (hors-ligne, ancien backend, tracker).
+La distance des objets vient d'une carte de profondeur **calculée sur le GPU
+Modal**, pas sur le téléphone. Chaque frame du direct demande `with_depth` ; le
+serveur joint la proximité de chaque objet (`SegObject.depth`, 0..1, grand =
+proche) et le téléphone s'en sert pour affiner ses distances sténopé.
 
-## Choix du modèle
+## Ce qui a changé le 01/11 (ordre user)
 
-- **Moteur unique : Depth Anything V2 Small** (24,8 M, Apache-2.0, commercial
-  OK), 256×256 → carte 252×252, CPU seul (NNAPI essayé le 2026-10-28 :
-  session OK bit-identique mais jamais plus rapide en dos-à-dos, abandonné).
-  Distribué en **`.ort` 27 Mo** (pré-optimisé, téléchargé une fois ; le paquet
-  `-mobile` est exclu : il refuse le `.onnx` et ne sait pas exécuter le
-  `ConvInteger` quantifié — prouvé sur Redmi) :
-  `onnx/model_uint8.onnx` (`onnx-community/depth-anything-v2-small`) converti
-  par `onnxruntime.tools.convert_onnx_models_to_ort` 1.18.1, sortie vérifiée
-  bit-identique (voir `NOTICE-depth.txt`). Verdict Redmi : 174 ms (~5,7 Hz).
-- Supprimé le 2026-10-29 : le repli **MiDaS v2.1 small** (TFLite fp32 63 Mo,
-  275 ms sur Redmi, hors seuil < 200 ms) — DA2, plus précis et ~1,6x plus
-  rapide, reste seul. Le fichier reste sur la release `depth-models-v1`
-  (rien ne le télécharge plus).
-- Exclus : DA-V2 Base/Large/Giant + UniDepth (CC-BY-NC), ZoeDepth/Marigold/
-  DepthFM/Metric3D/DepthPro (poids ou licence). Le modèle retenu est
-  **relatif** (grand = proche) : l'échelle métrique vient du sténopé
-  (`DepthFusion.calibrateScale`), jamais de la carte seule.
-- Attributions : `app/src/main/assets/NOTICE-depth.txt`.
+**L'inférence embarquée est supprimée** : moteur ONNX Runtime, modèle `.ort` 27
+Mo, téléchargement à l'exécution, banc « Tester la profondeur », réglage
+`depthBackend` et dépendance `onnxruntime-android` ont disparu (PR à venir).
+Raison : le téléphone ne pouvait pas gagner. La carte embarquée était déjà
+court-circuitée dès que le serveur envoyait ses médianes (`depthInferenceNeeded`,
+seuil `SERVER_FRESH_MS`), et sans serveur il n'y a **aucun objet** à mesurer —
+la segmentation SAM est serveur, le `pinhole` dérive des boîtes reçues. Le seul
+cas où l'embarqué travaillait vraiment était « serveur joignable qui répond sans
+`depth` » (backend sans modèle, ancien backend) : une fenêtre trop étroite pour
+27 Mo, ~1 800 lignes de prod et une dépendance native de plus.
+
+Conséquence assumée : dans cette fenêtre, iSee perd la mesure des murs,
+trottoirs et bordures et retombe sur le sténopé seul (labels à hauteur connue).
+
+## Modèle (serveur)
+
+- **Depth Anything V2 Small** (`depth-anything/Depth-Anything-V2-Small-hf`,
+  24,8 M params, Apache-2.0) via `transformers`, poids embarqués dans l'image
+  (`FAST_DEPTH_MODEL_DIR`, téléchargés au build comme sam3.1 — boot hermétique
+  `HF_HUB_OFFLINE=1`). Modèle absent ⇒ `with_depth` sans effet, jamais d'erreur.
+- Médiane sur le **masque** de l'objet (érosion 25 % par côté), repli boîte
+  érodée ; la boîte entière lirait le fond sur un objet fin (poteau).
+- Le modèle est **relatif** (grand = proche) : l'échelle métrique vient des
+  ancres sténopé de la frame (`DepthReadings.scaleFromAnchors`), jamais de la
+  carte seule.
+
+## Débit et coût
+
+- `FAST_DEPTH_EVERY` (défaut 8) : le client demande la profondeur à chaque
+  frame, le serveur ne calcule qu'une carte sur N et **répète** ses médianes
+  entre deux (`new_depth_throttle` + `cached_medians` + `attach_cached_medians`).
+  Répéter plutôt qu'omettre : une réponse sans clé retomberait en sténopé pur.
+- Poste `depth_ms` émis si `FAST_TIMING` est vrai (même carte Modal que SAM).
+- Client muet (pas de `with_depth`) : aucune clé, aucun coût.
 
 ## Code
 
-- `:core` (pur JVM) : `depth/DepthMap.kt` (proximité, bilinéaire),
-  `depth/DepthFusion.kt` (médiane par masque en une passe, quickselect O(n),
-  ordre, occlusion, calibration), `depth/DepthEstimator.kt` (interface,
-  `DepthBackend`, image synthétique), `model/Geometry.kt`
-  (rétroprojection, Box3D). Tests JVM à côté.
-- `:app` : `depth/OnnxDepthEstimator.kt`, `depth/DepthEstimators.kt`
-  (sélecteur + banc), `depth/ModelDownloader.kt` (téléchargement +
-  vérification sha256), `DepthSettings.kt` (Réglages → Profondeur). Modèle
-  absent ⇒ message + téléchargement au premier test, jamais de crash.
-- Réglage `depthBackend` (toujours **DA2**, seuil < 200 ms tenu : 174 ms
-  mesurés sur Redmi), persisté dans les deux stores. L'option Coupée est
-  supprimée (31/10, ordre user) : réglages anciens (`AUTO`, `MIDAS`, `OFF`)
-  migrés vers DA2 par `DepthBackend.fromName`.
-- Contrainte d'écriture (parseur UBS, exit 2 sinon) : pas de `while`
-  (`for` bornés + `break`), pas de `if`-expression (instructions + retours),
-  pas de sélection de propriété sur ressource fermable (lire le modèle en
-  `ByteArray`, comme le moteur ONNX).
+- `server/backend/live_fast/depth.py` : carte + médianes par objet, throttle,
+  cache, repli gracieux.
+- `:core` (pur JVM) : `depth/DepthReadings.kt` (médiane par boîte, calibration
+  par ancres, `refine` / `refineWithCloseness` / `serverCloseness`),
+  `depth/DepthMap.kt`, `depth/DepthFusion.kt`, `depth/AffineScale.kt`,
+  `depth/DepthConfirm.kt`, `model/Geometry.kt` (rétroprojection, Box3D).
+  Ces types servent aussi au pipeline sol (`core/ground`) et au mode traversée.
+- `:app` : `depth/DepthMeter.kt` — l'interface et son unique implémentation
+  `ServerDepthMeter` (médianes serveur, sténopé en repli). Branchée par
+  `isee/ProbeMeters` ; `LiveProbe` demande `with_depth = true` à la connexion.
+- Les tests branchent un faux `DepthMeter` : aucune référence réseau ni Android.
 
-## Modèles : téléchargement à l'exécution
+## Guidage
 
-L'APK ne porte pas les ~27 Mo du modèle : au premier test, le moteur est
-téléchargé depuis la release `depth-models-v1`
-(`github.com/BaptisteFaisy/vision/releases/tag/depth-models-v1`), vérifié par
-sha256 (renommage atomique, `.tmp` nettoyé en cas d'échec), puis réutilisé
-depuis `<filesDir>/depth-models`. Hors-ligne ⇒ message « réseau indisponible »,
-le banc ne tourne pas dans le vide. Dev hors-ligne : poser les fichiers en
-assets (mêmes noms) — le fichier téléchargé gagne, l'asset suit en repli.
+Les mètres profondeur alimentent le direct (pastilles, voix, consignes « va à
+gauche, 2 mètres », flèches) :
+- `DepthReadings.refineWithCloseness` remplace le sténopé quand la profondeur
+  mesure (murs, trottoirs, sans hauteur connue), l'ajoute quand il est muet, le
+  garde sinon. Mètres bornés [0,3 m, 60 m].
+- Mode traversée (`TraversePipeline`) : proximités serveur seulement.
+- Voix et flèches inchangées (une seule voix, le danger parle d'abord).
 
-## Guidage (direct)
+## Recette
 
-Les mètres profondeur alimentent le direct existant (pastilles, voix,
-consignes « va à gauche, 2 mètres », flèches) :
-- `:core` `depth/DepthReadings.kt` (pur, testé) : médiane de proximité par
-  boîte, échelle calibrée par les ancres (sténopé + plan de sol, médiane
-  des mètres × proximité), remplace le sténopé quand elle mesure (même sans
-  hauteur connue : trottoirs, murs), l'ajoute quand il est muet, le garde
-  sinon. Mètres bornés [0,3 m, 60 m].
-- `:app` `depth/LiveDepthMeter.kt` : infère la dernière frame JPEG en fond
-  (~5 Hz), moteur paresseux (téléchargement puis ouverture), carte de plus
-  d'une seconde = repli sténopé.
-- `with_depth` (même carte Modal, `WS /live/ws`) : la trame demande toujours
-  les médianes (`LiveProbe`, via `LiveMaskTransport`) ;
-  `SegObject.depth` (0..1, grand = proche) ; le mesureur préfère
-  `refineWithCloseness` (serveur) à la carte embarquée. Serveur muet ou
-  ancien backend : repli embarqué puis sténopé, sans erreur.
-- `LiveProbe.publish` : `offer(jpegB64)` puis `readingsFor` avant
-  pastilles/voix/consignes (3 lignes) ; voix et flèches inchangées (une
-  seule voix, le danger parle d'abord).
+Plus de banc sur téléphone : la profondeur se vérifie côté serveur (`depth_ms`
+dans les timings, clé `depth` dans la réponse `/live` ou `/live/ws`). Voir
+`docs/TESTING.md`.
 
-## Banc et recette (téléphone réel, jamais d'émulateur)
+## Historique
 
-1. `build-serveur <worktree>` puis installation sur le téléphone du créneau
-   (`PHONE_SERIAL` : Redmi `2c6852ac` ou Samsung `RF8T11NBMCV` — créneau via
-   le manager tests, cron `vision-phone-latest` gelé pendant le run).
-2. Réglages → Profondeur → « Tester la profondeur (5 inférences) »
-   (télécharge le modèle au premier appui : ~26 Mo).
-3. Verdict : bas de page + `phone-adb -s $PHONE_SERIAL logcat -d | grep DepthBench`
-   (`backend=DA2 medianMs=… runs=5 map=252x252`).
-4. Seuil < 200 ms tenu (DA2 : 174 ms) : profondeur toujours active depuis
-   le 31/10 (option Coupée supprimée) — pastilles, voix et consignes
-   reçoivent les mètres affinés.
+La release `depth-models-v1` conserve les anciens poids (DA2 `.ort` 27 Mo,
+MiDaS v2.1 small 63 Mo) : plus rien ne les télécharge, et ils ne sont pas
+nécessaires au serveur (qui charge ses poids depuis `FAST_DEPTH_MODEL_DIR`).
