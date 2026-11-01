@@ -9,6 +9,8 @@ uniform float uYou;
 uniform float uSee;
 uniform float uAmp;
 uniform float uLevel;
+uniform float uSpin;
+uniform float uSlosh;
 uniform vec4 uIdle[5];
 uniform vec4 uPalYou[5];
 uniform vec4 uPalSee[5];
@@ -47,12 +49,15 @@ float sheen(float d) {
   return 0.5 - 0.5 * cos(4.0 * 3.14159 * 1.33 * d / 540.0);
 }
 float sdBox(vec2 p, vec2 b, float r) { vec2 q = abs(p) - b + r; return length(max(q, 0.0)) + min(max(q.x, q.y), 0.0) - r; }
+vec2 rot(vec2 p, float a) { float c = cos(a); float s = sin(a); return vec2(c * p.x - s * p.y, s * p.x + c * p.y); }
 
 vec3 liquid(vec3 col, vec2 q) {
-  // Le liquide : surface ondulée, marbre en cinq teintes, ménisque blanc.
+  // Le liquide : surface ondulée (repère écran, jamais tournée : la gravité la tient
+  // horizontale), marbre en cinq teintes, ménisque blanc.
   vec2 p = q / 0.93;
   float stir = 0.018 + 0.06 * uAmp * (uSee + uYou);
-  float surf = -1.0 + 2.0 * uLevel + stir * sin(p.x * 5.5 + uTime * 2.4) + 0.4 * stir * sin(p.x * 11.0 - uTime * 3.3);
+  float surf = -1.0 + 2.0 * uLevel + stir * sin(p.x * 5.5 + uTime * 2.4) + 0.4 * stir * sin(p.x * 11.0 - uTime * 3.3)
+      + uSlosh * 0.035 * sin(p.x * 4.5 - uTime * 5.0);
   float e = 1.6 / (uR * 0.93);
   float a = smoothstep(e, -e, p.y - surf) * smoothstep(1.0, 1.0 - e * 2.0, length(p));
   if (a > 0.0) {
@@ -75,39 +80,44 @@ vec4 orb(vec2 fc) {
   float d = length(q);
   float aa = 1.4 / uR;
   if (d > 1.0 + aa) return vec4(0);
+  // Le verre tourne (g) ; le liquide garde le repère écran (q) : sa surface reste
+  // horizontale, tenue par la gravité et non par le verre. Le signe compense l'axe y
+  // vers le haut pour tourner en horaire comme \`rotate()\` de Compose.
+  vec2 g = rot(q, -uSpin);
   float z = sqrt(max(0.0, 1.0 - min(d * d, 1.0)));
   // L'intérieur du verre se teinte de la palette, jamais d'une couleur fixe : le bord ne
   // prend donc plus ni rose, ni vert (l'ancienne irisation arc-en-ciel), ni le bleu d'avant.
   vec3 accent = pal(0.45);
   vec3 col = mix(mix(vec3(0.96, 0.964, 0.968), accent, float(0.05)), vec3(1.0), float(z * 0.4));
-  col = mix(col, accent, float((0.05 + 0.18 * (uYou + uSee) * uAmp) * smoothstep(1.0, 0.2, length(q - vec2(0.0, -0.2)))));
+  col = mix(col, accent, float((0.05 + 0.18 * (uYou + uSee) * uAmp) * smoothstep(1.0, 0.2, length(g - vec2(0.0, -0.2)))));
   col = liquid(col, q);
   col *= float(mix(1.0, 0.88, pow(1.0 - z, 3.0)));
-  // Le verre : une irisation très légère, et seulement sur le haut de la boule. Elle n'a que
-  // deux teintes opposées de la palette active - le bleu froid du début de palette et l'or du
-  // milieu - choisies par le bruit spatial du verre : on voit donc des reflets bleu et jaune
-  // au lieu du rose/vert de l'ancien arc-en-ciel à trois longueurs d'onde. Le bas du verre et
-  // tout le reste de la boule restent blanc laiteux, comme avant.
+  // Le verre, dans son repère tournant (g) : une irisation très légère, et seulement sur
+  // le haut de la boule. Elle n'a que deux teintes opposées de la palette active - le bleu
+  // froid du début de palette et l'or du milieu - choisies par le bruit spatial du verre :
+  // on voit donc des reflets bleu et jaune au lieu du rose/vert de l'ancien arc-en-ciel à
+  // trois longueurs d'onde. Le bas du verre et tout le reste de la boule restent blanc
+  // laiteux, comme avant.
   float fres = pow(1.0 - z, 2.6);
-  float grain = fbm(q * 1.6 + vec2(0.0, uTime * 0.05) + z);
+  float grain = fbm(g * 1.6 + vec2(0.0, uTime * 0.05) + z);
   // La phase d'irisation ne sert plus qu'à l'éclat : les bandes claires et sombres du verre.
-  float irid = sheen(300.0 + 620.0 * grain + 180.0 * (0.5 - 0.5 * q.y));
+  float irid = sheen(300.0 + 620.0 * grain + 180.0 * (0.5 - 0.5 * g.y));
   // La teinte, elle, oppose les deux couleurs de la palette (bleu profond à gauche, or chaud à
   // droite), avec un bord ondulé par le bruit pour que ce soit des reflets et non un dégradé.
   // Le bleu est le premier de la palette et non le cyan : trop clair, il ne se voyait pas.
-  float top = smoothstep(-0.15, 0.85, q.y);
-  vec3 tint = mix(pal(0.04), pal(0.34), float(smoothstep(0.02, 0.55, q.x + 0.45 * (grain - 0.48))));
+  float top = smoothstep(-0.15, 0.85, g.y);
+  vec3 tint = mix(pal(0.04), pal(0.34), float(smoothstep(0.02, 0.55, g.x + 0.45 * (grain - 0.48))));
   vec3 fcol = mix(mix(accent, vec3(1.0), float(0.5)), tint, float(0.85 * top));
   fcol = mix(fcol, vec3(1.0), float(0.18));
   fcol *= float(0.86 + 0.18 * irid);
   col = mix(col, fcol, float((0.03 + 0.62 * fres) * 0.45)) + fcol * float(fres * 0.08);
-  vec2 r = 2.0 * z * q;
+  vec2 r = 2.0 * z * g;
   float box = smoothstep(0.035, -0.02, sdBox(r - vec2(-0.43, 0.5), vec2(0.2, 0.085), 0.07));
-  float hot = pow(max(dot(vec3(q, z), normalize(vec3(-0.45, 0.55, 0.7))), 0.0), 220.0);
+  float hot = pow(max(dot(vec3(g, z), normalize(vec3(-0.45, 0.55, 0.7))), 0.0), 220.0);
   col += float(box * 0.7 + hot);
-  vec2 dq = d > 1e-4 ? q / d : vec2(0.0);
+  vec2 dq = d > 1e-4 ? g / d : vec2(0.0);
   col += mix(accent, vec3(1.0), float(0.5)) * float(smoothstep(0.72, 1.0, d) * smoothstep(-0.1, 0.8, dot(dq, normalize(vec2(0.6, -0.55)))) * 0.3);
-  col += accent * float(0.12 * smoothstep(0.1, 1.0, -q.y) * smoothstep(1.0, 0.75, d));
+  col += accent * float(0.12 * smoothstep(0.1, 1.0, -g.y) * smoothstep(1.0, 0.75, d));
   float edge = smoothstep(1.0, 1.006, d) * smoothstep(1.03, 1.0, d);
   col = mix(col, col * 0.86, float(edge));
   float alpha = 1.0 - smoothstep(1.0 - aa, 1.0 + aa, d);
