@@ -67,7 +67,7 @@ internal fun BoxWithConstraintsScope.PortraitCamera(
         ) {
             StreetFeed(state, glue, probe, viewModel, showGlasses)
         }
-        if (state.recordingVideo && !showGlasses) {
+        if (state.placeMode.pictoEnabled && state.recordingVideo && !showGlasses) {
             PictoChip(
                 state.picto,
                 Modifier.align(Alignment.BottomEnd),
@@ -122,7 +122,10 @@ private fun BoxScope.StreetFeed(
         ProbeVideoRest(probe)
     } else {
         CameraLive(glue, probe, viewModel, Modifier.fillMaxSize())
-        PictoLayer(state.picto.hits, viewModel.picto::pngOf)
+        // Dehors, aucun picto affiché : ni cadre, ni carte « en grand ».
+        if (state.placeMode.pictoEnabled) {
+            PictoLayer(state.picto.hits, viewModel.picto::pngOf)
+        }
     }
 }
 

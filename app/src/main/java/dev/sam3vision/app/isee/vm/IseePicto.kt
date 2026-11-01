@@ -49,7 +49,8 @@ data class PictoUiState(
  * Un seul vol à la fois (`busy`) : le bouton est muet pendant la génération
  * (~10 s facturées ~0,01 $), et une seconde demande ne double pas la facture.
  * Dehors, tout est muet (bouton, ordres, relecture, reconnaissance sur
- * frames) : seul dedans suit des pictos.
+ * frames) : seul dedans suit des pictos. Une génération lancée dedans mais
+ * livrée dehors est jetée sans bruit ([dropLate]).
  */
 class IseePicto(
     private val media: MediaCacheStore,
@@ -225,6 +226,7 @@ class IseePicto(
         val result = clientOf(settings()).editToPictogram(photo, hint)
         result.fold(
             onSuccess = { png ->
+                if (!placeMode().pictoEnabled) return@fold dropLate()
                 draft = Draft(photo, template, png)
                 busy = false
                 update {
@@ -243,6 +245,7 @@ class IseePicto(
         val result = clientOf(settings()).editToPictogram(photo, label)
         result.fold(
             onSuccess = { png ->
+                if (!placeMode().pictoEnabled) return@fold dropLate()
                 runCatching { store.save(label, png, template) }.onFailure {
                     fail(IseeStatusText.pictoFailed(it))
                     return
@@ -266,6 +269,17 @@ class IseePicto(
                 fail(IseeStatusText.pictoFailed(e))
             }
         }
+    }
+
+    /**
+     * Livraison tardive (génération lancée dedans, bascule dehors entre-temps) :
+     * jetée sans bruit — ni relecture, ni stockage, ni statut (la confirmation
+     * de bascule reste à l'écran). Les repères déjà armés le restent.
+     */
+    private fun dropLate() {
+        draft = null
+        busy = false
+        update { it.copy(picto = PictoUiState(armed = pictos.size)) }
     }
 
     /** Échec : repos, brouillon jeté, motif affiché. */

@@ -14,6 +14,7 @@ import dev.sam3vision.core.picto.buildTemplate
 import dev.sam3vision.core.settings.Settings
 import java.io.File
 import java.nio.file.Files
+import kotlinx.coroutines.CompletableDeferred
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.update
@@ -212,6 +213,56 @@ class IseePictoTest {
     }
 
     @Test
+    fun `generation livree dehors jette la relecture sans stocker`() = runTest {
+        var mode = PictoPlaceMode.DEDANS
+        client.gate = CompletableDeferred()
+        val coordinator = picto(placeMode = { mode })(this)
+        coordinator.onPictoButton()
+        assertEquals(PictoPhase.Generating, state.value.picto.phase)
+        mode = PictoPlaceMode.DEHORS
+        client.gate?.complete(Result.success(PNG))
+        advanceUntilIdle()
+        assertEquals(PictoPhase.Idle, state.value.picto.phase)
+        assertNull(state.value.picto.draftPng)
+        assertTrue(coordinator.labels().isEmpty())
+        assertEquals(0, state.value.picto.armed)
+        assertNull(state.value.status)
+        assertTrue(client.lastPhoto.contentEquals(PHOTO_JPEG))
+    }
+
+    @Test
+    fun `find livre dehors sans stocker ni armer`() = runTest {
+        var mode = PictoPlaceMode.DEDANS
+        client.gate = CompletableDeferred()
+        val coordinator = picto(placeMode = { mode })(this)
+        coordinator.findObject("keys")
+        assertEquals(PictoPhase.Generating, state.value.picto.phase)
+        mode = PictoPlaceMode.DEHORS
+        client.gate?.complete(Result.success(PNG))
+        advanceUntilIdle()
+        assertEquals(PictoPhase.Idle, state.value.picto.phase)
+        assertEquals(0, state.value.picto.armed)
+        assertTrue(coordinator.labels().isEmpty())
+        assertNull(state.value.status)
+    }
+
+    @Test
+    fun `dehors valider et regenerer restent muets meme avec brouillon`() = runTest {
+        var mode = PictoPlaceMode.DEDANS
+        val coordinator = picto(placeMode = { mode })(this)
+        coordinator.onPictoButton()
+        advanceUntilIdle()
+        assertEquals(PictoPhase.Review, state.value.picto.phase)
+        mode = PictoPlaceMode.DEHORS
+        coordinator.confirmDraft("Objet")
+        coordinator.regenerateDraft("Objet")
+        advanceUntilIdle()
+        assertTrue(coordinator.labels().isEmpty())
+        assertEquals(0, state.value.picto.armed)
+        assertEquals("", client.lastHint)
+    }
+
+    @Test
     fun `sans repere arme aucune frame n'est decodee`() = runTest {
         val calls = mutableListOf<String>()
         picto(calls)(this).onFrame("frame-1")
@@ -289,15 +340,17 @@ class IseePictoTest {
         }
     }
 
-    /** Client Muse factice : PNG fixe, ou échec programmé. */
+    /** Client Muse factice : PNG fixe, échec programmé, ou réponse retenue par [gate]. */
     private class FakeClient : PictoImageClient {
         var failure: ApiError? = null
+        var gate: CompletableDeferred<Result<ByteArray>>? = null
         var lastPhoto: ByteArray = ByteArray(0)
         var lastHint: String = ""
 
         override suspend fun editToPictogram(photoJpeg: ByteArray, hint: String): Result<ByteArray> {
             lastPhoto = photoJpeg
             lastHint = hint
+            gate?.let { return it.await() }
             return failure?.let { Result.failure(it) } ?: Result.success(PNG)
         }
     }
