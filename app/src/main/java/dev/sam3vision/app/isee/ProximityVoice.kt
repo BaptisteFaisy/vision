@@ -151,12 +151,12 @@ class ProximityVoice(
      * [dedupMs] : délai de déduplication de cette phrase ([REPEAT_TTL_MS] par
      * défaut — le compteur de marches y passe 1 s : un compte répété n'est
      * pas un bégaiement, c'est le pas suivant).
-     * [preempt] : le mouvement coupe la parole douce en cours (chat,
-     * route, annonce — `speak` coupe le lecteur partagé) au lieu
-     * d'attendre le silence ; la sécurité et la parole du user gardent
-     * le dessus (fenêtre [busy], TTS système ou micro en cours : file
-     * comme le doux, rang tenu par [queues]). L'urgent garde la
-     * main (traité avant).
+     * [preempt] : le mouvement ou le compteur de marches coupe la parole
+     * douce en cours (chat, route, annonce — `speak` coupe le lecteur
+     * partagé) au lieu d'attendre le silence ; la sécurité et la parole
+     * du user gardent le dessus (fenêtre [busy], TTS système ou micro en
+     * cours : file comme le doux, rang tenu par [queues]). L'urgent garde
+     * la main (traité avant).
      * [trackId] : la personne suivie que [phrase] concerne (pisteur de
      * foule) — la cadence s'en sert comme clé (une personne = un tour),
      * donc deux passants à 1 s d'intervalle parlent tous les deux. `null`

@@ -29,8 +29,9 @@ import org.junit.Test
 /**
  * Voix du compteur de marches : quand SAM nomme l'escalier et que la caméra
  * voit des marches fraîches, le battement 300 ms dit le compte (« N
- * marches. »), une fois par compte puis répété toutes les 1 s ; sans
- * escalier nommé, sans compte frais ou en Traversée : silence.
+ * marches. »), une fois par compte puis répété toutes les 1 s — en
+ * prioritaire (coupe le doux, chat compris) ; sans escalier nommé, sans
+ * compte frais ou en Traversée : silence.
  *
  * Jamais `advanceUntilIdle` ici : le battement est une boucle infinie, seul
  * `advanceTimeBy` avance sans boucler (miroir `ProbePulse`).
@@ -129,6 +130,24 @@ class ProbeStairsCountVoiceTest {
     }
 
     @Test
+    fun `compteur prioritaire chat en lecture`() = runTest {
+        val (probe, fake, spoken, scope) = harness(this, stairsAudible = { false })
+        try {
+            StairCannyCount.offerLuma(stairsLuma(50, 58, 66, 74, 82, 90))
+            val offered = StairCannyCount.lineCount()
+            assertTrue(offered > 0)
+
+            respond(probe, fake, "A")
+            assertTrue(stairsFoundOf(probe.state.value).detected)
+            runCurrent()
+
+            assertEquals(listOf("$offered marches."), spoken)
+        } finally {
+            scope.cancel()
+        }
+    }
+
+    @Test
     fun `traversee coupe le compteur`() = runTest {
         val (probe, fake, spoken, scope) = harness(this)
         try {
@@ -154,7 +173,7 @@ class ProbeStairsCountVoiceTest {
     )
 
     /** Sonde sur faux client + voix capturée, compteur câblé (lui seul). */
-    private fun harness(scope: TestScope): Wiring {
+    private fun harness(scope: TestScope, stairsAudible: () -> Boolean = { true }): Wiring {
         val fake = ProbeTestClient(mutableListOf())
         val probe = LiveProbe(
             scope = scope,
@@ -180,7 +199,7 @@ class ProbeStairsCountVoiceTest {
             nowMs = clock,
         )
         val watchers = CoroutineScope(SupervisorJob() + StandardTestDispatcher(scope.testScheduler))
-        probe.observeStairsCount(watchers, voice, { true }, { SpeechLanguage.Fr }, nowMs = clock)
+        probe.observeStairsCount(watchers, voice, stairsAudible, { SpeechLanguage.Fr }, nowMs = clock)
         return Wiring(probe, fake, spoken, watchers)
     }
 

@@ -1,16 +1,17 @@
 package dev.sam3vision.app.isee
 
 /**
- * Préemption d'une phrase douce par le mouvement : la phrase coupe la
- * parole douce en cours (chat, route, autre annonce — le lecteur partagé
- * est coupé par `play()`) au lieu d'attendre le silence, mais jamais la
- * sécurité (fenêtre P1/P2 ou TTS système en cours : la phrase part en
- * file comme le doux). Dans la file, le rang tient l'ordre (l'ordinal
- * compare, à rang égal la plus fraîche gagne) : une voiture ([VEHICLE])
- * ne se fait pas remplacer par une personne ([PERSON]), qui ne se fait
- * pas remplacer par un doux ([NONE]). Ordre user du 01/11, § 31.
+ * Préemption d'une phrase douce par le mouvement ou le compteur de marches :
+ * la phrase coupe la parole douce en cours (chat, route, autre annonce — le
+ * lecteur partagé est coupé par `play()`) au lieu d'attendre le silence,
+ * mais jamais la sécurité (fenêtre P1/P2 ou TTS système en cours : la phrase
+ * part en file comme le doux). Dans la file, le rang tient l'ordre (l'ordinal
+ * compare, à rang égal la plus fraîche gagne) : le compteur de marches
+ * ([STAIRS]) ne se fait remplacer par personne, une voiture ([VEHICLE]) ne se
+ * fait pas remplacer par une personne ([PERSON]), qui ne se fait pas
+ * remplacer par un doux ([NONE]). Ordres user du 01/11, § 31 et § 32.
  */
-enum class VoicePreempt { NONE, PERSON, VEHICLE }
+enum class VoicePreempt { NONE, PERSON, VEHICLE, STAIRS }
 
 /**
  * File d'attente des phrases douces de `ProximityVoice` : les trois
@@ -66,10 +67,10 @@ internal class VoicePendingQueue(
 
     /**
      * Garde [phrase] de rang [preempt] en file douce, pour [nowMs] +
-     * [ttlMs] : une voiture en mouvement ne se fait pas remplacer par une
-     * personne, ni une personne par un doux (l'ordinal compare, à rang égal
-     * la plus fraîche gagne comme avant). [trackId] suit la phrase jusqu'au
-     * silence.
+     * [ttlMs] : le compteur de marches ne se fait remplacer par personne,
+     * une voiture en mouvement ne se fait pas remplacer par une personne,
+     * ni une personne par un doux (l'ordinal compare, à rang égal la plus
+     * fraîche gagne comme avant). [trackId] suit la phrase jusqu'au silence.
      */
     fun queueSoft(phrase: String, preempt: VoicePreempt, trackId: Int?, nowMs: Long) {
         val old = soft
