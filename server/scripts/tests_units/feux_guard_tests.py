@@ -23,6 +23,9 @@ LIVE_FAST_DIR = BACKEND_DIR / "live_fast"
 def _live_fast_module(name):
     """``live_fast/<name>.py`` importé à neuf (jamais la copie racine)."""
     sys.path.insert(0, str(LIVE_FAST_DIR))
+    # `fast_core` est un fork : purger le cache pour lier le déployé (voir
+    # `weights_tests._fresh_live_fast`), puis restaurer le legacy.
+    saved_fast_core = sys.modules.pop("fast_core", None)
     try:
         spec = importlib.util.spec_from_file_location(
             f"live_fast_{name}_feux_probe", LIVE_FAST_DIR / f"{name}.py")
@@ -30,6 +33,10 @@ def _live_fast_module(name):
         spec.loader.exec_module(module)
     finally:
         sys.path.remove(str(LIVE_FAST_DIR))
+        if saved_fast_core is None:
+            sys.modules.pop("fast_core", None)
+        else:
+            sys.modules["fast_core"] = saved_fast_core
     if name == "feux_guard":
         # Le déployé fait ``from feux_guard import …`` : le cache doit répondre
         # (aucune copie racine, pas de collision possible).

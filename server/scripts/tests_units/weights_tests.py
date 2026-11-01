@@ -254,6 +254,10 @@ def _fresh_live_fast(module_name: str, model_dir: str | None = "/opt/models/sam3
     # `weights` est mis en cache par le premier import : l'expulser pour que
     # chaque cas relise l'environnement (sinon MODEL_SOURCE reste périmé).
     sys.modules.pop("weights", None)
+    # `fast_core` est un fork (`live_fast` ≠ `backend/`) : le purger pour que
+    # le module frais lie le déployé — restauré ensuite (le legacy garde le
+    # sien ; `service` lit `DEPTH_EVERY`, qui n'existe qu'en déployé).
+    saved_fast_core = sys.modules.pop("fast_core", None)
     try:
         spec = importlib.util.spec_from_file_location(f"live_fast_{module_name}_probe",
                                                       LIVE_FAST_DIR / f"{module_name}.py")
@@ -262,6 +266,10 @@ def _fresh_live_fast(module_name: str, model_dir: str | None = "/opt/models/sam3
         return module
     finally:
         sys.path.remove(str(LIVE_FAST_DIR))
+        if saved_fast_core is None:
+            sys.modules.pop("fast_core", None)
+        else:
+            sys.modules["fast_core"] = saved_fast_core
         for key, value in saved.items():
             if value is None:
                 os.environ.pop(key, None)

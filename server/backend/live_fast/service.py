@@ -7,7 +7,6 @@ ne fournissent que l'amorçage et le transport. Contrat : ``docs/SPEC.md``,
 """
 
 import asyncio
-import inspect
 import json
 import os
 import threading
@@ -15,10 +14,11 @@ import time
 from contextlib import asynccontextmanager
 
 import detr_graph
-from fast_core import (BATCH_PROMPTS, DTYPE_NAME, EDGE, RUNTIME_EDGE, TIMING, clamp_int,
-                       gpu_name, levers, load, load_cpu, prepare, run_frame,
+from fast_core import (BATCH_PROMPTS, DEPTH_EVERY, DTYPE_NAME, EDGE, RUNTIME_EDGE, TIMING,
+                       clamp_int, gpu_name, levers, load, load_cpu, prepare, run_frame,
                        segment_frame, vision_grid)
-from http_errors import MAX_DETAIL_CHARS, validation_detail as _validation_detail
+from http_errors import validation_detail as _validation_detail
+from live_app_utils import accepts_param, call
 from passage import suggest_passage
 from timing import Stage, container_age_seconds, elapsed_ms, format_server_timing, now
 
@@ -35,42 +35,6 @@ WORK_EDGE_MAX = 1024
 MAX_OBJECTS_DEFAULT = 12
 MAX_OBJECTS_MIN = 1
 LIVE_DEFAULT_PROMPTS = ("person", "car", "dog", "chair")
-
-
-async def call(pipeline, *args, **kwargs):
-    """Blocage GPU dans un thread, erreurs mappées vers les codes HTTP.
-
-    Vérité unique des statuts : ``POST /live`` laisse remonter l'``HTTPException``,
-    ``/live/ws`` en fait un message d'erreur — même code, même détail borné.
-    """
-    from fastapi import HTTPException
-    from imaging import ImageDecodeError, MaskEncodingError
-    from segmentation import PromptError
-
-    try:
-        return await asyncio.to_thread(pipeline, *args, **kwargs)
-    except (ImageDecodeError, MaskEncodingError, PromptError) as exc:
-        raise HTTPException(status_code=400, detail=str(exc)[:MAX_DETAIL_CHARS]) from exc
-    except Exception as exc:
-        raise HTTPException(status_code=500,
-                            detail=f"internal error: {exc}"[:MAX_DETAIL_CHARS]) from exc
-
-
-def accepts_param(pipeline, name: str) -> bool:
-    """Le pipeline accepte-t-il le paramètre ``name`` ? (Par signature, pas par essai.)
-
-    Les doublures de test à six paramètres ignorent les suivants : on les leur
-    demande au lieu de les leur imposer.
-    """
-    try:
-        return name in inspect.signature(pipeline).parameters
-    except (TypeError, ValueError):  # callable sans signature introspectable
-        return False
-
-
-def accepts_mask_encoding(pipeline) -> bool:
-    """Le pipeline accepte-t-il le paramètre ``mask_encoding`` ? (Compat historique.)"""
-    return accepts_param(pipeline, "mask_encoding")
 
 
 class Sam3LiveService:
@@ -265,15 +229,17 @@ class Sam3LiveService:
         result.pop("_edge_ok", None)
         return result
 
-    async def _ws_frame(self, raw) -> dict:
+    async def _ws_frame(self, raw, depth_state=None) -> dict:
         """Un message texte ou binaire → un message texte (résultat ou erreur) ; ne lève jamais.
 
         Une frame invalide (JSON cassé, ``id`` absent, base64/JPEG illisible, GPU en
         vrac) ne ferme pas la connexion : elle repart en message d'erreur, avec l'``id``
-        connu (``-1`` si l'en-tête est illisible).
+        connu (``-1`` si l'en-tête est illisible). ``depth_state`` (un par connexion,
+        créé par ``_ws_loop``) porte le throttle depth (voir ``depth.py``).
         """
         from fastapi import HTTPException
 
+        from depth import depth_throttle_in, depth_throttle_out
         from live_ws import error_message, parse_frame, parse_frame_bytes, success_message
 
         binary = isinstance(raw, (bytes, bytearray))
@@ -282,6 +248,7 @@ class Sam3LiveService:
             return error_message(parsed["id"], parsed["error"]["status"],
                                  parsed["error"]["detail"])
         request = parsed["request"]
+        request, cache, repeat = depth_throttle_in(request, depth_state, DEPTH_EVERY)
         try:
             if binary:
                 result = await self._run_live_binary_ws(request, parsed["jpeg"])
@@ -291,9 +258,10 @@ class Sam3LiveService:
             return error_message(parsed["id"], exc.status_code, exc.detail)
         except Exception as exc:  # noqa: BLE001 — le contrat interdit la fermeture
             return error_message(parsed["id"], 500, f"internal error: {exc}")
+        depth_throttle_out(result.get("objects") or [], cache, repeat, depth_state)
         return success_message(result, parsed["id"])
 
-    async def _ws_answer(self, websocket, raw, frame_seconds) -> bool:
+    async def _ws_answer(self, websocket, raw, frame_seconds, depth_state=None) -> bool:
         """Traite un message reçu : inférence et réponse bornées, envoi.
 
         Renvoie False quand la boucle doit s'arrêter, True pour continuer.
@@ -307,7 +275,7 @@ class Sam3LiveService:
                 reply = error_message(UNKNOWN_ID, 400, "expected a text or binary message")
             else:
                 try:
-                    reply = await asyncio.wait_for(self._ws_frame(raw),
+                    reply = await asyncio.wait_for(self._ws_frame(raw, depth_state),
                                                    timeout=frame_seconds)
                 except asyncio.TimeoutError:
                     stuck = stuck_id(raw)
@@ -339,9 +307,13 @@ class Sam3LiveService:
         Sans ces bornes, chaque timeout client laisse une connexion pendante 300 s,
         et deux zombies saturent le conteneur (toute reconnexion queue alors
         indéfiniment : c'est le freeze observé). Seuils en paramètres pour les tests.
+        L'état du throttle depth est créé ici : un par connexion, jamais global.
         """
         from fastapi import WebSocketDisconnect
 
+        from depth import new_depth_throttle
+
+        depth_state = new_depth_throttle()
         try:
             while True:
                 try:
@@ -358,7 +330,7 @@ class Sam3LiveService:
                     return
                 except Exception:  # noqa: BLE001 — socket déjà fermé
                     raw = None
-                if not await self._ws_answer(websocket, raw, frame_seconds):
+                if not await self._ws_answer(websocket, raw, frame_seconds, depth_state):
                     return
         finally:
             try:

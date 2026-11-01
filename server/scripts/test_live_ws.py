@@ -294,7 +294,7 @@ def test_ws_slow_frame_keeps_connection(live_app) -> None:
     service, _api = _live_service(live_app)
     slowed: list[int] = []
 
-    async def slow_once(raw):
+    async def slow_once(raw, _depth_state=None):
         if not slowed:
             slowed.append(1)
             await asyncio.sleep(5)
@@ -317,7 +317,7 @@ def test_ws_huge_reply_closes(live_app) -> None:
     """Réponse géante → fermeture 1009 avant que le proxy ne tue sans prévenir."""
     service, _api = _live_service(live_app)
 
-    async def huge(_raw):
+    async def huge(_raw, _depth_state=None):
         return {"id": 61, "objects": [{"mask": "x" * 256}]}
 
     service._ws_frame = huge

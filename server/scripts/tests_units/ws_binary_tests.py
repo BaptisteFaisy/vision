@@ -33,7 +33,7 @@ def _live_fast_service():
     sys.path.insert(0, str(live_fast))
     purged = {name: sys.modules.pop(name, None) for name in
               ("service", "detr_graph", "fast_core", "http_errors", "passage",
-               "timing", "token_cache", "weights", "concepts")}
+               "timing", "token_cache", "weights", "concepts", "live_app_utils")}
     try:
         import service as deployed
     finally:

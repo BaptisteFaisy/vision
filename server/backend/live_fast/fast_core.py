@@ -10,6 +10,7 @@ Copie de travail T5 (objectif < 200 ms) — le contrat HTTP de ``live_app.py`` e
 * ``FAST_CUDA_GRAPH=1``    — capture CUDA graph de l'encodeur vision (exclusive de compile) ;
 * ``FAST_DTYPE=bf16|fp16|fp32`` ;
 * ``FAST_TIMING=1``        — détail des temps par étage dans la réponse (outillage de banc) ;
+* ``FAST_DEPTH_EVERY=5``   — carte depth 1 frame WS sur N (médianes répétées entre deux) ;
 * ``FAST_PREPROCESS=fast`` — ``pixel_values`` fusionnés torch (resize + normalisation en
   une passe, sur GPU si dispo) au lieu de l'appel HF ; ``hf`` (défaut) garde le chemin
   historique ;
@@ -69,6 +70,12 @@ CUDA_GRAPH = env_bool(os.environ.get("FAST_CUDA_GRAPH"))
 DETR_GRAPH = env_bool(os.environ.get("FAST_DETR_GRAPH"))
 WARMUPS = env_int(os.environ.get("FAST_COMPILE_WARMUPS"), 3)
 TIMING = env_bool(os.environ.get("FAST_TIMING"))
+# Throttle depth WS (voir depth.py) : 1 carte calculée sur N frames demandées
+# (défaut 5 ≈ 6 Hz à 30 images/s), médianes répétées entre deux. 1 = chaque
+# frame (throttle coupé) ; borne 30 ≈ 1 s à 30 Hz, sous les 1500 ms de
+# fraîcheur qu'exige le client (LiveDepthMeter.SERVER_FRESH_MS). env_int +
+# bornes explicites : clamp_int n'est défini qu'après ce bloc.
+DEPTH_EVERY = max(1, min(30, env_int(os.environ.get("FAST_DEPTH_EVERY"), 5)))
 # Pré-traitement : "hf" (appel processeur historique) ou "fast" (pixels_fast fusionné,
 # même sémantique à ±1 LSB 8 bits près, repli HF si la config sort du supporté).
 PREPROCESS = (os.environ.get("FAST_PREPROCESS") or "hf").strip().lower()
@@ -82,7 +89,8 @@ def levers() -> dict:
     return {"batch_prompts": BATCH_PROMPTS, "edge": EDGE, "runtime_edge": RUNTIME_EDGE,
             "compile": COMPILE, "cuda_graph": CUDA_GRAPH, "detr_graph": DETR_GRAPH,
             "dtype": DTYPE_NAME, "snapshot": SNAPSHOT, "attn": ATTN_IMPL or "eager",
-            "warmups": WARMUPS, "timing": TIMING, "preprocess": PREPROCESS}
+            "warmups": WARMUPS, "timing": TIMING, "depth_every": DEPTH_EVERY,
+            "preprocess": PREPROCESS}
 
 
 def clamp_int(value, default: int, low: int, high: int) -> int:

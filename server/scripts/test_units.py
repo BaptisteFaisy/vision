@@ -334,8 +334,9 @@ def test_live_pipeline(live_app) -> None:
 # (qui importent backend/) ne prouvent plus le déployé. fast_core.py et
 # live_app_fast.py sont volontairement forkés (poids extraits, leviers) :
 # exclus de cette parité, voir server/backend/README.md.
-VENDORED_PARITY = ("concepts.py", "http_errors.py", "imaging.py", "live_ws.py",
-                   "schemas.py", "segmentation.py", "timing.py", "passage.py")
+VENDORED_PARITY = ("concepts.py", "depth.py", "http_errors.py", "imaging.py",
+                   "live_app_utils.py", "live_ws.py", "schemas.py", "segmentation.py",
+                   "timing.py", "passage.py")
 
 
 def test_live_fast_parity(_) -> None:
@@ -390,6 +391,14 @@ RUNNERS = (
     ("profondeur : poids locaux (build)", "depth", depth_tests.test_depth_local_weights),
     ("profondeur : run_frame joint les médianes", "fast_core",
      depth_tests.test_run_frame_depth),
+    ("profondeur : throttle (helpers, sans GPU)", "depth",
+     depth_tests.test_depth_throttle),
+    ("profondeur : throttle in/out (sans GPU)", "depth",
+     depth_tests.test_depth_throttle_io),
+    ("profondeur : throttle WS (répétition)", "timing",
+     depth_tests.test_ws_depth_throttle),
+    ("profondeur : throttle WS (mixte)", "timing",
+     depth_tests.test_ws_depth_throttle_mixed),
     ("profondeur : run_frame saute depth à 0 objet", "fast_core",
      depth_tests.test_run_frame_depth_skip_empty),
     ("live_fast : passage (décision)", "passage", live_fast_tests.test_passage_decision),

@@ -111,6 +111,207 @@ def test_depth_math(depth) -> None:
           "depth" not in bare["objects"][0], str(bare["objects"][0])[:120])
 
 
+def test_depth_throttle(depth) -> None:
+    """Throttle depth (``FAST_DEPTH_EVERY``) : cadence, cache, répétition sans écraser."""
+    from test_units import check
+
+    first, second = depth.new_depth_throttle(), depth.new_depth_throttle()
+    check("throttle: état initial", first == {"frames": 0, "medians": []}, str(first))
+    first["frames"] = 3
+    check("throttle: un état par connexion (pas de partage)",
+          second["frames"] == 0, str(second))
+
+    state = depth.new_depth_throttle()
+    due = [depth.depth_compute_due(state, 5) for _ in range(10)]
+    check("throttle: 1re frame toujours calculée", due[0] is True, str(due))
+    check("throttle: 1 carte sur 5 (frames 0 et 5)",
+          due == [True, False, False, False, False, True, False, False, False, False],
+          str(due))
+    always = depth.new_depth_throttle()
+    check("throttle: EVERY=1 = chaque frame",
+          [depth.depth_compute_due(always, 1) for _ in range(3)] == [True] * 3)
+    for bad in (0, -2, "cinq", None):
+        fresh = depth.new_depth_throttle()
+        check(f"throttle: EVERY={bad!r} invalide vaut 1",
+              depth.depth_compute_due(fresh, bad) is True)
+
+    entries = [{"label": "a", "depth": 0.5}, {"label": "b"}, "pas un objet"]
+    check("throttle: cache par index (None = non mesuré)",
+          depth.cached_medians(entries) == [0.5, None, None],
+          str(depth.cached_medians(entries)))
+
+    bare = [{"label": "a"}, {"label": "b"}]
+    depth.attach_cached_medians(bare, [0.5, 0.6])
+    check("throttle: répétition par index",
+          [item.get("depth") for item in bare] == [0.5, 0.6], str(bare))
+    measured = [{"label": "a", "depth": 0.9}]
+    depth.attach_cached_medians(measured, [0.1])
+    check("throttle: jamais d'écrasement d'une vraie mesure",
+          measured[0]["depth"] == 0.9, str(measured))
+    short = [{"label": "a"}, {"label": "b"}, {"label": "c"}]
+    depth.attach_cached_medians(short, [0.5, None])
+    check("throttle: cache court + None = objets intacts",
+          [item.get("depth") for item in short] == [0.5, None, None], str(short))
+    depth.attach_cached_medians(short, [])
+    check("throttle: cache vide = sans effet",
+          [item.get("depth") for item in short] == [0.5, None, None], str(short))
+
+
+def test_depth_throttle_io(depth) -> None:
+    """Plan in/out : requête coupée + répétée, ou calculée + mémorisée."""
+    from types import SimpleNamespace
+
+    from test_units import check
+
+    def req(deep):
+        return SimpleNamespace(
+            with_depth=deep,
+            model_copy=lambda update: SimpleNamespace(
+                with_depth=update.get("with_depth", True)))
+
+    state = depth.new_depth_throttle()
+    out, cache, repeat = depth.depth_throttle_in(req(True), state, 5)
+    check("throttle in: 1re frame calculée",
+          out.with_depth is True and cache is True and repeat is None)
+    depth.depth_throttle_out([{"depth": 0.5}], cache, repeat, state)
+    check("throttle out: médianes mémorisées", state["medians"] == [0.5], str(state))
+    out2, cache2, repeat2 = depth.depth_throttle_in(req(True), state, 5)
+    check("throttle in: intermédiaire coupée + cache à répéter",
+          out2.with_depth is False and cache2 is False and repeat2 == [0.5],
+          f"{out2.with_depth} {cache2} {repeat2}")
+    bare = [{"label": "a"}]
+    depth.depth_throttle_out(bare, cache2, repeat2, state)
+    check("throttle out: cache répété", bare[0].get("depth") == 0.5, str(bare))
+    mute = req(False)
+    out3, cache3, repeat3 = depth.depth_throttle_in(mute, state, 5)
+    check("throttle in: frame muette intacte, compteur figé",
+          out3 is mute and (cache3, repeat3) == (False, None)
+          and state["frames"] == 2, str(state))
+    _out4, cache4, repeat4 = depth.depth_throttle_in(req(True), None, 5)
+    check("throttle in: sans état = calcul direct",
+          cache4 is False and repeat4 is None)
+
+
+def _throttle_service():
+    """Service déployé (``live_fast``) + son module, hors GPU (même purge que M1).
+
+    Le module est renvoyé avec l'instance : ``DEPTH_EVERY`` s'y monkeypatche
+    (les ``_ws_*`` le lisent en global), restauration à l'appelant.
+    """
+    import sys
+    import threading
+
+    from test_units import BACKEND_DIR
+
+    live_fast = BACKEND_DIR / "live_fast"
+    if str(live_fast) not in sys.path:
+        sys.path.append(str(live_fast))
+    sys.path.insert(0, str(live_fast))
+    purged = {name: sys.modules.pop(name, None) for name in
+              ("service", "detr_graph", "fast_core", "http_errors", "passage",
+               "timing", "token_cache", "weights", "concepts", "live_app_utils")}
+    try:
+        import service as deployed
+    finally:
+        sys.path.remove(str(live_fast))
+        for name, module in purged.items():
+            if module is not None:
+                sys.modules[name] = module
+    service = deployed.Sam3LiveService()
+    service._gpu_lock = threading.Lock()
+    service.gpu_name = "NVIDIA A100 80GB PCIe"
+    return service, service.api(), deployed
+
+
+def _throttle_run(computes: list):
+    """Pipeline factice : médianes fraîches par calcul, objets nus sinon."""
+    def run(image_b64, prompts, max_objects, work_edge, batch_prompts=None, edge=None,
+            mask_encoding=None, with_depth=False):
+        if with_depth:
+            computes.append(len(computes))
+        base = 0.5 + 0.1 * (len(computes) - 1) if with_depth else None
+        objects = [{"label": "person", "score": 0.9, "box": [1, 2, 3, 4]},
+                   {"label": "door", "score": 0.8, "box": [5, 6, 7, 8]}]
+        if base is not None:
+            objects[0]["depth"], objects[1]["depth"] = base, base + 0.01
+        return {"width": 64, "height": 40, "elapsed_ms": 12, "objects": objects}
+
+    return run
+
+
+def test_ws_depth_throttle(_) -> None:
+    """WS déployé : 1 carte sur 5, médianes répétées entre deux."""
+    import asyncio
+
+    from test_live_ws import frame, replies, ws_session
+    from test_units import check, sample_png
+
+    service, api, deployed = _throttle_service()
+    png = sample_png()
+    computes: list = []
+    service._live_sync = _throttle_run(computes)
+    old, deployed.DEPTH_EVERY = deployed.DEPTH_EVERY, 5
+    try:
+        answers = replies(asyncio.run(ws_session(
+            api, [frame(ident, png, with_depth=True) for ident in range(1, 11)])))
+    finally:
+        deployed.DEPTH_EVERY = old
+    check("WS throttle: 10 frames → 2 calculs", computes == [0, 1], str(computes))
+    depths = [[item.get("depth") for item in answer["objects"]] for answer in answers]
+    check("WS throttle: médianes présentes sur les 10 réponses",
+          all(value is not None for row in depths for value in row), str(depths))
+    check("WS throttle: frames 1-5 = carte 0 répétée",
+          all(row == [0.5, 0.51] for row in depths[:5]), str(depths[:5]))
+    check("WS throttle: frame 6 fraîche, 7-10 répétées",
+          depths[5] == [0.6, 0.61] and all(row == [0.6, 0.61] for row in depths[6:]),
+          str(depths[5:]))
+
+
+def test_ws_depth_throttle_mixed(_) -> None:
+    """EVERY=1 recalcule tout ; muette ignorée ; compteur par connexion."""
+    import asyncio
+
+    from test_live_ws import frame, replies, ws_session
+    from test_units import check, sample_png
+
+    service, api, deployed = _throttle_service()
+    png = sample_png()
+    computes: list = []
+    service._live_sync = _throttle_run(computes)
+    old, deployed.DEPTH_EVERY = deployed.DEPTH_EVERY, 1
+    try:
+        fresh = replies(asyncio.run(ws_session(
+            api, [frame(ident, png, with_depth=True) for ident in (21, 22, 23)])))
+    finally:
+        deployed.DEPTH_EVERY = old
+    check("WS throttle: EVERY=1 = 3 calculs", computes == [0, 1, 2], str(computes))
+    firsts = [[item.get("depth") for item in answer["objects"]] for answer in fresh]
+    check("WS throttle: EVERY=1 = 3 cartes fraîches",
+          [row[0] for row in firsts] == [0.5, 0.6, 0.7], str(fresh)[:200])
+
+    computes.clear()
+    old, deployed.DEPTH_EVERY = deployed.DEPTH_EVERY, 5
+    try:
+        mixed = replies(asyncio.run(ws_session(
+            api, [frame(ident, png, with_depth=True) for ident in range(31, 36)]
+            + [frame(36, png), frame(37, png, with_depth=True)])))
+    finally:
+        deployed.DEPTH_EVERY = old
+    check("WS throttle: frame muette ni calculée ni répétée",
+          computes == [0, 1] and mixed[5]["objects"]
+          and all("depth" not in item for item in mixed[5]["objects"]),
+          f"{computes} {mixed[5]['objects']}")
+    old, deployed.DEPTH_EVERY = deployed.DEPTH_EVERY, 5
+    try:
+        other = replies(asyncio.run(ws_session(api, [frame(41, png, with_depth=True)])))
+    finally:
+        deployed.DEPTH_EVERY = old
+    check("WS throttle: compteur par connexion (2e socket recalcule)",
+          computes == [0, 1, 2]
+          and [item.get("depth") for item in other[0]["objects"]] == [0.7, 0.71],
+          f"{computes} {other[0]['objects']}")
+
+
 def test_run_frame_depth(fast_core) -> None:
     """``run_frame(with_depth)`` : médianes jointes sous le verrou, repli gracieux."""
     import depth as depth_mod
