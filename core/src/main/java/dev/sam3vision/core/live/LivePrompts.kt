@@ -13,7 +13,7 @@ package dev.sam3vision.core.live
 object LivePrompts {
 
     /**
-     * Concepts par défaut : **20** concepts extérieurs — mobiles (« person »,
+     * Concepts par défaut : **21** concepts extérieurs — mobiles (« person »,
      * « car », « bus », et « bicycle » + « motorcycle » du 01/11 : un vélo et
      * une moto arrivent vite et longent le trottoir) puis feux piétons et cheminement (« pedestrian traffic light »,
      * « pedestrian signal head », « curb », « crosswalk ») puis statiques
@@ -24,7 +24,13 @@ object LivePrompts {
      *
      * **Ordre user du 01/11** : « vire electric scooter, bicycle, sidewalk,
      * fence », puis « rajoute bus », puis « bicycle moto je veux » — bus, vélo
-     * et moto sont revenus ; restent sortis : trottinette, trottoir, clôture. Ces cinq-là ne sont plus suivis **au repos** ; la
+     * et moto sont revenus, puis « go sidewalk » : le trottoir aussi.
+     * Restent sortis : la trottinette électrique et la clôture.
+     *
+     * Le trottoir n'est **pas** un obstacle à contourner ([CurbConcepts.isGround]
+     * l'exclut du guidage) : il sert de **rail**. [SidewalkKeep.positionOf] le
+     * lit, et l'app ne corrige que si l'utilisateur n'est plus dessus (dérive,
+     * contournement) — trottoir droit devant = aucun mot. Ces cinq-là ne sont plus suivis **au repos** ; la
      * Traversée les rétablit quand elle s'arme (`VehicleConcepts.promptsFor`
      * remet car/bus/bicycle/camion/moto, et `TraversePipeline` remet curb +
      * sidewalk), et le preset [outdoor] garde fence/animal pour la marche
@@ -69,7 +75,7 @@ object LivePrompts {
     val default: List<String> = listOf(
         "person", "car", "bus", "bicycle", "motorcycle",
         "pedestrian traffic light", "pedestrian signal head",
-        "curb", "crosswalk", "pole", "stairs", "keys", "gate", "souvenir shop",
+        "curb", "sidewalk", "crosswalk", "pole", "stairs", "keys", "gate", "souvenir shop",
         "beanie", "socks", "wall", "stroller", "child", "dog",
     )
 
