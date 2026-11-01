@@ -3,6 +3,7 @@ package dev.sam3vision.app.isee
 import dev.sam3vision.app.DistanceLayer
 import dev.sam3vision.app.TRANSPORT_WS
 import dev.sam3vision.app.TRANSPORT_WS_KO
+import dev.sam3vision.core.distance.CameraPose
 import dev.sam3vision.core.distance.DistanceMeter
 import dev.sam3vision.core.distance.DistanceReading
 import dev.sam3vision.core.live.FrameLabels
@@ -35,6 +36,14 @@ internal fun labelsOf(labels: FrameLabels, frame: LiveFrame): List<String> = lab
 /** Libellé de transport : ce que le socket fait vraiment, pas ce qu'on voudrait. */
 internal fun transportLabel(active: LiveSession): String =
     if (active.socketOpen) TRANSPORT_WS else TRANSPORT_WS_KO
+
+/**
+ * Pose exploitable pour cette frame : `null` en lunettes-live (branche sol
+ * coupée, voir [DistanceMeter.groundPlaneEnabled]) — les consommateurs hors
+ * sténopé (déclencheur passage, latéral Traversée) ne voient jamais le tangage
+ * téléphone appliqué à des pixels lunettes.
+ */
+internal fun DistanceMeter.effectivePose(): CameraPose? = if (groundPlaneEnabled) pose else null
 
 /**
  * Détections SAM confirmées de la frame et leurs distances (sténopé) : une
