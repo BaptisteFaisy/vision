@@ -280,12 +280,15 @@ class IseeVoiceNav(
 
     /** Dernier fix connu (GPS puis réseau), `null` sans fix en cache. */
     private fun lastKnown(locations: LocationManager): RoutePoint? {
-        val fix = runCatching {
+        val fix = try {
             locations.getLastKnownLocation(LocationManager.GPS_PROVIDER)
-        }.getOrNull()
-            ?: runCatching {
-                locations.getLastKnownLocation(LocationManager.NETWORK_PROVIDER)
-            }.getOrNull()
+        } catch (_: SecurityException) {
+            null
+        } ?: try {
+            locations.getLastKnownLocation(LocationManager.NETWORK_PROVIDER)
+        } catch (_: SecurityException) {
+            null
+        }
         fix ?: return null
         if (!fix.latitude.isFinite() || !fix.longitude.isFinite()) return null
         return RoutePoint(fix.latitude, fix.longitude)
