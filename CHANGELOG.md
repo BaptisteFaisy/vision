@@ -3,6 +3,67 @@
 Le journal part du 2026-10-26 après 19 h : le commit de départ, puis une entrée par fait
 livré et ses preuves (tâche, fichiers, chiffres) dans l'arbre.
 
+## 2026-11-01 — iSee : guidage vers le trou de grillage, humains prioritaires (branche `guidage-trou-humains`)
+
+- **Fait** : sur couloir bouché sans chemin optimal, un grillage ouvert à
+  gauche ou à droite (intervalle ≥ 0,80 m à ≤ 4 m) oriente la sortie vers le
+  trou (`FenceOpeningSignal.ofPlaced` + `holeSide`, `Guidance.decide`
+  `holeSide`, `GuidanceAnnouncer`, branché dans `ProbeVoice`) — sauf humain à
+  moins de 80 cm de ce côté (`PeoplePath.clearsSide`) : l'évitement des
+  humains prime toujours. Mêmes mots (voix TwinLite), mêmes clips < 100 ms,
+  chemin optimal et caps latéraux inchangés.
+- **Preuve** : `:core:testDebugUnitTest` 2 880 verts et
+  `:app:testDebugUnitTest` 1 769 verts (0 échec, 0 sauté, dont 12 nouveaux
+  `GuidanceFenceOpeningTest` et 2 nouveaux `ProbeVoiceFenceHoleTest`) ;
+  `check-kotlin-limits.py` OK ; recette rue **non mesurée**, exige un parcours
+  réel avec grillage.
+## 2026-11-01 — Traversée : les verts larges et ajourés passent (rappel 18/20 → 20/20)
+
+- **Origine** : cinq essais en parallèle sur les 49 crops téléphone ont montré que
+  l'arbre n'est plus le facteur limitant — un arbre constant « vert » obtient déjà
+  18/20 verts, 0 faux vert et 31/31 ancres. Le plafond est la **porte**
+  (`accept_green`), qui refusait deux vrais verts parce que leur tache verte est
+  **plus large que haute** (`ELONGATION_MIN = 1,0`), signature qu'on croyait
+  réservée aux disques voiture.
+- **Fait** : `PedLightGate.WIDE_FILL_MAX = 0,35` — une tache large n'est refusée
+  que si elle est **pleine**. Un disque allumé remplit 0,75-0,88 de sa boîte
+  (`fr_cardisc_367` 0,75, `st_c02` 0,75), un bonhomme large laisse des trous
+  (`0009` 0,09 ; `0015` 0,16). La mesure ne bouge pas entre 0,30 et 0,40 : ce
+  n'est pas un seuil ajusté à un cas, et 0,85 est la borne où les deux disques
+  de face repassent (vérifiée).
+- **Preuves** : crops téléphone **20/20 verts** (18/20 avant), 0 faux vert,
+  **31/31 → 33/33 ancres** (`tel_g08`/`tel_g09` promues : les deux verts réels
+  qui tombaient) ; :core 2 872 tests verts, parité Python 33 ancres,
+  `check-kotlin-limits` OK. Contrôle hors domaine : 400 crops PTL (Shanghaï,
+  open source) — faux verts **inchangés (13)**, verts 100 → 101 sur 179.
+- **Non fait, volontairement** : aucun réentraînement d'arbre. Les cinq essais
+  (pondération PTL 0,05-1,0, ancres sur-pondérées 5-50, jeu de traits glouton,
+  augmentation photométrique ×5 et ×20, filtrage PTL par domaine K=100-1000)
+  donnent tous au mieux 18/20 : l'arbre ne peut pas dépasser le plafond de la
+  porte, et le seuil actuel est déjà atteint par une souche d'un seul trait.
+## 2026-11-01 — Balade enregistrée rejouée sur l'émulateur (`scripts/isee-sim.sh`)
+
+- **Ordre user** : « mettre iSee sur un émulateur, avec la vidéo que j'enregistre dehors, pour
+  qu'un agent teste ses modifs — et la vidéo doit simuler le flux en temps réel ».
+- **Fait** : `scripts/isee-sim.sh` (une commande) transcode la balade en profil caméra
+  (H.264 yuv420p 640x480/30 fps, rotation appliquée, cache par empreinte), boote l'émulateur
+  headless avec `-camera-back videofile:<vidéo>`, installe l'APK debug, ouvre iSee
+  (`--es route isee`), attend la **première frame convertie** (`conversion:` au logcat),
+  rejoue un trajet CSV/GPX, filme l'écran, rapatrie `logcat` + tampon `crash`, et n'éteint que
+  l'émulateur qu'il a démarré. `scripts/sim/route-replay.py` pousse les positions par le
+  receiver debug `dev.sam3vision.app.sim.LOCATION` (test provider `gps` **et** `network`,
+  précision 8 m) et retombe sur `adb emu geo fix` s'il est absent.
+- **Mesuré** : caméra vidéo à **30 images/s temps réel** (compteur incrusté : 192 images entre
+  deux captures à 6,33 s d'écart), **bouclage indéfini**, boot 19-40 s, `conversion:` à
+  12-27 ms par frame (capteur 640×480, JPEG 5 Ko) dans iSee.
+- **Pourquoi pas `adb emu geo fix` seul** : il livre un fix **sans précision**, et iSee rejette
+  en silence au-delà de `NavTuning.maxAccM` (25 m) — guidage muet sans aucune erreur.
+- **Preuves** : `bash scripts/test_scripts.sh` 176/176, `tools/check-kotlin-limits.py` OK
+  (`isee-sim.sh` 499 lignes), `:app:testDebugUnitTest` 1 776 tests / 0 échec, trois passes
+  réelles du harnais (vidéo d'écran + logcat + 0 ligne fatale). Doc : `docs/TESTING.md` § 3.
+- **Limites assumées** : rendu logiciel (aucune mesure de latence réelle), services distants
+  nécessaires pour la sonde/LLM, pas de caméra avant ni de photo/enregistrement réels.
+
 ## 2026-11-01 — iSee : le mouvement écrase tout, voiture devant humain (branche `feat/isee-mouvement-overwrite`)
 
 - **Ordre user** : voitures en mouvement et humains en mouvement,
@@ -26,6 +87,19 @@ livré et ses preuves (tâche, fichiers, chiffres) dans l'arbre.
   `ProximityVoicePreemptTest`) ; `:core` non rejoué (aucun fichier
   touché) ; `check-kotlin-limits.py` OK ; recette téléphone
   **non mesurée**, exige un APK de cette branche sur appareil réel.
+## 2026-11-01 — iSee : le picto chassé disparaît hors champ (branche `fix/isee-picto-hors-champ`)
+
+- **Ordre user** : quand l'objet avec un picto n'est plus sur la caméra, il
+  faut cesser d'afficher le picto.
+- **Fait** : `IseePicto.onFrame` — un passage gabarit muet sur le picto chassé
+  périme son ancrage live (chute en ≤ 500 ms, sans attendre le prochain
+  aller-retour SAM, qui ré-ancre si l'objet est toujours là) ;
+  `publishHits` — l'ancrage live est seul juge pour le picto chassé, le
+  passage gabarit précédent ne le ressuscite pas quand SAM dit parti.
+  Hors chasse, comportement inchangé.
+- **Preuve** : `IseePictoTest` 24/24 (1 nouveau : disparition SAM + caméra +
+  réapparition sans régénérer — rouge sans le fix) ;
+  `check-kotlin-limits.py` vert (1 336 fichiers).
 
 ## 2026-11-01 — iSee : axe pile = droite, comme documenté (branche `hazard-avoidside-axis`)
 
@@ -42,6 +116,40 @@ livré et ses preuves (tâche, fichiers, chiffres) dans l'arbre.
   `ProximityVoiceQueueTest` 8, `DistanceKalmanTest` 11) ;
   `check-kotlin-limits.py` OK ; `check-voicepack.py` OK ; UBS : 0
   finding (scanner Kotlin indisponible, comme avant).
+## 2026-11-01 — iSee : bloc génération fin semi-transparent + picto sans nom ni carte (branche `fix/isee-picto-sans-confirmation`)
+
+- **Ordre user** : fenêtre « génération en cours » semi-transparente, plus
+  fine et moins haute, avec la boule iSee qui tourne à la place du rond bleu,
+  sans le gros titre « Pictogram », texte noir ; picto sans le nom de l'objet ;
+  un seul picto affiché (le cadre jaune à l'emplacement), pas la carte « en
+  grand ».
+- **Fait** : `PictoGeneratingCard` — bloc blanc à 78 % (220 dp max), boule iSee
+  56 dp tournant en 1,2 s (même motif que `RouteLoadingBlock`), « Generating…
+  (~10 s) » noir, affiché pendant `Generating` seul, jamais dehors ;
+  `PictoLayer` — cadre jaune seul (nom et `IseePictoBig` supprimés, nom gardé
+  en `contentDescription` pour l'accessibilité) ; `META-IMAGE.md` mis à jour.
+- **Preuve** : `:app:testDebugUnitTest` 1 700 verts (0 échec, 0 sauté, dont 3
+  `PictoGeneratingSpinTest` nouveaux) ; `check-isee-design.py` OK (boule
+  gelée intacte) ; `check-kotlin-limits.py` OK.
+
+## 2026-11-01 — iSee : pictogramme généré armé aussitôt, sans confirmation ni nom (branche `fix/isee-picto-sans-confirmation`)
+
+- **Ordre user** : quand un pictogramme est généré, ne pas demander de le
+  confirmer ni de le nommer, et ne pas l'afficher en premier plan — juste le
+  montrer sur l'image, à l'emplacement de ce qu'il représente.
+- **Fait** : le bouton « Picto » rejoint le chemin direct de « Find the X »
+  (`IseePicto.generateAndArm`) — photo, appel Muse, stockage aussitôt, overlay
+  à l'emplacement dès la frame suivante ; la phase `Review`, le brouillon
+  (`draftPng`/`draftLabel`), `confirmDraft`/`regenerateDraft`/`dismissDraft` et
+  la boîte d'avant-plan `PictoDialog` (relecture + « Generating… ») sont
+  supprimés ; le nom non demandé retombe sur `PictoStore.DEFAULT_LABEL` ;
+  le chip « Picto… » reste le seul témoin pendant la génération ;
+  `PlaceModeOrder`, `IseeState`, `META-IMAGE.md` mis à jour.
+- **Preuve** : `:app:testDebugUnitTest` 1 697 verts (0 échec, 0 sauté :
+  bouton → stockage direct + overlay à l'emplacement, rouge-avant/vert-après
+  constaté sur 2 tests) ; `check-kotlin-limits.py` OK ;
+  `test_check_kotlin_limits` 28/28.
+
 ## 2026-11-01 — iSee : humain imminent = mot seul répété 300 ms (branche `hazard-person-300ms`)
 
 - **Ordre user** : juste « humain, passez à droite / gauche », en
@@ -129,6 +237,20 @@ livré et ses preuves (tâche, fichiers, chiffres) dans l'arbre.
 - **Preuve** : `IseePictoTest` 20/20 (4 nouveaux),
   `IseePictoVoiceTest` 19/19, `ProbeEnsureConceptTest` 7/7 verts ;
   `check-kotlin-limits.py` OK (aucun dépassement).
+
+## 2026-11-01 — iSee : carte GPS réduite, sans km/temps ni badge gestes (branche `fix/isee-carte-reduite-sans-badge`)
+
+- **Ordre user** : rapetisser un peu la carte quand le GPS est actif,
+  retirer les indications de km et de temps sous la carte, et retirer
+  tout le temps le badge « Tap see / Hold ask ».
+- **Fait** : carte du guidage `IseeGuidanceBlock` 200 → 160 dp ;
+  ligne du reste (`remainingLine`, « In 50 m · 2.4 km left ·
+  12 min ») supprimée — seule l'instruction en cours reste sous la
+  carte ; pill `InstructionPill` supprimée de `SceneBottomBar` (la
+  ligne de statut reste) ; KDoc et imports morts nettoyés.
+- **Preuve** : `:app:testDebugUnitTest` 1 755 verts (0 échec,
+  0 sauté, dont 5 `IseeStatusLineTest`) ; `check-kotlin-limits.py`
+  OK (1 342 fichiers, aucun dépassement).
 
 ## 2026-10-31 — iSee : escaliers jalonnés à 4 / 2 / 1 m (branche `feat/escaliers-jalons`)
 

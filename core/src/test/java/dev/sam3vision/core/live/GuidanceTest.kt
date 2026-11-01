@@ -55,8 +55,17 @@ class GuidanceTest {
     }
 
     @Test
-    fun `objet lointain au centre ne bloque pas`() {
+    fun `obstacle sur l axe a 10 m bloque (portee axe 15 m)`() {
         val decision = Guidance.decide(listOf(placed("personne", 0.5f, 10f)))
+
+        assertTrue(decision.blocked)
+        assertEquals(GuidanceSide.Left, decision.side)
+        assertEquals("Left.", Guidance.phrase(decision))
+    }
+
+    @Test
+    fun `objet sur l axe au dela de 15 m ne bloque pas`() {
+        val decision = Guidance.decide(listOf(placed("personne", 0.5f, 16f)))
 
         assertFalse(decision.blocked)
     }
@@ -355,23 +364,15 @@ class GuidanceTest {
     }
 
     /** À 2 m/s, l'horizon vaut 5,8 m : un obstacle à 5 m entre dans le couloir. */
-    @Test
-    fun `vitesse 2 m s = la portee passe a 5 8 m`() {
-        val cinq = listOf(placed("personne", 0.5f, 5f))
-
-        assertEquals(5.8f, Timing.rangeFor(2f), 0.001f)
-        assertFalse(Guidance.decide(cinq).blocked)
-        assertFalse(Guidance.decide(cinq, speedMps = 1.4f).blocked)
-        assertTrue(Guidance.decide(cinq, speedMps = 2f).blocked)
-    }
-
     /** Une portée fixée par l'appelant fait foi, vitesse ou pas. */
     @Test
     fun `une portee explicite fait foi sur la vitesse`() {
         val cinq = listOf(placed("personne", 0.5f, 5f))
 
-        assertTrue(Guidance.decide(cinq, rangeMeters = 6f).blocked)
-        assertFalse(Guidance.decide(cinq, rangeMeters = 3f, speedMps = 2f).blocked)
+        assertTrue(Guidance.decide(cinq, rangeMeters = 6f, axisRangeMeters = 6f).blocked)
+        assertFalse(
+            Guidance.decide(cinq, rangeMeters = 3f, speedMps = 2f, axisRangeMeters = 3f).blocked,
+        )
     }
 
     /** Espace inconnu (trottoir supposé) : rien ne change, scène historique. */

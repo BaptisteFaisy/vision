@@ -3,6 +3,7 @@ package dev.sam3vision.app.isee
 import dev.sam3vision.core.curb.SidewalkKeep
 import dev.sam3vision.core.curb.SidewalkPosition
 import dev.sam3vision.core.distance.LensSpec
+import dev.sam3vision.core.hazard.FenceOpeningSignal
 import dev.sam3vision.core.live.GuidanceAnnouncer
 import dev.sam3vision.core.live.GuidanceDecision
 import dev.sam3vision.core.live.PlacedLabel
@@ -85,7 +86,9 @@ internal class ProbeVoice(
      * la décision gauche/droite reste locale).
      * [hfovDeg] est le champ porté par la largeur de l'image analysée
      * ([LensSpec.widthFovDeg], axe vertical en portrait) : le trait, le
-     * décalage chiffré et le chemin optimal s'y projettent.
+     * décalage chiffré et le chemin optimal s'y projettent. Le trou de
+     * grillage ouvert ([FenceOpeningSignal.holeSide]) oriente la sortie sur
+     * couloir bouché, sauf humain à moins de 80 cm de ce côté.
      */
     fun phrase(
         atMs: Long,
@@ -97,9 +100,10 @@ internal class ProbeVoice(
         if (guide) {
             val safe = placed.withoutCrosswalk()
             val sidewalk = SidewalkKeep.positionOf(safe)
+            val hole = FenceOpeningSignal.ofPlaced(safe, hfovDeg).holeSide()
             return guidance.onFrame(
                 atMs, safe, language, manualCap, routeCap,
-                sidewalk = sidewalk, samPassage = passage, hfovDeg = hfovDeg,
+                sidewalk = sidewalk, samPassage = passage, hfovDeg = hfovDeg, holeSide = hole,
             )
         }
         if (!announce) return null

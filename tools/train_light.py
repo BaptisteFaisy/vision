@@ -45,7 +45,7 @@ ANCHOR_GREENS = ["fr_green_fig_21", "fr_green_fig_302", "fr_green_fig_243",
                  "r1b_g01", "r1b_g02", "r1b_g03", "r1b_g04", "r1b_g05",
                  "st_g01", "st_g02", "st_c01",
                  "tel_g01", "tel_g02", "tel_g03", "tel_g04", "tel_g05",
-                 "tel_g06", "tel_g07"]
+                 "tel_g06", "tel_g07", "tel_g08", "tel_g09"]
 ANCHOR_REDS = ["fr_red_fig_548", "fr_red_dim_138", "fr_red_noise_732",
                "fr_cardisc_367", "st_r01", "st_r02", "st_c02",
                "tel_r01", "tel_r02", "tel_r03", "tel_r04"]

@@ -15,7 +15,6 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
-import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import dev.sam3vision.app.guidemap.GuidanceMapCard
@@ -26,9 +25,10 @@ import dev.sam3vision.core.nav.NavFix
 import dev.sam3vision.core.nav.NavRoute
 
 /**
- * Le guidage GPS sur l'accueil iSee, sous la caméra : carte (tracé +
- * position, repli schéma si les tuiles échouent), instruction en cours
- * et reste du trajet. La boule et la phrase en cours s'effacent pendant
+ * Le guidage GPS sur l'accueil iSee, sous la caméra et tout en bas de
+ * l'écran : carte réduite (tracé + position, repli schéma si les tuiles
+ * échouent) et instruction en cours, sans le reste du trajet (ni km ni
+ * temps). La boule et la phrase en cours s'effacent pendant
  * le guidage (la carte prend leur place), la caméra et la sonde
  * continuent (évitement d'obstacles préservé). L'arrêt se fait à la
  * voix (« arrête le guidage »).
@@ -48,14 +48,14 @@ internal fun IseeGuidanceBlock(
         GuidanceMapCard(
             snapshot,
             state.update,
-            Modifier.fillMaxWidth().height(200.dp),
+            Modifier.fillMaxWidth().height(160.dp),
             showAttribution = false,
         )
         GuidanceInstruction(state)
     }
 }
 
-/** Instruction en cours + reste, en grand et encre Portrait (jamais des zéros). */
+/** Instruction en cours, en grand et encre Portrait (sans le reste : ni km ni temps). */
 @Composable
 private fun GuidanceInstruction(state: VoiceNavUiState.Guiding) {
     Text(
@@ -67,40 +67,22 @@ private fun GuidanceInstruction(state: VoiceNavUiState.Guiding) {
         maxLines = 2,
         overflow = TextOverflow.Ellipsis,
     )
-    Text(
-        remainingLine(state),
-        color = Color(IseePortrait.SUB),
-        fontSize = 14.sp,
-        maxLines = 1,
-        overflow = TextOverflow.Ellipsis,
-    )
 }
 
-/** « In 50 m · 2.4 km left · 12 min », ou « calcul en cours » sans résumé. */
-private fun remainingLine(state: VoiceNavUiState.Guiding): String =
-    if (state.summary == null && !state.update.arrived) {
-        "Calculating the route…"
-    } else {
-        "${state.update.maneuver()} · ${state.update.remaining()}"
-    }
-
 /**
- * Sous la caméra : la navigation quand elle a un objectif (calcul
+ * Tout en bas de l'écran : la navigation quand elle a un objectif (calcul
  * d'itinéraire, ou guidage avec carte suivie), sinon la boule et la
  * phrase ([orb]). Le choix vit ici (état de session observé) pour garder
- * `PortraitScene` sous le plafond de 50 lignes : l'appelant ne fait que
- * passer la hauteur de la rue ([pictureH]).
+ * `PortraitScene` sous le plafond de 50 lignes. La barre du bas s'efface
+ * pendant le guidage ([isGuidanceOverlay]) : pas de recouvrement.
  */
 @Composable
 internal fun BoxWithConstraintsScope.SceneGuidanceLayer(
     viewModel: IseeViewModel,
-    open: Float,
-    pictureH: Dp,
     orb: @Composable () -> Unit,
 ) {
     val navState by viewModel.voiceNavState.collectAsState()
-    val mapTop = if (open > 0.5f) pictureH + 8.dp else 96.dp
-    val placed = Modifier.align(Alignment.TopCenter).padding(top = mapTop).padding(horizontal = 16.dp)
+    val placed = Modifier.align(Alignment.BottomCenter).padding(bottom = navInsetDp() + 10.dp).padding(horizontal = 16.dp)
     when (val nav = navState) {
         is VoiceNavUiState.Guiding -> IseeGuidanceBlock(
             nav,
@@ -111,3 +93,11 @@ internal fun BoxWithConstraintsScope.SceneGuidanceLayer(
         else -> orb()
     }
 }
+
+/**
+ * Le guidage recouvre-t-il la scène (calcul d'itinéraire ou carte suivie) :
+ * la carte prend le bas de l'écran, la boule, la phrase et la barre du bas
+ * s'effacent. Pure : même état, même réponse, testée sur JVM.
+ */
+internal fun isGuidanceOverlay(navState: VoiceNavUiState): Boolean =
+    navState is VoiceNavUiState.Guiding || navState is VoiceNavUiState.Confirming

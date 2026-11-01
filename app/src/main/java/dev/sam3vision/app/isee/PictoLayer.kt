@@ -9,16 +9,12 @@ import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.BoxScope
 import androidx.compose.foundation.layout.BoxWithConstraints
-import androidx.compose.foundation.layout.BoxWithConstraintsScope
-import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
-import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.offset
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
-import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.Text
@@ -34,33 +30,19 @@ import androidx.compose.ui.graphics.asImageBitmap
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.layout.onGloballyPositioned
 import androidx.compose.ui.text.font.FontWeight
-import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import dev.sam3vision.app.isee.vm.PictoPhase
 import dev.sam3vision.app.isee.vm.PictoUiState
 import dev.sam3vision.core.picto.PictoHit
 
-/** Le jaune des pictogrammes : cadre et étiquette reprennent leur palette. */
+/** Le jaune des pictogrammes : le cadre reprend leur palette. */
 private val PICTO_YELLOW = Color(0xFFFFD600)
-
-/** Image du pictogramme affiché en grand : comme le direct, lisible d'un coup d'œil. */
-private val BIG_IMAGE = 176.dp
-
-/** Carte « en grand » : taille fixe, le placement au-dessus du repère est exact. */
-private val BIG_WIDTH = 200.dp
-
-/** Hauteur fixe de la carte : paddings + image + une ligne de nom (22 sp). */
-private val BIG_HEIGHT = 230.dp
-
-/** La carte s'arrête au-dessus de l'étiquette du cadre, gardée visible. */
-private val BIG_GAP = 30.dp
 
 /**
  * Les objets reconnus, dessinés sur la vidéo : le pictogramme remplit le
- * rectangle reconnu, son nom en étiquette au-dessus (dedans si trop haut) —
- * et le premier reconnu s'affiche en grand au-dessus de son emplacement
- * ([IseePictoBig]). Posée après les pastilles de distance, comme
+ * rectangle reconnu, dans un cadre jaune — rien d'autre : ni nom, ni carte
+ * « en grand ». Posée après les pastilles de distance, comme
  * [SteeringLayer]. Rien de composé sans reconnaissance — la vidéo reste
  * nette le reste du temps.
  */
@@ -90,59 +72,9 @@ internal fun PictoLayer(hits: List<PictoHit>, pngOf: (String) -> ByteArray?, mod
                     ) {
                         Image(bitmap, contentDescription = hit.label, modifier = Modifier.fillMaxSize(), contentScale = ContentScale.Fit)
                     }
-                    Text(
-                        hit.label,
-                        color = Color.Black,
-                        fontSize = 10.sp,
-                        fontWeight = FontWeight.Bold,
-                        modifier = Modifier
-                            .offset(left, (fullH * hit.y - 22.dp).coerceAtLeast(0.dp))
-                            .background(PICTO_YELLOW, RoundedCornerShape(6.dp))
-                            .padding(horizontal = 6.dp, vertical = 2.dp),
-                    )
                 }
             }
         }
-        IseePictoBig(hits.first(), pngOf)
-    }
-}
-
-/**
- * Le premier objet reconnu, en grand au-dessus de son emplacement : son dessin
- * jaune/noir + son nom, lisible d'un coup d'œil — même motif que le direct
- * (sa carte « en grand »), ancré au repère car la rue iSee est un bandeau, pas
- * un plein écran. Les cadres jaunes gardent la localisation ; rien sans PNG
- * (démo), collée en haut si l'objet la touche.
- */
-@Composable
-private fun BoxWithConstraintsScope.IseePictoBig(hit: PictoHit, pngOf: (String) -> ByteArray?) {
-    val bitmap = remember(hit.pictoId) {
-        runCatching {
-            pngOf(hit.pictoId)?.let { BitmapFactory.decodeByteArray(it, 0, it.size) }
-        }.getOrNull()?.asImageBitmap()
-    } ?: return
-    val left = (maxWidth * (hit.x + hit.w / 2f) - BIG_WIDTH / 2)
-        .coerceIn(0.dp, (maxWidth - BIG_WIDTH).coerceAtLeast(0.dp))
-    val top = (maxHeight * hit.y - BIG_GAP - BIG_HEIGHT).coerceAtLeast(0.dp)
-    Column(
-        Modifier
-            .offset(left, top)
-            .width(BIG_WIDTH)
-            .height(BIG_HEIGHT)
-            .background(Color.Black.copy(alpha = 0.85f), RoundedCornerShape(12.dp))
-            .border(2.dp, PICTO_YELLOW, RoundedCornerShape(12.dp))
-            .padding(12.dp),
-        horizontalAlignment = Alignment.CenterHorizontally,
-    ) {
-        Image(bitmap, contentDescription = hit.label, modifier = Modifier.size(BIG_IMAGE))
-        Text(
-            hit.label,
-            color = PICTO_YELLOW,
-            fontSize = 22.sp,
-            fontWeight = FontWeight.Bold,
-            maxLines = 1,
-            overflow = TextOverflow.Ellipsis,
-        )
     }
 }
 

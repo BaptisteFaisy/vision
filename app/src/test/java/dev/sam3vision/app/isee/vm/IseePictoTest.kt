@@ -45,7 +45,9 @@ private fun keysAt(x1: Float, y1: Float, x2: Float, y2: Float): Detection =
     Detection(label = "keys", score = 0.9f, box = listOf(x1 * 100, y1 * 100, x2 * 100, y2 * 100), width = 100, height = 100)
 
 /**
- * Les repères : bouton → photo → génération → relecture → stockage → overlay.
+ * Les repères : bouton → photo → génération → stockage direct → overlay.
+ * Ni confirmation, ni nom, ni avant-plan : le pictogramme généré est armé
+ * aussitôt et l'overlay le montre à son emplacement sur l'image.
  * Caméra, client Muse et décodages sont factices : seul l'enchaînement est
  * prouvé ici, le réseau et le matcher ont leurs propres tests.
  */
@@ -61,6 +63,7 @@ class IseePictoTest {
         storeRoot: File? = null,
         now: () -> Long = { 0L },
         placeMode: () -> PictoPlaceMode = { PictoPlaceMode.DEDANS },
+        frames: () -> GrayImage = { FRAME },
     ) = { scope: kotlinx.coroutines.test.TestScope ->
         IseePicto(
             media = MediaCacheStore(tempDir("isee-picto-media"), dao),
@@ -72,7 +75,7 @@ class IseePictoTest {
             scope = scope,
             photoJpeg = { PHOTO_JPEG },
             photoTemplate = { PHOTO_TEMPLATE },
-            frameGray = { jpeg -> decodeCalls?.add(jpeg); FRAME },
+            frameGray = { jpeg -> decodeCalls?.add(jpeg); frames() },
             io = Dispatchers.Unconfined,
             clock = now,
             placeMode = placeMode,
@@ -80,48 +83,27 @@ class IseePictoTest {
     }
 
     @Test
-    fun `bouton puis generation mene a la relecture`() = runTest {
-        picto()(this).onPictoButton()
-        advanceUntilIdle()
-        assertEquals(PictoPhase.Review, state.value.picto.phase)
-        assertTrue(state.value.picto.draftPng.contentEquals(PNG))
-        assertEquals("", client.lastHint)
-        assertTrue(client.lastPhoto.contentEquals(PHOTO_JPEG))
-    }
-
-    @Test
-    fun `valider stocke et arme`() = runTest {
+    fun `bouton stocke et arme sans confirmation ni nom`() = runTest {
         val coordinator = picto()(this)
         coordinator.onPictoButton()
-        advanceUntilIdle()
-        coordinator.confirmDraft("Médocs")
         advanceUntilIdle()
         assertEquals(PictoPhase.Idle, state.value.picto.phase)
         assertEquals(1, state.value.picto.armed)
         assertEquals(IseeStatusText.PICTO_SAVED, state.value.status)
+        assertEquals(listOf(PictoStore.DEFAULT_LABEL), coordinator.labels())
+        assertEquals("", client.lastHint)
+        assertTrue(client.lastPhoto.contentEquals(PHOTO_JPEG))
         assertTrue(coordinator.armed())
     }
 
     @Test
-    fun `echec reseau affiche le motif sans relecture`() = runTest {
+    fun `echec reseau affiche le motif sans rien armer`() = runTest {
         client.failure = ApiError.PaymentRequired()
         picto()(this).onPictoButton()
         advanceUntilIdle()
         assertEquals(PictoPhase.Idle, state.value.picto.phase)
         assertTrue(state.value.status.orEmpty().startsWith("Picto:"))
-        assertNull(state.value.picto.draftPng)
-    }
-
-    @Test
-    fun `regenerer reutilise la photo avec le nom`() = runTest {
-        val coordinator = picto()(this)
-        coordinator.onPictoButton()
-        advanceUntilIdle()
-        coordinator.regenerateDraft("Médocs")
-        advanceUntilIdle()
-        assertEquals("Médocs", client.lastHint)
-        assertTrue(client.lastPhoto.contentEquals(PHOTO_JPEG))
-        assertEquals(PictoPhase.Review, state.value.picto.phase)
+        assertEquals(0, state.value.picto.armed)
     }
 
     @Test
@@ -203,6 +185,39 @@ class IseePictoTest {
     }
 
     @Test
+    fun `objet hors champ, le picto chassé disparaît aussitôt`() = runTest {
+        var now = 10_000L
+        var frame = FRAME
+        val coordinator = picto(now = { now }, frames = { frame })(this)
+        coordinator.findObject("keys")
+        coordinator.onDetections(listOf(keysAt(0.2f, 0.3f, 0.5f, 0.6f)))
+        advanceUntilIdle()
+        coordinator.onDetections(listOf(keysAt(0.2f, 0.3f, 0.5f, 0.6f)))
+        advanceUntilIdle()
+        coordinator.onFrame("frame-avec-cles")
+        advanceUntilIdle()
+        assertEquals(0.2f, state.value.picto.hits.single().x, 1e-6f)
+        // SAM dit parti : le passage gabarit précédent ne ressuscite rien.
+        coordinator.onDetections(emptyList())
+        advanceUntilIdle()
+        assertTrue(state.value.picto.hits.isEmpty())
+        coordinator.onDetections(listOf(keysAt(0.6f, 0.1f, 0.8f, 0.3f)))
+        advanceUntilIdle()
+        assertEquals(1, state.value.picto.hits.size)
+        // La caméra ne voit plus les clés : le picto tombe sans attendre SAM.
+        frame = MISS
+        now += 600
+        coordinator.onFrame("frame-sans-cles")
+        advanceUntilIdle()
+        assertTrue(state.value.picto.hits.isEmpty())
+        // Et il revient dès que SAM les revoit, sans régénérer.
+        coordinator.onDetections(listOf(keysAt(0.6f, 0.1f, 0.8f, 0.3f)))
+        advanceUntilIdle()
+        assertEquals(0.6f, state.value.picto.hits.single().x, 1e-6f)
+        assertEquals(1, client.calls)
+    }
+
+    @Test
     fun `find sur label deja arme reprend la chasse sans regenerer`() = runTest {
         val coordinator = picto()(this)
         coordinator.findObject("keys")
@@ -235,29 +250,16 @@ class IseePictoTest {
     }
 
     @Test
-    fun `abandonner jette le brouillon`() = runTest {
-        val coordinator = picto()(this)
-        coordinator.onPictoButton()
-        advanceUntilIdle()
-        coordinator.dismissDraft()
-        assertEquals(PictoPhase.Idle, state.value.picto.phase)
-        assertNull(state.value.picto.draftPng)
-        assertEquals(0, state.value.picto.armed)
-    }
-
-    @Test
     fun `frame contenant l'objet reconnu, au plus a 2 Hz`() = runTest {
         var now = 1_000L
         val calls = mutableListOf<String>()
         val coordinator = picto(calls, now = { now })(this)
         coordinator.onPictoButton()
         advanceUntilIdle()
-        coordinator.confirmDraft("Objet")
-        advanceUntilIdle()
         coordinator.onFrame("frame-1")
         advanceUntilIdle()
         assertEquals(1, state.value.picto.hits.size)
-        assertEquals("Objet", state.value.picto.hits.single().label)
+        assertEquals(PictoStore.DEFAULT_LABEL, state.value.picto.hits.single().label)
         now += 100
         coordinator.onFrame("frame-2")
         advanceUntilIdle()
@@ -297,7 +299,7 @@ class IseePictoTest {
     }
 
     @Test
-    fun `generation livree dehors jette la relecture sans stocker`() = runTest {
+    fun `generation livree dehors jetee sans stocker`() = runTest {
         var mode = PictoPlaceMode.DEDANS
         client.gate = CompletableDeferred()
         val coordinator = picto(placeMode = { mode })(this)
@@ -307,7 +309,6 @@ class IseePictoTest {
         client.gate?.complete(Result.success(PNG))
         advanceUntilIdle()
         assertEquals(PictoPhase.Idle, state.value.picto.phase)
-        assertNull(state.value.picto.draftPng)
         assertTrue(coordinator.labels().isEmpty())
         assertEquals(0, state.value.picto.armed)
         assertNull(state.value.status)
@@ -329,22 +330,6 @@ class IseePictoTest {
         assertEquals(0, state.value.picto.armed)
         assertTrue(coordinator.labels().isEmpty())
         assertNull(state.value.status)
-    }
-
-    @Test
-    fun `dehors valider et regenerer restent muets meme avec brouillon`() = runTest {
-        var mode = PictoPlaceMode.DEDANS
-        val coordinator = picto(placeMode = { mode })(this)
-        coordinator.onPictoButton()
-        advanceUntilIdle()
-        assertEquals(PictoPhase.Review, state.value.picto.phase)
-        mode = PictoPlaceMode.DEHORS
-        coordinator.confirmDraft("Objet")
-        coordinator.regenerateDraft("Objet")
-        advanceUntilIdle()
-        assertTrue(coordinator.labels().isEmpty())
-        assertEquals(0, state.value.picto.armed)
-        assertEquals("", client.lastHint)
     }
 
     @Test
@@ -452,6 +437,9 @@ class IseePictoTest {
 
         /** Frame à motif unique : son propre gabarit central y est reconnu. */
         val FRAME: GrayImage = geometricFrame(64, 22, 20, 8)
+
+        /** Frame vide : aucun gabarit ne s'y reconnaît (fenêtres plates). */
+        val MISS: GrayImage = GrayImage(IntArray(64 * 64), 64, 64)
 
         /** Gabarit réel de la frame : la détection le retrouve (chaîne prouvée en core). */
         val PHOTO_TEMPLATE: PictoTemplate = buildTemplate(FRAME)

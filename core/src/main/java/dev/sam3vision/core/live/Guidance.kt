@@ -59,10 +59,10 @@ data class GuidanceDecision(
  * Le cap droit projette un **trait** : la largeur du marcheur
  * ([RAY_HALF_WIDTH_M] de chaque côté de l'axe) à la distance de l'objet —
  * large de près, fin de loin ; les caps latéraux gardent la moitié visée.
- * Un objet qui coupe le trait, à portée ([RANGE_METERS]), bloque la marche.
- * Sans bords ou sans distance connus, repli prudent sur la bande centrale
- * historique (`centerX` entre 0,34 et 0,66) ; un objet lointain ne bloque
- * pas, même au centre.
+ * Un objet qui coupe le trait, à portée de l'axe ([AXIS_RANGE_METERS]),
+ * bloque la marche. Sans bords ou sans distance connus, repli prudent sur
+ * la bande centrale historique (`centerX` entre 0,34 et 0,66) ; un objet
+ * au-delà de la portée de l'axe ne bloque pas, même au centre.
  *
  * L'ordre est **borné par le trottoir** ([FreeSpace], audit foule P0 point 3) :
  * un côté sans [FreeSpace.EDGE_MARGIN_M] de place est écarté au profit du plus
@@ -75,8 +75,18 @@ data class GuidanceDecision(
  */
 object Guidance {
 
-    /** Au-delà, un objet au centre est trop loin pour un pas : il ne bloque pas. */
+    /**
+     * Portée du champ proche (m) : caps latéraux (demi-image visée), côtés,
+     * chemin optimal et évitement latéral — au-delà, le proche ne se juge plus.
+     */
     const val RANGE_METERS = 4f
+
+    /**
+     * Portée de l'axe marché (m, ordre user du 01/11) : un obstacle pile sur
+     * le trait droit bloque dès 15 m, le temps de préparer l'évitement. Seul
+     * le cap droit en profite : un cap latéral vise une demi-image, pas un axe.
+     */
+    const val AXIS_RANGE_METERS = 15f
 
     /** Contact mesuré (m) : à cette distance ou moins, on touche presque. */
     const val CONTACT_METERS = 0.6f
@@ -119,28 +129,25 @@ object Guidance {
      * le cap hors des bandes interdites le plus proche de tout droit — quand il
      * existe et tient ([PeoplePath.fits]) ; sinon, repli sur le côté le moins
      * encombré ([freerSide], ancien comportement : géométrie incomplète, voie
-     * sans issue, ou aucun obstacle à portée). Bordure au contact, cap droit,
+     * sans issue, ou aucun obstacle à portée). Trou de grillage ([holeSide],
+     * localisé par l'appelant) : sur ce repli seul, on part vers le trou
+     * quand il garantit 80 cm à toute personne ([PeoplePath.clearsSide]) —
+     * sinon l'évitement générique s'applique (l'humain prime toujours :
+     * jamais vers quelqu'un). Bordure au contact, cap droit,
      * + obstacle mesuré au contact (≤ [CONTACT_METERS]) = stop ([contactStop],
      * audit 31/10 : on ne monte pas une bordure dans un obstacle) ; [curbEdge]
      * porte le sens connu du bord (`null` = incertain).
      *
-     * **Un ordre ne pointe pas hors du trottoir** (audit foule P0 point 3) :
-     * la scène mesurée conseillait **1,38 m à gauche** quand le trottoir
-     * s'arrêtait à **0,90 m** — les mètres étaient calculés sans jamais savoir
-     * où est le bord. [free] borne donc les deux moitiés de l'ordre : un côté
-     * qui n'a pas [FreeSpace.EDGE_MARGIN_M] de place ([FreeSpace.canShift]
-     * faux) cède la place à [FreeSpace.side], le plus large ; aucun côté n'a la
-     * marge ⇒ le côté calculé est gardé (jamais de `null`, on ne se tait pas).
-     * Le décalage chiffré ne dépasse pas `free.room(side)`, arrondi au
-     * demi-mètre inférieur (plancher 0) : 1,50 m sur 0,60 m de place est un
-     * ordre dans le mur. [free] inconnu ([FreeSpace.unknown], trottoir supposé
-     * de 0,90 m) ne borne rien : comportement historique, scènes simulées
-     * comprises.
+     * Cap droit : le trait voit loin ([axisRangeMeters], 15 m par défaut) ;
+     * le reste (côtés, chemin, caps latéraux) juge au champ proche
+     * ([rangeMeters]). Un obstacle lointain sur l'axe bloque donc avec un
+     * côté de sortie au jugé proche — le plus souvent l'opposé de son
+     * décalage, le champ proche étant vide.
      *
-     * [speedMps] fait suivre la portée à l'horizon de décision
-     * ([Timing.rangeFor] : 5,8 m à 2 m/s au lieu des 4 m de [RANGE_METERS]) ;
-     * une [rangeMeters] fixée explicitement par l'appelant fait foi, et sans
-     * vitesse rien ne change.
+     * **Un ordre ne pointe pas hors du trottoir** (audit foule P0 point 3 :
+     * 1,38 m conseillé, trottoir de 0,90 m) : [free] borne le côté et le
+     * décalage chiffré ([GuidanceBounds]). [speedMps] fait suivre la portée à
+     * l'horizon de décision ([Timing.rangeFor]) ; [rangeMeters] explicite fait foi.
      */
     fun decide(
         labels: List<PlacedLabel>,
@@ -150,10 +157,12 @@ object Guidance {
         curbEdge: CurbEdge? = null,
         free: FreeSpace = FreeSpace.unknown(),
         speedMps: Float? = null,
+        holeSide: GuidanceSide? = null,
+        axisRangeMeters: Float = AXIS_RANGE_METERS,
     ): GuidanceDecision {
-        val range = effectiveRange(rangeMeters, speedMps)
+        val range = GuidanceBounds.effectiveRange(rangeMeters, speedMps)
         val cleaned = labels.filter { isObstacle(it) }
-        val blocking = cleaned.filter { blocks(it, cap, range, hfovDeg) }
+        val blocking = cleaned.filter { blocks(it, cap, range, hfovDeg, axisRangeMeters) }
         val curbContact = curbAtContact(labels, cap)
         if (blocking.isEmpty()) {
             return GuidanceDecision(blocked = false, cap = cap, curbContact = curbContact, curbEdge = curbEdge)
@@ -162,31 +171,43 @@ object Guidance {
             compareBy({ nearRank(it) }, { abs(it.centerX - 0.5f) }, { it.label }),
         )
         if (cap == SteeringCap.Straight) {
-            val threat = contactThreat(blocking)
-            if (curbContact && threat != null) {
-                return GuidanceDecision(
-                    blocked = true, obstacle = threat, cap = cap,
-                    shiftMeters = shiftOf(threat.meters, STRAIGHT_HALF_CORRIDOR, hfovDeg),
-                    curbContact = true, curbEdge = curbEdge, contactStop = true,
-                )
-            }
+            contactStopDecision(blocking, cap, hfovDeg, curbContact, curbEdge)?.let { return it }
             val path = PeoplePath.plan(cleaned, range, hfovDeg)
-            val computed =
-                if (path != null && path.fits) path.side else freerSide(cleaned, obstacle, range, hfovDeg)
-            val side = boundedSide(computed, free)
+            val computed = if (path != null && path.fits) {
+                path.side
+            } else {
+                holeOrFreer(cleaned, obstacle, holeSide, range, hfovDeg)
+            }
+            val side = GuidanceBounds.boundedSide(computed, free)
             val shift = shiftOf(obstacle.meters, STRAIGHT_HALF_CORRIDOR, hfovDeg)
             return GuidanceDecision(
                 true, obstacle, side, cap, side.toCap(),
-                boundedShift(shift, measuredRoom(free, side)), curbContact, curbEdge,
+                GuidanceBounds.boundedShift(shift, GuidanceBounds.measuredRoom(free, side)), curbContact, curbEdge,
             )
         }
-        val passage = bestPassage(cleaned, cap, range, hfovDeg)
-        val bounded = sideOf(passage)?.let { boundedSide(it, free) }
-        val shift = shiftOf(obstacle.meters, LATERAL_HALF_CORRIDOR, hfovDeg)
+        return GuidanceBounds.lateralDecision(
+            cleaned, obstacle, cap, range, hfovDeg, free, curbContact, curbEdge,
+        )
+    }
+
+    /**
+     * Bordure au contact **et** obstacle mesuré au contact, cap droit : on
+     * s'arrête (audit 31/10 : on ne monte pas une bordure dans un obstacle).
+     * `null` sinon. Extrait de [decide] (plafond 50 lignes/fonction).
+     */
+    private fun contactStopDecision(
+        blocking: List<PlacedLabel>,
+        cap: SteeringCap,
+        hfovDeg: Float,
+        curbContact: Boolean,
+        curbEdge: CurbEdge?,
+    ): GuidanceDecision? {
+        if (!curbContact) return null
+        val threat = contactThreat(blocking) ?: return null
         return GuidanceDecision(
-            true, obstacle, null, cap, bounded?.toCap() ?: passage,
-            boundedShift(shift, measuredRoom(free, bounded ?: free.side)),
-            curbContact, curbEdge,
+            blocked = true, obstacle = threat, cap = cap,
+            shiftMeters = shiftOf(threat.meters, STRAIGHT_HALF_CORRIDOR, hfovDeg),
+            curbContact = true, curbEdge = curbEdge, contactStop = true,
         )
     }
 
@@ -232,56 +253,6 @@ object Guidance {
     }
 
     /**
-     * Portée effective : la vitesse de marche fait suivre la portée à l'horizon
-     * de décision ([Timing.rangeFor] : 5,8 m à 2 m/s), sauf [rangeMeters] fixée
-     * explicitement par l'appelant — elle fait foi. Sans vitesse, portée
-     * historique ([RANGE_METERS]) : rien ne change pour les appelants muets.
-     */
-    private fun effectiveRange(rangeMeters: Float, speedMps: Float?): Float {
-        if (speedMps == null || rangeMeters != RANGE_METERS) return rangeMeters
-        return Timing.rangeFor(speedMps)
-    }
-
-    /**
-     * Côté conseillé tenu par l'espace libre : si [chosen] n'a pas
-     * [FreeSpace.EDGE_MARGIN_M] de place, on prend [FreeSpace.side] (le côté le
-     * plus large) quand il a la marge ; aucun côté n'a la marge ⇒ [chosen] est
-     * gardé. Jamais `null` : un trottoir étroit ne fait pas taire le guidage.
-     */
-    private fun boundedSide(chosen: GuidanceSide, free: FreeSpace): GuidanceSide {
-        if (free.canShift(chosen, FreeSpace.EDGE_MARGIN_M)) return chosen
-        val widest = free.side
-        return if (free.canShift(widest, FreeSpace.EDGE_MARGIN_M)) widest else chosen
-    }
-
-    /**
-     * Place du côté [side], `null` quand l'espace n'est **pas mesuré**
-     * ([FreeSpace.unknown] : trottoir supposé de 0,90 m) — on ne plafonne pas
-     * un ordre par une supposition, la géométrie historique reste seule juge.
-     */
-    private fun measuredRoom(free: FreeSpace, side: GuidanceSide): Float? =
-        if (free == FreeSpace.unknown()) null else free.room(side)
-
-    /**
-     * Décalage ramené à la place réelle : au plus [roomM], arrondi au demi-mètre
-     * **inférieur** (plancher 0). Un ordre de 1,50 m sur 0,60 m de place est un
-     * pas dans le mur ; `null` sans place mesurée ([roomM] `null`).
-     */
-    private fun boundedShift(shiftMeters: Float?, roomM: Float?): Float? {
-        val shift = shiftMeters ?: return null
-        val room = roomM?.takeIf { it.isFinite() } ?: return shift
-        val cap = floor(room / SHIFT_STEP_M) * SHIFT_STEP_M
-        return minOf(shift, cap.coerceAtLeast(0f))
-    }
-
-    /** Cap vu comme côté, `null` pour tout droit : l'axe n'a pas de côté. */
-    private fun sideOf(cap: SteeringCap): GuidanceSide? = when (cap) {
-        SteeringCap.Left -> GuidanceSide.Left
-        SteeringCap.Right -> GuidanceSide.Right
-        SteeringCap.Straight -> null
-    }
-
-    /**
      * Mot de la décision : voie libre ⇒ cap, bouché ⇒ côté de sortie —
      * même au contact mesuré (ordres user : dans une foule on se faufile,
      * et jamais de stop pour un obstacle — la voix dit directement
@@ -318,12 +289,22 @@ object Guidance {
     fun key(decision: GuidanceDecision): String = word(decision).key
 
     /**
-     * Le label bouche-t-il le cap marché ? Droit = le trait coupe la boîte,
-     * latéral = la moitié visée (inchangé).
+     * Le label bouche-t-il le cap marché ? Droit = le trait voit loin
+     * ([axisRangeMeters]) et coupe la boîte ; latéral = la moitié visée au
+     * champ proche ([rangeMeters]).
      */
-    private fun blocks(label: PlacedLabel, cap: SteeringCap, rangeMeters: Float, hfovDeg: Float): Boolean {
-        if (!inRange(label, rangeMeters)) return false
-        if (cap != SteeringCap.Straight) return inCorridor(label.centerX, cap)
+    private fun blocks(
+        label: PlacedLabel,
+        cap: SteeringCap,
+        rangeMeters: Float,
+        hfovDeg: Float,
+        axisRangeMeters: Float,
+    ): Boolean {
+        if (cap != SteeringCap.Straight) {
+            if (!inRange(label, rangeMeters)) return false
+            return inCorridor(label.centerX, cap)
+        }
+        if (!inRange(label, axisRangeMeters)) return false
         return rayBlocks(label, hfovDeg)
     }
 
@@ -374,7 +355,7 @@ object Guidance {
      * Obstacle non-bordure mesuré au contact (≤ [CONTACT_METERS]), le plus proche
      * — `null` si le seul contact est la bordure elle-même (on la monte).
      */
-    private fun contactThreat(blocking: List<PlacedLabel>): PlacedLabel? =
+    internal fun contactThreat(blocking: List<PlacedLabel>): PlacedLabel? =
         blocking.mapNotNull { hit ->
             hit.meters?.takeIf { it.isFinite() && it <= CONTACT_METERS && !isCurbStep(hit.label) }
                 ?.let { hit to it }
@@ -388,6 +369,23 @@ object Guidance {
     private fun nearRank(label: PlacedLabel): Float {
         val meters = label.meters
         return if (meters == null || !meters.isFinite()) 0f else meters
+    }
+
+    /**
+     * Repli quand le chemin optimal échoue : vers le trou ([holeSide]) quand
+     * il garantit 80 cm à toute personne ([PeoplePath.clearsSide]), sinon le
+     * côté le moins encombré ([freerSide]) — l'évitement des humains prime
+     * sur le trou, toujours.
+     */
+    private fun holeOrFreer(
+        labels: List<PlacedLabel>,
+        obstacle: PlacedLabel,
+        holeSide: GuidanceSide?,
+        rangeMeters: Float,
+        hfovDeg: Float,
+    ): GuidanceSide {
+        if (holeSide != null && PeoplePath.clearsSide(labels, holeSide, rangeMeters, hfovDeg)) return holeSide
+        return freerSide(labels, obstacle, rangeMeters, hfovDeg)
     }
 
     /**
@@ -429,7 +427,7 @@ object Guidance {
      * (sans personne d'abord, sinon moins d'objets à portée, sinon obstacle
      * connu le plus loin), le centre en premier à égalité.
      */
-    private fun bestPassage(
+    internal fun bestPassage(
         labels: List<PlacedLabel>,
         cap: SteeringCap,
         rangeMeters: Float,

@@ -8,7 +8,6 @@ import dev.sam3vision.core.speech.SpeechLanguage
 import kotlinx.coroutines.runBlocking
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
-import org.junit.Assert.assertNull
 import org.junit.Assert.assertTrue
 import org.junit.Test
 
@@ -63,9 +62,7 @@ class PlaceModeOrderTest {
     fun `bascule dehors vide l'etat picto affiche, les armes restent armes`() = runBlocking {
         state = IseeUiState(
             picto = PictoUiState(
-                phase = PictoPhase.Review,
-                draftPng = byteArrayOf(1, 2),
-                draftLabel = "Objet",
+                phase = PictoPhase.Generating,
                 hits = listOf(PictoHit("id-1", "Objet", 0f, 0f, 1f, 1f, 0.9f)),
                 armed = 2,
             ),
@@ -73,7 +70,6 @@ class PlaceModeOrderTest {
         assertTrue(order().run("mode dehors"))
         assertEquals(PictoPlaceMode.DEHORS, state.placeMode)
         assertEquals(PictoPhase.Idle, state.picto.phase)
-        assertNull(state.picto.draftPng)
         assertTrue(state.picto.hits.isEmpty())
         assertEquals(2, state.picto.armed)
         assertEquals("Mode dehors activé.", state.status)
@@ -82,8 +78,7 @@ class PlaceModeOrderTest {
     @Test
     fun `bascule dedans garde l'etat picto`() = runBlocking {
         val shown = PictoUiState(
-            phase = PictoPhase.Review,
-            draftPng = byteArrayOf(1, 2),
+            phase = PictoPhase.Generating,
             hits = listOf(PictoHit("id-1", "Objet", 0f, 0f, 1f, 1f, 0.9f)),
             armed = 1,
         )

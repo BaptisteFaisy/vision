@@ -41,13 +41,16 @@ queue_rules:
     batch_size:
       min: 1
       max: 3
-    # 60 s (31/10, était 20 s) : la file ne fait pas attendre pour rien, mais
-    # 20 s ne laissaient jamais le temps aux PR voisines d'arriver — mesuré le
-    # 31/10, chaque lot ne portait qu'UNE PR, donc un passage de CI complet
-    # (~90 s une fois le pool rendu au CI) par PR mergée. Un lot de 3 coûte le
-    # même passage : attendre jusqu'à 60 s pour le remplir divise le coût par
-    # trois et fait passer le débit de ~13 à ~3 PR par batch.
-    batch_max_wait_time: 60 seconds
+    # 30 s (2026-11-01, était 60 s). L'attente est du temps mort payé par
+    # CHAQUE PR sur son chemin critique, alors que le lot n'apporte un gain que
+    # s'il se remplit : mesuré le 01/11, 5 à 9 PR mergées par heure, soit moins
+    # d'une PR toutes les 6 minutes — le lot reste presque toujours à 1, et les
+    # 60 s ne servaient qu'à retarder. Et quand un lot change l'arbre, la CI du
+    # lot redevient un passage complet : la marge gagnée en fusionnant deux PR
+    # voisines se paie en latence sur toutes les autres. 30 s garde le
+    # regroupement des rafales (le balayeur en produit) sans imposer une minute
+    # d'attente à une PR seule.
+    batch_max_wait_time: 30 seconds
     merge_method: rebase
     update_method: rebase
     checks_timeout: 20 min

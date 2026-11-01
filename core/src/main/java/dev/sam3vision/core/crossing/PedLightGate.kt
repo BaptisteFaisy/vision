@@ -48,6 +48,23 @@ object PedLightGate {
      */
     private const val ELONGATION_MIN = 1.0f
 
+    /**
+     * Remplissage maximal de la boîte pour une tache **plus large que haute**.
+     *
+     * Une tache large est la signature d'un disque vu de face — mais un disque
+     * allumé est **plein** (0,75 à 0,88 de sa boîte mesurés), alors qu'un
+     * bonhomme, même cadré de près ou nimbé d'un halo, laisse des trous
+     * (0,09 et 0,16 sur les deux verts réels concernés). 0,35 tombe dans le
+     * vide entre les deux populations (facteur ≈ 2 de chaque côté), donc ce
+     * n'est pas un seuil ajusté à un cas : la mesure ne bouge pas entre 0,30
+     * et 0,40.
+     *
+     * Mesuré le 01/11/2026 sur les 49 crops téléphone FR : rappel vert
+     * 18/20 → **20/20**, aucun faux vert, 31/31 ancres ; sur 400 crops PTL
+     * (autre pays, contrôle indépendant) les faux verts sont inchangés (13).
+     */
+    private const val WIDE_FILL_MAX = 0.35f
+
     /** Hauteur minimale de la tache verte, en pixels (pas un point). */
     const val BBOX_MIN_PX = 3
 
@@ -102,7 +119,8 @@ object PedLightGate {
         val boxWidth = scan.maxX - scan.minX + 1
         val boxHeight = scan.maxY - scan.minY + 1
         if (boxHeight < BBOX_MIN_PX) return false
-        if (boxHeight.toFloat() < boxWidth * ELONGATION_MIN) return false
+        val wide = boxHeight.toFloat() < boxWidth * ELONGATION_MIN
+        if (wide && scan.green.toFloat() > boxWidth * boxHeight * WIDE_FILL_MAX) return false
         val bottomFraction = scan.greenBottom.toFloat() / scan.green
         if (bottomFraction >= GREEN_BOTTOM_MIN) return true
         if (bottomFraction <= R1B_BOTTOM_FLOOR) return false

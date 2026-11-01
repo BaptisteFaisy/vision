@@ -43,7 +43,7 @@ def plage_str(bornes):
 
 
 # --- étages du chemin client (dixièmes de ms) --------------------------------
-CAPTURE = (810, 810)                  # mesuré 01/11/2026 : capsplit `age` (chemin Direct)
+CAPTURE = (860, 860)                  # mesuré 01/11/2026 : capsplit `age` p50, n = 38 (Direct)
 CAPTURE_LOCAL = (250, 250)            # u07, hypothèse locale (rien à encoder par frame)
 ENCODE = (270, 270)                   # mesuré 01/11/2026 : enc 24 + b64 3
 ENCODE_HYPOTHESE = (50, 80)           # u02, estimé après la refonte NV21 (avant mesure)
@@ -78,12 +78,12 @@ COUT_MONTANT = "≈ 0,12 ms/Ko"
 
 # --- architecture locale (§ 4, dernière ligne) et allocation (§ 7) -----------
 LOCAL_AR = (0, 0)                     # aucun aller-retour réseau sur le chemin perçu
-LAN_PERÇU = (1616, 2181)              # boîte GPU dans le LAN, téléphone ↔ LAN
 ALLOCATION = (
     ("CAPTURE", 250,
-     "cible locale : les 81 ms **mesurés** sur le chemin Direct (§ 2) sont un backlog d'analyseur, "
-     "supposé disparaître quand le chemin local n'encode plus de JPEG par frame — le pari le plus "
-     "fragile du document"),
+     f"cible locale **non mesurée** : la campagne du 01/11 mesure {dix_str(CAPTURE[0])} ms de "
+     f"pipeline capteur, indépendant de l'application (§ 2) ; la ligne mesurée du § 4 sort à "
+     f"{plage_str(CLIENT_LOCAL_MESURE)} ms, propagation comprise — pari le plus fragile du "
+     f"document"),
     ("PROPAGATION (u10+u11)", 100,
      "cible u11 < 8 ms/frame à 512×206 ; 33,3 ms de débit disponible à 30 fps"),
     ("COMPOSE", 30, "0,93 ms mesuré (u03) — 3 ms laisse la place aux 12 objets"),
@@ -106,13 +106,17 @@ CIBLES_MESURES = ((300, 500), (250, 500))   # (moyenne, max) : défauts du parse
 # --- § 2 : étages du chemin Direct ------------------------------------------
 ETAGES_DOC = (
     ("CAPTURE", plage_str(CAPTURE), "capteur → callback de l'analyseur CameraX",
-     "**mesuré** 81 ms le 01/11/2026 (`ISEE_LAT` capsplit `age`, téléphone ; N non archivé) "
-     "— la cause n'est pas établie : le poste `int` (cadence obtenue) la tranche",
-     "période caméra 33,3 ms à 30 fps, donc exposition <= 33 ms : au moins ~48 ms de "
-     "ces 81 ms ne sont ni l'exposition ni la cadence (readout, ISP, file — à départager)"),
+     f"**mesuré** {dix_str(CAPTURE[0])} ms le 01/11/2026 (`ISEE_LAT` capsplit `age` p50, "
+     f"téléphone SM-G780G, build `1.0.1139-da6531a`, n = 38) — cause établie : délai du "
+     f"**pipeline capteur** (exposition + readout + ISP + buffers du HAL), indépendant de la "
+     f"durée d'analyse et du nombre de flux liés",
+     "`int` p50 33 ms (30 fps tenus, l'app n'affame pas la caméra) et corrélation "
+     "`age` ↔ `total` +0,18 : la durée d'analyse n'explique pas l'âge, le délai est en amont "
+     "de l'analyseur"),
     ("ENCODE", plage_str(ENCODE), "NV21 → JPEG q65 → base64 du corps de requête",
-     "**mesuré** 27 ms le 01/11/2026 (`ISEE_LAT` capsplit `enc` 24 + `b64` 3, téléphone ; "
-     "N non archivé)",
+     "**mesuré** 27 ms le 01/11/2026 (`ISEE_LAT` capsplit `enc` 24 + `b64` 3, SM-G780G, n = 38) "
+     "— le relevé à `int` du même dump donne `enc` p50 9 ms ; écart non tranché, la valeur "
+     "haute est publiée",
      "≈ 2 ms pour un 512×206 (non mesuré ici) ; u02 donnait 5–8 ms, base64 exclu"),
     ("QUEUE", "calculée", "attente du créneau d'envoi (`intervalMsAdaptive`)",
      "u01 + hypothèse de phase uniforme (attente ≈ intervalle ÷ 2) ; cadence prudente de cet arbre : 350 / 500 / 900 ms",
@@ -177,15 +181,15 @@ PLANCHERS_DOC = (
 
 # --- § 4 : budget par architecture (nom, contexte, A/R, client, attente, verdict) ---
 ARCHITECTURES = (
-    ("Cloud A100 eu-west, 4 concepts", "téléphone", (4440, 5780), (2466, 2979), "quart", "cloud"),
-    ("Cloud A100 eu-west, 4 concepts", "banc filaire r630", (3870, 5280), (2324, 2854), "quart", "cloud"),
-    ("Cloud H200, 8 concepts", "téléphone", (3940, 4970), (2341, 2777), "quart", "cloud"),
-    ("Cloud B200 /live, 1 concept", "téléphone", (1910, 2910), (1834, 2262), "quart", "cloud"),
-    ("Cloud B200 + tracker vidéo 720p", "téléphone", (1807, 2807), (1808, 2236), "quart", "cloud"),
-    ("Cloud B200 + tracker vidéo 720p", "banc filaire r630", (1237, 1237), (1356, 1701), "vsync", "cloud"),
-    ("Boîte GPU dans le LAN (4090/5090)", "téléphone ↔ LAN", (260, 480), (1356, 1701), "vsync", "limite"),
+    ("Cloud A100 eu-west, 4 concepts", "téléphone", (4440, 5780), (2516, 3029), "quart", "cloud"),
+    ("Cloud A100 eu-west, 4 concepts", "banc filaire r630", (3870, 5280), (2374, 2904), "quart", "cloud"),
+    ("Cloud H200, 8 concepts", "téléphone", (3940, 4970), (2391, 2827), "quart", "cloud"),
+    ("Cloud B200 /live, 1 concept", "téléphone", (1910, 2910), (1884, 2312), "quart", "cloud"),
+    ("Cloud B200 + tracker vidéo 720p", "téléphone", (1807, 2807), (1858, 2286), "quart", "cloud"),
+    ("Cloud B200 + tracker vidéo 720p", "banc filaire r630", (1237, 1237), (1406, 1751), "vsync", "cloud"),
+    ("Boîte GPU dans le LAN (4090/5090)", "téléphone ↔ LAN", (260, 480), (1406, 1751), "vsync", "limite"),
     ("Keyframe cloud + propagation locale (30 fps)", "téléphone", LOCAL_AR, CLIENT_LOCAL, "local", "local"),
-    ("Le même, capture et encode mesurés (01/11)", "téléphone", LOCAL_AR, CLIENT_LOCAL_MESURE,
+    ("Le même, capture mesurée sur appareil (01/11)", "téléphone", LOCAL_AR, CLIENT_LOCAL_MESURE,
      "local", "local-mesure"),
 )
 
@@ -211,6 +215,12 @@ def base_de(mode):
 def percee_de(ar, client):
     """Latence perçue d'une ligne : A/R + client hors HTTP (attente incluse dans le client)."""
     return (ar[0] + client[0], ar[1] + client[1])
+
+
+# Boîte GPU dans le LAN : lue dans `ARCHITECTURES` (A/R local + client cloud + attente), jamais
+# recopiée — c'est ce qui garantit que le § 4 et le § 5 publient le même chiffre.
+LAN_PERÇU = next(percee_de(ar, client) for nom, _, ar, client, _, _ in ARCHITECTURES
+                 if nom.startswith("Boîte GPU"))
 
 
 def cellule_verdict(percu, mode):
@@ -401,7 +411,7 @@ def assertions():
                     for i in (0, 1))
     lignes, pire = limites()
     return (
-        (f"sommes étages cloud : {plage_str(CLIENT_CLOUD)}", lambda: CLIENT_CLOUD == (1356, 1534)),
+        (f"sommes étages cloud : {plage_str(CLIENT_CLOUD)}", lambda: CLIENT_CLOUD == (1406, 1584)),
         (f"sommes keyframe + propagation : {plage_str(local)}", lambda: local == (466, 554)),
         (f"plancher A/R cloud {dix_str(PLANCHER_CLOUD)} ms > 100 ms", lambda: PLANCHER_CLOUD > CIBLE_DIX),
         ("les 6 architectures cloud dépassent 100 ms", lambda: len(cloud) == 6 and min(haut for _, haut in cloud) > CIBLE_DIX),

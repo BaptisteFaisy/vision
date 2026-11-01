@@ -24,14 +24,16 @@ pré-synthétisé, jamais de synthèse réseau au moment de parler.
 - **Trait** : le cap droit projette le marcheur devant lui — `RAY_HALF_WIDTH_M
   = 0,25 m` de chaque côté de l'axe `x = 0,5`, à la distance de l'objet
   (`Guidance.kt`, `rayBlocks`) : large de près (à 1 m, ±0,19), fin de loin (à
-  4 m, ±0,05). Une boîte SAM qui coupe le trait bloque, même décentrée ;
+  4 m, ±0,05 ; à 15 m, ±0,013). Une boîte SAM qui coupe le trait bloque, même décentrée ;
   l'objet étroit à côté libère, même centré dans l'ancienne bande. La
   consigne ne dit ni cadran ni label : le mot suffit.
 - **Repli prudent** : sans bords (`x0`/`x1`) ou sans distance connus, la bande
   centrale historique (`centerX` entre 0,34 et 0,66, `PositionText.SIDE_EDGE`,
   `inCorridor`) tranche — on ne devine jamais un passage.
-- **Portée** : `RANGE_METERS = 4f` (`Guidance.kt`) — au-delà, un objet sur le trait est
-  trop loin pour un pas et ne bloque pas.
+- **Portée** : l'axe voit loin — `AXIS_RANGE_METERS = 15f` (`Guidance.kt`,
+  ordre user du 01/11) : un obstacle pile sur le trait bloque dès 15 m, le
+  temps de préparer l'évitement. Le reste (caps latéraux, côtés, chemin
+  optimal, décalage latéral) juge au champ proche — `RANGE_METERS = 4f`.
 - **Distance inconnue = prudence** : un objet de la bande de repli sans distance
   mesurée (classe inconnue, boîte coupée) bloque quand même, et le mot reste
   le côté de sortie (`inRange`, `nearRank`, `Guidance.kt`) — on ne juge pas le
@@ -44,6 +46,11 @@ pré-synthétisé, jamais de synthèse réseau au moment de parler.
   connu le plus loin, sinon l'opposé du décalage de l'obstacle dans le couloir
   (pilier légèrement à gauche ⇒ on passe à droite), pile au centre ⇒ à gauche
   (`freerSide`, `Guidance.kt`).
+- **Trou de grillage** : sur ce repli seul (chemin optimal sans issue), un
+  grillage ouvert à gauche ou à droite (intervalle ≥ 0,80 m à ≤ 4 m,
+  `FenceOpeningSignal.holeSide`) oriente la sortie vers le trou — sauf humain
+  à moins de 80 cm de ce côté (`PeoplePath.clearsSide`) : l'évitement des
+  humains prime toujours. Mêmes mots (voix TwinLite), mêmes clips < 100 ms.
 
 ## 3. Ce que la consigne dit
 

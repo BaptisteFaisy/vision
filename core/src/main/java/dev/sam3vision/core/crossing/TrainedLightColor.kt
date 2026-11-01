@@ -7,10 +7,10 @@ package dev.sam3vision.core.crossing
  * tableaux. Ne pas éditer à la main : régénérer depuis les crops, mêmes
  * hyperparamètres. Traits : [FEATURE_NAMES] dans l'ordre.
  *
- * L'arbre appris est une souche (`green_frac` > 0,0048) : sur les crops
+ * L'arbre appris est une souche (`green_frac` > 0,0035, ordre user du 01/11 : 0,48 % → 0,35 %) : sur les crops
  * téléphone, la fraction verte sépare à elle seule (verts ≥ 0,017, rouges
  * ≤ 0,0018) et la forme reste du ressort de la porte. Mesuré 01/11 :
- * verdicts 18/20 verts lotfinal (0009 et 0015 : tache trop large, élancement
+ * verdicts 18/20 verts lotfinal au seuil 0,0048, à remesurer (0009 et 0015 : tache trop large, élancement
  * < 1,0 — seuils de porte intacts, non réglés), 32/32 rouges, 0 faux vert ;
  * 18/20 ancres stables (2 disques voiture repassent rouges, sens sûr).
  *
@@ -38,7 +38,7 @@ object TrainedLightColor {
     private const val GREEN_FRAC_INDEX = 13
 
     private val FEATURE = intArrayOf(13, -2, -2)
-    private val THRESHOLD = floatArrayOf(0.004812047118321061f, -2.0f, -2.0f)
+    private val THRESHOLD = floatArrayOf(0.0035f, -2.0f, -2.0f)
     private val LEFT = intArrayOf(1, -1, -1)
     private val RIGHT = intArrayOf(2, -1, -1)
     private val LEAF_CLASS = intArrayOf(0, 0, 1)

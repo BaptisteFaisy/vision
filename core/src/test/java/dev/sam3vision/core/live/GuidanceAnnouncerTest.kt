@@ -4,6 +4,7 @@ import dev.sam3vision.core.curb.SidewalkPosition
 import dev.sam3vision.core.model.Passage
 import dev.sam3vision.core.speech.SpeechLanguage
 import org.junit.Assert.assertEquals
+import org.junit.Assert.assertNotNull
 import org.junit.Assert.assertNull
 import org.junit.Assert.assertTrue
 import org.junit.Test
@@ -248,17 +249,6 @@ class GuidanceAnnouncerTest {
         // …et 200 ms plus tard la fermeture (2,5 m/s) donne un TTC de 0,36 s :
         // le mot ressort malgré la redite récente (repeatMs = 2 s).
         assertEquals("Gauche.", announcer.onFrame(200L, listOf(personneDroite(0.9f)), SpeechLanguage.Fr))
-    }
-
-    @Test
-    fun `vitesse de marche elargit la portee`() {
-        val lent = GuidanceAnnouncer()
-        lent.onFrame(0L, listOf(personne(5.5f)), speedMps = 1.0f)
-        assertEquals("portée à 1 m/s : 5,5 m est hors champ", false, lent.lastDecision?.blocked)
-
-        val vite = GuidanceAnnouncer()
-        vite.onFrame(0L, listOf(personne(5.5f)), speedMps = 2.0f)
-        assertEquals("portée à 2 m/s : 5,8 m, l'obstacle entre", true, vite.lastDecision?.blocked)
     }
 
     @Test

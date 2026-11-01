@@ -66,6 +66,19 @@ jobs:
       - uses: actions/checkout@v4
         with:
           fetch-depth: 1
+          # Workspace persistant : les sorties de build survivent d'un run à
+          # l'autre sur le même runner (voir le pas de nettoyage qui suit).
+          clean: false
+      - name: Nettoyage du workspace (sorties Gradle conservées)
+        shell: bash
+        run: |
+          # `actions/checkout` fait `git clean -ffdx` par défaut : il supprimait
+          # `app/build` et `core/build`, donc **chaque run recompilait à froid**
+          # (~56 s de Kotlin/KSP par passage, pour 4 s de tests réels).
+          # Les runners sont self-hosted et persistants : leurs sorties de build
+          # valent d'être gardées. On jette tout le reste (arbre aussi propre
+          # qu'aujourd'hui, aucun risque de fichier fantôme).
+          git clean -ffdx -e /build -e '*/build' -e /.gradle
       - uses: gradle/actions/setup-gradle@v4
       # Les clés des APK distribués (action composite, même étape que le job
       # `ci`) : sans elle, l'artefact apk-debug sort sans clé et l'app dit
@@ -121,6 +134,19 @@ jobs:
       - uses: actions/checkout@v4
         with:
           fetch-depth: 1
+          # Workspace persistant : les sorties de build survivent d'un run à
+          # l'autre sur le même runner (voir le pas de nettoyage qui suit).
+          clean: false
+      - name: Nettoyage du workspace (sorties Gradle conservées)
+        shell: bash
+        run: |
+          # `actions/checkout` fait `git clean -ffdx` par défaut : il supprimait
+          # `app/build` et `core/build`, donc **chaque run recompilait à froid**
+          # (~56 s de Kotlin/KSP par passage, pour 4 s de tests réels).
+          # Les runners sont self-hosted et persistants : leurs sorties de build
+          # valent d'être gardées. On jette tout le reste (arbre aussi propre
+          # qu'aujourd'hui, aucun risque de fichier fantôme).
+          git clean -ffdx -e /build -e '*/build' -e /.gradle
       - uses: gradle/actions/setup-gradle@v4
       # C'est CE job qui porte le contrôle lint (abortOnError = true : une
       # erreur échoue ici). Le job `apk` n'a plus à le refaire :

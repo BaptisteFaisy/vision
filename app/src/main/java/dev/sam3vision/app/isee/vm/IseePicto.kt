@@ -32,36 +32,38 @@ import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withTimeoutOrNull
 
-/** Où en est le repère : repos, photo, génération réseau, ou relecture aidant. */
-enum class PictoPhase { Idle, Shooting, Generating, Review }
+/** Où en est le repère : repos, photo, ou génération réseau. */
+enum class PictoPhase { Idle, Shooting, Generating }
 
 /**
- * L'état picto de l'écran : la phase, le brouillon relu, les objets reconnus
- * sur la vidéo (overlay temps réel) et le nombre de repères armés.
+ * L'état picto de l'écran : la phase, les objets reconnus sur la vidéo
+ * (overlay temps réel) et le nombre de repères armés.
  */
 data class PictoUiState(
     val phase: PictoPhase = PictoPhase.Idle,
-    val draftPng: ByteArray? = null,
-    val draftLabel: String = "",
     val hits: List<PictoHit> = emptyList(),
     val armed: Int = 0,
 )
 
 /**
- * Les repères visuels : photo de l'objet filmé → pictogramme Muse → relecture
- * aidant → reconnaissance temps réel sur la vidéo. Rien ici ne parle à CameraX
- * ni à Bitmap : tout passe par [IseeCameraActions] et des fonctions injectées,
- * ce qui garde l'écran testable sans appareil (voir [IseePhotoShot]).
+ * Les repères visuels : photo de l'objet filmé → pictogramme Muse →
+ * stockage direct → reconnaissance temps réel sur la vidéo. Ni confirmation,
+ * ni nom, ni avant-plan : le pictogramme généré est armé aussitôt et
+ * l'overlay le montre à son emplacement sur l'image. Rien ici ne parle à
+ * CameraX ni à Bitmap : tout passe par [IseeCameraActions] et des fonctions
+ * injectées, ce qui garde l'écran testable sans appareil (voir [IseePhotoShot]).
  *
  * Un seul vol à la fois (`busy`) : le bouton est muet pendant la génération
  * (~10 s facturées ~0,01 $), et une seconde demande ne double pas la facture.
  * La chasse (« où sont mes clés ») est pilotée par la détection : l'ordre
  * arme le label, le pictogramme se génère à sa première détection SAM,
- * puis l'overlay s'ancre sur la boîte détectée — il disparaît avec les
- * clés et réapparaît avec elles, sans jamais régénérer.
- * Dehors, tout est muet (bouton, ordres, relecture, reconnaissance sur
- * frames) : seul dedans suit des pictos. Une génération lancée dedans mais
- * livrée dehors est jetée sans bruit ([dropLate]).
+ * puis l'overlay s'ancre sur la boîte détectée : l'ancrage live est seul
+ * juge tant que dure la chasse — objet hors champ (passage gabarit muet)
+ * ou SAM muet, le picto tombe aussitôt et revient avec l'objet, sans
+ * jamais régénérer.
+ * Dehors, tout est muet (bouton, ordres, reconnaissance sur frames) : seul
+ * dedans suit des pictos. Une génération lancée dedans mais livrée dehors
+ * est jetée sans bruit ([dropLate]).
  */
 class IseePicto(
     private val media: MediaCacheStore,
@@ -92,15 +94,8 @@ class IseePicto(
         }
     }
 
-
-    /** Brouillon en relecture : photo d'origine (régénération), gabarit, PNG. */
-    private class Draft(val photo: ByteArray, val template: PictoTemplate, var png: ByteArray)
-
     @Volatile
     private var pictos: List<StoredPicto> = emptyList()
-
-    @Volatile
-    private var draft: Draft? = null
 
     @Volatile
     private var busy = false
@@ -150,7 +145,9 @@ class IseePicto(
     }
 
     /**
-     * Bouton « Picto » de la carte : photo de l'objet filmé, puis pictogramme.
+     * Bouton « Picto » de la carte : photo de l'objet filmé, pictogramme
+     * Muse, puis stockage direct — sans confirmation ni nom : le repère est
+     * cherché dès la frame suivante et l'overlay le montre à son emplacement.
      * Muet dehors, pendant une génération en vol, ou si la caméra n'est pas prête.
      */
     fun onPictoButton() {
@@ -164,7 +161,7 @@ class IseePicto(
                 fail(IseeStatusText.PICTO_PHOTO_FAILED)
             } else {
                 update { it.copy(picto = it.picto.copy(phase = PictoPhase.Generating)) }
-                generate(shot.first, shot.second, "")
+                generateAndArm(shot.first, shot.second, "")
             }
         }
     }
@@ -185,42 +182,10 @@ class IseePicto(
         update { it.copy(picto = it.picto.copy(hits = templateHits, armed = pictos.size), status = null) }
     }
 
-    /** L'aidant valide : le repère est stocké et la détection l'arme aussitôt. */
-    fun confirmDraft(label: String) {
-        if (!placeMode().pictoEnabled) return
-        val pending = draft ?: return
-        draft = null
-        scope.launch(io) {
-            val saved = runCatching { store.save(label, pending.png, pending.template) }
-            if (saved.isFailure) {
-                fail(IseeStatusText.pictoFailed(saved.exceptionOrNull() ?: IllegalStateException("save failed")))
-                return@launch
-            }
-            load()
-            update { it.copy(picto = PictoUiState(armed = pictos.size), status = IseeStatusText.PICTO_SAVED) }
-        }
-    }
-
-    /** L'aidant n'aime pas le dessin : régénération avec son nom comme indice. */
-    fun regenerateDraft(label: String) {
-        if (!placeMode().pictoEnabled) return
-        val pending = draft ?: return
-        if (busy) return
-        busy = true
-        update { it.copy(picto = it.picto.copy(phase = PictoPhase.Generating)) }
-        launchGuarded { generate(pending.photo, pending.template, label) }
-    }
-
-    /** L'aidant abandonne : rien n'est stocké, rien ne reste armé de plus. */
-    fun dismissDraft() {
-        draft = null
-        busy = false
-        update { it.copy(picto = it.picto.copy(phase = PictoPhase.Idle, draftPng = null)) }
-    }
-
     /**
      * Frame filmée (JPEG base64) : les repères armés y sont cherchés au plus
      * toutes les [MATCH_EVERY_MS] — 2 Hz, l'overlay garde le dernier passage.
+     * Chasse : un passage muet sur le picto chassé périme son ancrage live.
      */
     fun onFrame(jpegB64: String) {
         if (!placeMode().pictoEnabled) return
@@ -233,6 +198,16 @@ class IseePicto(
             val frame = frameGray(jpegB64) ?: return@launch
             val hits = known.mapNotNull { matchTemplate(frame, it.template, it.id, it.label) }
             templateHits = hits
+            // Chasse : la frame fraîche ne voit plus l'objet — l'ancrage live
+            // précédent est périmé, le picto tombe sans attendre SAM (qui le
+            // ré-ancre à sa prochaine publication si l'objet est toujours là).
+            huntLabel?.let { hunt ->
+                armedFor(hunt)?.let { armed ->
+                    if (hits.none { it.pictoId == armed.id }) {
+                        liveHits = liveHits.filter { it.pictoId != armed.id }
+                    }
+                }
+            }
             publishHits()
         }
     }
@@ -240,8 +215,8 @@ class IseePicto(
     /**
      * Détections SAM confirmées de la dernière frame : le label chassé
      * ([findObject]) y est guetté. Première détection sans repère armé :
-     * photo des clés cadrées, puis génération et armement direct — sans
-     * relecture, l'utilisateur est seul devant la caméra. Repère armé :
+     * photo des clés cadrées, puis génération et armement direct, sans
+     * confirmation — l'utilisateur est seul devant la caméra. Repère armé :
      * l'overlay s'ancre sur la boîte détectée ; les clés sorties du
      * champ, le picto disparaît, et il réapparaît avec elles, sans
      * régénérer. Muet dehors et sans chasse en cours.
@@ -296,26 +271,7 @@ class IseePicto(
         return Pair(jpeg, template)
     }
 
-    /** Appel Muse : le PNG part en relecture, l'échec en ligne de statut. */
-    private suspend fun generate(photo: ByteArray, template: PictoTemplate, hint: String) {
-        val result = clientOf(settings()).editToPictogram(photo, hint)
-        result.fold(
-            onSuccess = { png ->
-                if (!placeMode().pictoEnabled) return@fold dropLate()
-                draft = Draft(photo, template, png)
-                busy = false
-                update {
-                    it.copy(
-                        picto = it.picto.copy(phase = PictoPhase.Review, draftPng = png, draftLabel = hint),
-                        status = null,
-                    )
-                }
-            },
-            onFailure = { fail(IseeStatusText.pictoFailed(it)) },
-        )
-    }
-
-    /** Appel Muse puis stockage direct : pas de relecture, l'overlay parle. */
+    /** Appel Muse puis stockage direct : l'overlay parle, pas d'avant-plan. */
     private suspend fun generateAndArm(photo: ByteArray, template: PictoTemplate, label: String) {
         val result = clientOf(settings()).editToPictogram(photo, label)
         result.fold(
@@ -348,11 +304,10 @@ class IseePicto(
 
     /**
      * Livraison tardive (génération lancée dedans, bascule dehors entre-temps) :
-     * jetée sans bruit — ni relecture, ni stockage, ni statut (la confirmation
-     * de bascule reste à l'écran). Les repères déjà armés le restent.
+     * jetée sans bruit — ni stockage, ni statut (la confirmation de bascule
+     * reste à l'écran). Les repères déjà armés le restent.
      */
     private fun dropLate() {
-        draft = null
         busy = false
         update { it.copy(picto = PictoUiState(armed = pictos.size)) }
     }
@@ -370,16 +325,19 @@ class IseePicto(
         KnownSizes.canonical(hunt) == KnownSizes.canonical(label) ||
             PictoVoiceOrder.matches(label, hunt) || PictoVoiceOrder.matches(hunt, label)
 
-    /** Les deux sources fusionnées : l'ancrage live gagne sur le gabarit. */
+    /** Les deux sources fusionnées : l'ancrage live gagne sur le gabarit, et le picto chassé n'est jamais montré par le gabarit seul. */
     private fun publishHits() {
         val live = liveHits
-        val merged = live + templateHits.filter { hit -> live.none { it.pictoId == hit.pictoId } }
+        // Chasse : l'ancrage live est seul juge pour le picto chassé — le
+        // passage gabarit précédent ne le ressuscite pas quand SAM dit parti.
+        val huntedId = huntLabel?.let { armedFor(it)?.id }
+        val templates = templateHits.filter { hit -> live.none { it.pictoId == hit.pictoId } && hit.pictoId != huntedId }
+        val merged = live + templates
         update { it.copy(picto = it.picto.copy(hits = merged)) }
     }
 
-    /** Échec : repos, brouillon jeté, motif affiché. */
+    /** Échec : repos, motif affiché. */
     private fun fail(status: String) {
-        draft = null
         busy = false
         update { it.copy(picto = PictoUiState(armed = pictos.size), status = status) }
     }
