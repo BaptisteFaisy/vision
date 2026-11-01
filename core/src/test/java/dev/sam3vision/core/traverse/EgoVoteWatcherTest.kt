@@ -108,6 +108,7 @@ class EgoVoteWatcherTest {
         val motion = FrameMotion(MotionSample(0f, 0f, 1.02f, 0.9f), 256, 103, 100L)
         val muted = VehicleStateWatcher()
         val loud = VehicleStateWatcher()
+        val quiet = VehicleStateWatcher()
         repeat(5) { index ->
             val frame = box(100f + index, cx = 320f + index * 3f)
             val atMs = index * 100L
@@ -116,11 +117,19 @@ class EgoVoteWatcherTest {
                 muted.update(listOf(det("car", frame)), listOf(reading("car", 5f, frame)),
                     atMs = atMs, motion = motion),
             )
-            val spoke = loud.update(listOf(det("car", frame)), listOf(reading("car", 5f, frame)), atMs = atMs)
-            if (index == 2) assertNotNull("sans fond, la croissance parle", spoke)
+            // S1 : +1 %/frame sans fond = gigue SAM — jamais de mouvement
+            // (la glissade latérale doute aussi l'arrêt : silence, pas de stop).
+            assertNull(
+                "gigue sans fond : pas d'annonce mouvement",
+                quiet.update(listOf(det("car", frame)), listOf(reading("car", 5f, frame)), atMs = atMs),
+            )
+            val frank = box(100f + index * 10f, cx = 320f + index * 3f)
+            val spoke = loud.update(listOf(det("car", frank)), listOf(reading("car", 5f, frank)), atMs = atMs)
+            if (index == 2) assertNotNull("sans fond, la croissance franche parle", spoke)
         }
 
         assertNull(muted.lastMovingAlertMs)
+        assertNull("gigue sans fond : jamais d'alerte mouvement", quiet.lastMovingAlertMs)
     }
 
     @Test

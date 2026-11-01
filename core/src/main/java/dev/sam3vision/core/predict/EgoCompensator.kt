@@ -81,6 +81,12 @@ object EgoCompensator {
     /** Plancher de bruit d'une croissance (1/s) : en dessous, c'est du bruit (miroir de l'approche). */
     const val GROWTH_EPS = 0.005f
 
+    /** Sans fond prouvé, une croissance ≤ 2 %/s est de la gigue SAM, pas une approche (S1). */
+    const val NO_FOND_RATE_EPS = 0.02f
+
+    /** Sans fond prouvé, une aire qui prend ≤ 3 % par frame est de la gigue, pas une croissance (S1). */
+    const val AREA_REL_EPS = 0.03f
+
     /**
      * Vote boîte vs fond : ([boxDxPx], [boxDyPx]) le déplacement de la boîte
      * (pixels de la grille [boxWidthPx]×[boxHeightPx], [boxConf] sa confiance),
@@ -184,19 +190,28 @@ object EgoCompensator {
      * attendu `|échelle − 1| / dt` est soustrait, le reste est le [DiscountedGrowth.residual].
      * Décotée ([DiscountedGrowth.discounted]) quand la croissance tient dans
      * le zoom attendu ([SCALE_TOLERANCE]) ou sous le bruit ([GROWTH_EPS]).
-     * Sans fond prouvé : rien n'est décoté (repli historique).
+     * Sans fond prouvé : la croissance franche passe, la micro-croissance est
+     * décotée ([NO_FOND_RATE_EPS], gigue SAM — la garée ne dit plus « Stop »).
      */
     fun discountGrowth(boxGrowthRate: Float, global: MotionSample?, dtMs: Long): DiscountedGrowth {
         if (!boxGrowthRate.isFinite() || boxGrowthRate <= 0f) return DiscountedGrowth(0f, false)
-        if (global == null || dtMs <= 0L) return DiscountedGrowth(boxGrowthRate, false)
-        if (!global.scale.isFinite() || !global.confidence.isFinite()) return DiscountedGrowth(boxGrowthRate, false)
-        if (global.confidence < TRUST_MIN) return DiscountedGrowth(boxGrowthRate, false)
+        if (global == null || dtMs <= 0L) return noFond(boxGrowthRate)
+        if (!global.scale.isFinite() || !global.confidence.isFinite()) return noFond(boxGrowthRate)
+        if (global.confidence < TRUST_MIN) return noFond(boxGrowthRate)
         val expected = abs(global.scale - 1f) / (dtMs / 1000f)
         if (!expected.isFinite()) return DiscountedGrowth(boxGrowthRate, false)
         val residual = max(0f, boxGrowthRate - expected)
         val discounted = boxGrowthRate <= expected * (1f + SCALE_TOLERANCE) || residual <= GROWTH_EPS
         return DiscountedGrowth(residual, discounted)
     }
+
+    /**
+     * Repli sans fond prouvé : la croissance franche passe (jamais de silence
+     * inventé), la micro-croissance est décotée (gigue SAM, S1).
+     */
+    private fun noFond(boxGrowthRate: Float): DiscountedGrowth =
+        if (boxGrowthRate <= NO_FOND_RATE_EPS) DiscountedGrowth(0f, true)
+        else DiscountedGrowth(boxGrowthRate, false)
 
     /**
      * Croissance d'aire brute décotée du zoom : vrai quand [area] dépasse
@@ -206,6 +221,7 @@ object EgoCompensator {
      */
     fun areaGrowing(prevArea: Float, area: Float, dtMs: Long, global: MotionSample?): Boolean {
         if (area <= prevArea) return false
+        if (prevArea > 0f && area <= prevArea * (1f + AREA_REL_EPS)) return false
         val rate = linearRateFromAreas(prevArea, area, dtMs) ?: return true
         return !discountGrowth(rate, global, dtMs).discounted
     }
