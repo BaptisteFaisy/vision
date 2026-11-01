@@ -6,7 +6,7 @@ Vérifie, sans clé ni réseau (runnable en CI) :
    morceaux `parts` pour les phrases composées) ;
 2. chaque MP3 attendu existe et n'est pas vide (sauf mention --allow-missing,
    pour les branches qui codent le pack avant sa génération) ;
-3. aucun MP3 `vp_*` en surplus sur le disque (clip supprimé du catalogue
+3. aucun MP3 `vp_*` en surplus sur le disque (clip supprimé des catalogues
    mais fichier oublié — les 99 FR morts du 01/11/2026) ;
 4. assets/vp_voice.txt désigne la voix par défaut de l'app (LAURE_VOICE_ID).
 
@@ -39,6 +39,12 @@ def failures(root: str, allow_missing: bool) -> list:
     with open(os.path.join(root, "tools/voicepack-catalog.json"),
               encoding="utf-8") as fh:
         catalog = json.load(fh)["clips"]
+    try:
+        with open(os.path.join(root, "tools/isee-clips-en-catalog.json"),
+                  encoding="utf-8") as fh:
+            isee = json.load(fh)["clips"]
+    except (OSError, ValueError, KeyError):
+        isee = []
     laure = gen.default_voice(root, strict=False)
     expected = set()
     for clip in catalog:
@@ -63,6 +69,8 @@ def failures(root: str, allow_missing: bool) -> list:
             if not (os.path.isfile(mp3) and os.path.getsize(mp3)):
                 if not allow_missing:
                     problems.append(f"{cid}: {name} manquant/vide")
+    for clip in isee:
+        expected.add(f"vp_{clip['id']}_en.mp3")
     raw_dir = os.path.join(root, "app/src/main/res/raw")
     if os.path.isdir(raw_dir):
         for name in sorted(os.listdir(raw_dir)):
