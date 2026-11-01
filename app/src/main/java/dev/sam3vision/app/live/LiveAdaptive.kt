@@ -4,7 +4,7 @@ import dev.sam3vision.core.keyframe.FrameSignal
 import dev.sam3vision.core.keyframe.KeyframeDecision
 import dev.sam3vision.core.keyframe.KeyframeScheduler
 import dev.sam3vision.core.keyframe.KeyframeStats
-import dev.sam3vision.core.live.UploadLadder
+import dev.sam3vision.core.live.EncodePlan
 import dev.sam3vision.core.live.UploadRegulator
 import dev.sam3vision.core.live.UploadStatus
 import dev.sam3vision.core.model.LiveFrame
@@ -12,7 +12,7 @@ import dev.sam3vision.core.model.LiveFrame
 /**
  * Envois adaptatifs du direct (Q8+Q9) : paliers de qualité montante + keyframes.
  *
- * Q8 : [UploadRegulator] marche les paliers **qualité seule 0-2** (le bord y est
+ * Q8 : [UploadRegulator] marche les paliers **qualité seule 0-3** (le bord y est
  * constant) d'après la part réseau mesurée (aller-retour − `elapsed_ms`) ; seule la
  * qualité JPEG appliquée à l'encodeur bouge — **jamais le bord**, donc sans rebind
  * CameraX. Le palier 0 rend la qualité de la chaîne : allumé sur un lien sain, rien
@@ -35,7 +35,7 @@ import dev.sam3vision.core.model.LiveFrame
 class LiveAdaptive(
     /** Qualité JPEG de la chaîne (65 le Direct 512 px, 55 iSee 320 px) : le palier 0. */
     private val baseQuality: Int,
-    private val regulator: UploadRegulator = UploadRegulator(UploadLadder.Tiers.take(QUALITY_TIERS)),
+    private val regulator: UploadRegulator = UploadRegulator(QualityTiers),
     private val scheduler: KeyframeScheduler = KeyframeScheduler(),
 ) {
 
@@ -64,12 +64,12 @@ class LiveAdaptive(
 
     /**
      * Qualité JPEG à appliquer à l'encodeur : la constante éteint, le palier allumé
-     * (écart repris de l'échelle, jamais sous [MIN_QUALITY]).
+     * (écart repris de l'échelle qualité seule [QualityTiers], jamais sous [MIN_QUALITY]).
      */
     val jpegQuality: Int
         get() {
             if (!uploadEnabled) return baseQuality
-            val drop = UploadLadder.Tiers.first().jpegQuality - UploadLadder.plan(tier).jpegQuality
+            val drop = QualityTiers.first().jpegQuality - regulator.plan.jpegQuality
             return (baseQuality - drop).coerceAtLeast(MIN_QUALITY)
         }
 
@@ -148,8 +148,31 @@ class LiveAdaptive(
     }
 
     companion object {
-        /** Paliers câblés : 0-2, qualité seule (le bord y est constant, pas de rebind). */
-        const val QUALITY_TIERS = 3
+        /**
+         * Échelle qualité seule : le bord est fixé par CameraX (512 le Direct, 320
+         * iSee — jamais touché ici, pas de rebind), seule la qualité descend, par
+         * pas de 10, jusqu'à q−30. Le palier 3 (q35 sur le Direct, q25 iSee) n'est
+         * pris que sous charge réseau persistante : part réseau lissée > 250 ms
+         * pour sonder, puis gain mesuré ≥ 5 ms par palier pour garder — la
+         * mécanique du régulateur, seuils inchangés. Dès que le lien respire
+         * (< 200 ms) on remonte ; entre les deux on ne bouge pas, et un palier
+         * refusé gèle toute sonde 6 frames : pas d'oscillation, plafond intact
+         * quand ça passe.
+         *
+         * Pourquoi la détection reste OK : le bord ne bouge pas (masques,
+         * distances et overlay gardent leur géométrie), le serveur rééchantillonne
+         * de toute façon à la grille du modèle (518) — q35 à 512 px garde les
+         * contours que le modèle voit — et le palier 3 pèse ~14 % d'octets en
+         * moins que q45 (table mesurée : 13 486 contre 15 729) : il n'est gardé
+         * que si ce poids en moins fait gagner du temps mesuré, jamais par
+         * anticipation.
+         */
+        val QualityTiers: List<EncodePlan> = listOf(
+            EncodePlan(512, 65), // 0 : qualité pleine, le comportement actuel
+            EncodePlan(512, 55), // 1 : −10
+            EncodePlan(512, 45), // 2 : −20
+            EncodePlan(512, 35), // 3 : −30, charge persistante seule
+        )
 
         /** Plancher de sécurité : un palier ne descend jamais sous q20. */
         const val MIN_QUALITY = 20
