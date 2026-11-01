@@ -7,7 +7,10 @@ package dev.sam3vision.core.crossing
  * aussi haute que large — élancés comme ronds passent à 1,0 ; les disques
  * au contour cyan complet (tache plus large que haute) restent refusés,
  * réalité par ancre (voir `PedLightGateTest` et `docs/RECETTE-FEUX-FR.md`).
- * Les prompts piétons restent la garde contre les disques admis.
+ * Les prompts piétons restent la garde contre les disques admis, avec le
+ * veto caisson en amont ([CarHousingVeto] : tricolores francs écartés à la
+ * sélection, 01/11) — un veto par crop a été mesuré puis rejeté
+ * (recouvrement disque/bonhomme, voir `docs/MESURES-SAM3-FEUX.md` §11).
  *
  * Historique (10/2026, corpus Panoramax 235 lampes, crops ≤ 48 px) : à
  * élancement 1,5, 0 vert sur 90 rouges, 28/42 bonhommes, 0/47 disques de

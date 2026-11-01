@@ -31,19 +31,23 @@ from __future__ import annotations
 
 from concepts import model_concept
 
-# Concepts « feu » côté modèle : tricolores (suivi manuel) + piétons (Traversée).
-FEU_CONCEPTS = frozenset({"traffic light", "pedestrian traffic light"})
+# Concept « feu » gardé côté modèle : le piéton seul (la réserve
+# anti-éviction ne protège que lui). Les tricolores (`traffic light`, suivi
+# manuel) restent détectés mais ne prennent plus de place réservée — sinon
+# une boîte voiture dans le top marquait la famille « gardée » et le vrai
+# feu piéton faible score était évincé sans réserve (01/11).
+FEU_CONCEPTS = frozenset({"pedestrian traffic light"})
 
 # Variantes anglaises absentes de la table ``concepts`` : routées vers le feu
 # piéton (la Traversée ne suit que ceux-là, ordre user 31/10) au lieu d'être
 # remises telles quelles au CLIP — et reconnues par l'anti-éviction.
+# `signal` seul exclu (01/11) : mot ambigu (vise parfois un tricolore) qui
+# réservait un slot pour une boîte que le client ignore.
 ROUTED_LABELS = {
     "pedestrian light": "pedestrian traffic light",
     "pedestrian lights": "pedestrian traffic light",
     "pedestrian signal": "pedestrian traffic light",
     "pedestrian signals": "pedestrian traffic light",
-    "signal": "pedestrian traffic light",
-    "signals": "pedestrian traffic light",
 }
 
 # Concept « passage piéton » côté modèle (la table ``concepts`` y mène déjà
@@ -93,7 +97,11 @@ def routed_concept(prompt: str) -> str:
 
 
 def is_feu_label(label: object) -> bool:
-    """Vrai si [label] désigne un feu (FR/EN, casse et accents tolérés)."""
+    """Vrai si [label] désigne un feu piéton (FR/EN, casse/accents tolérés).
+
+    Les wordings voiture (`feu tricolore`, `traffic light`…) sont exclus :
+    la réserve anti-éviction ne protège que le piéton (01/11).
+    """
     if not isinstance(label, str) or not label.strip():
         return False
     return routed_concept(label) in FEU_CONCEPTS

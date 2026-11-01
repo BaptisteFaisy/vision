@@ -287,4 +287,14 @@ class TraverseWiringTest {
         assertTrue("car" in prompts)
         assertTrue("person" in prompts)
     }
+
+    @Test
+    fun `prompts - les wordings voiture de la base sont filtres`() {
+        val prompts = traversePrompts(listOf("feu tricolore", "traffic light", "dog"))
+
+        assertTrue(CrossingPrompts.LIGHT in prompts)
+        assertTrue("dog" in prompts)
+        assertFalse("feu tricolore" in prompts)
+        assertFalse("traffic light" in prompts)
+    }
 }
