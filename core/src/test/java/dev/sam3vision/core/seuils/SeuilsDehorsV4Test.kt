@@ -59,14 +59,14 @@ class SeuilsDehorsV4Test {
     // Humains — niveau 2.
 
     @Test
-    fun `humain a 9m dit phrase cadran distance niveau 2`() {
+    fun `humain a 9m dit mot seul niveau 2`() {
         val signal = HazardSignal.of(listOf(centered("person", 9f)), 512, 1138)
         assertTrue(signal.detected)
         val watcher = HazardWatcher()
         assertNull(watcher.onSignal(signal, 1_000L, En))
         val cue = watcher.onSignal(signal, 1_100L, En)
 
-        assertEquals("Attention, person, at 12 o'clock, 9 meters away, pass on the right.", cue!!.phrase)
+        assertEquals("Right.", cue!!.phrase)
         assertEquals(2, cue.level)
         assertEquals("human-soft", cue.antiRepeatKey)
         assertFalse(cue.urgent)

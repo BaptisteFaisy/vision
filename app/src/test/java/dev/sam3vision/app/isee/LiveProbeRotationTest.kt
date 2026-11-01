@@ -42,7 +42,7 @@ class LiveProbeRotationTest {
         send(probe, fake, "D", 26_000_000L, frame("person"))
         assertEquals(listOf(groups[0], groups[1], groups[2], groups[0]), fake.sentPrompts)
         assertTrue(fake.sentPrompts.all { it?.contains("person") == true })
-        assertEquals(listOf(8, 8, 7, 8), fake.sentPrompts.map { it?.size })
+        assertEquals(listOf(6, 6, 6, 6), fake.sentPrompts.map { it?.size })
     }
 
     @Test

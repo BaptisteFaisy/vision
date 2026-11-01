@@ -352,7 +352,7 @@ class EchelleOverwriteTest {
 
         assertEquals(1, speaker.said.size)
         assertEquals(OutdoorLevel.HUMAN, speaker.said.single().level)
-        assertTrue(speaker.said.single().text.startsWith("Attention à la personne"))
+        assertEquals("Droite.", speaker.said.single().text)
         assertNull(speaker.said.single().clipId)
     }
 
