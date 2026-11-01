@@ -1,14 +1,8 @@
 package dev.sam3vision.app.isee
 
 import android.content.Context
-import android.hardware.camera2.CameraMetadata
-import android.hardware.camera2.CaptureRequest
 import android.os.SystemClock
 import android.util.Size
-import androidx.annotation.OptIn
-import androidx.camera.camera2.interop.Camera2CameraControl
-import androidx.camera.camera2.interop.CaptureRequestOptions
-import androidx.camera.camera2.interop.ExperimentalCamera2Interop
 import androidx.camera.core.CameraSelector
 import androidx.camera.core.ImageAnalysis
 import androidx.camera.core.ImageProxy
@@ -107,6 +101,9 @@ class IseeCameraHost(private val context: Context) {
 
     /** Chaîne NV21 directe : un encodeur par analyseur (ses tampons sont réutilisés). */
     private val encoder = Nv21JpegEncoder()
+
+    /** Gouverneur de sous-exposition (scènes cramées), armé à la liaison. */
+    private val exposure = IseeExposureDriver()
 
     /** Vrai quand la dernière frame était nuit/noir : la phrase ne part qu'à la transition. */
     private var wasDark = false
@@ -213,6 +210,7 @@ class IseeCameraHost(private val context: Context) {
             )
             boundCamera = camera
             applySensorTuning(camera)
+            exposure.init(camera)
             imageCapture = image
             videoCapture = video
             null
@@ -257,6 +255,9 @@ class IseeCameraHost(private val context: Context) {
      */
     private fun analyse(proxy: ImageProxy) {
         if (wantsFrame?.invoke() == false) {
+            // Même jetée, la frame nourrit le gouverneur : l'aperçu reste exposé
+            // juste quand SAM ne consomme rien (échantillon Y, pas de pack NV21).
+            exposure.govern(encoder.sampleMeanLuma(proxy)?.toDouble(), boundCamera)
             noteDropped()
             proxy.close()
             return
@@ -270,6 +271,7 @@ class IseeCameraHost(private val context: Context) {
             val shareDue = SharedCameraFrame.audience && startedAt - lastShareEncodeMs >= STREAM_FRAME_MS
             val encStart = SystemClock.elapsedRealtime()
             val encoded = encodeSinglePass(proxy, quality, shareDue)
+            exposure.govern(encoded.mean, boundCamera)
             val encMs = SystemClock.elapsedRealtime() - encStart
             val ageMs = (enteredAtNs - captureStamp(proxy.imageInfo.timestamp, enteredAtNs)) / NS_PER_MS
             encoded.luma?.also { onLuma?.invoke(it) }?.let(::noteSharpness)
@@ -389,26 +391,6 @@ class IseeCameraHost(private val context: Context) {
         android.util.Log.i("sam3vision",
             "conversion: ${ms} ms (capteur ${size.first}×${size.second}, jpeg ${bytes / 1024} Ko$direct, jetées $droppedFrames, veto nuit $lowLightVetoes, floues $blurryFrames)")
         android.util.Log.i(LiveLatencyLog.TAG, TimingsText.capsplit(ageMs, encMs, b64Ms, cbMs, ms))
-    }
-
-    /**
-     * Réglage capteur : exposition verrouillée (pas de pompage entre frames), 50 Hz
-     * (pas de bandes sous l'éclairage secteur), autofocus continu (la rue nette sans
-     * tap). Appliqué après la liaison, ignoré si le HAL refuse — la caméra marche
-     * quand même, avec l'automatisme par défaut.
-     */
-    @OptIn(markerClass = [ExperimentalCamera2Interop::class])
-    private fun applySensorTuning(camera: androidx.camera.core.Camera) {
-        runCatching {
-            val options = CaptureRequestOptions.Builder()
-                .setCaptureRequestOption(CaptureRequest.CONTROL_AE_LOCK, true)
-                .setCaptureRequestOption(CaptureRequest.CONTROL_AE_ANTIBANDING_MODE, CameraMetadata.CONTROL_AE_ANTIBANDING_MODE_50HZ)
-                .setCaptureRequestOption(CaptureRequest.CONTROL_AF_MODE, CaptureRequest.CONTROL_AF_MODE_CONTINUOUS_PICTURE)
-                .build()
-            Camera2CameraControl.from(camera.cameraControl).setCaptureRequestOptions(options)
-        }.onFailure {
-            android.util.Log.w("sam3vision", "réglage capteur refusé: ${it.message}")
-        }
     }
 
     /** Démarre l'enregistrement du MP4 dans [file] ; `false` si non prêt ou déjà lancé. */

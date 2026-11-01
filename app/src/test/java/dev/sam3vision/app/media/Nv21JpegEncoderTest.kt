@@ -145,4 +145,31 @@ class Nv21JpegEncoderTest {
         assertEquals(0.toByte(), frame().y.at(-1, 0))
         assertEquals(0.toByte(), frame().y.at(0, 99))
     }
+
+    @Test
+    fun `la moyenne echantillonnee lit les octets non signes`() {
+        // Frame 4×4 toute blanche : moyenne 255, pas -1 (octets signés de Java).
+        val white = plane(ByteArray(16) { 0xFF.toByte() }, rowStride = 4, pixelStride = 1)
+        assertEquals(255, sampledMeanLuma(white, 4, 4))
+        // Y = 0..15 : moyenne entière 7 (120 / 16).
+        assertEquals(7, sampledMeanLuma(frame().y, 4, 4))
+    }
+
+    @Test
+    fun `la moyenne echantillonnee respecte le pas de ligne`() {
+        // Pas de ligne 8 pour 4 colonnes : les 4 octets de bourre ne comptent pas.
+        val data = ByteArray(4 * 8) { 100.toByte() }
+        val strided = plane(data, rowStride = 8, pixelStride = 1)
+        assertEquals(100, sampledMeanLuma(strided, 4, 4))
+    }
+
+    @Test
+    fun `la moyenne echantillonnee reste bornee sur une grande image`() {
+        // 640×480 uniforme : le pas saute des pixels mais la moyenne reste exacte.
+        val data = ByteArray(640 * 480) { 180.toByte() }
+        val big = plane(data, rowStride = 640, pixelStride = 1)
+        assertEquals(180, sampledMeanLuma(big, 640, 480))
+        // Dimensions nulles : 0, pas de division par zéro.
+        assertEquals(0, sampledMeanLuma(frame().y, 0, 4))
+    }
 }
