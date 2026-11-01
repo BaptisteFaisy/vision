@@ -49,9 +49,11 @@ class TestBloc(unittest.TestCase):
         block = solver.format_block({
             "hFovDeg": 60.61, "vFovDeg": 92.19, "cx": 0.5, "cy": 0.5,
             "hasDistortion": True, "k1": -0.1, "k2": 0.02, "atMs": 1,
+            "refW": 720, "refH": 1280,
         })
         self.assertEqual(block, "mire v1\nhFovDeg=60.61\nvFovDeg=92.19\ncx=0.5\ncy=0.5\n"
-                               "hasDistortion=True\nk1=-0.1\nk2=0.02\natMs=1\n")
+                               "hasDistortion=True\nk1=-0.1\nk2=0.02\natMs=1\n"
+                               "refW=720\nrefH=1280\n")
 
 
 class TestCoins(unittest.TestCase):
