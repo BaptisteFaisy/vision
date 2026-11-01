@@ -26,6 +26,19 @@ livré et ses preuves (tâche, fichiers, chiffres) dans l'arbre.
   `ProximityVoicePreemptTest`) ; `:core` non rejoué (aucun fichier
   touché) ; `check-kotlin-limits.py` OK ; recette téléphone
   **non mesurée**, exige un APK de cette branche sur appareil réel.
+## 2026-11-01 — iSee : le picto chassé disparaît hors champ (branche `fix/isee-picto-hors-champ`)
+
+- **Ordre user** : quand l'objet avec un picto n'est plus sur la caméra, il
+  faut cesser d'afficher le picto.
+- **Fait** : `IseePicto.onFrame` — un passage gabarit muet sur le picto chassé
+  périme son ancrage live (chute en ≤ 500 ms, sans attendre le prochain
+  aller-retour SAM, qui ré-ancre si l'objet est toujours là) ;
+  `publishHits` — l'ancrage live est seul juge pour le picto chassé, le
+  passage gabarit précédent ne le ressuscite pas quand SAM dit parti.
+  Hors chasse, comportement inchangé.
+- **Preuve** : `IseePictoTest` 24/24 (1 nouveau : disparition SAM + caméra +
+  réapparition sans régénérer — rouge sans le fix) ;
+  `check-kotlin-limits.py` vert (1 336 fichiers).
 
 ## 2026-11-01 — iSee : axe pile = droite, comme documenté (branche `hazard-avoidside-axis`)
 
