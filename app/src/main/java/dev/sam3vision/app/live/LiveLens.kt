@@ -1,6 +1,7 @@
 package dev.sam3vision.app.live
 
 import android.content.Context
+import dev.sam3vision.app.glasses.connectedGlassesStreamLens
 import dev.sam3vision.core.distance.LensSpec
 import kotlin.math.tan
 
@@ -42,7 +43,8 @@ data class ChosenLens(val spec: LensSpec, val origin: LensOrigin) {
  *
  * [fromGlasses] = la frame mesurée vient des lunettes : le champ lunettes forcé
  * prime (aspect 9:16 du flux), sinon [glasses] (mire, `null` = pas encore
- * calibrée), sinon le repli estimé [LensSpec.Glasses] — jamais le capteur du
+ * calibrée), sinon le profil flux du modèle détecté (`null` sans modèle
+ * reconnu), sinon le repli estimé [LensSpec.Glasses] — jamais le capteur du
  * téléphone (voir le protocole mire de `docs/LUNETTES-RECETTE-TEL.md`). Par
  * défaut (téléphone), le routage est inchangé.
  */
@@ -67,7 +69,9 @@ internal fun chooseLens(
 /**
  * Voie lunettes : le forcé prime quand il donne un calibrage utilisable (un
  * champ extrême sort le vertical 9:16 des bornes caméra), sinon la mire, sinon
- * le repli estimé — jamais le capteur du téléphone.
+ * le profil flux du modèle détecté, sinon le repli estimé — jamais le capteur
+ * du téléphone. Le profil modèle reste un estimé ([LensOrigin.FALLBACK]) :
+ * seule la mire mesure vraiment.
  */
 private fun chooseGlassesLens(forcedFovDeg: Float, glasses: LensSpec?): ChosenLens {
     if (forcedFovDeg.isFinite() && forcedFovDeg in LensSpec.FOV_MIN..LensSpec.FOV_MAX) {
@@ -77,6 +81,7 @@ private fun chooseGlassesLens(forcedFovDeg: Float, glasses: LensSpec?): ChosenLe
     }
     val usableGlasses = glasses?.takeIf { it.usable }
     if (usableGlasses != null) return ChosenLens(usableGlasses, LensOrigin.SENSOR)
+    connectedGlassesStreamLens()?.let { return ChosenLens(it, LensOrigin.FALLBACK) }
     return ChosenLens(LensSpec.Glasses, LensOrigin.FALLBACK)
 }
 
