@@ -123,7 +123,11 @@ object Guidance {
      * le cap hors des bandes interdites le plus proche de tout droit — quand il
      * existe et tient ([PeoplePath.fits]) ; sinon, repli sur le côté le moins
      * encombré ([freerSide], ancien comportement : géométrie incomplète, voie
-     * sans issue, ou aucun obstacle à portée). Bordure au contact, cap droit,
+     * sans issue, ou aucun obstacle à portée). Trou de grillage ([holeSide],
+     * localisé par l'appelant) : sur ce repli seul, on part vers le trou
+     * quand il garantit 80 cm à toute personne ([PeoplePath.clearsSide]) —
+     * sinon l'évitement générique s'applique (l'humain prime toujours :
+     * jamais vers quelqu'un). Bordure au contact, cap droit,
      * + obstacle mesuré au contact (≤ [CONTACT_METERS]) = stop ([contactStop],
      * audit 31/10 : on ne monte pas une bordure dans un obstacle) ; [curbEdge]
      * porte le sens connu du bord (`null` = incertain).
@@ -140,6 +144,7 @@ object Guidance {
         rangeMeters: Float = RANGE_METERS,
         hfovDeg: Float = LensSpec.DEFAULT_H_FOV_DEG,
         curbEdge: CurbEdge? = null,
+        holeSide: GuidanceSide? = null,
         axisRangeMeters: Float = AXIS_RANGE_METERS,
     ): GuidanceDecision {
         val cleaned = labels.filter { isObstacle(it) }
@@ -161,7 +166,11 @@ object Guidance {
                 )
             }
             val path = PeoplePath.plan(cleaned, rangeMeters, hfovDeg)
-            val side = if (path != null && path.fits) path.side else freerSide(cleaned, obstacle, rangeMeters, hfovDeg)
+            val side = if (path != null && path.fits) {
+                path.side
+            } else {
+                holeOrFreer(cleaned, obstacle, holeSide, rangeMeters, hfovDeg)
+            }
             val shift = shiftOf(obstacle.meters, STRAIGHT_HALF_CORRIDOR, hfovDeg)
             return GuidanceDecision(true, obstacle, side, cap, side.toCap(), shift, curbContact, curbEdge)
         }
@@ -328,6 +337,23 @@ object Guidance {
     private fun nearRank(label: PlacedLabel): Float {
         val meters = label.meters
         return if (meters == null || !meters.isFinite()) 0f else meters
+    }
+
+    /**
+     * Repli quand le chemin optimal échoue : vers le trou ([holeSide]) quand
+     * il garantit 80 cm à toute personne ([PeoplePath.clearsSide]), sinon le
+     * côté le moins encombré ([freerSide]) — l'évitement des humains prime
+     * sur le trou, toujours.
+     */
+    private fun holeOrFreer(
+        labels: List<PlacedLabel>,
+        obstacle: PlacedLabel,
+        holeSide: GuidanceSide?,
+        rangeMeters: Float,
+        hfovDeg: Float,
+    ): GuidanceSide {
+        if (holeSide != null && PeoplePath.clearsSide(labels, holeSide, rangeMeters, hfovDeg)) return holeSide
+        return freerSide(labels, obstacle, rangeMeters, hfovDeg)
     }
 
     /**

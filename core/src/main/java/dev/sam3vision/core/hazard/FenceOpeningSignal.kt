@@ -2,6 +2,8 @@ package dev.sam3vision.core.hazard
 
 import dev.sam3vision.core.distance.DistanceReading
 import dev.sam3vision.core.distance.LensSpec
+import dev.sam3vision.core.live.GuidanceSide
+import dev.sam3vision.core.live.PlacedLabel
 import dev.sam3vision.core.live.PositionText
 import kotlin.math.tan
 
@@ -28,6 +30,24 @@ data class FenceOpeningSignal(
     val isGate: Boolean = false,
     val middle: Boolean = false,
 ) {
+    /**
+     * Côté du trou vers lequel partir, `null` sans trou latéral : grillage
+     * ouvert à gauche ou à droite — un intervalle d'au moins
+     * [FenceOpeningWatcher.PASS_WIDTH_M] à [FenceOpeningWatcher.RANGE_METERS]
+     * ou moins, proche de tout droit par construction. Le fermé, le passage
+     * au milieu et l'absence de signal restent muets : le guidage garde son
+     * évitement générique. L'humain prime toujours : l'appelant ne part vers
+     * le trou que s'il garantit 80 cm à toute personne.
+     */
+    fun holeSide(): GuidanceSide? {
+        if (!detected || state != FenceOpeningState.Open) return null
+        return when (position) {
+            FenceOpeningPosition.Left -> GuidanceSide.Left
+            FenceOpeningPosition.Right -> GuidanceSide.Right
+            else -> null
+        }
+    }
+
     companion object {
         /** Signal vide : jamais d'exception sur le chemin du direct. */
         fun none(): FenceOpeningSignal = FenceOpeningSignal(detected = false)
@@ -49,7 +69,23 @@ data class FenceOpeningSignal(
             hfovDeg: Float = LensSpec.DEFAULT_H_FOV_DEG,
         ): FenceOpeningSignal {
             if (frameW <= 0 || frameH <= 0) return none()
-            val boxes = readings.mapNotNull { near(it, frameW) }
+            return ofBoxes(readings.mapNotNull { near(it, frameW) }, hfovDeg)
+        }
+
+        /**
+         * Signal des labels placés (voix du direct), miroir de [of] : mêmes
+         * règles — fermé, milieu, intervalle — depuis les boîtes normalisées
+         * et les distances déjà publiées par frame. Le guidage y lit le trou
+         * vers lequel partir ([FenceOpeningSignal.holeSide]) ; la description
+         * douce garde [of].
+         */
+        fun ofPlaced(
+            labels: List<PlacedLabel>,
+            hfovDeg: Float = LensSpec.DEFAULT_H_FOV_DEG,
+        ): FenceOpeningSignal = ofBoxes(labels.mapNotNull(::nearPlaced), hfovDeg)
+
+        /** Fermé, milieu, intervalle, dans l'ordre : le même verdict, deux sources. */
+        private fun ofBoxes(boxes: List<FenceBox>, hfovDeg: Float): FenceOpeningSignal {
             if (boxes.isEmpty()) return none()
             closedOf(boxes)?.let { return it }
             middleOf(boxes)?.let { return it }
@@ -76,6 +112,19 @@ data class FenceOpeningSignal(
             val x1 = maxOf(box[0], box[2]) / frameW
             if (!x0.isFinite() || !x1.isFinite()) return null
             return FenceBox(x0, x1, (x0 + x1) / 2f, meters, FenceOpeningConcepts.isGate(reading.label))
+        }
+
+        /** Pan proche mesuré depuis un label placé (boîte déjà normalisée), `null` sinon. */
+        private fun nearPlaced(label: PlacedLabel): FenceBox? {
+            if (!FenceOpeningConcepts.isFence(label.label)) return null
+            val meters = label.meters?.takeIf { it.isFinite() && it > 0f } ?: return null
+            if (meters > FenceOpeningWatcher.RANGE_METERS) return null
+            val x0 = label.x0
+            val x1 = label.x1
+            if (x0 == null || x1 == null || !x0.isFinite() || !x1.isFinite()) return null
+            val left = minOf(x0, x1)
+            val right = maxOf(x0, x1)
+            return FenceBox(left, right, (left + right) / 2f, meters, FenceOpeningConcepts.isGate(label.label))
         }
 
         /**

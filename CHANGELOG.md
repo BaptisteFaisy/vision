@@ -3,6 +3,21 @@
 Le journal part du 2026-10-26 après 19 h : le commit de départ, puis une entrée par fait
 livré et ses preuves (tâche, fichiers, chiffres) dans l'arbre.
 
+## 2026-11-01 — iSee : guidage vers le trou de grillage, humains prioritaires (branche `guidage-trou-humains`)
+
+- **Fait** : sur couloir bouché sans chemin optimal, un grillage ouvert à
+  gauche ou à droite (intervalle ≥ 0,80 m à ≤ 4 m) oriente la sortie vers le
+  trou (`FenceOpeningSignal.ofPlaced` + `holeSide`, `Guidance.decide`
+  `holeSide`, `GuidanceAnnouncer`, branché dans `ProbeVoice`) — sauf humain à
+  moins de 80 cm de ce côté (`PeoplePath.clearsSide`) : l'évitement des
+  humains prime toujours. Mêmes mots (voix TwinLite), mêmes clips < 100 ms,
+  chemin optimal et caps latéraux inchangés.
+- **Preuve** : `:core:testDebugUnitTest` 2 880 verts et
+  `:app:testDebugUnitTest` 1 769 verts (0 échec, 0 sauté, dont 12 nouveaux
+  `GuidanceFenceOpeningTest` et 2 nouveaux `ProbeVoiceFenceHoleTest`) ;
+  `check-kotlin-limits.py` OK ; recette rue **non mesurée**, exige un parcours
+  réel avec grillage.
+
 ## 2026-11-01 — iSee : le mouvement écrase tout, voiture devant humain (branche `feat/isee-mouvement-overwrite`)
 
 - **Ordre user** : voitures en mouvement et humains en mouvement,
