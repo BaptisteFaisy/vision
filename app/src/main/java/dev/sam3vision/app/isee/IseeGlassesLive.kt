@@ -57,7 +57,7 @@ internal fun GlassesLive(modifier: Modifier) {
         }
     }
     DisposableEffect(decoder, attached) {
-        GlassesVideoLink.attachSnapshot { attachedSnapshot(attached.view) }
+        GlassesVideoLink.attachSnapshot { attachedSnapshot(attached.view, attached) }
         onDispose {
             GlassesVideoLink.detachSnapshot()
             decoder.release()
@@ -185,10 +185,13 @@ private fun sizeBuffersToVideo(view: TextureView, attached: AttachedSurface, vid
 /**
  * Photographie la rue à l'échelle d'envoi SAM (320 px, jamais agrandie) : c'est cette
  * image — exactement ce que l'utilisateur voit — qui part au guidage. `null` si la vue
- * n'a pas encore de taille.
+ * n'a pas encore de taille. Note aussi la géométrie (vidéo + vue) pour le sténopé (D2).
  */
-private fun attachedSnapshot(view: TextureView?): android.graphics.Bitmap? {
+private fun attachedSnapshot(view: TextureView?, attached: AttachedSurface): android.graphics.Bitmap? {
     if (view == null || view.width <= 0 || view.height <= 0) return null
+    if (attached.videoW > 0 && attached.videoH > 0) {
+        GlassesVideoLink.noteSnapshotGeometry(attached.videoW, attached.videoH, view.width, view.height)
+    }
     val (targetWidth, targetHeight) = targetSize(view.width, view.height, 0, FramePolicy.EDGE)
     return runCatching { view.getBitmap(targetWidth, targetHeight) }.getOrNull()
 }

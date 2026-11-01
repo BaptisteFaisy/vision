@@ -43,8 +43,11 @@ internal fun LiveProbe.observeGlassesLive(
             if (live) {
                 onGlasses()
                 val chosen = chooseLens(settings().glassesFovDeg, phoneLens(), glassesLens(), fromGlasses = true)
+                // Focale flux pour le pont E5 (même étage D1) : recadrée par photo.
+                GlassesVideoLink.glassesStreamLens = chosen.spec
                 setCalibration(chosen.spec, CameraPose.Glasses)
             } else {
+                GlassesVideoLink.glassesStreamLens = null
                 val chosen = chooseLens(settings().cameraFovDeg, phoneLens())
                 setCalibration(chosen.spec, null)
                 onPhone()

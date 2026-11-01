@@ -11,6 +11,7 @@ import dev.sam3vision.app.bitmapToJpegBase64
 import dev.sam3vision.app.glasses.GlassesBackgroundFrames
 import dev.sam3vision.app.glasses.GlassesVideoLink
 import dev.sam3vision.app.uprightScaled
+import dev.sam3vision.core.distance.CropGeometry
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 
@@ -46,7 +47,9 @@ internal fun GlassesProbeWiring(probe: LiveProbe, glassesFeed: Boolean) {
             // sonde — tourne en fond, comme le fil d'analyse du téléphone.
             val snapshot = GlassesVideoLink.takeSnapshot()
             withContext(Dispatchers.Default) {
+                val fromView = snapshot != null
                 val bitmap = snapshot ?: sampler.bitmapOf(box) ?: return@withContext
+                applyGlassesLens(probe, fromView)
                 val jpeg = bitmapToProbeJpeg(bitmap) ?: return@withContext
                 probe.onFrame(jpeg, SystemClock.elapsedRealtimeNanos())
             }
@@ -63,6 +66,26 @@ private fun bitmapToProbeJpeg(bitmap: Bitmap): String? {
     bitmap.recycle()
     if (jpeg != null) countSnapshot()
     return jpeg
+}
+
+/**
+ * Focale cohérente avec la photo envoyée : la rue affiche un recadrage
+ * « remplit la vue » du flux portrait, le sténopé vise ce recadrage
+ * (pleine largeur = FOV horizontal inchangé, spec paysage après crop).
+ * Hors vue (poussée décodée fond = plein flux sans crop), la focale flux
+ * D1 s'applique telle quelle. Silencieux sans focale ni géométrie : le
+ * pont ne tombe jamais pour ça.
+ */
+private fun applyGlassesLens(probe: LiveProbe, fromView: Boolean) {
+    val stream = GlassesVideoLink.glassesStreamLens ?: return
+    if (!fromView) {
+        probe.distances.setLens(stream)
+        return
+    }
+    val geometry = GlassesVideoLink.snapshotGeometry() ?: return
+    val crop = CropGeometry.fillViewCrop(geometry.videoW, geometry.videoH, geometry.viewW, geometry.viewH)
+    val cropped = CropGeometry.afterCrop(stream, geometry.videoW, geometry.videoH, crop) ?: return
+    probe.distances.setLens(cropped)
 }
 
 /**

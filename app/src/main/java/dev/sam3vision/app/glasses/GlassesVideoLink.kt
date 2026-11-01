@@ -2,6 +2,7 @@ package dev.sam3vision.app.glasses
 
 import android.os.SystemClock
 import android.util.Log
+import dev.sam3vision.core.distance.LensSpec
 import dev.sam3vision.core.live.GlassesClockOffset
 import dev.sam3vision.core.live.GlassesLinkStats
 import dev.sam3vision.core.live.LinkDrop
@@ -51,6 +52,13 @@ data class GlassesFrame(
 
 /** Taille de la vidéo décodée, pour cadrer la vue (recadrage pur, testé en JVM). */
 data class VideoSize(val width: Int, val height: Int)
+
+/**
+ * Géométrie de la dernière photo SAM : taille vidéo décodée + taille de la vue
+ * affichée. La photo part au ratio de la vue ; le sténopé en déduit le recadrage
+ * « remplit la vue » subi par le flux (`CropGeometry.fillViewCrop`, D2).
+ */
+data class SnapshotGeometry(val videoW: Int, val videoH: Int, val viewW: Int, val viewH: Int)
 
 /** Journal du direct (recette : `logcat -s GlassesVideo`). */
 private const val TAG = "GlassesVideo"
@@ -105,10 +113,32 @@ object GlassesVideoLink {
     /** La rue ne regarde plus : plus de photo pour la sonde. */
     fun detachSnapshot() {
         snapshot = null
+        snapshotGeometryField = null
     }
 
     /** Photographie la rue des lunettes, ou `null` si elle ne regarde pas. */
     fun takeSnapshot(): android.graphics.Bitmap? = runCatching { snapshot?.invoke() }.getOrNull()
+
+    @Volatile
+    private var snapshotGeometryField: SnapshotGeometry? = null
+
+    /**
+     * Focale du flux des lunettes (même étage que `chooseLens` voie lunettes :
+     * forcé > mire > profil modèle > repli — tous décrivent le flux portrait
+     * 9:16, jamais la photo). Posée par D1 quand le direct vit, `null` hors
+     * lunettes. Le pont E5 la recadre par photo (`afterCrop`) : pas de double
+     * compte, la mire et le forcé sont eux aussi pré-crop (portrait).
+     */
+    @Volatile
+    var glassesStreamLens: LensSpec? = null
+
+    /** La rue photographiée note la géométrie de sa photo (lue à la photo suivante). */
+    fun noteSnapshotGeometry(videoW: Int, videoH: Int, viewW: Int, viewH: Int) {
+        snapshotGeometryField = SnapshotGeometry(videoW, videoH, viewW, viewH)
+    }
+
+    /** Géométrie de la dernière photo, `null` si la rue ne regarde pas. */
+    fun snapshotGeometry(): SnapshotGeometry? = snapshotGeometryField
 
     /**
      * Paramètres H.265 hors bande (VPS/SPS/PPS) : le flux simulé n'envoie que des tranches,
@@ -297,6 +327,7 @@ object GlassesVideoLink {
             _live.value = false
             _frames.value = null
             _videoSize.value = null
+            snapshotGeometryField = null
             _renderedSeq.value = null
             synchronized(timingLock) { resetLinkLocked() }
         }
@@ -308,6 +339,8 @@ object GlassesVideoLink {
         // Ici, pas dans setStreaming(false) : le flux émet `false` en ouverture de
         // session, pile entre la pose du repli (mock) et sa lecture (décodeur).
         fallbackCsd = null
+        // La paire peut changer entre deux sessions : la focale est reposée par D1.
+        glassesStreamLens = null
     }
 
     /** Taille annoncée par le décodeur (un changement de résolution recadre la vue). */
