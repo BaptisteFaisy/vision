@@ -12,7 +12,8 @@ import dev.sam3vision.core.live.PersonLabels
  * disent où aller, l'attention dit quoi éviter).
  *
  * `barrier` n'est plus dans les défauts du direct (31/10 : son slot passe
- * à « keys », ordre user) ; il reste reconnu côté client ([isHazard])
+ * à « keys », qui l'a rendu le 01/11 à la foule) ; il reste reconnu côté
+ * client ([isHazard])
  * quand le backend le segmente (preset extérieur, champ « Follow »). Le
  * français reste reconnu : un label « barrière » compte comme « barrier ».
  * Lampadaires (« street lamp », « lampadaire », « réverbère »), panneaux
@@ -28,6 +29,12 @@ import dev.sam3vision.core.live.PersonLabels
  * Liste fermée : un concept = un nom FR/EN ([HazardName]) ; la personne y
  * entre par [PersonLabels], sans table à part. Le « etc. » de l'ordre
  * s'ajoute ici (clé canonique → nom), jamais en dur dans une phrase.
+ *
+ * Foule (audit du 01/11) : la poussette, le fauteuil roulant, la trottinette,
+ * le chien et l'enfant ont leur nom parlé — ils barrent le passage même sans
+ * être un piéton. La poussette, le fauteuil, le chien et l'enfant se
+ * contournent comme un corps ([HazardKind.PERSON]) ; la trottinette reste
+ * diverse ([HazardKind.OTHER], c'est un véhicule, pas quelqu'un à éviter).
  */
 object HazardConcepts {
 
@@ -59,6 +66,24 @@ object HazardConcepts {
         "traffic sign" to HazardName("au panneau de signalisation", "traffic sign"),
         "potelet" to HazardName("au potelet", "bollard"),
         "plot" to HazardName("au plot", "bollard"),
+        // Foule (01/11) : ce qui barre le passage sans être un piéton debout,
+        // plus l'enfant et le chien. Pluriels irréguliers en dur (« children »,
+        // « fauteuils roulants »), les autres tombent sur la coupe du « s ».
+        "stroller" to HazardName("à la poussette", "stroller"),
+        "poussette" to HazardName("à la poussette", "stroller"),
+        "pram" to HazardName("à la poussette", "stroller"),
+        "buggy" to HazardName("à la poussette", "stroller"),
+        "wheelchair" to HazardName("au fauteuil roulant", "wheelchair"),
+        "fauteuil roulant" to HazardName("au fauteuil roulant", "wheelchair"),
+        "fauteuils roulants" to HazardName("au fauteuil roulant", "wheelchair"),
+        "electric scooter" to HazardName("à la trottinette", "scooter"),
+        "scooter" to HazardName("à la trottinette", "scooter"),
+        "trottinette" to HazardName("à la trottinette", "scooter"),
+        "dog" to HazardName("au chien", "dog"),
+        "chien" to HazardName("au chien", "dog"),
+        "child" to HazardName("à l'enfant", "child"),
+        "children" to HazardName("à l'enfant", "child"),
+        "enfant" to HazardName("à l'enfant", "child"),
     )
 
     /** Nom parlé de [label], `null` si ni personne ni mobilier suivi. */
@@ -81,8 +106,16 @@ object HazardConcepts {
      */
     fun isPole(label: String): Boolean = nameOf(label)?.en == "pole"
 
-    /** Vrai si [label] désigne une personne (le nom anglais fait foi, jamais une table à part). */
-    fun isPerson(label: String): Boolean = nameOf(label)?.en == "person"
+    /**
+     * Vrai si [label] désigne une personne (le nom anglais fait foi, jamais
+     * une table à part) : l'enfant en est une (il s'évite et se parle comme un
+     * adulte), la poussette, le fauteuil, le chien et la trottinette non —
+     * leur [kindOf] dira seulement qu'ils se contournent.
+     */
+    fun isPerson(label: String): Boolean {
+        val en = nameOf(label)?.en ?: return false
+        return en == "person" || en == "child"
+    }
 
     /**
      * Vrai si [label] fait parler le guetteur : personne ou mobilier
@@ -93,11 +126,18 @@ object HazardConcepts {
     /** Vrai si [label] désigne une barrière (P4, après la personne P3). */
     fun isBarrier(label: String): Boolean = nameOf(label)?.en == "barrier"
 
-    /** Sorte parlée de [label] : personne, barrière, ou divers (poteau muet, borne, clôture, portail…). */
-    fun kindOf(label: String): HazardKind = when (nameOf(label)?.en) {
-        "person" -> HazardKind.PERSON
-        "barrier" -> HazardKind.BARRIER
-        else -> HazardKind.OTHER
+    /**
+     * Sorte parlée de [label] : personne (tout ce qui se contourne comme un
+     * corps — personne, enfant, poussette, fauteuil roulant, chien),
+     * barrière, ou divers (poteau muet, borne, clôture, portail, trottinette).
+     */
+    fun kindOf(label: String): HazardKind {
+        val en = nameOf(label)?.en ?: return HazardKind.OTHER
+        return when (en) {
+            "person", "child", "stroller", "wheelchair", "dog" -> HazardKind.PERSON
+            "barrier" -> HazardKind.BARRIER
+            else -> HazardKind.OTHER
+        }
     }
 }
 
@@ -106,7 +146,7 @@ object HazardConcepts {
  * divers avec le reste) : l'arbitre voix y lit le rang du guetteur danger.
  */
 enum class HazardKind {
-    /** Personne proche : dit aussi comment l'éviter (P3). */
+    /** Corps qui bloque et s'évite (personne, enfant, poussette, fauteuil roulant, chien) : P3. */
     PERSON,
 
     /** Barrière : descriptive, après la personne (P4). */

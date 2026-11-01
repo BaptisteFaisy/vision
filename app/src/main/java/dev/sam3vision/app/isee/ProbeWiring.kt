@@ -15,11 +15,15 @@ import dev.sam3vision.core.distance.LensSpec
 import dev.sam3vision.core.hazard.FenceOpeningSignal
 import dev.sam3vision.core.hazard.FenceOpeningWatcher
 import dev.sam3vision.core.hazard.HazardWatcher
+import dev.sam3vision.core.live.FreeSpace
+import dev.sam3vision.core.live.FrameTimings
 import dev.sam3vision.core.live.GuidanceWord
 import dev.sam3vision.core.live.LivePrompts
+import dev.sam3vision.core.live.PersonTracker
 import dev.sam3vision.core.live.PlacedLabel
 import dev.sam3vision.core.live.SteeringCap
 import dev.sam3vision.core.live.SteeringCue
+import dev.sam3vision.core.live.Timing
 import dev.sam3vision.core.live.TwinLiteWord
 import dev.sam3vision.core.model.Detection
 import dev.sam3vision.core.model.LiveFrame
@@ -325,12 +329,65 @@ internal fun stairsCounterActive(
 }
 
 /**
+ * Pistes de personnes de la séance : une identité par promeneur d'une frame à
+ * l'autre (audit foule du 01/11 — sans identité, ni « il vient vers vous », ni
+ * « déjà prévenu »). Une instance pour toute l'app (un seul `LiveProbe`, posé par
+ * `IseeViewModel`), remise à zéro avec les autres resets de séance
+ * ([ProbeHazards.reset]) ; les ids continuent d'avancer, un id d'avant ne
+ * désigne jamais quelqu'un d'après. Du câblage, pas du transport.
+ */
+internal object ProbeTracks {
+    /** Suivi de la séance courante : la seule instance, alimentée à chaque frame. */
+    val tracker = PersonTracker()
+
+    /** Nouvelle séance : plus aucune identité (voir [PersonTracker.reset]). */
+    fun reset() = tracker.reset()
+}
+
+/**
+ * Une frame prête à **décider** : les étiquettes de la scène recopiées avec leur
+ * `trackId` et leur `closingMps` ([labels], par [PersonTracker]), et les trois
+ * chiffres que le guidage en tire — [ageMs] ([frameAgeMsOf]), [speedMps] (aucun GPS
+ * ici : [Timing.WALK_MPS]) et [free] ([FreeSpace.of]). Matière de `GuidanceAnnouncer`.
+ */
+internal data class ProbeGuideFrame(
+    val labels: List<PlacedLabel>,
+    val ageMs: Long,
+    val speedMps: Float,
+    val free: FreeSpace,
+)
+
+/**
+ * Frame de décision : alimente le suivi à [atMs], puis en tire les étiquettes
+ * identifiées, l'âge, la vitesse de marche et la place libre. Pure hors du tracker
+ * (horloge et chronologie fournies), donc testée en JVM : deux frames de la même
+ * personne rendent le même `trackId`, une chronologie de 700 ms un `ageMs` de 700.
+ */
+internal fun probeGuideFrameOf(
+    tracker: PersonTracker,
+    atMs: Long,
+    timings: FrameTimings,
+    labels: List<PlacedLabel>,
+    hfovDeg: Float,
+): ProbeGuideFrame {
+    val placed = tracker.onFrame(atMs, labels).map { it.label }
+    return ProbeGuideFrame(
+        labels = placed,
+        ageMs = frameAgeMsOf(atMs, timings),
+        speedMps = Timing.WALK_MPS,
+        free = FreeSpace.of(placed, hfovDeg),
+    )
+}
+
+/**
  * Phrase à dire pour la frame (`null` = silence) : voix rouge/vert en
  * Traversée — sauf ordre d'évitement du guidage ([steeringOf], § 25),
  * sinon guidage (cap route, sinon cap manuel) puis positions. Compteur de
  * marches actif : seul l'évitement parle (virage, stop), le reste se tait
  * devant le compte (1 s). Extraite de `LiveProbe.publish` (plafond 50
- * lignes/fonction).
+ * lignes/fonction). Le suivi alimente **chaque** frame, Traversée comprise ; le
+ * guidage reçoit les étiquettes identifiées ([ProbeGuideFrame.labels]), la
+ * Traversée sa liste brute.
  */
 internal fun LiveProbe.phraseOf(
     cross: CrossingPatch?,
@@ -344,13 +401,14 @@ internal fun LiveProbe.phraseOf(
     scanTrigger: Boolean = false,
     motion: FrameMotion? = null,
 ): String? {
+    val guide = probeGuideFrameOf(ProbeTracks.tracker, at, state.value.timings, placed, hfovDeg)
     if (state.value.crossingActive) {
         return crossingPhraseOf(cross?.cue, placed, detections,
             readings, at, language, frame.objects, frame.width, frame.height, scanTrigger,
             cross?.noLight == true, steeringOf(placed, frame, at, hfovDeg), motion)
     }
     resetCrossingWatches()
-    val phrase = voice.phrase(at, placed, state.value.steeringCap, frame.passage, hfovDeg = hfovDeg)
+    val phrase = voice.phrase(at, guide.labels, state.value.steeringCap, frame.passage, hfovDeg = hfovDeg)
     if (phrase != null && !preemptsCrossing(phrase) &&
         stairsCounterActive(readings, frame.objects, StairCannyCount.lineCount())
     ) {
@@ -397,7 +455,7 @@ internal class ProbeHazards(
     val cycle: CycleWatcher,
     val sidewalk: SidewalkWatcher,
 ) {
-    /** Oublie les huit guetteurs et le compte caméra (nouvelle séance). */
+    /** Oublie les huit guetteurs, le compte caméra et les pistes de personnes (nouvelle séance). */
     fun reset() {
         curb.reset()
         stairs.reset()
@@ -408,6 +466,7 @@ internal class ProbeHazards(
         cycle.reset()
         sidewalk.reset()
         StairCannyCount.clear()
+        ProbeTracks.reset()
     }
 }
 
