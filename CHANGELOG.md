@@ -76,6 +76,33 @@ livré et ses preuves (tâche, fichiers, chiffres) dans l'arbre.
   `LiveVehicleVoiceTest` ; `check-kotlin-limits.py` OK, `check-voicepack`,
   `check-isee-design`, `check-budget-derive`, `check-voice-nav-doc` OK.
   Recette téléphone **non mesurée**.
+## 2026-11-01 — iSee : traversée avec feu — le pan sur une garée ne dit plus « Stop » (branche `voiture-mouvement-arret`)
+
+- **Fait** : la voix véhicules de traversée jugeait les pistes par le
+  signal fond sans feu seulement — avec feu, `CrossingVehicleWatch`
+  recevait `motion = null` et un pan caméra sur une voiture garée
+  annonçait « Stop, car moving. » (relevé terrain user du 2026-11-01).
+  Le signal fond (`ProbeBackgroundMotion.lastMotion`, déjà fourni à
+  `phraseOf` par la sonde) traverse désormais la phrase avec feu comme
+  sans feu (`crossingPhraseOf` + `cuePhraseOf` → `CrossingVehicleWatch`,
+  `felt = motion` au lieu de `null` avec feu) : boîte qui suit la
+  caméra ⇒ `CAMERA_MOVED`, jamais de mouvement. `null` = repli
+  géométrie inchangé. Fichiers : `CrossingVehicleVoice.kt`,
+  `CrossingPeopleVoice.kt` (+11/−9), `docs/TRAVERSEE.md` § 15.2.
+- **Preuve** : `:app:testDebugUnitTest` 1 835 verts (0 échec, dont 2
+  nouveaux `CrossingVehicleTest` : pan+garée avec feu ⇒ arrêt compensé
+  « Car stopped, 5 meters away. », jamais « Stop » ni « moving »,
+  rouges avant le fix — « Stop, car moving. » reproduit — verts
+  après) ; `:core:testDebugUnitTest` 3 013 verts (0 échec) ;
+  `check-kotlin-limits.py` OK ; APK du fix booté sur isee-sim, stream
+  caméra 640×480 + GPU `sam3-eu-a100` (warm) prouvés par logcat.
+  Campagne oracle voiture (`ORACLE-VOITURE-MOUVEMENT.md`, vidéo 60 s
+  `voiture-boulevard-640x480.mp4`) **non rejouée** : qemu/adb
+  instable sur l'hôte partagé le 2026-11-01 (6 segfaults + 3 pertes
+  adb, y compris vidéo foule et APK master témoins — cause
+  environnementale, hors fix) ; vidéo compatible Baseline sans
+  B-frames, script et grille vierge prêts dans `/tmp/isee-voiture/`
+  et `/tmp/isee-voiture-fix/` pour un rerun à hôte calme.
 
 ## 2026-11-01 — iSee : rappel vocal GPS toutes les 5 s, relatif au cap suivi (branche `feat/isee-gps-voix-5s`)
 
