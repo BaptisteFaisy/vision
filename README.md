@@ -149,7 +149,8 @@ An ordinary phone, a remote GPU card, and voice as the only interface:
   then it is recognised on live video on-device with no network
   (`docs/META-IMAGE.md`).
 - **Ray-Ban Meta glasses** — glasses camera and mic (DAT SDK 1.0.0), test bench built
-  into the app (`docs/META-GLASSES.md`).
+  into the app (`docs/META-GLASSES.md`), live on the phone screen at **~24.5 fps**
+  (measured 01/11/2026).
 - **Companion follow-up** — a share link to a real-time page: current sentence,
   the landmark pictograms recognised in the scene, the user's camera (live
   WebSocket, slow photo fallback every 2 s), and a progress bar from start to
@@ -327,6 +328,18 @@ Four attempts to lift that 1/6 to 4/6 (new features, retrained tree, another cro
 another prompt) **all failed without a single false green**; the numbers and the reasons are
 in `docs/CALIBRAGE-FEU.md`, so nobody walks that road twice.
 
+## Glasses live on the phone screen: ~24.5 fps rendered (measured 01/11/2026)
+
+The iSee home shows the Ray-Ban Meta stream (DAT SDK 1.0.0, `HIGH` 720×1280
+H.265) on the phone. Requested 60 fps, accepted with no fallback
+(`GLASSES_FRAME_RATE_LADDER` 60 → 30 → 24 → 15); the link delivers **~30 fps**
+steady and the phone renders a **~24.5 fps** plateau (CPU-bound: the app burns
+~300 % CPU with the phone SAM probe running alongside). End-to-end link→pixel
+over 60 s (n=1123): p50/p95/p99 **57/111/158 ms** (radio jitter p95 77 ms
+dominates), so the B2 < 100 ms p95 target is not held. Protocol and PASS/FAIL
+grid: `docs/LUNETTES-RECETTE-TEL.md` §3/§7; verdict script:
+`scripts/parse_glasses_link.py`.
+
 ## CI and merge queue
 
 - **PRs**: `ci` (guards + JVM tests + backend unit tests + goldens) and `ci-budget`
@@ -362,7 +375,8 @@ Detail: `docs/CI-QUEUE.md`.
   `docs/VOICE_NAV_PROXY.md`, `docs/GPS-FUSION.md`, `docs/GPS_GUIDE_UTILISATEUR.md`,
   `docs/GUIDAGE-TOUT-DROIT.md`, `docs/URGENCE-EXTERNE.md`.
 - **Glasses and product**: `docs/META-GLASSES.md`, `docs/META-IMAGE.md`,
-  `docs/GLASSES-ETAT.md`, `docs/GLASSES-DECISION.md`, `docs/LUNETTES-LANCEMENT.md`,
+  `docs/GLASSES-ETAT.md`, `docs/GLASSES-DECISION.md`, `docs/LUNETTES-RECETTE-TEL.md`,
+  `docs/LUNETTES-LANCEMENT.md`,
   `docs/DEMO-LUNETTES.md`, `docs/ISEE-DESIGN-PORTRAIT.md`, `docs/MODE-TAP.md`,
   `docs/MODE-US.md`, `docs/CARTE-OSM.md`, `docs/NETTOYAGE.md`, `docs/CLES-DU-BUILD.md`,
   `docs/CI-QUEUE.md`, `docs/OPTIMISATIONS.md`.
