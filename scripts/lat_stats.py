@@ -48,8 +48,7 @@ WARMUP_DEFAUT = 5
 def resume_p99(valeurs):
     """(n, moyenne, p50, p95, p99, max, écart-type) d'une série non vide."""
     tri = sorted(valeurs)
-    n, moyenne, p50, p95, maxi = parse_isee_lat.resume(valeurs)
-    p99 = parse_isee_lat.centile(tri, 99)
+    n, moyenne, p50, p95, p99, maxi = parse_isee_lat.resume(valeurs)
     ecart = statistics.stdev(tri) if len(tri) >= 2 else 0.0
     return (n, moyenne, p50, p95, p99, maxi, ecart)
 
