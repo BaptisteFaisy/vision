@@ -23,7 +23,7 @@ class WsLiveContractTest {
     @Test
     fun `un backend en http simple devient un handshake ws sur live ws`() = runBlocking {
         val transport = ContractWsTransport()
-        val client = WsLiveClient("http://127.0.0.1:9", transport, 200, RecordingLiveClient())
+        val client = WsLiveClient("http://127.0.0.1:9", transport, 200, RecordingLiveClient(), binaryWs = false)
 
         client.live("QQ==", null, 640, 4)
 
@@ -33,7 +33,7 @@ class WsLiveContractTest {
     @Test
     fun `un envoi refuse par le socket donne Network sans attendre le delai`() = runBlocking {
         val transport = ContractWsTransport().apply { sendResult = false }
-        val client = WsLiveClient(base, transport, 1_000, RecordingLiveClient())
+        val client = WsLiveClient(base, transport, 1_000, RecordingLiveClient(), binaryWs = false)
 
         val result = client.live("QQ==", null, 640, 4)
 
@@ -48,7 +48,7 @@ class WsLiveContractTest {
             transport?.disconnect(null)      // close() côté serveur, sans exception
             emptyList()
         }
-        val client = WsLiveClient(base, transport, 1_000, RecordingLiveClient())
+        val client = WsLiveClient(base, transport, 1_000, RecordingLiveClient(), binaryWs = false)
 
         val result = client.live("QQ==", null, 640, 4)
 
@@ -99,7 +99,7 @@ class WsLiveContractTest {
         val transport = ContractWsTransport { json ->
             listOf(NetContract.errorReply(json.getInt("id"), status = 402, detail = "credits epuises"))
         }
-        val client = WsLiveClient(base, transport, 1_000, RecordingLiveClient())
+        val client = WsLiveClient(base, transport, 1_000, RecordingLiveClient(), binaryWs = false)
 
         val result = client.live("QQ==", null, 640, 4)
         NetContract.assertError(result, ApiError.PaymentRequired::class.java, "erreur de trame 402")
@@ -117,7 +117,7 @@ class WsLiveContractTest {
                 val transport = ContractWsTransport { json ->
                     listOf(NetContract.errorReply(json.getInt("id"), status = status))
                 }
-                val result = WsLiveClient(base, transport, 1_000, RecordingLiveClient())
+                val result = WsLiveClient(base, transport, 1_000, RecordingLiveClient(), binaryWs = false)
                     .live("QQ==", null, 640, 4)
 
                 NetContract.assertError(result, type, "erreur de trame $status")
@@ -131,7 +131,7 @@ class WsLiveContractTest {
     @Test
     fun `trois frames en vol recoivent chacune la bonne reponse quel que soit l ordre`() = runBlocking {
         val transport = ContractWsTransport()      // silencieux : rien ne répond pendant `send`
-        val client = WsLiveClient(base, transport, 2_000, RecordingLiveClient())
+        val client = WsLiveClient(base, transport, 2_000, RecordingLiveClient(), binaryWs = false)
 
         val frames = coroutineScope {
             val jobs = (1..3).map { id -> async { client.live("QQ==", null, 640, id) } }
@@ -152,7 +152,7 @@ class WsLiveContractTest {
         val transport = ContractWsTransport { json ->
             listOf(NetContract.frameReply(json.getInt("id")))
         }
-        val client = WsLiveClient(base, transport, 1_000, RecordingLiveClient(), withDepth = true)
+        val client = WsLiveClient(base, transport, 1_000, RecordingLiveClient(), withDepth = true, binaryWs = false)
 
         client.live("QQ==", null, 640, 4)
 
@@ -165,7 +165,7 @@ class WsLiveContractTest {
         val transport = ContractWsTransport { json ->
             listOf(NetContract.frameReply(json.getInt("id"), depth = 0.75f))
         }
-        val client = WsLiveClient(base, transport, 1_000, RecordingLiveClient())
+        val client = WsLiveClient(base, transport, 1_000, RecordingLiveClient(), binaryWs = false)
 
         val frame = client.live("QQ==", null, 640, 4).getOrThrow()
 
@@ -177,7 +177,7 @@ class WsLiveContractTest {
         val transport = ContractWsTransport { json ->
             listOf(NetContract.frameReply(json.getInt("id")))
         }
-        val client = WsLiveClient(base, transport, 1_000, RecordingLiveClient())
+        val client = WsLiveClient(base, transport, 1_000, RecordingLiveClient(), binaryWs = false)
 
         val frame = client.live("QQ==", null, 640, 4).getOrThrow()
 
