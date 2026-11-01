@@ -1,6 +1,7 @@
 package dev.sam3vision.app.isee
 
 import dev.sam3vision.app.glasses.GlassesVideoLink
+import dev.sam3vision.app.live.GlassesMireStore
 import dev.sam3vision.core.distance.CameraPose
 import dev.sam3vision.core.distance.LensSpec
 import dev.sam3vision.core.model.Detection
@@ -117,5 +118,34 @@ class LiveProbeCalibrationTest {
         probe.configureFrom(Settings.Default, glassesLens = mire, fromGlasses = true)
 
         assertEquals(mire, probe.distances.lensSpec)
+    }
+
+    @Test
+    fun `save mire reapplique le stack sans bascule live`() = runTest {
+        val (probe, _) = probeHarness(this)
+        var reads = 0
+        var mire: LensSpec? = null
+        val observer = CoroutineScope(SupervisorJob() + StandardTestDispatcher(testScheduler))
+        try {
+            probe.observeGlassesLive(
+                observer, { Settings.Default }, { null }, {}, {},
+                glassesLens = { reads += 1; mire },
+            )
+            runCurrent()
+            GlassesVideoLink.markRendered()
+            runCurrent()
+            val readsAtLive = reads
+            assertEquals(LensSpec.Glasses, probe.distances.lensSpec)
+
+            mire = LensSpec(60.61f, 92.19f, sensorLandscape = false)
+            GlassesMireStore.mireVersion.value += 1
+            runCurrent()
+
+            assertTrue(reads > readsAtLive)
+            assertEquals(mire, probe.distances.lensSpec)
+            assertEquals(mire, GlassesVideoLink.glassesStreamLens)
+        } finally {
+            observer.cancel()
+        }
     }
 }

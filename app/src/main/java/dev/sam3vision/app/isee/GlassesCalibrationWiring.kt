@@ -1,12 +1,14 @@
 package dev.sam3vision.app.isee
 
 import dev.sam3vision.app.glasses.GlassesVideoLink
+import dev.sam3vision.app.live.GlassesMireStore
 import dev.sam3vision.app.live.chooseLens
 import dev.sam3vision.core.distance.CameraPose
 import dev.sam3vision.core.distance.LensSpec
 import dev.sam3vision.core.settings.Settings
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.flow.collect
+import kotlinx.coroutines.flow.combine
 import kotlinx.coroutines.launch
 
 /**
@@ -55,7 +57,9 @@ internal fun LiveProbe.observeGlassesLive(
 ) {
     scope.launch {
         // `live` est un StateFlow conflated : une valeur répétée ne réémet pas.
-        GlassesVideoLink.live.collect { live ->
+        // `mireVersion` force la relecture (Save/Clear mire → stack reposé chaud).
+        combine(GlassesVideoLink.live, GlassesMireStore.mireVersion) { live, _ -> live }
+            .collect { live ->
             if (live) {
                 onGlasses()
                 val chosen = chooseLens(settings().glassesFovDeg, phoneLens(), glassesLens(), fromGlasses = true)
