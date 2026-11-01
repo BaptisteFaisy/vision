@@ -66,6 +66,21 @@ interface LiveClient {
         maxObjects: Int,
     ): Result<LiveFrame>
 
+    /**
+     * Même frame, JPEG **brut** : aucun base64 ne transite côté client (ni la
+     * `String` +33 % ni son décodage). Le pont par défaut encode puis délègue à
+     * [live] (transports texte, faux de test) ; [WsLiveClient] l'envoie en binaire
+     * M1 sans conversion, [HttpLiveClient] avec `binaryUpload` en `POST` octets.
+     */
+    suspend fun liveBytes(
+        jpeg: ByteArray,
+        prompts: List<String>?,
+        workEdge: Int,
+        maxObjects: Int,
+    ): Result<LiveFrame> = live(
+        dev.sam3vision.core.mask.base64Text(jpeg), prompts, workEdge, maxObjects,
+    )
+
     suspend fun health(): Result<LiveHealth>
 
     /**

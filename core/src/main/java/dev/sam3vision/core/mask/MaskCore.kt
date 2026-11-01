@@ -64,6 +64,12 @@ fun base64Bytes(text: String): ByteArray? {
     }
 }
 
+/**
+ * Encode en base64 nu (sans retours ligne, sans préfixe) : le repli des chemins
+ * binaires quand le transport exige du texte (repli JSON du WS, pont par défaut).
+ */
+fun base64Text(bytes: ByteArray): String = Base64.getEncoder().encodeToString(bytes)
+
 /** Lit largeur/hauteur dans l'en-tête IHDR d'un PNG (pur, sans décodage d'image). */
 fun parsePngSize(bytes: ByteArray): Pair<Int, Int>? {
     if (bytes.size < IHDR_OFFSET + 8) return null

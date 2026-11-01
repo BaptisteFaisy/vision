@@ -1,6 +1,7 @@
 package dev.sam3vision.core.net
 
 import dev.sam3vision.core.mask.base64Bytes
+import dev.sam3vision.core.mask.base64Text
 import dev.sam3vision.core.model.LiveFrame
 import dev.sam3vision.core.model.LiveHealth
 import dev.sam3vision.core.model.MASK_ENCODING_BITS
@@ -91,15 +92,39 @@ class HttpLiveClient(
         }.then { bytes -> catchingResult { parseLiveFrameBytes(bytes) } }
         val jpeg = base64Bytes(jpegB64)
             ?: return Result.failure(ApiError.BadResponse("/live : image_b64 illisible"))
-        return client.executeBytesBuilt(marks) {
-            request(
-                liveBinaryUrl(baseUrl, prompts, workEdge, maxObjects, maskFormat, maskEdge, masks),
-                "POST",
-                OneShotBytesBody(jpeg, OCTET_MEDIA),
-                LIVE_USER_AGENT,
-            )
-        }.then { bytes -> catchingResult { parseLiveFrameBytes(bytes) } }
+        return postBytes(jpeg, prompts, workEdge, maxObjects)
     }
+
+    /**
+     * JPEG brut : en `binaryUpload`, `POST` octets **sans** détour base64 ; sinon le JSON
+     * du contrat (le base64 fait partie du corps historique, pas d'un détour client).
+     */
+    override suspend fun liveBytes(
+        jpeg: ByteArray,
+        prompts: List<String>?,
+        workEdge: Int,
+        maxObjects: Int,
+    ): Result<LiveFrame> {
+        endpointRefusal("endpoint direct", baseUrl, "/live")?.let { return Result.failure(it) }
+        if (!binaryUpload) return live(base64Text(jpeg), prompts, workEdge, maxObjects)
+        if (jpeg.isEmpty()) return Result.failure(ApiError.BadResponse("/live : image vide"))
+        return postBytes(jpeg, prompts, workEdge, maxObjects)
+    }
+
+    /** `POST` octets : JPEG brut, knobs en query — le corps binaire du direct. */
+    private suspend fun postBytes(
+        jpeg: ByteArray,
+        prompts: List<String>?,
+        workEdge: Int,
+        maxObjects: Int,
+    ): Result<LiveFrame> = client.executeBytesBuilt(marks) {
+        request(
+            liveBinaryUrl(baseUrl, prompts, workEdge, maxObjects, maskFormat, maskEdge, masks),
+            "POST",
+            OneShotBytesBody(jpeg, OCTET_MEDIA),
+            LIVE_USER_AGENT,
+        )
+    }.then { bytes -> catchingResult { parseLiveFrameBytes(bytes) } }
 
     override suspend fun health(): Result<LiveHealth> {
         endpointRefusal("endpoint direct", baseUrl, "/health")?.let { return Result.failure(it) }
