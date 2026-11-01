@@ -211,7 +211,8 @@ La phrase effectivement dite reste visible dans le panneau iSee sous `dit : …`
 - `core.mask.MaskDetectionsTest` (**9**) : poly (exact, réduit, hors cadre), bits (exact, épars, dimensions),
   rle réduit, png/none/inconnu/cassé nuls, tracker.
 - `app.live.DistanceTickerTest` (**6**) : pas 80 ms (10 Hz) ≤ 150 ms, ticks virtuels, double start, couche (vide, champ).
-- `app.live.LiveLensTest` (**14**) : forcé > capteur > repli côté téléphone, forcé 9:16 > mire > repli estimé côté lunettes, provenance (`LensOrigin`).
+- `app.live.LiveLensTest` (**15**) : forcé > capteur > repli côté téléphone, forcé 9:16 > mire > repli estimé côté lunettes, provenance (`LensOrigin`).
+- `app.live.GlassesMireTest` (**7**) : validation des champs mire, parsing du bloc solveur, ligne de statut.
 - `app.isee.ProbeMetersPredictionsTest` (**1**) : ticker sonde insensible au temps virtuel (non-régression `advanceUntilIdle`).
 - `core.distance.CalibrationSolverTest` (**3**) : focale retrouvée, tolérance par taille, refus.
 - `app.live.CalibrationSnapshotsTest` (**3**) : plus grande personne, coupures/vide, fraîcheur.
@@ -221,7 +222,7 @@ La phrase effectivement dite reste visible dans le panneau iSee sous `dit : …`
 - `core.distance.ReadingQualityTest` (**10**) : occlusion (contenue, scores égaux, masqueur faible gardé, NaN, seuil exact, malformée), confiance (quantification, accord des branches), poids sol (dépression, plancher).
 - `core.distance.DistanceBenchmarkTest` (**5**) : banc de précision — aller-retour sténopé 0,5-50 m, aller-retour sol (3 pitchs, centre décentré), enveloppe ±1 px, fusion à branches d'accord.
 - `core.distance.GroundPlaneTest` (**18**) : horizon, dépression, ligne à distance, pieds→mètres, latéral, point complet, pose lunettes (1,6 m, pitch 0).
-- `app.isee.LiveProbeCalibrationTest` (**5**) : bascule à chaud (lens + pose, sessions intactes, pistes oubliées), suivi du direct lunettes, routage `configureFrom`.
+- `app.isee.LiveProbeCalibrationTest` (**6**) : bascule à chaud (lens + pose, sessions intactes, pistes oubliées), suivi du direct lunettes, routage `configureFrom` (repli et mire).
 - `core.distance.DistanceTextTest` (**8**) : « 85 cm », « 3,3 m », « 12 m », « ≈ », plus proche, par étiquette, mots parlés.
 - `core.live.LiveTimelineTest` (**10**, dont le test « record rend l'identité **dans l'ordre des détections** »,
   `null` pour une détection inexploitable).
@@ -277,9 +278,10 @@ distorsion, donc tout ce qui suit est **estimé**, pas mesuré :
 
 Conséquences : la voie lunettes mesure sur ce repli (`LensSpec.Glasses` +
 `CameraPose.Glasses`), affinable par le réglage, remplaçable par la mire
-(`LUNETTES-RECETTE-TEL.md` § 6). Le snapshot est la rue affichée (center-crop
-symétrique du flux, 100 % de la largeur en pratique) réduite au bord 480 :
-la focale se recalcule par frame comme côté téléphone.
+(`LUNETTES-RECETTE-TEL.md` § 6 — solveur `tools/solve_glasses_mire.py`,
+store `GlassesMireStore`, étage SENSOR branché). Le snapshot est la rue
+affichée (center-crop symétrique du flux, 100 % de la largeur en pratique)
+réduite au bord 480 : la focale se recalcule par frame comme côté téléphone.
 
 ## Pistes (non faites)
 
@@ -290,9 +292,9 @@ recette (`docs/RECETTE-DISTANCES.md`, `scripts/mesure-distances.sh`), étalonnag
 (`CalibrationSolver`, section Réglages — voir « Étalonnage »), intrinsèques du téléphone
 mesurées et verrouillées (voir « Téléphone cible »), calibrage lunettes estimé +
 bascule à chaud (`LensSpec.Glasses`, `CameraPose.Glasses`, `observeGlassesLive`).
-- **Mire lunettes** : résoudre focale px + centre optique + (k1, k2) sur mire
-  plane et fournir le `LensSpec` en `glassesLens` (repli estimé en attendant) —
-  protocole `LUNETTES-RECETTE-TEL.md` § 6.
+- **Mire lunettes** : prise terrain restante (damier + solveur + collage,
+  protocole `LUNETTES-RECETTE-TEL.md` § 6) — store, câblage `glassesLens` et
+  solveur livrés, repli estimé en attendant.
 - **Masques compacts en production** : demander `bits`/`poly` au direct (au lieu du PNG) pour
   activer les étendues de masque partout — ou cache de décodage partagé overlay↔distances
   (pas de double décodage PNG par frame).

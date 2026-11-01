@@ -14,8 +14,8 @@ une *procédure*, pas une preuve. La liste de ce qui n'a pas été rejoué est a
 (une par test, `-o` évite de compter deux fois une ligne qui en porterait deux), pas les fichiers.
 
 ```bash
-grep -rho '@Test' core/src/test --include='*.kt' | wc -l                    # 2 816
-grep -rho '@Test' app/src/test --include='*.kt' | wc -l                     # 1 676
+grep -rho '@Test' core/src/test --include='*.kt' | wc -l                    # 2 831
+grep -rho '@Test' app/src/test --include='*.kt' | wc -l                     # 1 710
 grep -rho '@Test' app/src/test/java/dev/sam3vision/app/glasses/bench --include='*.kt' | wc -l   # 97
 grep -rho '@Test' app/src/androidTest --include='*.kt' | wc -l              # 8
 grep -rho '@Test' app/src/androidTestDebug --include='*.kt' | wc -l         # 1
@@ -23,13 +23,13 @@ grep -rho '@Test' app/src/androidTestDebug --include='*.kt' | wc -l         # 1
 
 | | Fichiers `src/test` | Classes `@Test` | Annotations `@Test` |
 |---|---|---|---|
-| `:core` | 329 (dont 18 aides) | 313 | **2 816** |
-| `:app` | 231 (dont 6 aides) | 227 | **1 676** |
-| **Total JVM** | **560** | **540** | **4 492** |
+| `:core` | 330 (dont 18 aides) | 314 | **2 831** |
+| `:app` | 235 (dont 6 aides) | 231 | **1 710** |
+| **Total JVM** | **565** | **545** | **4 541** |
 | `:app` `androidTest` | 3 | 3 | **8** (instrumentés) |
 | `:app` `androidTestDebug` (banc) | 1 | 1 | **1** (instrumenté) |
 
-- **4 492 tests JVM** au total, dont **2 816** dans `:core` et **1 676** dans `:app`. Dans `:app`, le
+- **4 541 tests JVM** au total, dont **2 831** dans `:core` et **1 710** dans `:app`. Dans `:app`, le
   banc lunettes pèse **97** (`glasses/bench/`) et le reste du paquet `glasses` **153**. Les
   **9 tests instrumentés** (8 + 1) sont hors de ce total.
 - « Classes `@Test` » = déclarations `class …Test` dans les fichiers portant `@Test`
@@ -253,7 +253,7 @@ ont dérivé sans MAJ de cette table ; à recaler séparément.
 - **usecase** (40) : DictationUseCaseTest 4, NavigationRouterTest 14, SpeechUseCaseTest 8, UseCasesTest 14
 - **voicenav** (16) : VoiceDestinationParserTest 10, VoiceDestinationUseCaseTest 6
 
-### `:app` — 1 081
+### `:app` — 1 089
 
 - **(racine)** (187) : BuildInfoTest 2, CaregiverShareLinkTest 6, DistanceLayoutTest 15, FirstRunPermissionsTest 3, GoogleMapsSeedTest 3, GpuStatusLineTest 1, GpuWakeTest 8, HomePresetRequestTest 3, LiveCrossingPublishTest 4, LiveLocalOverlayTest 13, LiveMaskTransportTest 4, LiveMemoryContextTest 3, LiveStateTest 21, LiveVoiceRequestTest 3, LiveVoiceTest 4, LocaleIndependenceTest 2, MicBusTest 5, ModelPinTest 7, ParentShareTest 5, PhotoTimingsTest 2, PictoOverlayTest 2, PrewarmTest 2, RouteBaseUrlSeedTest 3, RouteSeedTest 3, RouteStatusTextTest 3, SettingsSeedTest 20, ShareTrackingPolicyTest 3, SpeechClientsTest 6, TtsLogicTest 9, UiLogicTest 18, VoiceLanguageSettingsTest 4
 - **cleanup** (15) : CaptureCleanerTest 6, CaptureScannerTest 5, CleanupDowngradeTest 4
@@ -261,9 +261,9 @@ ont dérivé sans MAJ de cette table ; à recaler séparément.
 - **glasses** (71) : GlassesAnnexBTest 10, GlassesAudioPlanTest 7, GlassesFrameCollectorTest 9, GlassesMessagesTest 7, GlassesPhaseMappingTest 2, GlassesPolicyTest 8, GlassesUiStateTest 7, GlassesVideoCropTest 4, GlassesVideoDecoderTest 10, GlassesVideoLinkTest 7
 - **glasses.bench** (95) : ChaineCompleteTest 8, CycleLatchTest 5, GlassesAudioRouteTest 7, GlassesFrameEncoderTest 4, GlassesFramePolicyTest 22, LinkGateTest 3, SessionPolicyTest 18, SpikeLaunchTest 9, SpikeLogTest 6, YuvConverterTest 13
 - **guidemap** (9) : GuideMapStyleTest 9
-- **isee** (200) : BubbleCountTest 2, CrossingLightPumpTest 1, CrossingLocalLightTest 7, CrossingOverlayLayoutTest 11, CrossingWiringTest 6, FramePolicyTest 6, IseeCaptionStateTest 3, IseePlaybackTest 11, IseeRenderTest 12, IseeSceneGlassesTest 8, IseeSceneTest 17, IseeShareTest 5, IseeStatusLineTest 5, LiveProbeCadenceTest 4, LiveProbeCalibrationTest 5, LiveProbeDepthOfferTest 2, LiveProbeForegroundTest 2, LiveProbeGuidanceTest 6, LiveProbeSchedulingTest 2, LiveProbeStateTest 1, LiveProbeSteeringTest 5, LiveProbeStopTest 5, LiveProbeTextTest 23, LiveProbeWakeTest 2, OnboardingGesturesTest 6, OrbShaderTest 3, PictoStoreTest 4, ProbeHazardsTest 3, ProbeVoiceSidewalkTest 6, ProbeVoiceTest 9, ProbeWiringSpokenTest 3, ProximityVoiceWordTest 4, RevealShiftTest 4, SendingGateTest 4, SpeakableTextTest 3
+- **isee** (201) : BubbleCountTest 2, CrossingLightPumpTest 1, CrossingLocalLightTest 7, CrossingOverlayLayoutTest 11, CrossingWiringTest 6, FramePolicyTest 6, IseeCaptionStateTest 3, IseePlaybackTest 11, IseeRenderTest 12, IseeSceneGlassesTest 8, IseeSceneTest 17, IseeShareTest 5, IseeStatusLineTest 5, LiveProbeCadenceTest 4, LiveProbeCalibrationTest 6, LiveProbeDepthOfferTest 2, LiveProbeForegroundTest 2, LiveProbeGuidanceTest 6, LiveProbeSchedulingTest 2, LiveProbeStateTest 1, LiveProbeSteeringTest 5, LiveProbeStopTest 5, LiveProbeTextTest 23, LiveProbeWakeTest 2, OnboardingGesturesTest 6, OrbShaderTest 3, PictoStoreTest 4, ProbeHazardsTest 3, ProbeVoiceSidewalkTest 6, ProbeVoiceTest 9, ProbeWiringSpokenTest 3, ProximityVoiceWordTest 4, RevealShiftTest 4, SendingGateTest 4, SpeakableTextTest 3
 - **isee.vm** (82) : IseeAnswersTest 17, IseeCameraCoordinatorTest 6, IseeDictationTest 12, IseeLiveDictationTest 3, IseePhotoShotTest 10, IseePictoTest 8, IseePictoVoiceTest 8, IseeStatusTextTest 4, IseeTranscriptTest 5, MaisonEnterOrderTest 3, NavigationHookTest 6
-- **live** (104) : DistanceTickerTest 6, LiveAskForgetTest 1, LiveAskSessionTest 24, LiveAskVoiceTest 5, LiveFpsMeterTest 6, LiveFrameCadenceTest 5, LiveFrameDispatcherTest 7, LiveLensTest 14, LiveMaskDecoderTest 6, LiveNarrationTest 5, LivePositionVoiceTest 7, LivePredictionTest 8, LiveTrackFallbackTest 3, LiveWakeGuardTest 7
+- **live** (112) : DistanceTickerTest 6, GlassesMireTest 7, LiveAskForgetTest 1, LiveAskSessionTest 24, LiveAskVoiceTest 5, LiveFpsMeterTest 6, LiveFrameCadenceTest 5, LiveFrameDispatcherTest 7, LiveLensTest 15, LiveMaskDecoderTest 6, LiveNarrationTest 5, LivePositionVoiceTest 7, LivePredictionTest 8, LiveTrackFallbackTest 3, LiveWakeGuardTest 7
 - **locked** (6) : LockedMicAnswerTest 6
 - **media** (14) : MediaCacheStoreTest 4, Nv21JpegEncoderTest 9, PcmToMp3EncoderTest 1
 - **navigation** (22) : AndroidGeocoderLabelTest 4, NavigationLauncherTest 12, VoiceNavTrackerTest 6

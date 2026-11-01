@@ -17,7 +17,10 @@ import androidx.compose.ui.unit.sp
 import dev.sam3vision.app.live.CalibrationSnap
 import dev.sam3vision.app.live.CalibrationSnapshots
 import dev.sam3vision.app.live.CalibrationStore
+import dev.sam3vision.app.live.GlassesMireStore
 import dev.sam3vision.app.live.LensOrigin
+import dev.sam3vision.app.live.mireLensOf
+import dev.sam3vision.app.live.parseMireBlock
 import dev.sam3vision.app.live.LensQualityStore
 import dev.sam3vision.app.live.SavedCalibration
 import dev.sam3vision.app.pose.CameraHeightStore
@@ -79,6 +82,7 @@ internal fun DistanceSettings(draft: Settings, onChange: (Settings) -> Unit) {
         }
         LensFallbackWarning(lensStore)
         CalibrationBlock(draft, onChange, calibrationStore)
+        MireBlock()
     }
 }
 
@@ -150,6 +154,61 @@ private fun CalibrationBlock(draft: Settings, onChange: (Settings) -> Unit, stor
         }
         message?.let { Text(it, color = SettingsLight.text, fontSize = 13.sp) }
     }
+}
+
+/**
+ * Glasses mire: paste the solver block (`tools/solve_glasses_mire.py`), save it,
+ * and the probe measures on the measured lens instead of the estimated fallback.
+ * One paste per glasses model — the store remembers, no retyping.
+ */
+@Composable
+private fun MireBlock() {
+    val context = LocalContext.current
+    val mireStore = remember(context) { GlassesMireStore(context) }
+    var pasted by remember { mutableStateOf("") }
+    var mire by remember { mutableStateOf(mireStore.lastMire()) }
+    var message by remember { mutableStateOf<String?>(null) }
+    Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
+        Text(
+            mireLine(mire, mireStore.mireAgeMs(System.currentTimeMillis())),
+            color = SettingsLight.text,
+            fontSize = 13.sp,
+        )
+        LabeledField(
+            label = "Mire solver block (paste, mire v1)",
+            value = pasted,
+            secret = false,
+        ) { pasted = it }
+        GlassButton("Save mire", pasted.isNotBlank(), true, onClick = {
+            val spec = parseMireBlock(pasted)?.let(::mireLensOf)
+            if (spec == null) {
+                message = "Unreadable block: paste the full solver output"
+            } else {
+                mireStore.save(spec)
+                mire = spec
+                pasted = ""
+                message = "Mire saved"
+            }
+        })
+        if (mire != null) {
+            GlassButton("Clear mire (back to estimated fallback)", true, false, onClick = {
+                mireStore.clear()
+                mire = null
+                message = null
+            })
+        }
+        message?.let { Text(it, color = SettingsLight.text, fontSize = 13.sp) }
+    }
+}
+
+/**
+ * Mire status line: measured field (H × V, age) when set, warning otherwise —
+ * "no mire" shows, glasses distances never run silently on the fallback.
+ */
+internal fun mireLine(mire: LensSpec?, ageMs: Long?): String {
+    if (mire == null) return "Mire: none — glasses distances run on the estimated fallback"
+    val age = ageMs?.takeIf { it >= 0L }?.let { " (${ageText(it)} ago)" } ?: ""
+    return "Mire: measured ${fovText(mire.horizontalFovDeg)}° × ${fovText(mire.verticalFovDeg)}°$age"
 }
 
 /** État d'étalonnage + dernière visée, en deux lignes (+ alerte si jamais calibré). */

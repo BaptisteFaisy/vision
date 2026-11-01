@@ -108,4 +108,14 @@ class LiveProbeCalibrationTest {
         probe.configureFrom(Settings.Default, fromGlasses = false)
         assertEquals(LensSpec.Default, probe.distances.lensSpec)
     }
+
+    @Test
+    fun `configureFrom prefere la mire au repli estime`() = runTest {
+        val (probe, _) = probeHarness(this)
+        val mire = LensSpec(60.61f, 92.19f, sensorLandscape = false)
+
+        probe.configureFrom(Settings.Default, glassesLens = mire, fromGlasses = true)
+
+        assertEquals(mire, probe.distances.lensSpec)
+    }
 }

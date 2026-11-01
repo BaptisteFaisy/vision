@@ -26,7 +26,8 @@ internal fun LiveProbe.setCalibration(lens: LensSpec, pose: CameraPose? = null) 
  * actions pose (`pitch.stop()`/`pitch.start()` en prod), injectées car le
  * `PitchMeter` exige un `Context` Android, absent des tests JVM.
  * `configureFrom` converge vers le même choix à la prochaine reconfiguration,
- * donc les deux chemins ne divergent jamais.
+ * donc les deux chemins ne divergent jamais. [glassesLens] fournit la mire
+ * persistée (`null` = jamais posée, le repli estimé s'applique).
  */
 internal fun LiveProbe.observeGlassesLive(
     scope: CoroutineScope,
@@ -34,13 +35,14 @@ internal fun LiveProbe.observeGlassesLive(
     phoneLens: () -> LensSpec?,
     onGlasses: () -> Unit,
     onPhone: () -> Unit,
+    glassesLens: () -> LensSpec? = { null },
 ) {
     scope.launch {
         // `live` est un StateFlow conflated : une valeur répétée ne réémet pas.
         GlassesVideoLink.live.collect { live ->
             if (live) {
                 onGlasses()
-                val chosen = chooseLens(settings().glassesFovDeg, phoneLens(), fromGlasses = true)
+                val chosen = chooseLens(settings().glassesFovDeg, phoneLens(), glassesLens(), fromGlasses = true)
                 setCalibration(chosen.spec, CameraPose.Glasses)
             } else {
                 val chosen = chooseLens(settings().cameraFovDeg, phoneLens())
