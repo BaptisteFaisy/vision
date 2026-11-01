@@ -35,7 +35,7 @@ import dev.sam3vision.core.traverse.FrameMotion
  * danger, « Attendez. » sur danger (mouvement brut seul — une voiture
  * garée ne bloque jamais, même proche ou sous pan caméra, ordre user du
  * 31/10), tous les deux toutes les 2 s. [motion] (`null` = pas de signal
- * fond) juge les pistes par le fond, sans feu seul (avec feu : inchangé).
+ * fond) juge les pistes par le fond, avec feu comme sans feu.
  */
 internal fun crossingPhraseOf(
     cue: CrossingCue?,
@@ -53,7 +53,7 @@ internal fun crossingPhraseOf(
     motion: FrameMotion? = null,
 ): String? {
     if (cue != null) {
-        return cuePhraseOf(cue, detections, readings, placed, objects, width, height, atMs, language, scanTrigger, steering)
+        return cuePhraseOf(cue, detections, readings, placed, objects, width, height, atMs, language, scanTrigger, steering, motion)
     }
     if (noLight) {
         CrosswalkScanWatch.update(atMs, false, movingNow = false, feu = false, language)
@@ -66,7 +66,7 @@ internal fun crossingPhraseOf(
         CrossingPeopleWatch.avoidance(placed, atMs, language, objects, width, height, readings)?.let { return it }
         return verdict
     }
-    val vehiclePhrase = CrossingVehicleWatch.update(detections, readings, atMs, language)
+    val vehiclePhrase = CrossingVehicleWatch.update(detections, readings, atMs, language, motion = motion)
     CrosswalkScanWatch.update(atMs, scanTrigger, CrossingVehicleWatch.movingNow, feu = false, language)
         ?.let { return it }
     vehiclePhrase?.let { return it }
@@ -86,6 +86,8 @@ internal fun crossingPhraseOf(
  * ([steering], mot des personnes), statut enfin. L'évitement est nourri
  * même quand le statut parle (suivi continu, parole seule cadencée).
  * Procédure scan en cours : l'évitement se tait, le statut parle.
+ * [motion] (`null` = pas de signal fond) juge les pistes véhicules par
+ * le fond, comme hors statut.
  */
 internal fun cuePhraseOf(
     cue: CrossingCue,
@@ -99,8 +101,9 @@ internal fun cuePhraseOf(
     language: SpeechLanguage,
     scanTrigger: Boolean,
     steering: String?,
+    motion: FrameMotion? = null,
 ): String? {
-    val vehiclePhrase = CrossingVehicleWatch.update(detections, readings, atMs, language)
+    val vehiclePhrase = CrossingVehicleWatch.update(detections, readings, atMs, language, motion = motion)
     CrosswalkScanWatch.update(atMs, scanTrigger, movingNow = false, feu = true, language)
     val avoid = if (!scanRunning()) {
         CrossingPeopleWatch.avoidance(placed, atMs, language, objects, width, height, readings)

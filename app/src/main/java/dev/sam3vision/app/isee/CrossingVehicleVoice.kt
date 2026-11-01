@@ -53,9 +53,9 @@ internal object CrossingVehicleWatch {
      * vrai = traversée sans feu : le mouvement se dit à toute portée
      * (ordre user du 31/10 — même au-delà de 15 m, dès qu'une voiture en
      * mouvement est détectée), sinon 15 m. [motion] (`null` = pas de
-     * signal fond) fait juger chaque piste par le fond : une boîte qui
-     * suit la caméra (pan sur une voiture garée) ne conclut plus le
-     * mouvement — sans feu seul.
+     * signal fond) fait juger chaque piste par le fond, avec feu comme
+     * sans feu : une boîte qui suit la caméra (pan sur une voiture
+     * garée) ne conclut plus le mouvement.
      */
     fun update(
         detections: List<Detection>,
@@ -66,8 +66,7 @@ internal object CrossingVehicleWatch {
         motion: FrameMotion? = null,
     ): String? {
         val range = if (noLight) Float.POSITIVE_INFINITY else VehicleStateWatcher.MOVING_METERS
-        val felt = if (noLight) motion else null
-        val found = watcher.update(detections, readings, atMs, language, motion = felt, movingMeters = range)
+        val found = watcher.update(detections, readings, atMs, language, motion = motion, movingMeters = range)
         if (found != null) return found.safetyPhrase ?: found.phrase
         return cycles.update(detections, readings, atMs, language)?.phrase
     }
