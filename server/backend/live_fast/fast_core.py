@@ -12,7 +12,7 @@ Copie de travail T5 (objectif < 200 ms) — le contrat HTTP de ``live_app.py`` e
 * ``FAST_DTYPE=bf16|fp16|fp32`` ;
 * ``FAST_TIMING=1``        — détail des temps par étage dans la réponse (outillage de
   banc) ; ``FAST_SYNC_TIMING=1`` = barrière CUDA/poste ;
-* ``FAST_DEPTH_EVERY=5``   — carte depth 1 frame WS sur N (médianes répétées entre deux) ;
+* ``FAST_DEPTH_EVERY=8``   — carte depth 1 frame WS sur N (médianes répétées entre deux) ;
 * ``FAST_PREPROCESS=fast`` — ``pixel_values`` fusionnés torch (resize + normalisation en
   une passe, sur GPU si dispo) au lieu de l'appel HF ; ``hf`` (défaut) garde le chemin
   historique ;
@@ -75,11 +75,12 @@ WARMUPS = env_int(os.environ.get("FAST_COMPILE_WARMUPS"), 3)
 TIMING = env_bool(os.environ.get("FAST_TIMING"))
 SYNC_TIMING = env_bool(os.environ.get("FAST_SYNC_TIMING"))
 # Throttle depth WS (voir depth.py) : 1 carte calculée sur N frames demandées
-# (défaut 5 ≈ 6 Hz à 30 images/s), médianes répétées entre deux. 1 = chaque
-# frame (throttle coupé) ; borne 30 ≈ 1 s à 30 Hz, sous les 1500 ms de
-# fraîcheur qu'exige le client (LiveDepthMeter.SERVER_FRESH_MS). env_int +
+# (défaut 8 : pics +22 ms 1 frame sur 8 au lieu de 5 — campagne Redmi 01/11,
+# 10,3 ips, les pics depth creusaient les tranches), médianes répétées entre
+# deux. 1 = chaque frame (throttle coupé) ; 8 frames < 1500 ms de fraîcheur
+# qu'exige le client (LiveDepthMeter.SERVER_FRESH_MS) dès 5,3 ips. env_int +
 # bornes explicites : clamp_int n'est défini qu'après ce bloc.
-DEPTH_EVERY = max(1, min(30, env_int(os.environ.get("FAST_DEPTH_EVERY"), 5)))
+DEPTH_EVERY = max(1, min(30, env_int(os.environ.get("FAST_DEPTH_EVERY"), 8)))
 # Pré-traitement : "hf" (appel processeur historique) ou "fast" (pixels_fast fusionné,
 # même sémantique à ±1 LSB 8 bits près, repli HF si la config sort du supporté).
 PREPROCESS = (os.environ.get("FAST_PREPROCESS") or "hf").strip().lower()

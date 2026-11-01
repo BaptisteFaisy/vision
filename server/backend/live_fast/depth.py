@@ -9,7 +9,7 @@ repli boîte érodée (25 % par côté, comme ``DepthReadings`` embarqué) : la 
 entière lirait le fond sur un objet fin (poteau). Client muet = aucune clé,
 aucun coût ; modèle absent = repli gracieux (pas de clé, jamais d'erreur).
 
-Throttle WS (``FAST_DEPTH_EVERY``, défaut 5) : le client demande la profondeur à
+Throttle WS (``FAST_DEPTH_EVERY``, défaut 8) : le client demande la profondeur à
 chaque frame mais se contente d'une carte fraîche de moins de 1500 ms (voir
 ``LiveDepthMeter.SERVER_FRESH_MS``) — le serveur ne calcule donc qu'1 carte sur
 N et répète les médianes entre deux (``new_depth_throttle`` + ``cached_medians``

@@ -18,7 +18,7 @@
 #   FAST_SNAPSHOT=1      snapshot mémoire (réveil 2-7 s au lieu de 25-38 s)
 #   FAST_MODEL_DIR=...   poids dans l'image (plus de re-téléchargement au réveil)
 #   FAST_TIMING=1        timings_ms + Server-Timing (validation des < 10 s)
-#   FAST_DEPTH_EVERY     throttle depth WS, ACTIF par défaut (5 : 1 carte sur 5,
+#   FAST_DEPTH_EVERY     throttle depth WS, ACTIF par défaut (8 : 1 carte sur 8,
 #                        médianes répétées entre deux) — non posé ici, le défaut
 #                        suffit ; =1 pour revenir au calcul à chaque frame.
 #
@@ -107,7 +107,7 @@ print("boot   :", "restore" if restored is True else
       "complet" if restored is False else "inconnu (backend trop vieux ?)")
 print("load   :", json.dumps(h.get("load_breakdown"), ensure_ascii=False, sort_keys=True))
 missing = [k for k, v in {"batch_prompts": True, "cuda_graph": True, "edge": 512,
-                           "snapshot": True, "detr_graph": True, "depth_every": 5,
+                           "snapshot": True, "detr_graph": True, "depth_every": 8,
                            "post": "kept-only",
                            "attn": "sdpa"}.items()
            if lev.get(k) != v]

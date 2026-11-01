@@ -395,6 +395,8 @@ RUNNERS = (
      depth_tests.test_depth_throttle),
     ("profondeur : throttle in/out (sans GPU)", "depth",
      depth_tests.test_depth_throttle_io),
+    ("profondeur : défaut EVERY=8 (déployé)", "timing",
+     depth_tests.test_depth_default_every),
     ("profondeur : throttle WS (répétition)", "timing",
      depth_tests.test_ws_depth_throttle),
     ("profondeur : throttle WS (mixte)", "timing",

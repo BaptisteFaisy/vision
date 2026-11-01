@@ -192,6 +192,35 @@ def test_depth_throttle_io(depth) -> None:
           cache4 is False and repeat4 is None)
 
 
+def test_depth_default_every(_) -> None:
+    """Défaut ``FAST_DEPTH_EVERY`` = 8 sur le déployé (``live_fast``).
+
+    Campagne Redmi 01/11 : pics depth +22 ms 1 frame sur 8, tranches ips
+    stabilisées ; 8 frames < 1500 ms dès 5,3 ips. Import direct du déployé
+    (même purge que ``_throttle_service``) : ``backend/fast_core.py`` est un
+    autre fork, sans ce levier.
+    """
+    import sys
+
+    from test_units import BACKEND_DIR, check
+
+    live_fast = BACKEND_DIR / "live_fast"
+    sys.path.insert(0, str(live_fast))
+    purged = {name: sys.modules.pop(name, None) for name in
+              ("fast_core", "fast_env", "timing", "token_cache", "weights",
+               "concepts", "depth", "schemas", "imaging", "segmentation")}
+    try:
+        import fast_core as deployed
+
+        check("depth: défaut EVERY=8 (déployé)", deployed.DEPTH_EVERY == 8,
+              str(deployed.DEPTH_EVERY))
+    finally:
+        sys.path.remove(str(live_fast))
+        for name, module in purged.items():
+            if module is not None:
+                sys.modules[name] = module
+
+
 def _throttle_service():
     """Service déployé (``live_fast``) + son module, hors GPU (même purge que M1).
 
