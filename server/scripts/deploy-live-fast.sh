@@ -18,6 +18,9 @@
 #   FAST_SNAPSHOT=1      snapshot mémoire (réveil 2-7 s au lieu de 25-38 s)
 #   FAST_MODEL_DIR=...   poids dans l'image (plus de re-téléchargement au réveil)
 #   FAST_TIMING=1        timings_ms + Server-Timing (validation des < 10 s)
+#   FAST_DEPTH_EVERY     throttle depth WS, ACTIF par défaut (5 : 1 carte sur 5,
+#                        médianes répétées entre deux) — non posé ici, le défaut
+#                        suffit ; =1 pour revenir au calcul à chaque frame.
 #
 # Ne JAMAIS déployer backend/live_app.py (version lente, 205-241 ms).
 #
@@ -45,7 +48,7 @@ profile_arg=()
 deploy=1
 case "${1:-}" in
   --no-deploy) deploy=0 ;;
-  -h|--help)   sed -n '2,20p' "$0"; exit 0 ;;
+  -h|--help)   sed -n '2,23p' "$0"; exit 0 ;;
   "") ;;
   *) echo "option inconnue : $1 (voir --help)" >&2; exit 2 ;;
 esac
@@ -98,7 +101,7 @@ print("boot   :", "restore" if restored is True else
       "complet" if restored is False else "inconnu (backend trop vieux ?)")
 print("load   :", json.dumps(h.get("load_breakdown"), ensure_ascii=False, sort_keys=True))
 missing = [k for k, v in {"batch_prompts": True, "cuda_graph": True, "edge": 512,
-                           "snapshot": True, "detr_graph": True,
+                           "snapshot": True, "detr_graph": False, "depth_every": 5,
                            "attn": "sdpa"}.items()
            if lev.get(k) != v]
 if "fast" not in str(h.get("model", "")).lower():

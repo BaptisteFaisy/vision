@@ -8,6 +8,14 @@ disparité). Médiane sur la **boîte** (pas le masque) : robuste, prévisible, 
 téléphone garde sa fusion au masque embarquée en complément. Client muet = aucune
 clé, aucun coût ; modèle absent = repli gracieux (pas de clé, jamais d'erreur).
 
+Throttle WS (``FAST_DEPTH_EVERY``, défaut 5) : le client demande la profondeur à
+chaque frame mais se contente d'une carte fraîche de moins de 1500 ms (voir
+``LiveDepthMeter.SERVER_FRESH_MS``) — le serveur ne calcule donc qu'1 carte sur
+N et répète les médianes entre deux (``new_depth_throttle`` + ``cached_medians``
++ ``attach_cached_medians``). Répéter plutôt qu'omettre : le client ne rejoue
+pas les dernières médianes reçues (une réponse sans clé retombe en sténopé
+pur), et des médianes à chaque réponse gardent l'inférence embarquée coupée.
+
 Imports lourds (torch/transformers) dans les fonctions : ce module reste
 importable sans GPU, comme ``segmentation``.
 """
@@ -117,3 +125,64 @@ def attach_frame_depth(ctx, image, entries: list, with_depth: bool, timers: dict
     norm = depth_map_for(ctx["depth_model"], ctx.get("depth_processor"), image, ctx["device"])
     add_ms(timers, "depth_ms", elapsed_ms(started))
     return attach_medians(norm, entries, image.size)
+
+
+def new_depth_throttle() -> dict:
+    """État du throttle depth, UN par connexion WS (jamais global, jamais partagé)."""
+    return {"frames": 0, "medians": []}
+
+
+def depth_compute_due(state: dict, every: int) -> bool:
+    """Faut-il calculer la carte pour cette frame demandée ? 1re frame : toujours.
+
+    ``every`` ≤ 0 vaut 1 (throttle coupé). N'appeler que pour une frame avec
+    ``with_depth`` : les frames muettes ne font pas avancer le compteur.
+    """
+    step = every if isinstance(every, int) and every >= 1 else 1
+    due = state["frames"] % step == 0
+    state["frames"] += 1
+    return due
+
+
+def cached_medians(entries: list) -> list:
+    """Médianes d'une réponse calculée, par index (``None`` = objet non mesuré)."""
+    return [entry.get("depth") if isinstance(entry, dict) else None for entry in entries]
+
+
+def attach_cached_medians(entries: list, medians: list) -> list:
+    """Répète les médianes de la dernière carte calculée (frames throttlées).
+
+    Par index d'objet (les réponses sont triées par score décroissant) et sans
+    jamais écraser une vraie mesure : seuls les objets sans clé ``depth``
+    reçoivent la médiane mémorisée au même index.
+    """
+    for index, entry in enumerate(entries):
+        if index >= len(medians) or medians[index] is None:
+            continue
+        if isinstance(entry, dict) and "depth" not in entry:
+            entry["depth"] = medians[index]
+    return entries
+
+
+def depth_throttle_in(request, depth_state, every):
+    """Avant l'inférence : requête à servir + plan ``(mémoriser, répéter)``.
+
+    Carte due (1re frame, puis 1 sur ``every``) : la requête passe telle
+    quelle et on mémorisera les médianes ; sinon ``with_depth`` est coupé
+    (zéro coût GPU) et on répétera les médianes mémorisées. Sans
+    ``with_depth`` ou sans état de connexion : la requête passe, rien à faire.
+    """
+    if not request.with_depth or depth_state is None:
+        return request, False, None
+    if depth_compute_due(depth_state, every):
+        return request, True, None
+    return (request.model_copy(update={"with_depth": False}), False,
+            depth_state["medians"])
+
+
+def depth_throttle_out(objects, cache, repeat, depth_state):
+    """Après l'inférence : mémorise les médianes calculées ou répète le cache."""
+    if cache:
+        depth_state["medians"] = cached_medians(objects)
+    elif repeat is not None:
+        attach_cached_medians(objects, repeat)
