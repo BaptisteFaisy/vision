@@ -47,8 +47,9 @@ H = 2·atan(0,6·tan(D/2)) :
 ## Borne d'erreur
 
 - Valeur retenue : **H = 94,5° → 95° inchangé**.
-- Bande d'incertitude : **[90°, 97°]** (−5° variance modèle/dewarp, +2° spread
-  marketing 124°). Erreur distance bornée ≈ **−4 % / +9 %** pire cas.
+- Bande d'incertitude : **[92°, 97°]** (−2,5° méthode/extrapolation : aspect 0,75
+  confirmé sur Vanguard même (3024×4032), gen1 second point ≤ 1,5° ; +2,5° spread
+  124° conservé, 122° officiel). Erreur distance bornée ≈ **−5,1 % / +3,6 %**.
 - Mitigation runtime : `glassesFovDeg` forcé (priorité forcé > profil > défaut)
   permet de corriger sur le terrain sans nouveau build.
 
@@ -62,7 +63,7 @@ Pour le détenteur d'une paire Vanguard :
    bord 320) + relever la photo pleine taille 3024×4032 si exposée.
 3. Mesurer H : H = 2·atan(L / (2·d)) avec L = largeur de mire visible sur toute
    la largeur image, d = distance mire-objectif. Répéter à 3 distances, moyenner.
-4. Critère d'acceptation : H ∈ [90°, 97°] → garder 95° ; H hors bande → poser
+4. Critère d'acceptation : H ∈ [92°, 97°] → garder 95° ; H hors bande → poser
    `glassesFovDeg = H` en Réglages (correction immédiate) + patch mettant à jour
    `VANGUARD_SENSOR_H_FOV_DEG` et son test `GlassesLensTest`.
 5. Consigner : modèle (`OAKLEY_META_VANGUARD`), H mesuré, d/L, version
