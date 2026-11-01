@@ -231,6 +231,8 @@ dependencies {
     implementation(libs.mwdat.core)
     implementation(libs.mwdat.camera)
     implementation(libs.mwdat.inputs)
+    // Orientation tête (Motion bêta, même pin 1.0.0 : le runtime lunettes 1.0.0.0.0 coupe les sessions 1.0.1).
+    implementation(libs.mwdat.motion)
     // Mock Device Kit (lunettes simulées) : build debug seulement, hors de l'APK public.
     debugImplementation(libs.mwdat.mockdevice)
     implementation(libs.kotlinx.coroutines.android)

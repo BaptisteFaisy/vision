@@ -13,6 +13,9 @@ import com.meta.wearable.dat.core.types.PermissionStatus
 import com.meta.wearable.dat.core.types.RegistrationError
 import com.meta.wearable.dat.core.types.RegistrationState
 import com.meta.wearable.dat.core.types.WearablesError
+import com.meta.wearable.dat.motion.addMotion
+import com.meta.wearable.dat.motion.removeMotion
+import com.meta.wearable.dat.motion.types.MotionConfiguration
 import dev.sam3vision.app.BuildConfig
 import dev.sam3vision.app.PcmSource
 import dev.sam3vision.app.speechClient
@@ -134,6 +137,7 @@ class GlassesController(
     private var sessionWatch: Job? = null
     private var camera: GlassesCamera? = null
     private var inputs: GlassesInputs? = null
+    private var headPose: GlassesHeadPose? = null
     private var activity: Activity? = null
     private var started = false
 
@@ -362,6 +366,14 @@ class GlassesController(
             autoListen.arm()
         }
         inputs = GlassesInputs(created, scope, clock, ::onGesture, ::note).also { it.start() }
+        // Motion au pin 1.0.0, config par défaut (10 Hz) : un refus (canal bêta,
+        // paire sans Motion) publie null et la sonde garde le sténopé seul.
+        headPose = GlassesHeadPose(scope, ::note).also {
+            it.start(
+                attach = { created.addMotion(MotionConfiguration()).getOrNull() },
+                detach = { created.removeMotion() },
+            )
+        }
     }
 
     /** Micro utilisable maintenant : flux en cours **et** micro autorisé, sinon rien. */
@@ -468,6 +480,8 @@ class GlassesController(
         GlassesMicLink.detach()
         GlassesVideoLink.detachNotes()
         GlassesVideoLink.clear()
+        headPose?.stop()
+        headPose = null
         inputs?.stop()
         inputs = null
         camera?.stop()

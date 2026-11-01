@@ -108,7 +108,8 @@ class PitchMeter(
     /**
      * Démarre l'écoute, sauf en session lunettes : le téléphone (en poche) ne
      * dit plus où regarde la tête — la pose tombe alors sur la constante
-     * lunettes ([CameraPose.Glasses]) au lieu de l'IMU. Miroir de l'aller de
+     * lunettes ([CameraPose.Glasses]) au lieu de l'IMU — ou la pose tête DAT
+     * Motion si elle est fraîche. Miroir de l'aller de
      * `observeGlassesLive`, pour les réactivations caméra sans bascule `live`.
      */
     fun startUnlessGlassesLive() {
@@ -117,7 +118,7 @@ class PitchMeter(
             return
         }
         stop()
-        distances.pose = CameraPose.Glasses
+        distances.pose = GlassesVideoLink.freshHeadPose() ?: CameraPose.Glasses
     }
 
     /** Démarre l'écoute ; sans capteur, ne fait rien. Idempotent. */

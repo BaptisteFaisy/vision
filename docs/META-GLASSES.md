@@ -453,9 +453,11 @@ et question bout-en-bout avec photo jointe à la réponse.
 
 ## 15. Calibration optique pour les distances (2026-11-01)
 
-Le SDK DAT 1.0.0 **n'expose aucune optique** (ni focale, ni FOV, ni distorsion)
-et **aucune orientation tête** (ni IMU, ni quaternion — `DonState`/`HingeState`
-seuls, R3). Le calibrage lunettes vient donc d'une table par modèle, lue via
+Le SDK DAT 1.0.0 **n'expose aucune optique** (ni focale, ni FOV, ni distorsion).
+L'orientation tête vient du module optionnel `mwdat-motion` (même pin 1.0.0,
+bêta dev+bêta : `MotionSample.orientation`, quaternion fusionné nullable —
+`core`/`camera`/`inputs` n'ont que `DonState`/`HingeState`, R3). Le calibrage
+lunettes vient donc d'une table par modèle, lue via
 `Device.deviceType` (`GlassesLens.kt`, D1) :
 
 | Paire (`DeviceType`) | H retenu | Source |
@@ -474,8 +476,10 @@ inchangé. Recadrage → FOV effectif (`CropGeometry.afterCrop`, D2 : la spec
 post-crop porte l'orientation du crop, sinon le sténopé prend le mauvais axe,
 −44 % prouvé ; le pont E5 recadre la focale flux par photo envoyée).
 Tangage : le téléphone ne vise pas où vise la tête → branche sol coupée
-explicitement en lunettes-live (`groundPlaneEnabled`, `setGlassesLive`, D3),
-sténopé seul. Profondeur DA2 : aucun changement (D4 — embarqué et serveur sont
+explicitement en lunettes-live (`groundPlaneEnabled`,
+`setGlassesLive`, D3), sténopé seul ; avec une pose Motion fraîche, la branche
+rouvre sur la tête (même `setGlassesLive`, pose en paramètre). Profondeur DA2 :
+aucun changement (D4 — embarqué et serveur sont
 aspect-safe, calibration par frame sur ancres sténopé).
 Tests : `GlassesLensTest` + `GlassesSelectTest` (ici, §11), `CropGeometryTest` +
 `CropFovLimitsTest` + `PhoneLensDefaultsTest` + 3 `DistanceMeterTest` + 3
