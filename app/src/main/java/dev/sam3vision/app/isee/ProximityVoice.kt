@@ -3,6 +3,7 @@ package dev.sam3vision.app.isee
 import dev.sam3vision.app.SpeechPlayer
 import dev.sam3vision.app.speech.SystemTtsEngine
 import dev.sam3vision.app.speech.VoicePack
+import dev.sam3vision.core.live.AttentionCadence
 import dev.sam3vision.core.live.GuidanceWord
 import dev.sam3vision.core.net.ApiError
 import dev.sam3vision.core.net.ElevenLabsTtsClient
@@ -50,6 +51,15 @@ import kotlin.coroutines.coroutineContext
  * [PENDING_TTL_MS]. L'arrivée sur le passage ([onArrivalPhrase]) passe en
  * dernier, derrière la route et les doux — la plus basse priorité de
  * toutes les annonces.
+ *
+ * Deux ordres user du 1/11 passent par ici : les annonces « Attention … »
+ * sont cadencées par [cadence] (même annonce jamais deux fois dans la
+ * fenêtre, silence entre deux annonces — le direct ne mitraille plus), et la
+ * parole du user ([userSpeaking] : tenue du micro, transcription en cours)
+ * passe devant tout ce que dit cette voix — rien ne parle par-dessus lui, les
+ * phrases attendent en file ([flushPending]) et se redisent au silence.
+ * Seule exception : le stop de Traversée ([GuidanceWord.isStopPhrase]), qui
+ * n'attend jamais. La voix de sécurité ([safety]) garde ses propres règles.
  */
 class ProximityVoice(
     private val player: SpeechPlayer,
@@ -66,6 +76,8 @@ class ProximityVoice(
     private val nowMs: () -> Long = { System.currentTimeMillis() },
     private val system: SystemTtsEngine? = null,
     private val systemBusy: () -> Boolean = { false },
+    private val userSpeaking: () -> Boolean = { false },
+    private val cadence: AttentionCadence = AttentionCadence(),
 ) {
 
     private var lastPhrase: String? = null
@@ -85,6 +97,9 @@ class ProximityVoice(
     /** Signal « voix réseau indisponible » déjà parlé (une fois par session). */
     private var networkAlertSpoken = false
 
+    /** Lecture déjà coupée pour la parole du user (une fois par prise de parole). */
+    private var cutForUserDone = false
+
     /** Nouvelle session : la prochaine phrase sera dite même si elle ressemble à la précédente. */
     fun reset() {
         lastPhrase = null
@@ -93,7 +108,33 @@ class ProximityVoice(
         pendingRoute = null
         pendingArrival = null
         networkAlertSpoken = false
+        cutForUserDone = false
+        cadence.reset()
     }
+
+    /**
+     * Parole du user (tenue du micro, transcription) : la voix se tait et coupe
+     * ce qu'elle lisait (chat compris). Une seule coupe par prise de parole —
+     * le fanion est rendu, sinon le lecteur resterait cru occupé pour toujours.
+     * Le stop de Traversée ([GuidanceWord.isStopPhrase]) n'est jamais coupé.
+     */
+    private fun yieldsToUser(phrase: String): Boolean =
+        userSpeaking() && !GuidanceWord.isStopPhrase(phrase)
+
+    /** Coupe la lecture en cours pour la parole du user (une fois), fanion rendu. */
+    private fun cutForUser() {
+        if (cutForUserDone) return
+        cutForUserDone = true
+        player.stop()
+        onSpeaking("")
+    }
+
+    /**
+     * Vrai si le user parle à iSee (tenue du micro, transcription) : l'appelant
+     * ne fait alors rien couper — les alertes attendent le silence ([flushPending])
+     * au lieu de passer par la voix de sécurité.
+     */
+    fun userIsSpeaking(): Boolean = userSpeaking()
 
     /**
      * Nouvelle phrase de SAM. [playerIdle] vrai = aucune bulle du chat en cours de lecture ;
@@ -122,6 +163,12 @@ class ProximityVoice(
         dedupMs: Long = REPEAT_TTL_MS,
     ) {
         if (saidRecently(phrase, dedupMs)) return
+        if (cadence.blocked(phrase, nowMs(), urgent)) return
+        if (yieldsToUser(phrase)) {
+            cutForUser()
+            if (queue) pending = Pending(phrase, nowMs() + PENDING_TTL_MS)
+            return
+        }
         if (urgent) {
             speakUrgent(phrase)
             return
@@ -150,6 +197,12 @@ class ProximityVoice(
         urgent: Boolean = false,
     ) {
         if (saidRecently(phrase)) return
+        if (cadence.blocked(phrase, nowMs(), urgent)) return
+        if (yieldsToUser(phrase)) {
+            cutForUser()
+            pendingRoute = Pending(phrase, nowMs() + PENDING_TTL_MS)
+            return
+        }
         if (urgent) {
             speakUrgent(phrase)
             return
@@ -173,6 +226,11 @@ class ProximityVoice(
     suspend fun onArrivalPhrase(phrase: String, playerIdle: Boolean) {
         if (saidRecently(phrase)) return
         val current = settings()
+        if (yieldsToUser(phrase)) {
+            cutForUser()
+            pendingArrival = Pending(phrase, nowMs() + PENDING_TTL_MS)
+            return
+        }
         if (!playerIdle || routeSpeaking() || systemBusy()) {
             pendingArrival = Pending(phrase, nowMs() + PENDING_TTL_MS)
             return
@@ -191,7 +249,7 @@ class ProximityVoice(
      * comprise.
      */
     suspend fun flushPending(playerIdle: Boolean, busy: () -> Boolean = { false }) {
-        if (!playerIdle || routeSpeaking() || busy() || systemBusy()) return
+        if (!playerIdle || routeSpeaking() || busy() || systemBusy() || userSpeaking()) return
         val current = settings()
         if (flushOne(pendingRoute, current) { pendingRoute = null }) return
         if (flushOne(pending, current) { pending = null }) return
@@ -205,7 +263,7 @@ class ProximityVoice(
      * pas le rattrapage latéral). Périmée ou déjà dite : jetée.
      */
     suspend fun flushArrival(playerIdle: Boolean) {
-        if (!playerIdle || routeSpeaking() || systemBusy()) return
+        if (!playerIdle || routeSpeaking() || systemBusy() || userSpeaking()) return
         val current = settings()
         if (hasFresh(pendingRoute) || hasFresh(pending)) return
         flushOne(pendingArrival, current) { pendingArrival = null }
@@ -235,6 +293,9 @@ class ProximityVoice(
             clear()
             return false
         }
+        // Annonce « Attention … » encore dans sa fenêtre : gardée (sa cadence
+        // la libérera) — pas dite, pas perdue avant [PENDING_TTL_MS].
+        if (cadence.blocked(due.phrase, nowMs())) return false
         if (!speak(due.phrase, current)) return false
         clear()
         return true
@@ -256,6 +317,7 @@ class ProximityVoice(
             cut.speak(phrase)
             lastPhrase = phrase
             lastPhraseAtMs = nowMs()
+            cadence.record(phrase, nowMs(), urgent = true)
             return
         }
         player.stop()
@@ -266,6 +328,8 @@ class ProximityVoice(
         if (bytes.isEmpty()) return
         lastPhrase = phrase
         lastPhraseAtMs = nowMs()
+        cadence.record(phrase, nowMs(), urgent = true)
+        cutForUserDone = false
         onSpeaking(phrase)
         player.play(bytes).onFailure { onSpeaking("") }
     }
@@ -289,6 +353,8 @@ class ProximityVoice(
         // (chat, route, système, porte, synthèse) ne tait pas les réémissions.
         lastPhrase = phrase
         lastPhraseAtMs = nowMs()
+        cadence.record(phrase, nowMs())
+        cutForUserDone = false
         onSpeaking(phrase)
         player.play(bytes).onFailure { onSpeaking("") }
         return true
@@ -313,6 +379,8 @@ class ProximityVoice(
         networkAlertSpoken = true
         lastPhrase = phrase
         lastPhraseAtMs = nowMs()
+        cadence.record(phrase, nowMs())
+        cutForUserDone = false
         return true
     }
 
@@ -344,6 +412,11 @@ class ProximityVoice(
         queue: Boolean = false,
     ) {
         if (text == lastPhrase && GuidanceWord.isStopPhrase(text)) return
+        if (yieldsToUser(text)) {
+            cutForUser()
+            if (queue) pending = Pending(text, nowMs() + PENDING_TTL_MS)
+            return
+        }
         if (urgent) {
             speakUrgent(text)
             return

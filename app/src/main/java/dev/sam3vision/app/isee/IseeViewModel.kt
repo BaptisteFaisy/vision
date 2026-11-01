@@ -110,7 +110,7 @@ class IseeViewModel(app: Application) : AndroidViewModel(app) {
     /** Voix de sécurité : toute urgence, dite aussitôt en grave, même en dictée (moteur partagé avec le repli hors-ligne de la voix de proximité). */
     private val safety = SafetyVoice(player, systemTts, { settings }, stopCurrent = { player.stop(); update { it.cutSpeaking() } })
     /** Voix de proximité : doux en Laure, urgences déléguées à la sécurité. */
-    private val proximity = ProximityVoice(player, { settings }, safety, ::speakAnnouncement, ::canAnnounce, clips = guideVoicePack(getApplication()), routeSpeaking = ::isRouteSpeaking, system = systemTts, systemBusy = { systemTts.speaking })
+    private val proximity = ProximityVoice(player, { settings }, safety, ::speakAnnouncement, ::canAnnounce, clips = guideVoicePack(getApplication()), routeSpeaking = ::isRouteSpeaking, system = systemTts, systemBusy = { systemTts.speaking }, userSpeaking = { _state.value.holding || _state.value.transcribing })
 
     /** Guetteurs bordure + escaliers + mobilier + trottoir, posés par `observeHazards` (reset à chaque début de séance). */
     private var hazards: ProbeHazards? = null

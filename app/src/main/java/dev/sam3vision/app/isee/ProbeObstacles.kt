@@ -112,22 +112,27 @@ internal fun obstacleFrame(
     val curbSignal = CurbSignal.of(readings, st.width, st.height)
     val curbCue = if (st.crossingActive && curbSignal.tier != CurbTier.NEAR) null
     else watchers.curb.onSignal(curbSignal, nowMs, lang)?.takeIf { shouldSpeakCurb(it, st.crossingActive) }
-    if (BuildConfig.DEBUG) {
-        android.util.Log.d("CurbVoice", curbVoiceLine(readings, curbSignal, curbCue?.phrase, st.crossingActive))
-    }
+    if (BuildConfig.DEBUG) android.util.Log.d("CurbVoice", curbVoiceLine(readings, curbSignal, curbCue?.phrase, st.crossingActive))
     val hazardCue = if (st.crossingActive) null
     else watchers.hazard.onSignal(HazardSignal.of(readings, st.width, st.height), nowMs, lang)
     val wordClip = imminentWordClipId(hazardCue)
     val decision = decideObstacles(vehicleCue, curbCue, hazardCue.takeUnless { wordClip != null })
-    decision.safety?.let {
-        safety.speak(it)
+    val busy: () -> Boolean = { safetyBusy(System.currentTimeMillis(), watchers.lastSafetyMs) }
+    // Parole du user devant tout (ordre user du 1/11) : l'alerte retenue
+    // attend le silence en file douce au lieu de couper le micro.
+    val heldForUser = decision.safety != null && voice.userIsSpeaking()
+    if (decision.safety != null && !heldForUser) {
+        safety.speak(decision.safety)
         watchers.lastSafetyMs = nowMs
     }
     launchImminentWord(scope, voice, playerIdle, softSpeech, lang, hazardCue, wordClip)
-    val soft = decision.soft
-    val busy: () -> Boolean = { safetyBusy(System.currentTimeMillis(), watchers.lastSafetyMs) }
+    val soft = softOf(decision, heldForUser)
     if (soft != null) {
-        scope.launch { softSpeech.withLock { voice.onPhrase(soft, playerIdle(), urgent = decision.urgent, queue = true, busy = busy) } }
+        scope.launch {
+            softSpeech.withLock {
+                voice.onPhrase(soft, playerIdle(), urgent = decision.urgent && !heldForUser, queue = true, busy = busy)
+            }
+        }
     } else if (!st.crossingActive) {
         scope.launch { softSpeech.withLock { voice.flushPending(playerIdle(), busy) } }
     }
@@ -151,3 +156,13 @@ internal fun launchImminentWord(
     if (wordClip == null || word == null) return
     scope.launch { softSpeech.withLock { voice.speakWord(wordClip, word, lang, playerIdle(), urgent = false, queue = true) } }
 }
+
+/**
+ * Phrases douces de la frame : l'alerte de sécurité retenue pour la parole du
+ * user ([heldForUser]) passe en doux, derrière sa phrase — elle attend le
+ * silence au lieu de couper le micro (ordre user du 1/11). Sinon la frame dit
+ * exactement ce que l'arbitre a décidé. Pur, testé en JVM.
+ */
+internal fun softOf(decision: ObstacleDecision, heldForUser: Boolean): String? =
+    if (!heldForUser) decision.soft
+    else listOfNotNull(decision.soft, decision.safety).joinToString(" ").takeIf { it.isNotEmpty() }

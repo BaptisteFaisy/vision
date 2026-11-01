@@ -23,6 +23,23 @@ livré et ses preuves (tâche, fichiers, chiffres) dans l'arbre.
   doux-puis-imminent — et 2 nouveaux app `imminentWordClipId`) ;
   `check-kotlin-limits.py` OK ; `check-voicepack.py` OK ; UBS : 0
   finding (scanner Kotlin indisponible, comme avant).
+## 2026-11-01 — iSee : « Attention … » cadencées, parole du user devant tout (branche `fix/attention-cadence-user-voice`)
+
+- **Ordre user** : arrêter le spam « Attention … » du direct, et que sa
+  propre voix passe devant tout le reste.
+- **Fait (§ 30 VOIX-DANGER)** : `core/live/AttentionCadence` (pure) — même
+  annonce jamais deux fois dans 20 s (clé = phrase sans ses nombres, l'heure
+  du cadran ne fait pas une phrase neuve), 6 s entre deux annonces
+  différentes, 2 s entre deux urgentes ; branchée dans `ProximityVoice`
+  (seules les phrases « Attention »/« Caution » sont filtrées).
+  `ProximityVoice.userSpeaking` — pendant la tenue du micro ou une
+  transcription, rien ne parle : lecture coupée une fois (fanion rendu),
+  phrases gardées et redites au silence ; `ProbeObstacles` retient l'alerte
+  de sécurité de la frame (elle rejoint le doux, `softOf`) ; seul le stop de
+  Traversée passe outre.
+- **Preuve** : `:core:testDebugUnitTest` + `:app:testDebugUnitTest` verts sur
+  r630 (dont `AttentionCadenceTest` 7, `ProximityVoiceUserTest` 7,
+  `SoftHeldForUserTest` 4) ; `check-kotlin-limits.py` OK.
 
 ## 2026-11-01 — iSee : voix danger aux humains, poteau muet (branche `hazard-person-not-pole`)
 
