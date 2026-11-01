@@ -76,7 +76,10 @@ class GuidanceAnnouncer(
      * cap (ordre de retour), une absence parle prudemment ; le bouché prime.
      * [samPassage] est le passage conseillé par SAM : bouché et côté du
      * serveur, obstacle chiffré du téléphone ; `null` (backend antérieur) =
-     * décision locale. Direction stable : redite toutes les [repeatMs]
+     * décision locale. [holeSide] est le côté du trou de grillage (ouvert,
+     * proche, localisé par l'appelant) : sur couloir bouché sans chemin
+     * optimal, on part vers lui sauf humain à moins de 80 cm — sinon
+     * l'évitement générique. Direction stable : redite toutes les [repeatMs]
      * millisecondes, sauf overwrite (mot nouveau aussitôt) ; jamais de stop.
      */
     fun onFrame(
@@ -88,10 +91,11 @@ class GuidanceAnnouncer(
         hfovDeg: Float = LensSpec.DEFAULT_H_FOV_DEG,
         sidewalk: SidewalkPosition = SidewalkPosition.Ahead,
         samPassage: Passage? = null,
+        holeSide: GuidanceSide? = null,
     ): String? {
         val effective = routeCap ?: cap
         val decision = samPassage?.let { samDecision(it, labels, effective, hfovDeg) }
-            ?: Guidance.decide(labels, effective, rangeMeters, hfovDeg)
+            ?: Guidance.decide(labels, effective, rangeMeters, hfovDeg, holeSide = holeSide)
         lastDecision = decision
         lastSidewalk = sidewalk
         lastNudge = null

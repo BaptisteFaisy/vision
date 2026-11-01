@@ -46,6 +46,11 @@ pré-synthétisé, jamais de synthèse réseau au moment de parler.
   connu le plus loin, sinon l'opposé du décalage de l'obstacle dans le couloir
   (pilier légèrement à gauche ⇒ on passe à droite), pile au centre ⇒ à gauche
   (`freerSide`, `Guidance.kt`).
+- **Trou de grillage** : sur ce repli seul (chemin optimal sans issue), un
+  grillage ouvert à gauche ou à droite (intervalle ≥ 0,80 m à ≤ 4 m,
+  `FenceOpeningSignal.holeSide`) oriente la sortie vers le trou — sauf humain
+  à moins de 80 cm de ce côté (`PeoplePath.clearsSide`) : l'évitement des
+  humains prime toujours. Mêmes mots (voix TwinLite), mêmes clips < 100 ms.
 
 ## 3. Ce que la consigne dit
 
