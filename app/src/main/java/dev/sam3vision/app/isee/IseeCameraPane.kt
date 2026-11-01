@@ -9,7 +9,6 @@ import androidx.camera.core.ImageProxy
 import androidx.camera.core.resolutionselector.ResolutionSelector
 import androidx.camera.core.resolutionselector.ResolutionStrategy
 import androidx.camera.core.ImageCapture
-import androidx.camera.core.ImageCaptureException
 import androidx.camera.core.Preview
 import androidx.camera.lifecycle.ProcessCameraProvider
 import androidx.camera.view.PreviewView
@@ -18,23 +17,18 @@ import androidx.compose.ui.graphics.toArgb
 import dev.sam3vision.app.AppColors
 import dev.sam3vision.app.bitmapToJpeg
 import dev.sam3vision.app.lensSpecOf
-import dev.sam3vision.app.live.LiveLatencyLog
 import dev.sam3vision.app.media.Nv21JpegEncoder
 import dev.sam3vision.app.media.jpegBytesToBase64
 import dev.sam3vision.app.previewResolutionSelector
 import dev.sam3vision.app.uprightScaled
 import dev.sam3vision.core.distance.LensSpec
-import dev.sam3vision.core.live.TimingsText
 import dev.sam3vision.core.live.captureStamp
-import dev.sam3vision.core.local.LumaPlane
 import dev.sam3vision.core.share.STREAM_FRAME_MS
 import java.io.File
 import java.util.concurrent.ExecutorService
 import java.util.concurrent.Executors
-import kotlinx.coroutines.CompletableDeferred
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
-import kotlinx.coroutines.withTimeoutOrNull
 
 /**
  * Côté long de la frame envoyée à SAM par la page caméra (px) : 320, jamais agrandi.
@@ -73,28 +67,34 @@ const val SHARE_FRAME_QUALITY = 70
 class IseeCameraHost(private val context: Context) {
 
     private val executor: ExecutorService = Executors.newSingleThreadExecutor()
-    private var imageCapture: ImageCapture? = null
-    private var videoCapture: androidx.camera.video.VideoCapture<androidx.camera.video.Recorder>? = null
-    private var recording: androidx.camera.video.Recording? = null
-    private var finalizing: CompletableDeferred<File>? = null
+
+    /** Enregistrement et photo de la fenêtre : la liaison lui confie ses captures. */
+    private val recorder = IseeCameraRecorder(context, executor)
+
+    /** Compteurs et journal de conversion ; la phrase nuit/noir reste branchée ici. */
+    private val stats = IseeConversionStats().also {
+        it.onDarkTransition = { onLowLight?.invoke(LOW_LIGHT_PHRASE) }
+    }
 
     /** Frames converties depuis la liaison caméra (le log de coût ne tire qu'un coup sur 20). */
-    private var conversionFrames = 0
+    private var conversionFrames: Int
+        get() = stats.conversionFrames
+        set(value) { stats.conversionFrames = value }
 
     /** Frames jetées par la porte `wantsFrame` (KEEP_ONLY_LATEST gardé) : comptées, loguées. */
-    @Volatile
-    var droppedFrames = 0L
-        private set
+    var droppedFrames: Long
+        get() = stats.droppedFrames
+        private set(value) { stats.droppedFrames = value }
 
     /** Frames vetoées par la garde nuit/noir (jamais envoyées à SAM) : comptées, loguées. */
-    @Volatile
-    var lowLightVetoes = 0L
-        private set
+    var lowLightVetoes: Long
+        get() = stats.lowLightVetoes
+        private set(value) { stats.lowLightVetoes = value }
 
     /** Frames floues (diagnostic seul, sans veto) : comptées dans le log de conversion. */
-    @Volatile
-    var blurryFrames = 0L
-        private set
+    var blurryFrames: Long
+        get() = stats.blurryFrames
+        private set(value) { stats.blurryFrames = value }
 
     /** Dernier encodage du direct : la cadence du direct, pas celle du capteur. */
     private var lastShareEncodeMs = 0L
@@ -103,7 +103,9 @@ class IseeCameraHost(private val context: Context) {
     private var lastEntryNs = 0L
 
     /** Intervalle de la dernière frame analysée (ms), publié dans `capsplit` (`int`). */
-    private var lastIntervalMs = 0L
+    private var lastIntervalMs: Long
+        get() = stats.lastIntervalMs
+        set(value) { stats.lastIntervalMs = value }
 
     /** Chaîne NV21 directe : un encodeur par analyseur (ses tampons sont réutilisés). */
     private val encoder = Nv21JpegEncoder()
@@ -112,11 +114,13 @@ class IseeCameraHost(private val context: Context) {
     private val exposure = IseeExposureDriver()
 
     /** Vrai quand la dernière frame était nuit/noir : la phrase ne part qu'à la transition. */
-    private var wasDark = false
+    private var wasDark: Boolean
+        get() = stats.wasDark
+        set(value) { stats.wasDark = value }
 
     /** L'implémentation [IseeCameraActions] exposée au ViewModel. */
     val actions: IseeCameraActions = object : IseeCameraActions {
-        override val ready: Boolean get() = videoCapture != null
+        override val ready: Boolean get() = recorder.ready
 
         override val lensSpec: LensSpec? get() = lensSpecOf(boundCamera)
 
@@ -217,8 +221,7 @@ class IseeCameraHost(private val context: Context) {
             boundCamera = camera
             applySensorTuning(camera)
             exposure.init(camera)
-            imageCapture = image
-            videoCapture = video
+            recorder.attach(image, video)
             null
         }.getOrElse { "Camera binding failed: ${it.message}" }
     }
@@ -255,7 +258,7 @@ class IseeCameraHost(private val context: Context) {
      * [captureStamp] : certains HAL n'incluent pas la veille dans leur horloge (27 s de
      * dérive mesurés sur le Redmi).
      *
-     * Chronométré (tous les [LOG_EVERY_FRAMES] frames) : ce coût-là n'est **pas** dans la
+     * Chronométré (une ligne toutes les 20 frames, [IseeConversionStats]) : ce coût-là n'est **pas** dans la
      * latence affichée par la sonde, qui ne mesure que l'appel réseau. Or c'est du temps
      * mural entre ce que voit l'utilisateur et ce que SAM reçoit.
      */
@@ -370,110 +373,37 @@ class IseeCameraHost(private val context: Context) {
         return SinglePass(bitmapToJpeg(upright, quality), null, share, meanLumaFromArgb(pixels))
     }
 
-    /**
-     * Porte `wantsFrame` fermée : la frame est jetée (KEEP_ONLY_LATEST gardé), comptée
-     * dans [droppedFrames] et loguée tous les [LOG_EVERY_DROPS] — pas de perte silencieuse.
-     */
-    private fun noteDropped() {
-        droppedFrames += 1
-        if (droppedFrames % LOG_EVERY_DROPS == 0L) {
-            android.util.Log.i("sam3vision", "analyse: $droppedFrames frames jetées (porte fermée), veto nuit $lowLightVetoes")
-        }
-    }
+    /** Délégateur : comptage des frames jetées (voir [IseeConversionStats.noteDropped]). */
+    private fun noteDropped() = stats.noteDropped()
 
-    /**
-     * Garde nuit/noir : la frame ne part ni à SAM ni au picto (veto conservateur —
-     * pas de description inventée sur du noir), comptée dans [lowLightVetoes]. La
-     * phrase ne part qu'à la transition ([wasDark]) ; le direct aidant montre la
-     * frame quand même (des pixels noirs honnêtes valent mieux que le silence).
-     */
-    private fun noteLowLight() {
-        lowLightVetoes += 1
-        if (!wasDark) {
-            wasDark = true
-            onLowLight?.invoke(LOW_LIGHT_PHRASE)
-        }
-    }
+    /** Délégateur : garde nuit/noir + phrase de transition (voir [IseeConversionStats.noteLowLight]). */
+    private fun noteLowLight() = stats.noteLowLight()
 
-    /** Piqué de la frame (diagnostic seul) : floue sous [BLUR_VAR_MIN], sans veto. */
-    private fun noteSharpness(luma: ByteArray) {
-        if (laplacianVariance(luma, LumaPlane.WIDTH, LumaPlane.HEIGHT) < BLUR_VAR_MIN) blurryFrames += 1
-    }
+    /** Délégateur : piqué de la frame (voir [IseeConversionStats.noteSharpness]). */
+    private fun noteSharpness(luma: ByteArray) = stats.noteSharpness(luma)
 
-    /**
-     * Log périodique de la conversion : un toutes les [LOG_EVERY_FRAMES] frames.
-     * La décomposition `capsplit` part sous le tag [LiveLatencyLog.TAG] : même dump
-     * `ISEE_LAT` que la sonde, jointure temporelle directe avec le poste `capt`.
-     */
+    /** Délégateur : log périodique de la conversion (voir [IseeConversionStats.countConversion]). */
     private fun countConversion(frames: Int, ms: Long, size: Pair<Int, Int>, bytes: Int, shareBytes: Int,
-        ageMs: Long, encMs: Long, b64Ms: Long, cbMs: Long) {
-        if (frames % LOG_EVERY_FRAMES != 0) return
-        val direct = if (shareBytes >= 0) ", direct ${shareBytes / 1024} Ko" else ""
-        android.util.Log.i("sam3vision",
-            "conversion: ${ms} ms (capteur ${size.first}×${size.second}, jpeg ${bytes / 1024} Ko$direct, jetées $droppedFrames, veto nuit $lowLightVetoes, floues $blurryFrames)")
-        android.util.Log.i(LiveLatencyLog.TAG, TimingsText.capsplit(ageMs, encMs, b64Ms, cbMs, ms, lastIntervalMs))
-    }
+        ageMs: Long, encMs: Long, b64Ms: Long, cbMs: Long) = stats.countConversion(
+        frames, ms, size, bytes, shareBytes, ageMs, encMs, b64Ms, cbMs,
+    )
 
     /** Démarre l'enregistrement du MP4 dans [file] ; `false` si non prêt ou déjà lancé. */
-    fun startVideo(file: File): Boolean {
-        val video = videoCapture ?: return false
-        if (recording != null) return false
-        return runCatching {
-            val done = CompletableDeferred<File>()
-            finalizing = done
-            val options = androidx.camera.video.FileOutputOptions.Builder(file).build()
-            val pending = video.output.prepareRecording(context, options)
-            recording = pending.start(executor) { event ->
-                if (event is androidx.camera.video.VideoRecordEvent.Finalize) {
-                    if (event.hasError()) done.completeExceptionally(IllegalStateException("video finalize error"))
-                    else done.complete(file)
-                }
-            }
-            true
-        }.getOrDefault(false)
-    }
+    fun startVideo(file: File): Boolean = recorder.startVideo(file)
 
     /** Stoppe puis attend la finalisation du MP4 (fichier non vide) ou `null`. */
-    suspend fun stopVideo(): File? {
-        val pending = recording
-        recording = null
-        pending?.let { runCatching { it.stop() } }
-        val done = finalizing
-        val saved = runCatching { withTimeoutOrNull(FINALIZE_TIMEOUT_MS) { done?.await() } }.getOrNull()
-        finalizing = null
-        return saved?.takeIf { it.isFile && it.length() > 0L }
-    }
+    suspend fun stopVideo(): File? = recorder.stopVideo()
 
     /**
      * Photo de la frame filmée (appui long) ; `true` = demande acceptée (écriture
      * asynchrone). [onSaved] est rappelé plus tard : `true` si écrite, `false` sinon.
      */
-    fun takePhotoNow(target: File, onSaved: (Boolean) -> Unit): Boolean {
-        val capture = imageCapture ?: return false
-        val options = ImageCapture.OutputFileOptions.Builder(target).build()
-        return runCatching {
-            capture.takePicture(
-                options,
-                executor,
-                object : ImageCapture.OnImageSavedCallback {
-                    override fun onImageSaved(output: ImageCapture.OutputFileResults) {
-                        onSaved(target.isFile && target.length() > 0L)
-                    }
-
-                    override fun onError(error: ImageCaptureException) {
-                        target.delete()
-                        onSaved(false)
-                    }
-                },
-            )
-            true
-        }.getOrDefault(false)
-    }
+    fun takePhotoNow(target: File, onSaved: (Boolean) -> Unit): Boolean =
+        recorder.takePhotoNow(target, onSaved)
 
     /** Libère l'executor ; la caméra est déliée par le dispose de la fenêtre. */
     fun release() {
-        recording?.let { runCatching { it.stop() } }
-        recording = null
+        recorder.cancelRecording()
         executor.shutdown()
     }
 
@@ -485,14 +415,6 @@ class IseeCameraHost(private val context: Context) {
     private class SinglePass(val sam: ByteArray, val luma: ByteArray?, val share: ByteArray?, val mean: Double)
 
     companion object {
-        private const val FINALIZE_TIMEOUT_MS = 4_000L
-
-        /** Une ligne de log de conversion toutes N frames (mesure, pas trace complète). */
-        private const val LOG_EVERY_FRAMES = 20
-
-        /** Une ligne de frames jetées tous les 60 (même cadence que le direct). */
-        private const val LOG_EVERY_DROPS = 60L
-
         /** Nanosecondes par milliseconde : l'âge capteur → analyseur se lit en ms. */
         private const val NS_PER_MS = 1_000_000L
     }
