@@ -37,20 +37,21 @@ class TraverseVetoTest {
     }
 
     @Test
-    fun `voiture proche sans approche - pas de veto, garee exclue`() {
+    fun `voiture proche sans approche - veto quand meme`() {
         val veto = TraverseVeto()
         val nearCar = detection("car", 0.9f, listOf(0f, 0f, 200f, 200f))
         val decision = veto.update(true, listOf(nearCar), focalPx)
-        assertFalse("proximité seule : pas de veto", decision.veto)
-        assertEquals(TraversePhase.PRET, decision.state)
-        assertNull(decision.blockingLabel)
+        assertTrue("proximité mesurée : veto (audit 31/10)", decision.veto)
+        assertEquals(TraversePhase.ATTENDRE, decision.state)
+        assertEquals("car", decision.blockingLabel)
+        assertEquals(7.25f, decision.blockingMeters!!, 0.01f)
         assertTrue("objet proche : guidage gardé", decision.keepObstacleGuidance)
     }
 
     @Test
     fun `voiture proche en croissance - veto avec distance`() {
         val veto = TraverseVeto()
-        veto.update(true, listOf(detection("car", 0.9f, listOf(0f, 0f, 100f, 100f))), focalPx)
+        veto.update(true, listOf(detection("car", 0.9f, listOf(0f, 0f, 60f, 60f))), focalPx)
         val decision = veto.update(true, listOf(detection("car", 0.9f, listOf(0f, 0f, 200f, 200f))), focalPx)
         assertTrue(decision.veto)
         assertEquals(TraversePhase.ALERTE, decision.state)
@@ -145,7 +146,7 @@ class TraverseVetoTest {
     @Test
     fun `veto juste avant de partir donne alerte puis reconfirmation`() {
         val veto = TraverseVeto()
-        veto.update(true, listOf(detection("car", 0.9f, listOf(0f, 0f, 100f, 100f))), focalPx)
+        veto.update(true, listOf(detection("car", 0.9f, listOf(0f, 0f, 60f, 60f))), focalPx)
         assertEquals(TraversePhase.PRET, veto.currentState)
         val alert = veto.update(
             true,
@@ -271,8 +272,10 @@ class TraverseVetoTest {
     }
 
     @Test
-    fun `fond qui defile - proximite sans approche, jamais de veto`() {
-        // Même mesurée sous 15 m, une boîte qui ne grandit pas ne bloque pas (garée).
+    fun `fond qui defile - proximite statique, veto maintenu`() {
+        // Boîte statique sous 15 m pendant un pan : elle tient sa place face à
+        // la caméra (une garée dériverait) — proche ou doute bloque (audit 31/10).
+        // Seule une croissance expliquée par le suivi caméra se tait.
         val motion = FrameMotion(MotionSample(0.75f, 0f, 1f, 0.9f), 96, 96, 100L)
         val veto = TraverseVeto()
         val nearCar = detection("car", 0.9f, listOf(0f, 0f, 200f, 200f))
@@ -281,8 +284,9 @@ class TraverseVetoTest {
             last = veto.update(true, listOf(nearCar), focalPx, atMs = index * 100L, motion = motion)
         }
 
-        assertFalse("7,25 m sans croissance : pas de veto", last!!.veto)
-        assertNull(last.blockingLabel)
+        assertTrue("7,25 m statique sous pan : veto", last!!.veto)
+        assertEquals("car", last.blockingLabel)
+        assertEquals(7.25f, last.blockingMeters!!, 0.01f)
         assertTrue("objet proche : guidage gardé", last.keepObstacleGuidance)
     }
 

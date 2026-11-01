@@ -19,7 +19,7 @@ import org.junit.Test
  * Le pipeline assemble hystérésis, veto et voix : la première frame cache,
  * la deuxième montre, le vert maintenu fait traverser, le veto en pleine
  * traversée coupe tout en urgent. Focale de test : 1000 px (une voiture de
- * 200 px de haut sort à 7,25 m ; le veto exige une approche confirmée).
+ * 200 px de haut sort à 7,25 m ; le veto bloque sur approche ou proximité).
  */
 class TraversePipelineTest {
 
@@ -63,7 +63,7 @@ class TraversePipelineTest {
     }
 
     @Test
-    fun `deuxieme frame - piste confirmee, sans approche pas de veto`() = runBlocking {
+    fun `deuxieme frame - piste confirmee proche, veto alerte`() = runBlocking {
         val pipe = pipeline()
         val small = listOf(0f, 0f, 100f, 100f)
         pipe.frame(listOf(seg(box = small)), green = true, index = 1)
@@ -73,24 +73,26 @@ class TraversePipelineTest {
         assertEquals(1, out.detections.size)
         assertEquals(640, out.detections.single().width)
         assertEquals(480, out.detections.single().height)
-        assertFalse("première frame vue : pas d'approche", out.decision.veto)
-        assertEquals(TraversePhase.TRAVERSER, out.decision.state)
+        assertTrue("14,5 m mesurés : veto (audit 31/10)", out.decision.veto)
+        assertEquals(TraversePhase.ALERTE, out.decision.state)
         assertTrue(out.decision.keepObstacleGuidance)
-        assertNull("vert non confirmé : silence", out.cue)
+        assertNull("alerte d une seule frame : pas encore confirmee", out.cue)
     }
 
     @Test
-    fun `troisieme frame - croissance confirmee, veto alerte`() = runBlocking {
+    fun `troisieme frame - veto confirme, attente rouge`() = runBlocking {
         val pipe = pipeline()
         pipe.frame(listOf(seg(box = listOf(0f, 0f, 100f, 100f))), green = true, index = 1)
         pipe.frame(listOf(seg(box = listOf(0f, 0f, 150f, 150f))), green = true, index = 2)
         val out = pipe.frame(listOf(seg(box = nearBox)), green = true, index = 3)
 
         assertTrue(out.decision.veto)
-        assertEquals(TraversePhase.ALERTE, out.decision.state)
+        assertEquals(TraversePhase.ATTENDRE, out.decision.state)
         assertEquals("car", out.decision.blockingLabel)
         assertTrue(out.decision.keepObstacleGuidance)
-        assertNull("alerte d une seule frame : pas encore confirmee", out.cue)
+        assertNotNull("alerte confirmée sur 2 frames : parle", out.cue)
+        assertTrue(out.cue!!.urgent)
+        assertEquals(CrossingText.phrase(CrossingState.Red), out.cue.phrase)
     }
 
     @Test
@@ -116,14 +118,14 @@ class TraversePipelineTest {
         val player = FakePlayer()
         val pipe = pipeline(player = player)
         repeat(4) { i -> pipe.frame(emptyList(), green = true, index = i + 1) }
-        // Piste vue à 5 (cachée, non confirmée), visible à 6 : la croissance
-        // ne se lit qu'à 7 — le veto suit d'une frame la confirmation.
+        // Piste vue à 5 (cachée, non confirmée), visible à 6 : la proximité
+        // bloque dès la visibilité — l'alerte se confirme à la suivante.
         pipe.frame(listOf(seg(box = listOf(0f, 0f, 100f, 100f))), green = true, index = 5)
         val repeat = pipe.frame(listOf(seg(box = listOf(0f, 0f, 150f, 150f))), green = true, index = 6)
-        assertNull("pas d'approche : vert maintenu, répétition pas encore due", repeat.cue)
-        val alert = pipe.frame(listOf(seg()), green = true, index = 7)
-        assertNull("croissance : veto force le rouge, une seule frame ne suffit pas", alert.cue)
-        val out = pipe.frame(listOf(seg(box = listOf(0f, 0f, 220f, 220f))), green = true, index = 8)
+        assertTrue("9,7 m mesurés : veto", repeat.decision.veto)
+        assertEquals(TraversePhase.ALERTE, repeat.decision.state)
+        assertNull("1re frame de veto : pas encore confirmée", repeat.cue)
+        val out = pipe.frame(listOf(seg()), green = true, index = 7)
 
         assertTrue(out.decision.veto)
         assertEquals(TraversePhase.ATTENDRE, out.decision.state)

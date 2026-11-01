@@ -39,6 +39,9 @@ class LateralNudgeTracker {
      * s'approche d'un seul côté. Les deux côtés à la fois = ambigu, on se
      * tait (le couloir bouché parle s'il est bouché) ; une personne côté
      * cible = veto, on se tait aussi (s'écarter, jamais foncer dedans).
+     * Obstacle proche (≤ [CLOSE_METERS]) : conseil immédiat, dès la 1re frame,
+     * sans attendre les diminutions — au-delà, l'approche doit se confirmer
+     * ([CONFIRM_DECREASES]) : la garde distance tait le lointain incertain.
      * [hfovDeg] calibre la fenêtre en mètres (défaut 67° : l'appelant qui
      * connaît la focale la passe).
      */
@@ -68,7 +71,7 @@ class LateralNudgeTracker {
             if (atMs - track.lastMs > STALE_MS) resetTrack(track)
             return null
         }
-        if (track.lastMs == Long.MIN_VALUE) {
+        if (track.lastMs == Long.MIN_VALUE && nearest > CLOSE_METERS) {
             track.meters = nearest
             track.lastMs = atMs
             return null
@@ -77,7 +80,7 @@ class LateralNudgeTracker {
         else if (nearest > track.meters + MIN_DECREASE_M) track.hits = 0
         track.meters = nearest
         track.lastMs = atMs
-        if (track.hits < CONFIRM_DECREASES) return null
+        if (track.hits < CONFIRM_DECREASES && nearest > CLOSE_METERS) return null
         val away = if (side == SteeringCap.Left) SteeringCap.Right else SteeringCap.Left
         if (personAhead(labels, away, hfovDeg)) return null
         return LateralNudge(away, nearest)
@@ -134,6 +137,13 @@ class LateralNudgeTracker {
 
         /** Gauche/droite de l'axe : pile au centre = couloir, pas côté. */
         const val SIDE_MID = 0.5f
+
+        /**
+         * Sous cette distance (m), l'obstacle conseille aussitôt, dès la 1re
+         * frame, sans attendre les diminutions : à 1,5 m on est dessus, la
+         * confirmation peut attendre — au-delà, l'approche doit se prouver.
+         */
+        const val CLOSE_METERS = 1.5f
 
         /** Diminutions consécutives pour confirmer (3e frame parle). */
         const val CONFIRM_DECREASES = 2
