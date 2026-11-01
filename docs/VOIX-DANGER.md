@@ -1108,3 +1108,47 @@ silence pendant la parole, redite au silence, sécurité retenue, stop qui
 passe, cadence) et `SoftHeldForUserTest` (4). Recette téléphone : parler
 en marchant devant un obstacle fixe ne donne plus une annonce toutes les
 4 s — **non mesurée**, exige un APK de cette branche.
+
+## 31. Mouvement écrase tout : voiture > humain (ordre user du 01/11)
+
+Le user marche avec l'app : une voiture en mouvement (ou une personne)
+arrive pendant une autre annonce et se fait attendre — ou se noie dans
+une phrase fusionnée. Nouveau contrat, qui amende le § 26 (la fusion
+ordonnée ne vaut plus que sans mouvement) : le mouvement écrase tout
+doux, et la voiture écrase l'humain.
+
+- **gagnant seul** (`decideObstacles`) : voiture en mouvement présente →
+  sa phrase seule ; sinon personne présente → sa phrase seule ; sinon
+  fusion par rang comme avant (bordure > barrière > reste) ;
+- **coupe le doux** (`VoicePreempt`, `ProximityVoice.onPhrase`) : la
+  phrase du mouvement coupe la parole douce en cours (chat, route,
+  annonce — le lecteur partagé est coupé) au lieu d'attendre le
+  silence, voix Laure et sous-titres inchangés (pas la voix de
+  sécurité) ;
+- **sécurité et parole du user au-dessus** : fenêtre P1/P2, TTS système
+  ou micro en cours → la phrase mouvement part en file comme le doux
+  (jamais de chevauchement avec une alerte, jamais par-dessus le user,
+  § 30) ; l'urgent garde la main (danger qui s'approche, bordure à
+  0,7 m) ; le mot seul imminent (personne à 2 m ou moins) parle en
+  clip même quand une voiture gagne (anti-collision) ;
+- **file ordonnée** : dans la file douce, la voiture ne se fait pas
+  remplacer par une personne, ni une personne par un doux (à rang égal,
+  la plus fraîche gagne comme avant) ;
+- **inchangé** : la voiture à l'arrêt (fusionnée avec le reste), la
+  sécurité bordure (immédiate, devant le mouvement), la Traversée (voix
+  propre), les cycles et escaliers (doux, coupés comme le reste), la
+  cadence des « Attention … » (§ 30, qui filtre aussi la personne).
+
+Verrouillé par `ObstacleArbiterTest` (+4 : voiture écrase bordure et
+personne, personne écrase bordure et barrière, personne écrase l'arrêt,
+sécu gardée avec mouvement ; 3 repris : stop roulant seul, fusion sans
+mouvement, danger seul urgent) et `ProximityVoicePreemptTest` (8 :
+coupe chat, coupe route, file P1/P2, file TTS système, file voiture
+devant personne, personne remplace doux, voiture remplace personne,
+urgent devant préemption).
+
+Recette téléphone : bulle du chat en lecture + voiture qui passe → la
+bulle est coupée, « Car moving, … » parle ; personne + bordure à 1 m →
+la personne seule ; alerte rebord + voiture → le rebord d'abord, la
+voiture juste après — **non mesuré**, exige un APK de cette branche sur
+appareil réel.

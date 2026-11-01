@@ -8,12 +8,15 @@ import dev.sam3vision.core.live.GuidanceWord
 import dev.sam3vision.core.traverse.VehicleStateCue
 
 /**
- * Priorité voix des obstacles : P1 (voiture en mouvement) > P2 (bordure) >
- * P3 (personne) > P4 (barrière) > reste (arrêt, bateau, divers — dans l'ordre
- * de détection). Quand SAM confirme plusieurs obstacles sur la même frame,
- * l'arbitre ([decideObstacles]) les ordonne au lieu de les faire se couper :
- * tout ce qui est confirmé est dit, dans cet ordre. Extrait de `ProbeWiring`
- * (plafond 500 lignes). Pur, testé en JVM.
+ * Priorité voix des obstacles : la voiture en mouvement écrase tout doux,
+ * la personne écrase tout doux sauf la voiture (ordre user du 01/11, §
+ * 31) — sans mouvement, les rangs P1-P5 ordonnent la fusion comme avant
+ * (bordure > barrière > reste, dans l'ordre de détection). Quand SAM
+ * confirme plusieurs obstacles sur la même frame, l'arbitre
+ * ([decideObstacles]) ne fusionne plus le mouvement : le gagnant parle
+ * seul et coupe la parole douce ([VoicePreempt]) ; la sécurité (bordure
+ * imminente, jamais de « Stop » hors Traversée, § 22) garde le dessus.
+ * Extrait de `ProbeWiring` (plafond 500 lignes). Pur, testé en JVM.
  */
 internal enum class ObstacleRank { VEHICLE_MOVING, CURB, PERSON, BARRIER, OTHER }
 
@@ -29,20 +32,31 @@ internal fun safetyBusy(nowMs: Long, lastSafetyMs: Long?): Boolean =
 
 /**
  * Parole d'une frame : [safety] les alertes fusionnées P2→P3 (`null` = rien
- * d'immédiat), [soft] les phrases douces fusionnées par rang (`null` =
- * silence), [urgent] vrai quand le danger roule sur le user ou que la bordure est
- * imminente (0,7 m), le doux coupe comme avant. Une alerte couverte par la sécurité n'est pas redite en doux.
+ * d'immédiat), [soft] la phrase douce (`null` = silence) — le mouvement
+ * gagnant seul (voiture, sinon personne), ou les doux fusionnés par rang
+ * sans mouvement —, [urgent] vrai quand le danger roule sur le user ou
+ * que la bordure est imminente (0,7 m), le doux coupe comme avant,
+ * [preempt] le rang qui coupe la parole douce (voiture > personne,
+ * sécurité exceptée). Une alerte couverte par la sécurité n'est pas
+ * redite en doux.
  */
-internal data class ObstacleDecision(val safety: String?, val soft: String?, val urgent: Boolean = false)
+internal data class ObstacleDecision(
+    val safety: String?,
+    val soft: String?,
+    val urgent: Boolean = false,
+    val preempt: VoicePreempt = VoicePreempt.NONE,
+)
 
 /**
  * Arbitre d'une frame en mode normal : les sécurités (bordure, personne
  * imminente — jamais de « Stop » hors Traversée, § 22) fusionnent dans
- * l'ordre des rangs, puis les doux (mouvement P1, bordure à 1 m, personne,
- * barrière, reste en ordre de détection). Le véhicule ne fournit que du
- * doux ici (son stop roulant ne se dit qu'en Traversée, § 22) ; son
- * `urgent` (danger qui s'approche, bordure à 0,7 m) coupe le doux. `null` partout =
- * silence. Pur, testé en JVM.
+ * l'ordre des rangs, puis le doux — le mouvement gagnant seul (voiture
+ * en mouvement, sinon personne : il écrase bordure, barrière et reste
+ * au lieu de fusionner, § 31), ou les doux fusionnés par rang sans
+ * mouvement. Le véhicule ne fournit que du doux ici (son stop roulant
+ * ne se dit qu'en Traversée, § 22) ; son `urgent` (danger qui
+ * s'approche, bordure à 0,7 m) coupe le doux. `null` partout = silence.
+ * Pur, testé en JVM.
  */
 internal fun decideObstacles(
     vehicle: VehicleStateCue?,
@@ -51,8 +65,22 @@ internal fun decideObstacles(
 ): ObstacleDecision {
     val safety = listOfNotNull(curb?.safetyPhrase, hazard?.safetyPhrase)
         .joinToString(" ").takeIf { it.isNotEmpty() }
-    val soft = softParts(vehicle, curb, hazard).joinToString(" ").takeIf { it.isNotEmpty() }
-    return ObstacleDecision(safety, soft, urgent = vehicle?.urgent == true || curb?.urgent == true)
+    val mover = vehicle?.takeIf { it.moving }
+    val person = hazard?.takeIf { it.kind == HazardKind.PERSON && it.safetyPhrase == null }
+    val soft = mover?.phrase
+        ?: person?.phrase
+        ?: softParts(vehicle, curb, hazard).joinToString(" ").takeIf { it.isNotEmpty() }
+    val preempt = when {
+        mover != null -> VoicePreempt.VEHICLE
+        person != null -> VoicePreempt.PERSON
+        else -> VoicePreempt.NONE
+    }
+    return ObstacleDecision(
+        safety,
+        soft,
+        urgent = vehicle?.urgent == true || curb?.urgent == true,
+        preempt = preempt,
+    )
 }
 
 /** Phrases douces de la frame, par rang (véhicule, bordure, mobilier à égalité). */

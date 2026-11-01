@@ -60,7 +60,21 @@ import kotlin.coroutines.coroutineContext
  * phrases attendent en file ([flushPending]) et se redisent au silence.
  * Seule exception : le stop de Traversée ([GuidanceWord.isStopPhrase]), qui
  * n'attend jamais. La voix de sécurité ([safety]) garde ses propres règles.
+ * Le mouvement ([VoicePreempt], § 31) coupe la parole douce en cours au
+ * lieu d'attendre le silence, sécurité et parole du user exceptées.
  */
+/**
+ * Préemption d'une phrase douce par le mouvement : la phrase coupe la
+ * parole douce en cours (chat, route, autre annonce — le lecteur partagé
+ * est coupé par `play()`) au lieu d'attendre le silence, mais jamais la
+ * sécurité (fenêtre P1/P2 ou TTS système en cours : la phrase part en
+ * file comme le doux). Dans la file, le rang tient l'ordre (l'ordinal
+ * compare, à rang égal la plus fraîche gagne) : une voiture ([VEHICLE])
+ * ne se fait pas remplacer par une personne ([PERSON]), qui ne se fait
+ * pas remplacer par un doux ([NONE]). Ordre user du 01/11, § 31.
+ */
+enum class VoicePreempt { NONE, PERSON, VEHICLE }
+
 class ProximityVoice(
     private val player: SpeechPlayer,
     private val settings: () -> Settings,
@@ -153,6 +167,12 @@ class ProximityVoice(
      * [dedupMs] : délai de déduplication de cette phrase ([REPEAT_TTL_MS] par
      * défaut — le compteur de marches y passe 1 s : un compte répété n'est
      * pas un bégaiement, c'est le pas suivant).
+     * [preempt] : le mouvement coupe la parole douce en cours (chat,
+     * route, annonce — `speak` coupe le lecteur partagé) au lieu
+     * d'attendre le silence ; la sécurité et la parole du user gardent
+     * le dessus (fenêtre [busy], TTS système ou micro en cours : file
+     * comme le doux, rang tenu par [queuePending]). L'urgent garde la
+     * main (traité avant).
      */
     suspend fun onPhrase(
         phrase: String,
@@ -161,12 +181,13 @@ class ProximityVoice(
         queue: Boolean = false,
         busy: () -> Boolean = { false },
         dedupMs: Long = REPEAT_TTL_MS,
+        preempt: VoicePreempt = VoicePreempt.NONE,
     ) {
         if (saidRecently(phrase, dedupMs)) return
         if (cadence.blocked(phrase, nowMs(), urgent)) return
         if (yieldsToUser(phrase)) {
             cutForUser()
-            if (queue) pending = Pending(phrase, nowMs() + PENDING_TTL_MS)
+            if (queue) queuePending(phrase, preempt)
             return
         }
         if (urgent) {
@@ -174,8 +195,16 @@ class ProximityVoice(
             return
         }
         val current = settings()
+        if (preempt != VoicePreempt.NONE) {
+            if (busy() || systemBusy()) {
+                if (queue) queuePending(phrase, preempt)
+                return
+            }
+            speak(phrase, current)
+            return
+        }
         if (!playerIdle || routeSpeaking() || busy() || systemBusy()) {
-            if (queue) pending = Pending(phrase, nowMs() + PENDING_TTL_MS)
+            if (queue) queuePending(phrase, VoicePreempt.NONE)
             return
         }
         speak(phrase, current)
@@ -414,7 +443,7 @@ class ProximityVoice(
         if (text == lastPhrase && GuidanceWord.isStopPhrase(text)) return
         if (yieldsToUser(text)) {
             cutForUser()
-            if (queue) pending = Pending(text, nowMs() + PENDING_TTL_MS)
+            if (queue) queuePending(text, VoicePreempt.NONE)
             return
         }
         if (urgent) {
@@ -423,7 +452,7 @@ class ProximityVoice(
         }
         val current = settings()
         if (!playerIdle || systemBusy()) {
-            if (queue) pending = Pending(text, nowMs() + PENDING_TTL_MS)
+            if (queue) queuePending(text, VoicePreempt.NONE)
             return
         }
         val file = clips?.clipFor(clipId, language, current.ttsVoiceId)?.takeIf { it.isFile }
@@ -452,8 +481,21 @@ class ProximityVoice(
         player.play(bytes).onFailure { onSpeaking("") }
     }
 
-    /** Phrase douce en attente de silence : [phrase] à redire avant [expiresAtMs]. */
-    private data class Pending(val phrase: String, val expiresAtMs: Long)
+    /** Phrase douce en attente de silence : [phrase] à redire avant [expiresAtMs], [preempt] son rang (la file tient l'ordre du mouvement). */
+    private data class Pending(val phrase: String, val expiresAtMs: Long, val preempt: VoicePreempt = VoicePreempt.NONE)
+
+    /**
+     * Garde [phrase] de rang [preempt] en file douce : une voiture en
+     * mouvement ne se fait pas remplacer par une personne, ni une
+     * personne par un doux (l'ordinal compare, à rang égal la plus
+     * fraîche gagne comme avant).
+     */
+    private fun queuePending(phrase: String, preempt: VoicePreempt) {
+        val old = pending
+        if (old == null || preempt.ordinal >= old.preempt.ordinal) {
+            pending = Pending(phrase, nowMs() + PENDING_TTL_MS, preempt)
+        }
+    }
 
     companion object {
         /** Rattrapage borné : au-delà, la scène a changé, la phrase est périmée. */
