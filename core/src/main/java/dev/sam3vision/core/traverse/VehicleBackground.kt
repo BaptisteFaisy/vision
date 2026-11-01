@@ -1,5 +1,6 @@
 package dev.sam3vision.core.traverse
 
+import dev.sam3vision.core.motion.EgoMotion
 import dev.sam3vision.core.motion.GyroHint
 import dev.sam3vision.core.motion.MotionSample
 import dev.sam3vision.core.predict.EgoVerdict
@@ -123,7 +124,7 @@ object VehicleBackground {
         // PISTE4 : résidu visuel d'abord ; le gyro ne prend le relais (fond de
         // repli, rotation pure) que si le fond mesuré est inutilisable — pan rapide
         // qui sature le bloc-matching. Sans gyro, chemin strictement inchangé.
-        val sample = global?.takeIf { visualUsable(it) } ?: gyro?.toSample()
+        val sample = EgoMotion.fusedSample(global, gyro)
         if (sample == null) return unknown(trackId, global, bg)
         val dtSeconds = dtMs / 1000f
         val gx = sample.dx / lumaWidth / dtSeconds
@@ -160,9 +161,7 @@ object VehicleBackground {
      * (confiance et valeurs finies). Un fond qui échoue ici laisse la place au
      * repli gyro au lieu de conclure [Verdict.UNKNOWN] tout de suite.
      */
-    private fun visualUsable(sample: MotionSample): Boolean =
-        sample.confidence.isFinite() && sample.confidence >= TRUST_MIN &&
-            sample.dx.isFinite() && sample.dy.isFinite() && sample.scale.isFinite()
+    private fun visualUsable(sample: MotionSample): Boolean = EgoMotion.visualUsable(sample)
 
     /**
      * Arrêt prouvé d'une piste : [speed01ps] la dérive du centre (fractions
