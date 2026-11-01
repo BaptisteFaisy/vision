@@ -31,9 +31,11 @@ import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import dev.sam3vision.app.glasses.GlassesVideoLink
 import dev.sam3vision.app.isee.vm.PictoPhase
+import dev.sam3vision.app.voicenav.VoiceNavUiState
 import dev.sam3vision.core.iseedesign.IseePortrait
 import dev.sam3vision.core.iseedesign.IseeScene
 import dev.sam3vision.core.iseedesign.PortraitGeometry
+import dev.sam3vision.core.iseedesign.SpeechPosition
 import dev.sam3vision.core.iseedesign.portraitGeometry
 import dev.sam3vision.core.iseedesign.voiceEnvelope
 import kotlinx.coroutines.delay
@@ -101,10 +103,7 @@ private fun BoxWithConstraintsScope.PortraitScene(
     Header(view.scene, onPicture = open > 0.5f, modifier = Modifier.fillMaxWidth())
     val navState by viewModel.voiceNavState.collectAsState()
     SceneGuidanceLayer(viewModel) {
-        OrbClockLayer(view.scene, geo, open)
-        with(density) {
-            SpokenLine(currentCaption(state, position), state.holding && state.userSpeaking, geo.textTop.toDp(), compact = open > 0.5f)
-        }
+        SceneOrbLayer(state, view, geo, open, position, navState)
     }
     BottomScrim()
     // Ligne de statut + pill d'instructions : sans elle, `IseeUiState.status`
@@ -117,6 +116,35 @@ private fun BoxWithConstraintsScope.PortraitScene(
     // Génération picto : le bloc fin semi-transparent survit à la rue
     // (génération lancée, vidéo coupée), jamais dehors.
     if (state.placeMode.pictoEnabled && state.picto.phase == PictoPhase.Generating) PictoGeneratingCard()
+}
+
+/**
+ * La boule et la phrase en cours. En guidage, quand le user parle, son
+ * transcript prend la place de la boule au milieu (caméra en haut, carte
+ * en bas) au lieu de rester sous la boule. Extrait pour garder
+ * `PortraitScene` sous le plafond de 50 lignes.
+ */
+@Composable
+private fun BoxWithConstraintsScope.SceneOrbLayer(
+    state: IseeUiState,
+    view: IseeSceneView,
+    geo: PortraitGeometry,
+    open: Float,
+    position: SpeechPosition?,
+    navState: VoiceNavUiState,
+) {
+    val density = LocalDensity.current
+    val fromUser = state.holding && state.userSpeaking
+    if (showGuidanceTranscript(navState, state)) {
+        with(density) {
+            SpokenLine(currentCaption(state, position), fromUser, (geo.orbY - geo.orbR).toDp(), compact = open > 0.5f)
+        }
+    } else {
+        OrbClockLayer(view.scene, geo, open)
+        with(density) {
+            SpokenLine(currentCaption(state, position), fromUser, geo.textTop.toDp(), compact = open > 0.5f)
+        }
+    }
 }
 
 /** Boucle du temps de la scène : 10 minutes, comme l'ancienne transition infinie. */

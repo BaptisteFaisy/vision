@@ -28,9 +28,11 @@ import dev.sam3vision.core.nav.NavRoute
  * Le guidage GPS sur l'accueil iSee, sous la caméra et tout en bas de
  * l'écran : carte réduite (tracé + position, repli schéma si les tuiles
  * échouent) et instruction en cours, sans le reste du trajet (ni km ni
- * temps). La boule et la phrase restent affichées entre la caméra et la
- * carte, la caméra et la sonde continuent (évitement d'obstacles
- * préservé). L'arrêt se fait à la voix (« arrête le guidage »).
+ * temps). La boule reste affichée entre la caméra et la carte — sauf
+ * quand le user parle : son transcript prend alors la place de la boule
+ * au milieu ([showGuidanceTranscript]). La caméra et la sonde continuent
+ * (évitement d'obstacles préservé). L'arrêt se fait à la voix
+ * (« arrête le guidage »).
  *
  * Affichée par `IseeScenePane` quand la session est en
  * [VoiceNavUiState.Guiding] ; rien sans tracé (la carte ne se compose pas,
@@ -71,8 +73,9 @@ private fun GuidanceInstruction(state: VoiceNavUiState.Guiding) {
 /**
  * Tout en bas de l'écran : la navigation quand elle a un objectif (calcul
  * d'itinéraire, ou guidage avec carte suivie), sinon la boule et la
- * phrase ([orb]). Pendant le guidage, la boule et la phrase restent
- * affichées entre la caméra et la carte. Le choix vit ici (état de
+ * phrase ([orb]). Pendant le guidage, la boule reste affichée entre la
+ * caméra et la carte, sauf quand le user parle (son transcript prend sa
+ * place, voir [showGuidanceTranscript]). Le choix vit ici (état de
  * session observé) pour garder `PortraitScene` sous le plafond de 50
  * lignes. La barre du bas s'efface pendant le guidage
  * ([isGuidanceOverlay]) : pas de recouvrement.
@@ -102,3 +105,14 @@ internal fun BoxWithConstraintsScope.SceneGuidanceLayer(
  */
 internal fun isGuidanceOverlay(navState: VoiceNavUiState): Boolean =
     navState is VoiceNavUiState.Guiding || navState is VoiceNavUiState.Confirming
+
+/**
+ * En guidage (caméra en haut, carte en bas), le transcript du user prend-il
+ * la place de la boule au milieu : oui quand le user parle avec un
+ * transcript à afficher, sinon la boule reste. Hors guidage : jamais (la
+ * phrase reste sous la boule). Pure : même état, même réponse, testée
+ * sur JVM.
+ */
+internal fun showGuidanceTranscript(navState: VoiceNavUiState, state: IseeUiState): Boolean =
+    navState is VoiceNavUiState.Guiding &&
+        state.holding && state.userSpeaking && state.liveTranscript.isNotBlank()
