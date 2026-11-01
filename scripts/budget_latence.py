@@ -10,7 +10,7 @@ comparaisons sont exactes, l'affichage seul arrondit (au dixième, virgule déci
 (Seule exception : le bloc `mesures`, relevé en millisecondes entières comme `ISEE_LAT`.)
 
 Usage :
-    python3 scripts/budget_latence.py --selftest     # 17 assertions sur l'arithmétique
+    python3 scripts/budget_latence.py --selftest     # 19 assertions sur l'arithmétique
     python3 scripts/budget_latence.py --check-doc    # 7 blocs : doc <-> script
     python3 scripts/budget_latence.py --write-doc    # régénère les blocs du document
     python3 scripts/budget_latence.py --verdict      # verdict chiffré sur les 100 ms
@@ -94,12 +94,14 @@ ALLOCATION = (
 ALLOC_TOTAL = sum(cible for _, cible, _ in ALLOCATION)
 
 # --- § 10 : campagnes ISEE_LAT citées (ms entières, comme `parse_isee_lat.py`) --
-# (nom, N, moyenne `latency`, (capt, up, srv, rtt, mask, pixel), max, conditions)
+# (nom, N, moyenne `latency`, (capt, up, srv, rtt, mask, pixel), max, conditions,
+#  p95, p99, gigue, jetées) — `None` = non relevé (campagne antérieure au parseur
+# enrichi) ; on publie « — », jamais un chiffre reconstitué.
 CAMPAGNES = (
     ("baseline pré-PR2", 1257, 454, (171, 38, 102, 165, 5, 78), 1677,
-     "référence avant PR2"),
+     "référence avant PR2", None, None, None, None),
     ("post-PR2", 1500, 380, (119, 38, 100, 164, 1, 58), 713,
-     "scène vide (0 masque), app à 430 % CPU"),
+     "scène vide (0 masque), app à 430 % CPU", None, None, None, None),
 )
 CIBLES_MESURES = ((300, 500), (250, 500))   # (moyenne, max) : défauts du parseur, objectif
 
@@ -295,32 +297,46 @@ def table_budget():
     return "\n".join(lignes)
 
 
-def cellule_mesure(moyenne, maxi, cible_moyenne, cible_max):
-    """Verdict d'une campagne : « tenu » ou l'écart à chaque seuil dépassé."""
-    if moyenne <= cible_moyenne and maxi <= cible_max:
-        return "tenu"
-    ecarts = []
-    if moyenne > cible_moyenne:
-        ecarts.append(f"+{moyenne - cible_moyenne} en moyenne")
-    if maxi > cible_max:
-        ecarts.append(f"+{maxi - cible_max} en max")
-    return "non (" + ", ".join(ecarts) + ")"
+def mesure_str(valeur):
+    """Valeur de campagne : « — » si non relevée, un décimal si flottante."""
+    if valeur is None:
+        return "—"
+    return f"{valeur:.1f}" if isinstance(valeur, float) else str(valeur)
+
+
+def cellule_mesure(moyenne, maxi, cible_moyenne, cible_max, extra=()):
+    """Verdict d'une campagne : « tenu » ou l'écart à chaque seuil dépassé.
+
+    `extra` = [(étiquette, valeur, seuil), ...] — les seuils optionnels du
+    parseur (`p95`, `p99`, `gigue`, `jetées`) ; une valeur ou un seuil `None`
+    désactive le contrôle au lieu d'inventer un chiffre.
+    """
+    controles = [("moyenne", moyenne, cible_moyenne), ("max", maxi, cible_max)]
+    controles += [(nom, valeur, seuil) for nom, valeur, seuil in extra
+                  if valeur is not None and seuil is not None]
+    ecarts = [f"+{valeur - seuil} en {nom}" for nom, valeur, seuil in controles
+              if valeur > seuil]
+    return "tenu" if not ecarts else "non (" + ", ".join(ecarts) + ")"
 
 
 def table_mesures():
     lignes = ["| campagne | N | moyenne (ms) | capt | up | srv | rtt | mask | pixel | max (ms) "
-              "| 300 / 500 ? | 250 / 500 ? | conditions |",
-              "|---|---:|---:|---:|---:|---:|---:|---:|---:|---:|---|---|---|"]
+              "| p95 | p99 | gigue | jetées | 300 / 500 ? | 250 / 500 ? | conditions |",
+              "|---|---:|---:|---:|---:|---:|---:|---:|---:|---:|---:|---:|---:|---:|---|---|---|"]
     (m1, x1), (m2, x2) = CIBLES_MESURES
-    for nom, n, moyenne, postes, maxi, conditions in CAMPAGNES:
+    for nom, n, moyenne, postes, maxi, conditions, p95, p99, ecart, ratees in CAMPAGNES:
+        details = " | ".join(mesure_str(v) for v in (p95, p99, ecart, ratees))
         lignes.append(
             f"| {nom} | {n} | {moyenne} | {' | '.join(str(p) for p in postes)} | {maxi} "
-            f"| {cellule_mesure(moyenne, maxi, m1, x1)} "
+            f"| {details} | {cellule_mesure(moyenne, maxi, m1, x1)} "
             f"| {cellule_mesure(moyenne, maxi, m2, x2)} | {conditions} |")
     lignes += ["",
                "Règle des verdicts : celle de `scripts/parse_isee_lat.py` "
                "(`moyenne <= --mean` et `max <= --max`, défauts 300 / 500) ; "
-               "`250 / 500` = objectif (moyenne < 250 ms, max ≤ 500 ms)."]
+               "`250 / 500` = objectif (moyenne < 250 ms, max ≤ 500 ms). "
+               "Les colonnes `p95`, `p99`, `gigue`, `jetées` portent les mesures "
+               "brutes (« — » = non relevé) ; les seuils `--p95`, `--p99`, `--jitter`, "
+               "`--drop` du parseur les contrôlent quand ils sont posés."]
     return "\n".join(lignes)
 
 
@@ -400,52 +416,53 @@ def verdict():
     return 0 if marge > 0 else 1
 
 
-def assertions():
-    """Les 17 assertions du `--selftest` : (libellé, prédicat)."""
+def assertions_socle():
+    """13 assertions : sommes, planchers, architectures, allocation, débit."""
     cloud = [percee_de(ar, client) for _, _, ar, client, _, v in ARCHITECTURES if v == "cloud"]
     local = percee_de(LOCAL_AR, CLIENT_LOCAL)
-    base, post = CAMPAGNES
-    gain_moyenne, gain_max = base[2] - post[2], base[4] - post[4]
-    ecart_max = max(abs(client[i] - (base_de(sorte)[i] + attente_de(ar, attente)[i]))
-                    for _, _, ar, client, attente, sorte in ARCHITECTURES
-                    for i in (0, 1))
-    lignes, pire = limites()
+    ecart_max = max(abs(c[i] - (base_de(s)[i] + attente_de(a, t)[i]))
+                    for _, _, a, c, t, s in ARCHITECTURES for i in (0, 1))
+    depasse = min(haut for _, haut in cloud) > CIBLE_DIX
     return (
         (f"sommes étages cloud : {plage_str(CLIENT_CLOUD)}", lambda: CLIENT_CLOUD == (1406, 1584)),
         (f"sommes keyframe + propagation : {plage_str(local)}", lambda: local == (466, 554)),
         (f"plancher A/R cloud {dix_str(PLANCHER_CLOUD)} ms > 100 ms", lambda: PLANCHER_CLOUD > CIBLE_DIX),
-        ("les 6 architectures cloud dépassent 100 ms", lambda: len(cloud) == 6 and min(haut for _, haut in cloud) > CIBLE_DIX),
-        ("perçu = A/R + client sur les 8 lignes",
-         lambda: all(percee_de(ar, client) == (ar[0] + client[0], ar[1] + client[1])
-                     for _, _, ar, client, _, _ in ARCHITECTURES)),
-        (f"client = base + attente à un dixième près (écart max {dix_str(ecart_max)})",
-         lambda: ecart_max <= 1),
-        (f"A/R médian mesuré {dix_str(AR_MEDIAN)} ms ∈ [{dix_str(AR_BANDE[0])} ; {dix_str(AR_BANDE[1])}]",
-         lambda: AR_BANDE[0] <= AR_MEDIAN <= AR_BANDE[1]),
-        (f"la boîte LAN ne franchit plus la cible ({plage_str(LAN_PERÇU)} ms)",
-         lambda: LAN_PERÇU[0] > CIBLE_DIX),
-        ("la propagation locale est la seule ligne sous 100 ms",
-         lambda: min(haut for _, haut in cloud) > CIBLE_DIX and local[1] < CIBLE_DIX
-                 and LAN_PERÇU[1] > CIBLE_DIX),
-        (f"marge du chemin local = {dix_str(CIBLE_DIX - local[1])} ms",
-         lambda: CIBLE_DIX - local[1] == 446),
-        (f"allocation du budget cible = {dix_str(ALLOC_TOTAL)} ms, "
-         f"marge {dix_str(CIBLE_DIX - ALLOC_TOTAL)} ms",
-         lambda: ALLOC_TOTAL == 700 and CIBLE_DIX - ALLOC_TOTAL == 300),
-        (f"H200 téléphone {dix_str(H200_TEL)} ms modélisés < {plage_str(H200_MESURE)} ms mesurés",
-         lambda: H200_TEL < H200_MESURE[0]),
-        (f"débit 30 fps = {dix_str(CIBLE_DIX // 3)} ms/frame",
-         lambda: CIBLE_DIX // 3 == 333),
-        (f"campagnes ISEE_LAT : N={base[1]}/{post[1]}, moyennes {base[2]}/{post[2]} ms",
-         lambda: (base[1], base[2], post[1], post[2]) == (1257, 454, 1500, 380)),
-        ("aucune campagne ne tient 300/500 ni 250/500",
-         lambda: all(cellule_mesure(moy, mx, cm, cx).startswith("non")
-                     for _, _, moy, _, mx, _ in CAMPAGNES for cm, cx in CIBLES_MESURES)),
-        (f"gains post-PR2 : −{gain_moyenne} ms en moyenne, −{gain_max} en max",
-         lambda: (gain_moyenne, gain_max) == (74, 964)),
-        (f"limites du script : {lignes} l., fonction max {pire[1]} l. ({pire[0]})",
-         lambda: lignes < 500 and pire[1] < 50),
+        ("les 6 architectures cloud dépassent 100 ms", lambda: len(cloud) == 6 and depasse),
+        ("perçu = A/R + client sur les 8 lignes", lambda: all(percee_de(a, c) == (a[0] + c[0], a[1] + c[1]) for _, _, a, c, _, _ in ARCHITECTURES)),
+        (f"client = base + attente à un dixième près (écart max {dix_str(ecart_max)})", lambda: ecart_max <= 1),
+        (f"A/R médian mesuré {dix_str(AR_MEDIAN)} ms ∈ [{dix_str(AR_BANDE[0])} ; {dix_str(AR_BANDE[1])}]", lambda: AR_BANDE[0] <= AR_MEDIAN <= AR_BANDE[1]),
+        (f"la boîte LAN ne franchit plus la cible ({plage_str(LAN_PERÇU)} ms)", lambda: LAN_PERÇU[0] > CIBLE_DIX),
+        ("la propagation locale est la seule ligne sous 100 ms", lambda: depasse and local[1] < CIBLE_DIX and LAN_PERÇU[1] > CIBLE_DIX),
+        (f"marge du chemin local = {dix_str(CIBLE_DIX - local[1])} ms", lambda: CIBLE_DIX - local[1] == 446),
+        (f"allocation du budget cible = {dix_str(ALLOC_TOTAL)} ms, marge {dix_str(CIBLE_DIX - ALLOC_TOTAL)} ms", lambda: ALLOC_TOTAL == 700 and CIBLE_DIX - ALLOC_TOTAL == 300),
+        (f"H200 téléphone {dix_str(H200_TEL)} ms modélisés < {plage_str(H200_MESURE)} ms mesurés", lambda: H200_TEL < H200_MESURE[0]),
+        (f"débit 30 fps = {dix_str(CIBLE_DIX // 3)} ms/frame", lambda: CIBLE_DIX // 3 == 333),
     )
+
+
+def assertions_campagnes():
+    """5 assertions : campagnes ISEE_LAT citées au § 10 et verdict paramétrable."""
+    base, post = CAMPAGNES
+    gain_moyenne, gain_max = base[2] - post[2], base[4] - post[4]
+    return (
+        (f"campagnes ISEE_LAT : N={base[1]}/{post[1]}, moyennes {base[2]}/{post[2]} ms", lambda: (base[1], base[2], post[1], post[2]) == (1257, 454, 1500, 380)),
+        ("aucune campagne ne tient 300/500 ni 250/500", lambda: all(cellule_mesure(m, x, cm, cx).startswith("non") for _, _, m, _, x, _, _, _, _, _ in CAMPAGNES for cm, cx in CIBLES_MESURES)),
+        ("verdict paramétrable : seuils optionnels décisifs, None inactif",
+         lambda: (cellule_mesure(200, 400, 300, 500, [("p95", 450, 400)]) == "non (+50 en p95)"
+                  and cellule_mesure(200, 400, 300, 500, [("p95", 350, 400), ("jetées", 2, 3)]) == "tenu"
+                  and cellule_mesure(200, 400, 300, 500, [("p95", None, 400), ("jetées", 2, None)]) == "tenu")),
+        ("campagnes historiques : p95/p99/gigue/jetées non relevés, publiés « — »",
+         lambda: (all(c[i] is None for c in CAMPAGNES for i in (6, 7, 8, 9)) and table_mesures().count("—") >= 8)),
+        (f"gains post-PR2 : −{gain_moyenne} ms en moyenne, −{gain_max} en max", lambda: (gain_moyenne, gain_max) == (74, 964)),
+    )
+
+
+def assertions():
+    """Les 19 assertions du `--selftest` : (libellé, prédicat)."""
+    lignes, pire = limites()
+    return (assertions_socle() + assertions_campagnes()
+            + ((f"limites du script : {lignes} l., fonction max {pire[1]} l. ({pire[0]})",
+                lambda: lignes < 500 and pire[1] < 50),))
 
 
 def selftest():

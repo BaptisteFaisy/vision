@@ -285,12 +285,12 @@ la règle de `scripts/parse_isee_lat.py` (`moyenne <= --mean` et `max <= --max`)
 seuils par défaut (300 / 500) et sous l'objectif (moyenne < 250 ms, max ≤ 500 ms).
 
 <!-- table:mesures -->
-| campagne | N | moyenne (ms) | capt | up | srv | rtt | mask | pixel | max (ms) | 300 / 500 ? | 250 / 500 ? | conditions |
-|---|---:|---:|---:|---:|---:|---:|---:|---:|---:|---|---|---|
-| baseline pré-PR2 | 1257 | 454 | 171 | 38 | 102 | 165 | 5 | 78 | 1677 | non (+154 en moyenne, +1177 en max) | non (+204 en moyenne, +1177 en max) | référence avant PR2 |
-| post-PR2 | 1500 | 380 | 119 | 38 | 100 | 164 | 1 | 58 | 713 | non (+80 en moyenne, +213 en max) | non (+130 en moyenne, +213 en max) | scène vide (0 masque), app à 430 % CPU |
+| campagne | N | moyenne (ms) | capt | up | srv | rtt | mask | pixel | max (ms) | p95 | p99 | gigue | jetées | 300 / 500 ? | 250 / 500 ? | conditions |
+|---|---:|---:|---:|---:|---:|---:|---:|---:|---:|---:|---:|---:|---:|---|---|---|
+| baseline pré-PR2 | 1257 | 454 | 171 | 38 | 102 | 165 | 5 | 78 | 1677 | — | — | — | — | non (+154 en moyenne, +1177 en max) | non (+204 en moyenne, +1177 en max) | référence avant PR2 |
+| post-PR2 | 1500 | 380 | 119 | 38 | 100 | 164 | 1 | 58 | 713 | — | — | — | — | non (+80 en moyenne, +213 en max) | non (+130 en moyenne, +213 en max) | scène vide (0 masque), app à 430 % CPU |
 
-Règle des verdicts : celle de `scripts/parse_isee_lat.py` (`moyenne <= --mean` et `max <= --max`, défauts 300 / 500) ; `250 / 500` = objectif (moyenne < 250 ms, max ≤ 500 ms).
+Règle des verdicts : celle de `scripts/parse_isee_lat.py` (`moyenne <= --mean` et `max <= --max`, défauts 300 / 500) ; `250 / 500` = objectif (moyenne < 250 ms, max ≤ 500 ms). Les colonnes `p95`, `p99`, `gigue`, `jetées` portent les mesures brutes (« — » = non relevé) ; les seuils `--p95`, `--p99`, `--jitter`, `--drop` du parseur les contrôlent quand ils sont posés.
 <!-- /table:mesures -->
 
 Lecture :
@@ -386,5 +386,5 @@ fait échouer la CI.
 | ce que cet arbre refuse d'affirmer | `docs/PERF.md` § 1 et § 3 | latences, fps, réveil de conteneur : « non mesuré ici » |
 | instrument côté client | `core/live/LiveStats.kt`, banc JVM `LiveFrameBudgetTest` | coûts CPU mesurés en microsecondes, hors JPEG et hors radio |
 | décomposition du poste `capt` | `core/live/TimingsText.kt` (`capsplit`), `app/isee/IseeCameraPane.kt` | `age` / `enc` / `b64` / `cb` / `total`, 1 frame sur 20, même dump `ISEE_LAT` |
-| agrégation de cette décomposition | `scripts/parse_isee_lat.py --capsplit` | moyenne/p50/p95/max par poste, `somme` et écart au `capt` de la sonde |
+| agrégation de cette décomposition | `scripts/parse_isee_lat.py --capsplit` | moyenne/p50/p95/p99/max par poste, `somme` et écart au `capt` de la sonde |
 | une hypothèse peut-elle survivre à une mesure ? | `scripts/check-budget-provenance.py` | non : étiquette fermée, « mesuré » daté, contradiction archive ↔ doc = échec |
