@@ -11,8 +11,15 @@ internal const val TAU_MIN_RUN = 5
 /** Nourrit une piste : run +1 par croissance, tenu sur frame statique, zéro sinon. */
 internal fun feedTrackRun(track: VehicleApproach.Track, box: Box, atMs: Long, maxSpeed: Float) {
     val outcome = track.motion.observe(box, atMs, maxSpeed)
+    if (outcome == MotionModel.Outcome.JUMPED) {
+        // Saut = nouvel objet (coupe de scène, changement d'id) : le run ET
+        // l'armement meurent (un tau armé sur S2 ne tire plus sur S1).
+        track.growthRun = 0
+        track.tauArmed = false
+        return
+    }
     val raw = track.motion.lastRawWidth
-    track.growthRun = if (outcome == MotionModel.Outcome.JUMPED || outcome == MotionModel.Outcome.STALE) 0
+    track.growthRun = if (outcome == MotionModel.Outcome.STALE) 0
         else if (raw > 0f) track.growthRun + 1 else if (raw < 0f) 0 else track.growthRun
 }
 
