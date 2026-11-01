@@ -46,19 +46,18 @@ base64 en continu, et hors ces cas la frame n'est **même pas convertie** (`want
 Caméra coupée ou app en arrière-plan, `LiveProbe.stop` ferme les sessions WebSocket : sans socket ouvert,
 le conteneur Modal retombe à zéro et rien n'est facturé.
 
-Pendant l'enregistrement, la session tourne en `Cadence.Fast` (`core/live/LiveSession.kt:42-48`) :
-**pas de plancher artificiel**, **un seul créneau** (`concurrency = 1`) et un **budget de latence de
-150 ms** (`latencyBudgetMs = 150L`). Le régulateur ne se prononce qu'après **3 mesures**
-(`REGULATE_MIN_SAMPLES`, `:171`) et ne rouvre un créneau que sous **la moitié** du budget
-(`RELAX_RATIO = 0.5`, `:168`) — mais avec `concurrency = 1` il n'y a rien à rouvrir : le budget ne sert
-qu'à documenter la cible. Motif de ce choix, relevé sur appareil (relevé non rejoué ici) : deux frames
-en vol donnaient **417 ms** par frame contre **185 ms** à un seul, serveur inchangé à ~120 ms
-(commentaire de `Cadence.Fast`) — le backend sérialise de toute façon sur un verrou GPU.
+Pendant l'enregistrement, la session tourne en `Cadence.Fast` (`core/live/LiveSession.kt:45-51`) :
+**pas de plancher artificiel**, **deux créneaux** (`concurrency = 2`) et un **budget de latence de
+210 ms** (`latencyBudgetMs = 210L`). Le régulateur ne se prononce qu'après **3 mesures**
+(`REGULATE_MIN_SAMPLES`) et ne rouvre le second créneau que sous **la moitié** du budget
+(`RELAX_RATIO = 0.5`). Motif de ce choix (campagne Samsung 01/11, Wi-Fi) : rtt 173 ms à un créneau
+(serveur 83 ms + réseau 89 ms) — le budget précédent (150 ms) refermait toujours, le lien ne pipelinait
+jamais. Au-delà de deux frames en vol, le backend sérialise sur son verrou GPU.
 
-⚠️ Ce paragraphe a dit « budget 200 ms, jusqu'à 2 requêtes en vol » : **inexact** pour cet arbre (le code
-dit 1 créneau / 150 ms). L'ancienne formule « une seule requête en vol (`FrameGate`) et cadence
-350–900 ms » décrivait le direct (`Cadence.Direct`), pas la sonde iSee. L'estimation « un direct de 10 s
-≈ 10–25 frames » n'a pas été remesurée : **non mesuré**.
+⚠️ Ce paragraphe a dit « 1 créneau / 150 ms » : **inexact** pour cet arbre (le code dit 2 créneaux /
+210 ms). L'ancienne formule « une seule requête en vol (`FrameGate`) et cadence 350–900 ms » décrivait
+le direct (`Cadence.Direct`), pas la sonde iSee. L'estimation « un direct de 10 s ≈ 10–25 frames » n'a
+pas été remesurée : **non mesuré**.
 
 Une frame de réserve est convertie pendant que la requête court (emplacement d'une seule image,
 `LatestFrameSlot` — `LiveProbe.kt:201-210`) ; au-delà, les frames sont jetées — la scène a changé.

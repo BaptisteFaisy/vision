@@ -15,7 +15,7 @@ import dev.sam3vision.core.net.WsLiveClient
  * Le Direct suit la cadence régulée (moitié de la latence, bornée 33-900 ms —
  * O8, fin des paliers 350/500/900) ; la page caméra d'iSee part sur
  * [Cadence.Fast] (pas de plancher : `fastMs = 0`, on repart dès qu'un créneau
- * se libère, budget 150 ms) : le GPU répond en ~115 ms, la limite réelle est
+ * se libère, budget 210 ms) : le serveur répond en ~83 ms, la limite réelle est
  * alors l'aller-retour réseau, pas la carte.
  */
 data class Cadence(
@@ -36,18 +36,19 @@ data class Cadence(
 
         /**
          * iSee : pas de plancher artificiel (on repart dès qu'un créneau se libère) et
-         * **deux créneaux**, budget 150 ms. Le second créneau laisse partir une frame
-         * fraîche pendant qu'une analyse est en vol ; si le backend sérialise vraiment
-         * (mesuré : 417 ms à deux créneaux contre 185 ms à un seul), [LiveSession.regulate]
-         * referme à un seul dès que la moyenne dépasse le budget — le pire cas reste
-         * celui d'avant, le lien qui pipeline vraiment gagne le double vol.
+         * **deux créneaux**, budget 210 ms (campagne Samsung 01/11 : rtt 173 ms à un
+         * créneau, serveur 83 ms + réseau 89 ms — le budget 150 ms refermait toujours).
+         * Le second créneau laisse partir une frame fraîche pendant qu'une analyse est
+         * en vol ; si le backend sérialise vraiment, [LiveSession.regulate] referme à
+         * un seul dès que la moyenne dépasse le budget — le pire cas reste celui
+         * d'avant, le lien qui pipeline vraiment gagne le double vol.
          */
         val Fast = Cadence(
             fastMs = 0L,
             targetMs = 0L,
             slowMs = 900L,
             concurrency = 2,
-            latencyBudgetMs = 150L,
+            latencyBudgetMs = 210L,
         )
     }
 }
