@@ -27,7 +27,7 @@ import kotlinx.coroutines.launch
  * nourrie par le décodeur, recadré « remplit la vue ». Même place, même fondu, même boule
  * dessous que la caméra du téléphone — seule la source change.
  *
- * Le décodage tourne hors du fil UI (les frames arrivent à 15 i/s) et ne recompose rien :
+ * Le décodage tourne hors du fil UI (les frames arrivent jusqu'à 60 i/s) et ne recompose rien :
  * seule la taille vidéo recadre la vue, une fois par résolution.
  */
 @Composable
@@ -37,8 +37,8 @@ internal fun GlassesLive(modifier: Modifier) {
     val size by GlassesVideoLink.videoSize.collectAsState()
     LaunchedEffect(decoder) {
         launch(Dispatchers.Default) {
-            // Un essai par poussée, sans attendre : le flux bat à 15 i/s, la suivante
-            // réessaie ~66 ms plus tard. Boucler ici affamerait le décodeur (constaté :
+            // Un essai par poussée, sans attendre : le flux bat jusqu'à 60 i/s, la suivante
+            // réessaie ~17 ms plus tard. Boucler ici affamerait le décodeur (constaté :
             // 200 entrées en 4 min au lieu de 15/s, première sortie à +4 min).
             // Le rendu est daté à ses bornes (même horloge monotone que
             // `arrivedAtNs`) : c'est l'étage `dec` de la mesure B2.

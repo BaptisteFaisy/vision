@@ -89,7 +89,7 @@ internal fun startsWithAnnexB(bytes: ByteArray): Boolean {
 
 /**
  * Faut-il tenter le décodage bitmap avant le codec ? Non pour un bitstream déjà en
- * Annex B : `BitmapFactory` y échoue à coup sûr après 1 à 3 ms (15 i/s, c'est ~45 ms
+ * Annex B : `BitmapFactory` y échoue à coup sûr après 1 à 3 ms (60 i/s, c'est ~180 ms
  * de CPU jetées par seconde). Les images fixes (JPEG/PNG/WebP, jamais `00 00 01…` en
  * tête) et le brut non compressé gardent la sonde ; le longueur-préfixé ambigu aussi
  * (prudence : [annexB] tranche déjà ce cas vers Annex B, la sonde reste le repli sûr).
@@ -193,7 +193,7 @@ class GlassesLiveDecoder(
                 try {
                     return drawBitmap(target, frame, it)
                 } finally {
-                    // Bitmap décodé pour ce seul dessin (15 i/s) : libéré aussitôt.
+                    // Bitmap décodé pour ce seul dessin (jusqu'à 60 i/s) : libéré aussitôt.
                     runCatching { it.recycle() }
                 }
             }
@@ -366,7 +366,7 @@ class GlassesLiveDecoder(
     }
 
     /**
-     * Panne de rendu : journalisée (1re fois puis une sur 100, le flux bat à 15 i/s),
+     * Panne de rendu : journalisée (1re fois puis une sur 100, le flux bat jusqu'à 60 i/s),
      * annoncée à l'utilisateur une seule fois.
      */
     private fun noteFailure(message: GlassesMessage) {

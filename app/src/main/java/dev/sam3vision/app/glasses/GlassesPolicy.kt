@@ -232,6 +232,11 @@ object GlassesMessages {
 
     fun cameraUnavailable(reason: String) = GlassesMessage(MessageKind.ERROR, "Camera unavailable: $reason")
 
+    fun frameRateFallback(asked: Int, held: Int) = GlassesMessage(
+        MessageKind.WARNING,
+        "Glasses link refused $asked fps: the stream holds $held fps instead.",
+    )
+
     fun headPoseUnavailable() = GlassesMessage(
         MessageKind.WARNING,
         "Head pose unavailable: glasses distances run pinhole-only.",

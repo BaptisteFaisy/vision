@@ -7,7 +7,7 @@ import org.junit.Test
 
 /**
  * Latence du lien lunettes : le décalage d'horloges se cale sur le minimum observé
- * (pas de NTP possible), et le perçu se lit en p50/p95/p99 sur une fenêtre de 100.
+ * (pas de NTP possible), et le perçu se lit en p50/p95/p99 sur une fenêtre de 200.
  */
 class GlassesLatencyTest {
 
@@ -50,14 +50,14 @@ class GlassesLatencyTest {
     }
 
     @Test
-    fun `le p99 vaut la 99e mesure sur une fenetre pleine de 100`() {
+    fun `le p99 vaut la 198e mesure sur une fenetre pleine de 200`() {
         val stats = GlassesLinkStats()
-        for (i in 1..100) stats.record(linkUs = i.toLong(), decodeUs = 0L, displayUs = 0L)
-        assertEquals(50L, stats.perceivedP50Us)
-        assertEquals(95L, stats.perceivedP95Us)
-        assertEquals(99L, stats.perceivedP99Us)
-        assertEquals(95L, stats.linkP95Us)
-        assertEquals(100L, stats.samples)
+        for (i in 1..200) stats.record(linkUs = i.toLong(), decodeUs = 0L, displayUs = 0L)
+        assertEquals(100L, stats.perceivedP50Us)
+        assertEquals(190L, stats.perceivedP95Us)
+        assertEquals(198L, stats.perceivedP99Us)
+        assertEquals(190L, stats.linkP95Us)
+        assertEquals(200L, stats.samples)
     }
 
     @Test
@@ -104,9 +104,9 @@ class GlassesLatencyTest {
     }
 
     @Test
-    fun `p99 vaut le max sur une fenetre de 20, d ou la fenetre 100 du lien`() {
+    fun `p99 vaut le max sur une fenetre de 20, d ou la fenetre 200 du lien`() {
         // Rang = ceil(0.99 × 20) = 20 : sur la fenêtre du direct, le p99 n'apprend rien.
         assertEquals(19, Percentiles.rank(Percentiles.P99, 20))
-        assertEquals(98, Percentiles.rank(Percentiles.P99, 100))
+        assertEquals(197, Percentiles.rank(Percentiles.P99, 200))
     }
 }
