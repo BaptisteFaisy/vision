@@ -33,6 +33,9 @@ internal class ProbeTestClient(private val journal: MutableList<String>) : LiveC
 
     private val waiting = mutableMapOf<String, CompletableDeferred<Result<LiveFrame>>>()
 
+    /** Verrou du journal et des créneaux : deux vols appellent `live` en même temps. */
+    private val lock = Any()
+
     override suspend fun live(
         jpegB64: String,
         prompts: List<String>?,
@@ -40,18 +43,22 @@ internal class ProbeTestClient(private val journal: MutableList<String>) : LiveC
         maxObjects: Int,
     ): Result<LiveFrame> {
         val slot = CompletableDeferred<Result<LiveFrame>>()
-        waiting[jpegB64] = slot
-        sent += 1
-        sentPrompts += prompts
-        journal += "envoi $jpegB64 (frames=${publishedFrames()})"
+        synchronized(lock) {
+            waiting[jpegB64] = slot
+            sent += 1
+            sentPrompts += prompts
+            journal += "envoi $jpegB64 (frames=${publishedFrames()})"
+        }
         return slot.await()
     }
 
     /** Livre la réponse de [jpeg] : c'est le test qui décide de l'ordre des frames. */
     fun respond(jpeg: String, frame: LiveFrame) {
-        val slot = waiting.remove(jpeg) ?: error("aucune frame « $jpeg » en attente")
+        val slot = synchronized(lock) {
+            waiting.remove(jpeg) ?: error("aucune frame « $jpeg » en attente")
+        }
         marks?.onBody()
-        journal += "reponse $jpeg"
+        synchronized(lock) { journal += "reponse $jpeg" }
         slot.complete(Result.success(frame))
     }
 

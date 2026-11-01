@@ -1,12 +1,9 @@
 package dev.sam3vision.app.isee
 
 import dev.sam3vision.core.model.LiveFrame
-import dev.sam3vision.core.model.LiveHealth
 import dev.sam3vision.core.model.MASK_ENCODING_NONE
 import dev.sam3vision.core.model.SegObject
-import dev.sam3vision.core.net.LiveClient
 import java.util.concurrent.ConcurrentLinkedQueue
-import java.util.concurrent.CountDownLatch
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.CoroutineExceptionHandler
 import kotlinx.coroutines.CoroutineScope
@@ -15,6 +12,7 @@ import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.cancel
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.runBlocking
+import kotlinx.coroutines.withTimeout
 import org.junit.Assert.assertTrue
 import org.junit.Test
 
@@ -26,8 +24,6 @@ import org.junit.Test
  * La section publication est sérialisée, le réseau reste parallèle.
  */
 class LiveProbePublishConcurrencyTest {
-
-    private var ns = 0L
 
     /** Objet sans masque (décodage Bitmap impossible en JVM, inutile ici). */
     private fun objet(label: String, x0: Float) = SegObject(
@@ -51,7 +47,7 @@ class LiveProbePublishConcurrencyTest {
     )
 
     @Test
-    fun `des frames qui se recouvrent ne plantent pas la publication`() {
+    fun `deux vols qui publient ensemble ne plantent pas`() {
         val errors = ConcurrentLinkedQueue<Throwable>()
         val handler = CoroutineExceptionHandler { _, e ->
             if (e is CancellationException) return@CoroutineExceptionHandler
@@ -59,47 +55,46 @@ class LiveProbePublishConcurrencyTest {
         }
         val scope = CoroutineScope(Dispatchers.Default + SupervisorJob() + handler)
         try {
+            val fake = ProbeTestClient(mutableListOf())
             val probe = LiveProbe(
                 scope = scope,
-                clock = { ns },
+                clock = { 0L },
                 background = Dispatchers.Default,
-                clientFor = { _, _, _ -> QuickClient(frame()) },
-            ).also {
-                it.configure("https://sam.test", announce = false, guide = true)
-                it.begin()
-                it.onForeground()
-            }
-            val start = CountDownLatch(1)
-            val threads = List(8) {
-                Thread {
-                    start.await()
-                    repeat(40) { i ->
-                        try {
-                            probe.onFrame("A$i")
-                        } catch (e: Throwable) {
-                            errors.add(e)
-                        }
+                clientFor = { _, _, _ -> fake },
+            )
+            probe.configure(PROBE_TEST_ENDPOINT)
+            probe.begin()
+            // Scheduler coupé : ce test verrouille le recouvrement, pas les keyframes.
+            probe.adaptive.configure(uploadEnabled = false, keyframesEnabled = false)
+            runBlocking {
+                withTimeout(120_000) {
+                    var paires = 0
+                    repeat(60) { cycle ->
+                        val baseFrames = probe.state.value.frames
+                        val baseSent = fake.sent
+                        probe.onFrame("A$cycle")
+                        probe.onFrame("B$cycle")
+                        if (!attendre { fake.sent >= baseSent + 2 }) return@repeat
+                        fake.respond("A$cycle", frame())
+                        fake.respond("B$cycle", frame())
+                        if (!attendre { probe.state.value.frames >= baseFrames + 2 }) return@repeat
+                        paires += 1
                     }
-                }.also { it.start() }
+                    assertTrue("pas assez de paires publiées : $paires", paires >= 20)
+                }
             }
-            start.countDown()
-            threads.forEach { it.join(60_000) }
-            runBlocking { delay(3_000) }
             assertTrue("plantage concurrent : ${errors.peek()}", errors.isEmpty())
         } finally {
             scope.cancel()
         }
     }
 
-    /** Client qui répond aussitôt : les vols se recouvrent au maximum. */
-    private class QuickClient(private val frame: LiveFrame) : LiveClient {
-        override suspend fun live(
-            jpegB64: String,
-            prompts: List<String>?,
-            workEdge: Int,
-            maxObjects: Int,
-        ): Result<LiveFrame> = Result.success(frame)
-        override suspend fun health(): Result<LiveHealth> =
-            Result.success(LiveHealth(ok = true, model = "sam3.1", device = "cuda", gpu = "A100"))
+    /** Attend [cond] (vrai = tenue, faux = cycle sauté, jamais bloquant). */
+    private suspend fun attendre(cond: () -> Boolean): Boolean {
+        repeat(100) {
+            if (cond()) return true
+            delay(20)
+        }
+        return cond()
     }
 }
