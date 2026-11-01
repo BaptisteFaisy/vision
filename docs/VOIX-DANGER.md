@@ -1152,3 +1152,35 @@ bulle est coupée, « Car moving, … » parle ; personne + bordure à 1 m →
 la personne seule ; alerte rebord + voiture → le rebord d'abord, la
 voiture juste après — **non mesuré**, exige un APK de cette branche sur
 appareil réel.
+
+## 32. Compteur de marches prioritaire : dit chaque seconde, coupe le doux (ordre user du 01/11)
+
+Le user marche avec l'app : devant un escalier, le compte des marches se
+fait attendre — il veut l'entendre toutes les secondes, en plus haute
+priorité. La répétition existe déjà (le même compte se redit toutes les
+1 s, `StairCountVoice.REPEAT_MS`) ; nouveau contrat, qui amende le § 31
+(le mouvement n'est plus seul à couper) : le compte coupe la parole
+douce au lieu d'attendre le silence, devant le mouvement lui-même.
+
+- **rang escaliers** (`VoicePreempt.STAIRS`, `observeStairsCount`) : le
+  compte (« 5 marches. ») coupe la parole douce en cours (chat, route,
+  annonce — le lecteur partagé est coupé) au lieu d'attendre le
+  silence, voix Laure et sous-titres inchangés (pas la voix de
+  sécurité) ;
+- **sécurité et parole du user au-dessus** : fenêtre P1/P2, TTS système
+  ou micro en cours → le compte attend (jamais de chevauchement avec
+  une alerte, jamais par-dessus le user, § 30) ; l'urgent garde la main
+  (traité avant) ; Traversée et esquive coupent le compteur comme
+  avant ;
+- **file ordonnée** : dans la file douce, le compte ne se fait remplacer
+  par personne — ni voiture, ni personne, ni doux (l'ordinal compare,
+  à rang égal la plus fraîche gagne comme avant).
+
+Verrouillé par `ProximityVoicePreemptTest` (+2 : escaliers remplacent
+voiture, voiture ne remplace pas escaliers) et
+`ProbeStairsCountVoiceTest` (+1 : compteur parlé chat en lecture).
+
+Recette téléphone : bulle du chat en lecture + escalier nommé → la
+bulle est coupée, « N marches. » parle puis se répète chaque seconde ;
+voiture en mouvement + escalier → le compte d'abord — **non mesuré**,
+exige un APK de cette branche sur appareil réel.

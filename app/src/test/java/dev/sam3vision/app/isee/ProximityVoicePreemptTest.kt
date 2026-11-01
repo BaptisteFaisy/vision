@@ -10,11 +10,12 @@ import org.junit.Assert.assertTrue
 import org.junit.Test
 
 /**
- * Préemption du mouvement : une voiture en mouvement (ou une personne)
- * coupe la parole douce en cours (chat, route, autre annonce) au lieu
- * d'attendre le silence — mais jamais la sécurité (alerte système en
- * cours ou fenêtre P1/P2 : la phrase part en file). Dans la file, la
- * voiture garde son rang devant la personne.
+ * Préemption du mouvement et du compteur de marches : une voiture en
+ * mouvement (ou une personne, ou le compte des marches) coupe la parole
+ * douce en cours (chat, route, autre annonce) au lieu d'attendre le
+ * silence — mais jamais la sécurité (alerte système en cours ou fenêtre
+ * P1/P2 : la phrase part en file). Dans la file, les marches gardent
+ * leur rang devant la voiture, qui garde le sien devant la personne.
  */
 class ProximityVoicePreemptTest {
 
@@ -162,6 +163,32 @@ class ProximityVoicePreemptTest {
         voice.flushPending(playerIdle = true, busy = { false })
 
         assertEquals(listOf("Car moving, 12 meters away."), spoken)
+    }
+
+    @Test
+    fun `file escaliers remplace voiture`() = runTest {
+        val attempts = mutableListOf<String>()
+        val spoken = mutableListOf<String>()
+        val voice = voice(attempts, spoken)
+
+        voice.onPhrase("Car moving, 12 meters away.", playerIdle = true, queue = true, busy = { true }, preempt = VoicePreempt.VEHICLE)
+        voice.onPhrase("6 marches.", playerIdle = true, queue = true, busy = { true }, preempt = VoicePreempt.STAIRS)
+        voice.flushPending(playerIdle = true, busy = { false })
+
+        assertEquals(listOf("6 marches."), spoken)
+    }
+
+    @Test
+    fun `file voiture ne remplace pas escaliers`() = runTest {
+        val attempts = mutableListOf<String>()
+        val spoken = mutableListOf<String>()
+        val voice = voice(attempts, spoken)
+
+        voice.onPhrase("6 marches.", playerIdle = true, queue = true, busy = { true }, preempt = VoicePreempt.STAIRS)
+        voice.onPhrase("Car moving, 12 meters away.", playerIdle = true, queue = true, busy = { true }, preempt = VoicePreempt.VEHICLE)
+        voice.flushPending(playerIdle = true, busy = { false })
+
+        assertEquals(listOf("6 marches."), spoken)
     }
 
     @Test

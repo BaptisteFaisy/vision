@@ -118,13 +118,15 @@ internal fun LiveProbe.stairsYieldToAvoidance(): Boolean {
  * Voix du compteur de marches : toutes les [tickMs] (300 ms), quand SAM nomme
  * un escalier et que la caméra voit des marches fraîches, dit combien
  * (« 5 marches. ») — changements aussitôt, même compte répété toutes les
- * 1 s ([StairCountVoice]), doux, coupé en Traversée comme en esquive
- * ([stairsYieldToAvoidance]). La voix part en coroutine fille : le battement
- * ne s'arrête jamais pour une synthèse lente (le lecteur coupe le précédent,
- * dernier gagnant). Sans escalier nommé ou sans compte frais : silence
- * (auto-muet caméra coupée, séance finie). Rend le compteur pour le `reset()`
- * de séance. [stairsAudible] ignore la sourdine GPS, comme l'annonce
- * (sécurité). [nowMs] est l'horloge du compteur (injectée en test).
+ * 1 s ([StairCountVoice]), en prioritaire ([VoicePreempt.STAIRS] : coupe la
+ * parole douce, chat compris — sécurité et parole du user exceptées), coupé
+ * en Traversée comme en esquive ([stairsYieldToAvoidance]). La voix part en
+ * coroutine fille : le battement ne s'arrête jamais pour une synthèse lente
+ * (le lecteur coupe le précédent, dernier gagnant). Sans escalier nommé ou
+ * sans compte frais : silence (auto-muet caméra coupée, séance finie). Rend
+ * le compteur pour le `reset()` de séance. [stairsAudible] ignore la sourdine
+ * GPS, comme l'annonce (sécurité). [nowMs] est l'horloge du compteur
+ * (injectée en test).
  */
 internal fun LiveProbe.observeStairsCount(
     scope: CoroutineScope,
@@ -146,7 +148,10 @@ internal fun LiveProbe.observeStairsCount(
                 true, StairCannyCount.lineCount(), nowMs(), language(),
             ) ?: continue
             scope.launch {
-                voice.onPhrase(phrase, stairsAudible(), urgent = false, dedupMs = StairCountVoice.REPEAT_MS)
+                voice.onPhrase(
+                    phrase, stairsAudible(), urgent = false,
+                    dedupMs = StairCountVoice.REPEAT_MS, preempt = VoicePreempt.STAIRS,
+                )
             }
         }
     }
