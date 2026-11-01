@@ -3,6 +3,8 @@ package dev.sam3vision.core.traverse
 import dev.sam3vision.core.live.LivePrompts
 import dev.sam3vision.core.model.Detection
 import dev.sam3vision.core.motion.MotionSample
+import java.util.concurrent.ConcurrentLinkedQueue
+import java.util.concurrent.CountDownLatch
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
 import org.junit.Assert.assertNotNull
@@ -324,5 +326,35 @@ class TraverseVetoTest {
     private fun youngCarDetection(frame: Int): Detection {
         val width = 100f + frame * 20f
         return detection("car", 0.9f, listOf(320f - width / 2f, 240f - width * 0.3f, 320f + width / 2f, 240f + width * 0.3f))
+    }
+
+    @Test
+    fun `des update concurrents ne plantent pas le veto`() {
+        // Non-régression : instance unique par `LiveProbe`, alimentée par des
+        // `runFrame` qui se recouvrent (même classe de race que
+        // `PersonTracker.sweep`, crash constaté sur émulateur le 01/11).
+        val veto = TraverseVeto()
+        val errors = ConcurrentLinkedQueue<Throwable>()
+        val start = CountDownLatch(1)
+        val threads = List(8) { t ->
+            Thread {
+                start.await()
+                try {
+                    repeat(300) { i ->
+                        veto.update(
+                            lightGreen = true,
+                            detections = listOf(youngCarDetection(i % 20)),
+                            focalPx = focalPx,
+                            atMs = (t * 300L + i) * 40L,
+                        )
+                    }
+                } catch (e: Throwable) {
+                    errors.add(e)
+                }
+            }.also { it.start() }
+        }
+        start.countDown()
+        threads.forEach { it.join(60_000) }
+        assertTrue("plantage concurrent : ${errors.peek()}", errors.isEmpty())
     }
 }

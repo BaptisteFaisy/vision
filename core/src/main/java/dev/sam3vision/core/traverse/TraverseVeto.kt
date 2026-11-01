@@ -134,6 +134,7 @@ class TraverseVeto {
     private val approach = VehicleApproach()
 
     /** Oublie la phase, la frame précédente et les pistes (nouvelle traversée). */
+    @Synchronized
     fun reset() {
         currentState = TraversePhase.ATTENDRE
         previousAreas = emptyMap()
@@ -150,6 +151,7 @@ class TraverseVeto {
      * pistes qui suivent la caméra, ainsi que la croissance instantanée de
      * leur clé — le guidage obstacles, lui, reste actif devant un objet proche.
      */
+    @Synchronized
     fun update(
         lightGreen: Boolean,
         detections: List<Detection>,
