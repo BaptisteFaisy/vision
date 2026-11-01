@@ -39,12 +39,15 @@ class VehicleApproachDepthTest {
         val approach = VehicleApproach()
         frame(approach, 100f, 0L, 0.4f)
         frame(approach, 110f, 100L, 0.5f)
-        val third = frame(approach, 120f, 200L, 0.6f)
+        frame(approach, 120f, 200L, 0.6f)
+        frame(approach, 130f, 300L, 0.7f)
+        frame(approach, 140f, 400L, 0.8f)
+        val sixth = frame(approach, 150f, 500L, 0.9f)
 
-        assertTrue(third.approaching)
-        assertNotNull(third.ttcSeconds)
-        assertTrue("tau ~2,4 s", third.ttcSeconds!! in 1.0f..3.0f)
-        assertEquals("car", third.label)
+        assertTrue(sixth.approaching)
+        assertNotNull(sixth.ttcSeconds)
+        assertTrue("tau ~1,8 s", sixth.ttcSeconds!! in 1.0f..3.0f)
+        assertEquals("car", sixth.label)
     }
 
     @Test
@@ -52,10 +55,13 @@ class VehicleApproachDepthTest {
         val approach = VehicleApproach()
         frame(approach, 100f, 0L, null)
         frame(approach, 110f, 100L, null)
-        val third = frame(approach, 120f, 200L, null)
+        frame(approach, 120f, 200L, null)
+        frame(approach, 130f, 300L, null)
+        frame(approach, 140f, 400L, null)
+        val sixth = frame(approach, 150f, 500L, null)
 
-        assertTrue(third.approaching)
-        assertNotNull(third.ttcSeconds)
+        assertTrue(sixth.approaching)
+        assertNotNull(sixth.ttcSeconds)
     }
 
     @Test
@@ -63,9 +69,12 @@ class VehicleApproachDepthTest {
         val approach = VehicleApproach()
         frame(approach, 100f, 0L, null)
         frame(approach, 110f, 100L, 0.5f)
-        val third = frame(approach, 120f, 200L, 0.5f)
+        frame(approach, 120f, 200L, 0.5f)
+        frame(approach, 130f, 300L, 0.5f)
+        frame(approach, 140f, 400L, 0.5f)
+        val sixth = frame(approach, 150f, 500L, 0.5f)
 
-        assertTrue("première mesure manquante : le doute ne tait pas", third.approaching)
+        assertTrue("première mesure manquante : le doute ne tait pas", sixth.approaching)
     }
 
     private fun box(widthPx: Float): List<Float> {
