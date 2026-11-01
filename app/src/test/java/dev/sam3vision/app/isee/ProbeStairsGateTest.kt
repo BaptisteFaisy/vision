@@ -109,6 +109,7 @@ class ProbeStairsGateTest {
         )
         probe.configure(PROBE_TEST_ENDPOINT)
         probe.begin()
+        probe.adaptive.configure(uploadEnabled = false, keyframesEnabled = false)
         val spoken = mutableListOf<String>()
         val safety = SafetyVoice(
             player = SpeechPlayer(File(tempDir(), "securite")),
