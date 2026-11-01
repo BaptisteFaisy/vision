@@ -3,6 +3,7 @@ package dev.sam3vision.app.isee
 import android.app.Application
 import dev.sam3vision.app.BuildConfig
 import dev.sam3vision.app.debugModelsLine
+import dev.sam3vision.app.glasses.GlassesVideoLink
 import dev.sam3vision.app.live.LensOrigin
 import dev.sam3vision.app.live.chooseLens
 import dev.sam3vision.app.speech.VoicePack
@@ -84,6 +85,8 @@ internal fun LiveProbe.configureFrom(
     crossingActive: Boolean = false,
     sensorLens: LensSpec? = null,
     onLens: ((LensOrigin) -> Unit)? = null,
+    glassesLens: LensSpec? = null,
+    fromGlasses: Boolean = GlassesVideoLink.live.value,
 ) {
     android.util.Log.i("DepthLive", "configure profondeur=" + settings.depthBackend)
     val effective = if (prompts.isEmpty() || prompts == LivePrompts.default || prompts == LivePrompts.indoor) {
@@ -91,7 +94,8 @@ internal fun LiveProbe.configureFrom(
     } else {
         prompts
     }
-    val chosen = chooseLens(settings.cameraFovDeg, sensorLens)
+    val forced = if (fromGlasses) settings.glassesFovDeg else settings.cameraFovDeg
+    val chosen = chooseLens(forced, sensorLens, glassesLens, fromGlasses)
     onLens?.invoke(chosen.origin)
     configure(
         baseUrl = settings.resolveSamEndpoint(BuildConfig.SAM_BASE_URL, BuildConfig.SAM_US_BASE_URL),

@@ -88,6 +88,22 @@ data class LensSpec(
         /** Repli quand le capteur ne dit rien et que l'utilisateur n'a rien réglé. */
         val Default: LensSpec = fromHorizontalFov(DEFAULT_H_FOV_DEG)
 
+        /** Champ horizontal du flux lunettes 9:16, déduit des 100° diagonaux constructeur. */
+        const val GLASSES_H_FOV_DEG = 60.6f
+
+        /** Rapport largeur/hauteur du flux des lunettes (720×1280 portrait). */
+        const val GLASSES_ASPECT = 9f / 16f
+
+        /**
+         * Repli lunettes (≈ 60,6° × 92,1°, capteur natif portrait) : la diagonale
+         * de 100° annoncée par le constructeur, ramenée au 9:16 du flux. Estimation
+         * en attendant la mire (protocole `docs/LUNETTES-RECETTE-TEL.md` § 6) : le
+         * flux peut être recadré ou stabilisé — le réglage l'affine, la mire le
+         * remplacera.
+         */
+        val Glasses: LensSpec = fromHorizontalFov(GLASSES_H_FOV_DEG, GLASSES_ASPECT)
+            .copy(sensorLandscape = false)
+
         /**
          * Calibrage déduit d'un seul angle horizontal (réglage utilisateur), pour un
          * capteur d'aspect [aspect] (4:3 par défaut) : le champ vertical suit la même
@@ -107,6 +123,16 @@ data class LensSpec(
          */
         fun fromSettings(forcedFovDeg: Float): LensSpec =
             if (forcedFovDeg in FOV_MIN..FOV_MAX) fromHorizontalFov(forcedFovDeg) else Default
+
+        /**
+         * Calibrage lunettes des Réglages : le champ horizontal forcé prime (borné
+         * caméra, aspect 9:16 du flux), sinon le repli [Glasses]. Miroir de
+         * [fromSettings], qui suppose un capteur téléphone 4:3.
+         */
+        fun fromGlassesSettings(forcedFovDeg: Float): LensSpec =
+            if (forcedFovDeg in FOV_MIN..FOV_MAX) fromHorizontalFov(forcedFovDeg, GLASSES_ASPECT)
+                .copy(sensorLandscape = false)
+            else Glasses
 
         /** Calibrage à partir d'une focale (mm) et d'un capteur (mm), `null` si incohérent. */
         fun fromSensor(focalMm: Float, sensorWidthMm: Float, sensorHeightMm: Float): LensSpec? {

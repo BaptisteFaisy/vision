@@ -125,6 +125,7 @@ internal object SettingsCodec {
     private const val K_OUTDOOR_MODE = "outdoorMode"
     private const val K_ROUTE_BASE_URL = "routeBaseUrl"
     private const val K_CAMERA_FOV = "cameraFovDeg"
+    private const val K_GLASSES_FOV = "glassesFovDeg"
     private const val K_CAREGIVER_ROLE = "caregiverRole"
     private const val K_PARENT_SITE_URL = "parentSiteUrl"
     private const val K_SHARE_ENABLED = "shareEnabled"
@@ -167,6 +168,7 @@ internal object SettingsCodec {
         appendLine("$K_OUTDOOR_MODE=${s.outdoorMode}")
         appendLine("$K_ROUTE_BASE_URL=${s.routeBaseUrl}")
         appendLine("$K_CAMERA_FOV=${s.cameraFovDeg}")
+        appendLine("$K_GLASSES_FOV=${s.glassesFovDeg}")
         appendLine("$K_CAREGIVER_ROLE=${s.caregiverRole.name}")
         appendLine("$K_PARENT_SITE_URL=${s.parentSiteUrl}")
         appendLine("$K_SHARE_ENABLED=${s.shareEnabled}")
@@ -220,6 +222,8 @@ internal object SettingsCodec {
             routeBaseUrl = values[K_ROUTE_BASE_URL].orEmpty(),
             cameraFovDeg = values[K_CAMERA_FOV]?.toFloatOrNull()?.takeIf { it > 0f }
                 ?: default.cameraFovDeg,
+            glassesFovDeg = values[K_GLASSES_FOV]?.toFloatOrNull()?.takeIf { it > 0f }
+                ?: default.glassesFovDeg,
             maxObjects = ObjectLimits.clamp(
                 values[K_MAX_OBJECTS]?.toIntOrNull() ?: default.maxObjects,
             ),
