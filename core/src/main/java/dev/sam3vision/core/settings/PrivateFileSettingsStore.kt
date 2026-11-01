@@ -128,7 +128,6 @@ internal object SettingsCodec {
     private const val K_CAREGIVER_ROLE = "caregiverRole"
     private const val K_PARENT_SITE_URL = "parentSiteUrl"
     private const val K_SHARE_ENABLED = "shareEnabled"
-    private const val K_GOOGLE_MAPS_API_KEY = "googleMapsApiKey"
     private const val K_SHARE_ID = "shareId"
     private const val K_SHARE_WRITE_KEY = "shareWriteKey"
     private const val K_CAREGIVER_INVITE = "caregiverInvite"
@@ -171,7 +170,6 @@ internal object SettingsCodec {
         appendLine("$K_CAREGIVER_ROLE=${s.caregiverRole.name}")
         appendLine("$K_PARENT_SITE_URL=${s.parentSiteUrl}")
         appendLine("$K_SHARE_ENABLED=${s.shareEnabled}")
-        appendLine("$K_GOOGLE_MAPS_API_KEY=${s.googleMapsApiKey}")
         appendLine("$K_SHARE_ID=${s.shareId}")
         appendLine("$K_SHARE_WRITE_KEY=${s.shareWriteKey}")
         appendLine("$K_CAREGIVER_INVITE=${s.caregiverInvite}")
@@ -252,7 +250,6 @@ internal object SettingsCodec {
         caregiverRole = CaregiverRole.fromName(values[K_CAREGIVER_ROLE]),
         parentSiteUrl = values[K_PARENT_SITE_URL].orEmpty().ifBlank { default.parentSiteUrl },
         shareEnabled = values[K_SHARE_ENABLED]?.toBooleanStrictOrNull() ?: default.shareEnabled,
-        googleMapsApiKey = values[K_GOOGLE_MAPS_API_KEY].orEmpty(),
         shareId = values[K_SHARE_ID].orEmpty().ifBlank { default.shareId },
         shareWriteKey = values[K_SHARE_WRITE_KEY].orEmpty(),
         caregiverInvite = values[K_CAREGIVER_INVITE].orEmpty(),

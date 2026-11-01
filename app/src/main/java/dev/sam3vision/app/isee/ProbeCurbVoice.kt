@@ -16,7 +16,7 @@ import dev.sam3vision.core.distance.DistanceReading
 /**
  * Ligne diagnostique bordure d'une frame (DEBUG seul, tag `CurbVoice`) : nombre de
  * lectures, lectures à label bordure (`label/mètres/bas-de-boîte`), signal lissé
- * (détecté/mètres/palier/bateau), phrase du cue (`null` = muet) et Traversée.
+ * (détecté/mètres/palier), phrase du cue (`null` = muet) et Traversée.
  * Construite au [StringBuilder], appelée sous `BuildConfig.DEBUG` : aucun log ni
  * allocation en release. Pure, testée en JVM.
  */
@@ -37,7 +37,7 @@ internal fun curbVoiceLine(
             .append(reading.box.getOrNull(3))
     }
     return line.append("] signal=").append(signal.detected).append('/').append(signal.meters)
-        .append("m/").append(signal.tier).append("/flat=").append(signal.flatPass)
+        .append("m/").append(signal.tier)
         .append(" phrase=").append(phrase).append(" traversee=").append(crossingActive)
         .toString()
 }
@@ -46,8 +46,7 @@ internal fun curbVoiceLine(
  * Parole bordure : les paliers proches 0,7 / 0,5 m ([CurbTier.NEAR])
  * passent toujours, même en Traversée et même après un stop (une alerte
  * de sécurité ne se tait pour rien) ; la détection et les paliers doux
- * ([CurbTier.FAR]) et le bateau ([CurbTier.NONE]) sont coupés en
- * Traversée. Pure, testée en JVM.
+ * ([CurbTier.FAR]) sont coupés en Traversée. Pure, testée en JVM.
  */
 internal fun shouldSpeakCurb(cue: CurbCue, crossingActive: Boolean): Boolean =
     cue.tier == CurbTier.NEAR || !crossingActive

@@ -351,7 +351,6 @@ internal fun TechnicalSection(
             onStop = onStopVoice,
         )
         DictationSettings(draft) { onChange(it) }
-        GoogleMapsSettings(draft, onChange)
         ParentShareSettings(draft, onStartTracking, onStopTracking) { onChange(it) }
         SettingsActions(draft, llmConfigured, onSave, onTestLlm, onTestSam, onTestAsr)
         GestureHelp(nav.onOpenGestures)

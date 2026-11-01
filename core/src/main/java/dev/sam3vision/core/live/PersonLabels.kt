@@ -24,13 +24,13 @@ object PersonLabels {
 
     /**
      * Corps qui bloquent sans être une personne debout : poussette, fauteuil
-     * roulant, trottinette (canoniques FR/EN). Un enfant n'est pas ici : il
-     * reste une personne ([KEYS]), sa phrase se dit « à l'enfant ».
+     * roulant (canoniques FR/EN — trottinette sortie, spec v4 : plus
+     * détectée). Un enfant n'est pas ici : il reste une personne ([KEYS]),
+     * sa phrase se dit « à l'enfant ».
      */
     private val BODY_KEYS = setOf(
         "stroller", "poussette", "pram", "buggy",
         "wheelchair", "fauteuil roulant",
-        "electric scooter", "scooter", "trottinette",
     )
 
     /** Vrai si [label] (brut, tel que renvoyé par SAM) désigne une personne. */
@@ -40,9 +40,8 @@ object PersonLabels {
     /**
      * Vrai si [label] (brut, tel que renvoyé par SAM) désigne un corps qui
      * bloque la trajectoire : une personne ([isPerson]) **ou** ce qui se
-     * contourne comme elle — poussette, fauteuil roulant, trottinette.
-     * Pluriel toléré (« poussettes », « strollers ») ; label vide ou inconnu
-     * = faux.
+     * contourne comme elle — poussette, fauteuil roulant. Pluriel toléré
+     * (« poussettes », « strollers ») ; label vide ou inconnu = faux.
      */
     fun isBody(label: String): Boolean {
         val key = KnownSizes.canonical(label)
