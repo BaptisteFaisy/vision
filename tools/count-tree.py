@@ -33,15 +33,17 @@ def walk(*subdirs):
     return seen
 
 
+def lines_of(path):
+    """Sauts de ligne d'un fichier : exactement ce que compte `wc -l` (`None` si illisible)."""
+    try:
+        return path.open("rb").read().count(b"\n")
+    except OSError:
+        return None
+
+
 def n_lines(paths):
     """Nombre de sauts de ligne : exactement ce que compte `wc -l`."""
-    total = 0
-    for path in paths:
-        try:
-            total += path.open("rb").read().count(b"\n")
-        except OSError:
-            pass
-    return total
+    return sum(n for n in (lines_of(p) for p in paths) if n is not None)
 
 
 def count_annotation(paths, needle):
@@ -63,9 +65,8 @@ def _under(path, *segments):
 def largest(paths):
     best, best_lines = "", 0
     for path in paths:
-        try:
-            lines = path.open("rb").read().count(b"\n")
-        except OSError:
+        lines = lines_of(path)
+        if lines is None:
             continue
         if lines > best_lines:
             best, best_lines = str(path.relative_to(ROOT)), lines
