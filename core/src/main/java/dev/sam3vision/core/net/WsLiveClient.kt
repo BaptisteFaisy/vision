@@ -1,6 +1,7 @@
 package dev.sam3vision.core.net
 
 import dev.sam3vision.core.mask.base64Bytes
+import dev.sam3vision.core.mask.base64Text
 import dev.sam3vision.core.model.LiveFrame
 import dev.sam3vision.core.model.LiveHealth
 import kotlinx.coroutines.CompletableDeferred
@@ -90,18 +91,60 @@ class WsLiveClient(
         if (binary) {
             val jpeg = base64Bytes(jpegB64)
                 ?: return Result.failure(ApiError.BadResponse(WS_BAD_IMAGE))
-            val bytes = frameMessageBinary(id, jpeg, prompts, workEdge, maxObjects, maskFormat, maskEdge, withDepth, masks)
+            val bytes = binaryFrame(id, jpeg, prompts, workEdge, maxObjects)
             sender = { transport.sendBytes(bytes) }
         } else {
             val message = frameMessage(id, jpegB64, prompts, workEdge, maxObjects)
             sender = { transport.send(message) }
         }
+        val jsonSender: () -> Boolean =
+            { transport.send(frameMessage(id, jpegB64, prompts, workEdge, maxObjects)) }
+        return roundTrip(id, binary, sender, jsonSender)
+    }
+
+    /**
+     * JPEG brut : la trame M1 est assemblée **sans base64** (ni `String` +33 %, ni
+     * décodage) et envoyée d'un seul `sendBytes`, synchrone avant l'attente de la
+     * réponse — aucun tampon applicatif entre l'encodeur et le socket. Le base64
+     * n'est construit qu'en repli (serveur sans binaire : une frame, puis collant).
+     */
+    override suspend fun liveBytes(
+        jpeg: ByteArray,
+        prompts: List<String>?,
+        workEdge: Int,
+        maxObjects: Int,
+    ): Result<LiveFrame> {
+        if (jpeg.isEmpty()) return Result.failure(ApiError.BadResponse(WS_BAD_IMAGE))
+        val id = synchronized(lock) { ++nextId }
+        val binary = synchronized(lock) { binaryWs && !binaryRefused }
+        val sender: () -> Boolean
+        if (binary) {
+            val bytes = binaryFrame(id, jpeg, prompts, workEdge, maxObjects)
+            sender = { transport.sendBytes(bytes) }
+        } else {
+            val message = frameMessage(id, base64Text(jpeg), prompts, workEdge, maxObjects)
+            sender = { transport.send(message) }
+        }
+        // Encodage paresseux : le repli JSON n'a lieu que sur `id: -1`, jamais avant.
+        val jsonSender: () -> Boolean =
+            { transport.send(frameMessage(id, base64Text(jpeg), prompts, workEdge, maxObjects)) }
+        return roundTrip(id, binary, sender, jsonSender)
+    }
+
+    /**
+     * Un aller-retour avec repli : [sender] porte l'encodage (binaire ou texte),
+     * [jsonSender] le renvoi en JSON quand le serveur répond `id: -1` (vieux serveur).
+     */
+    private suspend fun roundTrip(
+        id: Int,
+        binary: Boolean,
+        sender: () -> Boolean,
+        jsonSender: () -> Boolean,
+    ): Result<LiveFrame> {
         return try {
             exchange(id, binary, sender).then { text -> parseReply(text) }
         } catch (e: FallbackToJson) {
-            exchange(id, binary = false) {
-                transport.send(frameMessage(id, jpegB64, prompts, workEdge, maxObjects))
-            }.then { text -> parseReply(text) }
+            exchange(id, binary = false, jsonSender).then { text -> parseReply(text) }
         }
     }
 
@@ -186,6 +229,15 @@ class WsLiveClient(
         workEdge: Int,
         maxObjects: Int,
     ): String = liveFrameJson(jpegB64, prompts, workEdge, maxObjects, id, maskFormat, maskEdge, withDepth, masks)
+
+    /** Trame M1 : les knobs du client appliqués à [frameMessageBinary]. */
+    private fun binaryFrame(
+        id: Int,
+        jpeg: ByteArray,
+        prompts: List<String>?,
+        workEdge: Int,
+        maxObjects: Int,
+    ): ByteArray = frameMessageBinary(id, jpeg, prompts, workEdge, maxObjects, maskFormat, maskEdge, withDepth, masks)
 
     /**
      * Réponse du serveur : même forme que `POST /live`, ou `error` (connexion maintenue).

@@ -79,6 +79,20 @@ object UploadLadder {
     /** Plancher : le palier le plus léger (10,5 Ko sur le fil). */
     val Floor: EncodePlan get() = Tiers.last()
 
+    /**
+     * Échelle proactive (O6) : deux paliers, **un seul saut** — 512 px q65 (le
+     * comportement actuel) puis 320 px q55. Le régulateur sonde [Tiers] palier par
+     * palier (2 frames par palier + gel) ; ici, dès que la part réseau dépasse
+     * [UploadRegulator.FAST_DROP_SHARE_MS], on tombe directement au palier léger,
+     * sans sonde. La remontée reste celle du régulateur (sonde `Heavier` quand le
+     * lien respire) : pas d'oscillation, et le bord ne bouge que sur cette échelle
+     * explicite — jamais sur les paliers qualité seule de la chaîne CameraX.
+     */
+    val FastTiers: List<EncodePlan> = listOf(
+        EncodePlan(512, 65), // 0 : le comportement actuel
+        EncodePlan(320, 55), // 1 : le saut proactif (~12 Ko sur le fil, modèle)
+    )
+
     /** Qualités de la table mesurée, croissantes. */
     private val QUALITIES = intArrayOf(25, 35, 45, 55, 65, 75, 85)
 
@@ -147,6 +161,13 @@ data class UploadStatus(
  *  5. Le gain n'est mesuré que sur des octets réels : au-dessus de 5 Mbit/s, le régulateur
  *     constate que rien ne coûte et **ne change aucun palier** (0 octet économisé).
  *
+ * Descente proactive (O6, opt-in via [fastDropShareMs]) : quand la part réseau
+ * **brute** d'une frame dépasse le seuil (une seule mesure, pas l'EWMA), on saute
+ * directement à [fastDropTier] au lieu de sonder palier par palier — avec
+ * [UploadLadder.FastTiers], 512 px q65 → 320 px q55 **dès 200 ms**, en une frame.
+ * Le gel est respecté (pas de saut juste après un refus) et la remontée reste la
+ * sonde `Heavier` normale : si le lien respirait déjà, on remonte en 2 frames.
+ *
  * Sûre entre threads : appelée depuis un seul fil (celui des réponses du direct).
  */
 class UploadRegulator(
@@ -164,6 +185,13 @@ class UploadRegulator(
     private val framesPerTier: Int = FRAMES_PER_TIER,
     /** Frames d'attente après un palier refusé (le lien a peut-être changé). */
     private val freezeFrames: Int = FREEZE_FRAMES,
+    /**
+     * Descente proactive : part réseau brute (ms) déclenchant le saut direct à
+     * [fastDropTier]. `0` = désactivée (sondes seules, le comportement actuel).
+     */
+    private val fastDropShareMs: Long = 0L,
+    /** Palier cible du saut proactif (le plus léger de l'échelle par défaut). */
+    private val fastDropTier: Int = tiers.lastIndex,
 ) {
 
     /** Ce que le régulateur est en train de tester, s'il teste quelque chose. */
@@ -211,10 +239,12 @@ class UploadRegulator(
         lastShare = share
         wireBytes = onWireBytes.coerceAtLeast(0)
         frames += 1
-        if (probe == Probe.None) {
-            if (frozen > 0) frozen -= 1 else if (frames >= framesPerTier) maybeProbe()
-        } else if (frames >= framesPerTier) {
-            settle()
+        if (!maybeFastDrop(share)) {
+            if (probe == Probe.None) {
+                if (frozen > 0) frozen -= 1 else if (frames >= framesPerTier) maybeProbe()
+            } else if (frames >= framesPerTier) {
+                settle()
+            }
         }
         return UploadStatus(index, plan, shareMs, kbitPerSecond)
     }
@@ -235,6 +265,21 @@ class UploadRegulator(
         wireBytes = 0
         kbitPerSecond = 0
         probes = 0
+    }
+
+    /**
+     * Saut proactif : une seule part brute au-delà du seuil, et on tombe à la cible
+     * sans sonde (vrai = saut fait, les sondes ne tournent pas cette frame-ci).
+     * Jamais pendant une sonde ou un gel, jamais quand on est déjà à la cible ou
+     * plus léger : la décision reste réversible par la sonde `Heavier` normale.
+     */
+    private fun maybeFastDrop(share: Double): Boolean {
+        if (fastDropShareMs <= 0L || probe != Probe.None || frozen > 0) return false
+        val target = fastDropTier.coerceIn(0, tiers.lastIndex)
+        if (share < fastDropShareMs || index >= target) return false
+        index = target
+        frames = 0
+        return true
     }
 
     /** Le lien est-il assez chargé (ou assez libre) pour tenter un autre palier ? */
@@ -300,6 +345,9 @@ class UploadRegulator(
 
         /** Frames d'attente après un palier refusé. */
         const val FREEZE_FRAMES = 6
+
+        /** Part réseau brute déclenchant le saut proactif (O6, opt-in). */
+        const val FAST_DROP_SHARE_MS = 200L
 
         /** Poids de la mesure neuve dans l'EWMA. */
         private const val EWMA = 0.4

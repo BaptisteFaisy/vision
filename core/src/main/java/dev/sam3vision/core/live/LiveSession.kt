@@ -138,12 +138,23 @@ class LiveSession(
      * réponse est **périmée**, elle ne doit ni être publiée (l'écran d'un direct arrêté
      * resterait arrêté) ni compter dans les statistiques de la séance suivante.
      */
-    suspend fun runFrame(jpegB64: String): Result<LiveFrame>? {
+    suspend fun runFrame(jpegB64: String): Result<LiveFrame>? =
+        runGated { client.live(jpegB64, normalizedPrompts, workEdge, maxObjects) }
+
+    /**
+     * Même frame, JPEG **brut** : [LiveClient.liveBytes], sans base64 côté client.
+     * Mêmes règles (créneau, ère, statistiques, régulateur) que [runFrame].
+     */
+    suspend fun runFrameBytes(jpeg: ByteArray): Result<LiveFrame>? =
+        runGated { client.liveBytes(jpeg, normalizedPrompts, workEdge, maxObjects) }
+
+    /** Un envoi sous créneau : l'ère, les statistiques et le régulateur de [runFrame]. */
+    private suspend fun runGated(send: suspend () -> Result<LiveFrame>): Result<LiveFrame>? {
         val era = gate.generation
         if (!gate.tryStart(era)) return null
         val startedAt = clock()
         try {
-            val result = client.live(jpegB64, normalizedPrompts, workEdge, maxObjects)
+            val result = send()
             if (!gate.isCurrent(era)) return null
             result.getOrNull()?.let { frame -> serverStats.record(frame.elapsedMs) }
             stats.record(clock() - startedAt)
