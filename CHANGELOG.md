@@ -42,6 +42,24 @@ livré et ses preuves (tâche, fichiers, chiffres) dans l'arbre.
   `ProximityVoiceQueueTest` 8, `DistanceKalmanTest` 11) ;
   `check-kotlin-limits.py` OK ; `check-voicepack.py` OK ; UBS : 0
   finding (scanner Kotlin indisponible, comme avant).
+## 2026-11-01 — iSee : pictogramme généré armé aussitôt, sans confirmation ni nom (branche `fix/isee-picto-sans-confirmation`)
+
+- **Ordre user** : quand un pictogramme est généré, ne pas demander de le
+  confirmer ni de le nommer, et ne pas l'afficher en premier plan — juste le
+  montrer sur l'image, à l'emplacement de ce qu'il représente.
+- **Fait** : le bouton « Picto » rejoint le chemin direct de « Find the X »
+  (`IseePicto.generateAndArm`) — photo, appel Muse, stockage aussitôt, overlay
+  à l'emplacement dès la frame suivante ; la phase `Review`, le brouillon
+  (`draftPng`/`draftLabel`), `confirmDraft`/`regenerateDraft`/`dismissDraft` et
+  la boîte d'avant-plan `PictoDialog` (relecture + « Generating… ») sont
+  supprimés ; le nom non demandé retombe sur `PictoStore.DEFAULT_LABEL` ;
+  le chip « Picto… » reste le seul témoin pendant la génération ;
+  `PlaceModeOrder`, `IseeState`, `META-IMAGE.md` mis à jour.
+- **Preuve** : `:app:testDebugUnitTest` 1 697 verts (0 échec, 0 sauté :
+  bouton → stockage direct + overlay à l'emplacement, rouge-avant/vert-après
+  constaté sur 2 tests) ; `check-kotlin-limits.py` OK ;
+  `test_check_kotlin_limits` 28/28.
+
 ## 2026-11-01 — iSee : humain imminent = mot seul répété 300 ms (branche `hazard-person-300ms`)
 
 - **Ordre user** : juste « humain, passez à droite / gauche », en
