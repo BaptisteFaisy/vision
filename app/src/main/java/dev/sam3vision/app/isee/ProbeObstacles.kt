@@ -158,8 +158,10 @@ internal fun obstacleFrame(
     val curbCue = if (st.crossingActive && curbSignal.tier != CurbTier.NEAR) null
     else watchers.curb.onSignal(curbSignal, nowMs, lang)?.takeIf { shouldSpeakCurb(it, st.crossingActive) }
     if (BuildConfig.DEBUG) android.util.Log.d("CurbVoice", curbVoiceLine(readings, curbSignal, curbCue?.phrase, st.crossingActive))
+    val hazardSignal = HazardSignal.of(readings, st.width, st.height)
     val hazardCue = if (st.crossingActive) null
-    else watchers.hazard.onSignal(HazardSignal.of(readings, st.width, st.height), nowMs, lang)
+    else watchers.hazard.onSignal(hazardSignal, nowMs, lang)
+    if (BuildConfig.DEBUG) android.util.Log.d("HazardVoice", hazardVoiceLine(readings, hazardSignal, hazardCue?.phrase))
     val wordClip = imminentWordClipId(hazardCue)
     val decision = decideObstacles(vehicleCue, curbCue, hazardCue.takeUnless { wordClip != null })
     val busy: () -> Boolean = { safetyBusy(System.currentTimeMillis(), watchers.lastSafetyMs) }
