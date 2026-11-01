@@ -45,6 +45,7 @@ class LiveClientFactoryTest {
             baseUrl = "https://exemple.invalid",
             timeoutSeconds = 10L,
             withDepth = true,
+            binaryWs = false,
             transportFor = { transport },
         )
 
@@ -82,6 +83,7 @@ class LiveClientFactoryTest {
             maskFormat = "rle",
             maskEdge = 256,
             masks = false,
+            binaryWs = false,
             transportFor = { transport },
         )
 

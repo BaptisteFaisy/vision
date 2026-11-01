@@ -9,7 +9,7 @@ import org.junit.Test
 
 /**
  * Transport WS binaire M1, testé **sans réseau** : contrat d'octets (longueur big-endian,
- * en-tête sans image, JPEG brut), envoi derrière le flag `binaryWs` (défaut OFF = texte)
+ * en-tête sans image, JPEG brut), envoi binaire par défaut (`binaryWs`, opt-out = texte)
  * et repli JSON quand le serveur répond `{"id":-1,"error":…}`.
  */
 class WsLiveBinaryTest {
@@ -62,14 +62,26 @@ class WsLiveBinaryTest {
     }
 
     @Test
-    fun `par defaut la frame part en texte`() = runBlocking {
-        val transport = ContractWsTransport { json -> listOf(NetContract.frameReply(json.getInt("id"))) }
+    fun `par defaut la frame part en binaire`() = runBlocking {
+        val transport = ContractWsTransport()
+            .apply { answerBytesWith { bytes -> listOf(NetContract.frameReply(binaryIdOf(bytes))) } }
         val client = WsLiveClient(base, transport, 1_000, RecordingLiveClient())
 
         client.live("SUVLFw==", null, 640, 4).getOrThrow()
 
+        assertEquals(1, transport.sentBytes.size)
+        assertTrue("aucun texte par défaut", transport.sent.isEmpty())
+    }
+
+    @Test
+    fun `avec binaryWs false la frame part en texte`() = runBlocking {
+        val transport = ContractWsTransport { json -> listOf(NetContract.frameReply(json.getInt("id"))) }
+        val client = WsLiveClient(base, transport, 1_000, RecordingLiveClient(), binaryWs = false)
+
+        client.live("SUVLFw==", null, 640, 4).getOrThrow()
+
         assertEquals(1, transport.sent.size)
-        assertTrue("aucune trame binaire sans le flag", transport.sentBytes.isEmpty())
+        assertTrue("aucune trame binaire en opt-out", transport.sentBytes.isEmpty())
     }
 
     @Test

@@ -8,8 +8,8 @@ import kotlinx.coroutines.withTimeoutOrNull
 import org.json.JSONObject
 
 /**
- * Direct par WebSocket : un message JSON par frame sur `/live/ws`, réponse portant le
- * **même `id`**. Mesuré côté Modal : 50,3 ms en WebSocket contre 81,4 ms en POST, soit
+ * Direct par WebSocket : une trame par frame sur `/live/ws` (binaire M1 par défaut,
+ * JSON en repli), réponse portant le **même `id`**. Mesuré côté Modal : 50,3 ms en WebSocket contre 81,4 ms en POST, soit
  * ~31 ms gagnées par frame.
  *
  * Corrélation : une **file par `id`** (et non une file FIFO) — le serveur peut répondre
@@ -50,12 +50,12 @@ class WsLiveClient(
     private val masks: Boolean = true,
     /**
      * Envoi binaire M1 : JPEG brut (longueur + en-tête + JPEG) au lieu du JSON base64
-     * (−33 % à la montée). `false` par défaut : exige un serveur qui sait lire le
-     * binaire — à activer après son déploiement, jamais avant. Quand le serveur répond
-     * `{"id":-1,"error":…}` (signature d'un serveur sans binaire), la frame repart une
-     * fois en JSON et les suivantes partent directement en texte.
+     * (−33 % à la montée, plus de base64 à l'aller). `true` par défaut : le serveur
+     * déployé lit le binaire. Quand le serveur répond `{"id":-1,"error":…}` (vieux
+     * serveur, ou trame rejetée), la frame repart une fois en JSON et les suivantes
+     * partent directement en texte.
      */
-    private val binaryWs: Boolean = false,
+    private val binaryWs: Boolean = true,
 ) : LiveClient {
 
     private val lock = Any()
