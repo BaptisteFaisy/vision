@@ -70,15 +70,24 @@ class IseeExposureDriver {
  * souvent avant convergence — d'où un aperçu systématiquement surexposé dehors
  * (mesuré le 2026-11-01). Le pompage entre frames, s'il gêne un jour, se
  * réglera par une zone de mesure resserrée, pas par un verrou global.
+ *
+ * [halStages] (décidés par [CameraHalProcessing]) : étages HAL passés à OFF
+ * dans le MÊME appel — `setCaptureRequestOptions` écrase le précédent, deux
+ * appels séparés perdraient ce tuning. Vide = tuning d'avant, inchangé.
  */
 @OptIn(markerClass = [ExperimentalCamera2Interop::class])
-fun applySensorTuning(camera: androidx.camera.core.Camera) {
+fun applySensorTuning(
+    camera: androidx.camera.core.Camera,
+    halStages: Set<CameraHalProcessing.HalStage> = emptySet(),
+) {
     runCatching {
-        val options = CaptureRequestOptions.Builder()
+        val builder = CaptureRequestOptions.Builder()
             .setCaptureRequestOption(CaptureRequest.CONTROL_AE_ANTIBANDING_MODE, CameraMetadata.CONTROL_AE_ANTIBANDING_MODE_50HZ)
             .setCaptureRequestOption(CaptureRequest.CONTROL_AF_MODE, CaptureRequest.CONTROL_AF_MODE_CONTINUOUS_PICTURE)
-            .build()
-        Camera2CameraControl.from(camera.cameraControl).setCaptureRequestOptions(options)
+        for (stage in halStages) {
+            builder.setCaptureRequestOption(CameraHalProcessing.keyOf(stage), CameraHalProcessing.OFF)
+        }
+        Camera2CameraControl.from(camera.cameraControl).setCaptureRequestOptions(builder.build())
     }.onFailure {
         Log.w("sam3vision", "réglage capteur refusé: ${it.message}")
     }
