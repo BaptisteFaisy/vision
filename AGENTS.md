@@ -30,7 +30,11 @@ unique du 26/10.
   `settings.gradle.kts` ni sur le disque).
 - `docs/MASQUES-DEBUG.md` — z-order `AndroidView`/Compose et recette des masques.
 - `docs/LIVE-SPEC.md` — contrat du direct (cité par `core/net/HttpLiveClient.kt:42`).
-- `docs/VOIX-DANGER.md` — voix : guidage doux + « Attention à … », stop seul urgent (ordre 29/10).
+- `docs/VOIX-DANGER.md` — voix spec v4 : échelle dehors 0-12, traversée 100-102, chaîne dedans, écrasement, antirépétition, clips anglais, 10 ordres dictée, listes 16/10.
+- `docs/TRAVERSEE.md` — verdict v4 (« Cross. » / « Don't cross. », voiture uniquement), ordre 100-102, exclusivité.
+- `docs/GUIDAGE-TOUT-DROIT.md` — guidage v4 : GPS (11 + rappel 3), rail trottoir (10), repli (12).
+- `docs/RECETTE-RUE.md` — recette rue v4 (une prise, phrases exactes, checklist).
+- `docs/REVUE-V4.md` — revue des 14 branches v4 : contradictions résiduelles + décisions d'intégration (lire avant de toucher la voix).
 - `docs/ISEE-DESIGN-PORTRAIT.md` — design Portrait de l'écran iSee, obligatoire (§3.12).
 - `server/README.md` + `server/docs/` — backend Modal (direct déployé, Valhalla CPU,
   tracker, legacy) : lire avant de toucher `server/` ou un endpoint.
@@ -53,10 +57,56 @@ là, atteignables depuis les Réglages, section « Other screens »
 | `:core` | domaine + réseau + logique pure JVM (`model, net, mask, distance, settings, live, gesture, predict, audio, usecase`), minSdk 26 |
 | `:app` | Compose + CameraX : écrans, ViewModels, `dev.sam3vision.app`, minSdk **29** (`app/build.gradle.kts:87`) |
 | Direct | **WebSocket `/live/ws`**, une frame en vol : `core/net/WsLiveClient.kt` sur `WsTransport` (`OkHttpWsTransport` en prod, faux JVM en test) |
-| Concepts du direct | **21** par défaut (person, car, bus, bicycle, motorcycle, feux piétons ×2, curb, sidewalk, crosswalk, pole, stairs, keys, gate, boutique ×3, wall, foule ×3), `LivePrompts.MAX = 22` (`core/live/LivePrompts.kt:75-81` (+ `MAX`)) |
-| Tests | **4 809 `@Test`** JVM (`:core` 2 972, `:app` 1 837, relevé du 01/11/2026, voir `docs/TESTING.md`) + 8 instrumentés (`:app` : 7 + 1 banc `MockGlassesTest`) |
-| Taille | **1 215** fichiers `.kt`, **78 831** lignes de prod (`:core` 34 397, `:app` 44 434, mesure du 01/11/2026 par `tools/count-tree.py`) |
+| Concepts du direct | **21** par défaut sur `master` (person, car, bus, bicycle, motorcycle, feux piétons ×2, curb, sidewalk, crosswalk, pole, stairs, keys, gate, boutique ×3, wall, foule ×3), `LivePrompts.MAX = 22` (`core/live/LivePrompts.kt:75-81` (+ `MAX`)) ; **spec v4 (branches `feat/isee-*`, non mergée) : 16 dehors + 10 dedans** (voir § 1 bis) |
+| Tests | **4 795 `@Test`** JVM (`:core` 2 957, `:app` 1 838, relevé du 01/11/2026, voir `docs/TESTING.md`) + 9 instrumentés (`:app` : 8 + 1 banc `MockGlassesTest`) |
+| Taille | **1 224** fichiers `.kt`, **79 608** lignes de prod (`:core` 34 344, `:app` 45 264, mesure du 01/11/2026 par `tools/count-tree.py`) |
 | Versions | JDK Temurin 17.0.21 (par `JAVA_HOME`, hors dépôt) · Gradle 8.14.1 · AGP 8.11.1 · Kotlin 2.2.21 · compileSdk/targetSdk 36 |
+| Spec v4 (branches, non mergée) | voix : échelle 0-12 dehors, 100-102 traversée, chaîne dedans ; clips anglais, zéro réseau sauf chat + GPS ; 10 ordres « mode … », reste = LLM (voir § 1 bis) |
+
+## 1 bis. Spec v4 — résumé (branches `feat/isee-*`, 01/11/2026, non mergée)
+
+Contrats détaillés : `docs/VOIX-DANGER.md` (voix), `docs/TRAVERSEE.md`
+(verdict), `docs/GUIDAGE-TOUT-DROIT.md` (GPS + repli), `docs/RECETTE-RUE.md`
+(recette), `docs/REVUE-V4.md` (contradictions résiduelles — lire avant
+d'intégrer). Ce qui suit est un résumé opposable : en cas de conflit avec
+un doc pré-v4, la v4 gagne.
+
+- **Dehors 0-12** : 0 voitures en mouvement < 20 m (« Car. »/« Cars. »,
+  présence seule) ; 1 parole user (seul 0 la coupe) ; 2 humains < 10 m
+  (phrase + cadran + distance, ≤ 2 m = « Stop. » immédiat) ; 3 rappel GPS
+  (silence ≥ 15 s, consigne + distance restante) ; 4 grillages/murs/
+  barrières < 6 m ; 5 bordures < 6 m ; 6 escaliers (jalons 4/2/1 + marches
+  dites) ; 7 poteaux + mobilier + divers < 6 m ; 8 passages piétons < 6 m
+  (1 fois par vue / au changement / 1 fois) ; 9 chat (attente + reprise,
+  seule file) ; 10 trottoirs ; 11 GPS manœuvres ; 12 repli (silence
+  300 ms → gauche/droite/tout droit).
+- **Écrasement** : le plus petit gagne, l'écrasé jamais redit sauf
+  re-détecté actuel (chat : reprise).
+- **Traversée 100-102** : verdict (rouge ou voiture en mouvement =
+  « Don't cross. », sinon « Cross. », voiture uniquement) > humains >
+  bordures ; dictée active ; chat et GPS muets.
+- **Dedans** : objet cherché (10 : clés, médicaments, lunettes, boîtier,
+  téléphone, chaussures, porte, murs, humain, chaussettes) > parole user >
+  humain > chat > porte et murs ; résultats en clips.
+- **Antirépétition** : voitures 4 s, humains 2 s (imminent immédiat),
+  grillages 4 s, bordures 2 s, escaliers 2 s, poteaux/divers 2 s, passage
+  (1 fois / changement / 1 fois), chat aucune, trottoirs 10 s, GPS aux
+  événements, verdict 3 s + changement immédiat.
+- **Contrats partagés** : `fun VoiceBus.post(level: Int, text: String,
+  clipId: String? = null)` ; `object AntiRepeat` +
+  `fun allow(key: String, nowMs: Long): Boolean`, clés stables
+  (`car-moving`, `human-soft`, `human-imminent`, `gps-reminder`, `fence`,
+  `curb`, `stairs`, `pole`, `misc`, `crosswalk-announce/-align/-arrival`,
+  `sidewalk`, `verdict`).
+- **Interdits v4** : clips anglais uniquement, zéro réseau sauf chat et
+  GPS (ElevenLabs) ; hors-ligne supprimé ; Google Maps supprimé ; bus,
+  vélo, camion, moto, clés dehors, borne, arbre, portail, bateau supprimés
+  de la détection.
+- **Listes SAM** : dehors 16 (`person`, `car`, `pedestrian traffic
+  light`, `curb`, `sidewalk`, `crosswalk`, `pole`, `stairs`, `fence`,
+  `wall`, `barrier`, `sign`, `street lamp`, `animal`, `trash can`,
+  `souvenir shop`) ; dedans 10 (`keys`, `medicine box`, `glasses`,
+  `glasses case`, `phone`, `shoes`, `door`, `wall`, `person`, `socks`).
 
 ## 2. Commandes de vérification (à passer avant chaque push)
 

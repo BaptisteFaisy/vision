@@ -1,189 +1,128 @@
-# Recette — rue : guidage in-app + obstacles + traversée (une prise)
+# Recette — rue : spec v4 (une prise)
 
-Fiche relue dans le **code de cet arbre** (branche
-`integration-isee-outdoor-p1p6`, base `origin/master` `6aaf881`,
-intégration P1–P6).
-⚠️ **Recette non rejouée sur appareil** : aucun téléphone n'était piloté
-d'ici, aucune commande `adb` n'a été lancée. Ce qui suit décrit ce que le
-**code** fait ; le comportement dans la rue reste **non mesuré**.
+Fiche spec v4 (01/11/2026) : l'intégrateur dicte une destination à ~200 m,
+marche, passe les obstacles imposés, et note les phrases exactes entendues.
+Historique pré-v4 : `git show 4a3c2bcf:docs/RECETTE-RUE.md`.
 
-Le script `scripts/verify-street.sh` déroule cette fiche en une prise
-(~15 min) : l'intégrateur dicte une destination à ~200 m, marche, passe
-les obstacles imposés, et le script capture l'observable horodaté
-(phrases exactes entendues, écran, crash) puis rend la checklist remplie.
-Tout le téléphone passe par le verrou `~/bin/phone` (`PHONE_WAIT=0`,
-jamais de force : occupé = on s'arrête, on relance plus tard).
+⚠️ **Recette non rejouée sur appareil** : ce qui suit décrit ce que le
+**code** doit faire ; le comportement dans la rue reste **non mesuré**
+jusqu'à la première prise.
 
-## Ce qui est vrai dans le code aujourd'hui
+## Ce qui est vrai dans le code (après intégration v4)
 
-Chaîne : appui long iSee → dictée → `NavigationHook` (avant le LLM) →
-écran de confirmation (question vocale EN + « Démarrer »/« Annuler ») →
-moteur Valhalla (`VoiceNavEngine` + `VoiceNavEngineDriver`, si
-`routeBaseUrl` est renseignée) → consignes route par la voix Laure
-(`speakRoute`, **même tuyau que les obstacles : jamais deux voix en même
-temps**) ; sinon repli Google Maps piéton (`TravelMode.WALK`) décrit dans
-`docs/RECETTE-NAVIGATION-VOCALE.md`.
+Chaîne : appui long iSee → dictée → routeur « mode … » (10 ordres, § 6 de
+`docs/VOIX-DANGER.md`) → question LLM sinon → moteur Valhalla in-app
+(`VoiceNavEngine` + `VoiceNavEngineDriver`, si `routeBaseUrl` renseignée)
+→ manœuvres (11) et rappels (3) par la voix réseau ElevenLabs ; obstacles
+(0–8, 10, 12) en **clips anglais, zéro réseau**. **Jamais deux voix en
+même temps** (bus vocal : le plus petit niveau gagne, écrasé jeté).
 
-| Étape | Observable promis par le code | Source |
+| Étape | Observable promis | Source |
 |---|---|---|
-| Dictée | « je veux aller à X » consommé avant le LLM, X transmis tel quel | `NavigationIntentParser.kt`, `NavigationRouter.kt` |
-| Confirmation | question « Do you really want to go to X? Travel time: Y. Answer yes or no. », puis « Navigation vers X » au « yes »/« Démarrer » | `VoiceNavPolicy.kt:293-297`, `NavigationAnnouncer.kt:18` |
-| Consigne loin/près | préavis à 100 m (« Continuez dans cette direction[, rue X]. »), ordre sec à 25 m (« Tournez à gauche[, rue X]. », sans distance), une fois chacun (front moteur + signature `ahead`/`now`) | `VoiceNavEngine.kt:7-17,228-241`, `VoiceNavPolicy.kt:113-129,342-350,392-398` |
-| Poteau | « Attention au poteau, à … heure. » ≤ 4 m après 2 frames (1ʳᵉ si ≤ 2 m, urgent sauf P1/P2 — P3), silence 10 s + ré-armement, rattrapage au silence ≤ 3 s | `HazardConcepts.kt:53`, `HazardWatcher.kt:123,179-185`, `ProbePriority.kt:11-32`, `ProximityVoice.flushPending` |
-| Poubelle | position chiffrée (« … à N mètres », 0,90 m sténopé, « poubelle »/« trash can ») et/ou mot de côté « gauche. »/« droite. » (couloir bloqué) | `KnownSizes.kt:70-71`, `Guidance.kt`, `TwinLiteWord` |
-| Benne | position chiffrée (« … à N mètres », 1,50 m sténopé, « benne »/« dumpster ») et/ou mot de côté (couloir bloqué) | `KnownSizes.kt:71`, `Guidance.kt`, `TwinLiteWord` |
-| Panneau bas | position (« … à N mètres », 2,20 m sténopé) et/ou mot de côté ; panneau haut ignoré (filtre tête : centre < 0,22 et mesuré < 4 m) | `KnownSizes.kt:69`, `SignConcepts.kt:30-36,61-66` |
-| Animal | position chiffrée (« chien à N mètres », 0,55 m ; « chat … », 0,25 m ; « animal » générique, 0,60 m) | `KnownSizes.kt:55-57`, `PositionText` |
-| Virage + obstacle | 0 chevauchement : une seule voix, la consigne route se met en file (`Instruction`), le danger coupe (`Danger`), deux phrases de même niveau s'enchaînent ; obstacle non urgent différé tant que la route parle, urgent coupe toujours | `VoiceNavEngineDriver.kt:49-57,200-201`, `SpeechArbitration.kt:18-26,48-49`, `ProximityVoice.kt:42,67`, `IseeVoiceNav.kt:146` |
-| Traversée, préavis | « Passage protégé dans X » (loin), jamais de « tout droit » au bord du trottoir | `VoiceNavPhrases.crossingAhead` (`VoiceNavPolicy.kt:272-275`), `VoiceNavEngine.kt:225-226` |
-| Traversée, rappel proche | le mode s'arme **une seule fois**, sa voix prend le relais (« Mode traversée activé. »), la progression se tait | `VoiceNavEngineDriver.kt:253-263`, `IseeViewModel.kt:231-235` |
-| Traversée, feu | « Vert, traversez. » / « Rouge, attendez. » (binaire depuis le 31/10, fini le doute) | `CrossingText.kt` |
-| Traversée passée | « Traversée terminée. », le mode auto se coupe, le guidage reprend | `VoiceNavPolicy.kt:277-278`, `VoiceNavEngineDriver.kt:266-272` |
-| Arrivée | « Vous êtes arrivé à X » (rayon 20 m), une seule fois, moteur arrêté | `VoiceNavPolicy.kt:261-265`, `VoiceNavEngine.kt:11`, `VoiceNavEngineDriver.kt:223-226` |
-
-Seuils moteur (`VoiceNavEngine.kt:7-17`, `NavTuning`) : annonce loin
-100 m, rappel proche 25 m, arrivée 20 m, validation de manœuvre 12 m. La
-destination à ~200 m fait passer les trois : annonce loin, rappel proche,
-arrivée.
-
-Le « délai annonce < 1 s après confirmation » reprend le seuil déjà
-pratiqué pour le trottoir (`docs/VOIX-DANGER.md` § 4) : la confirmation,
-c'est la 2ᵉ frame (`HazardWatcher`, 1ʳᵉ si poteau ≤ 2 m), le chronomètre part là.
+| Dictée ordre | « mode GPS I want to go to X » consommé avant le LLM, X transmis tel quel ; tout le reste = question LLM | `DictationOrders`, `IseeDictationRouter` |
+| Confirmation | « Guidance started. » (clip `gps_started`) ; indisponible : « Guidance unavailable. » (`gps_unavailable`) | `IseeClipsEn` |
+| Voiture en mouvement | « Car. » / « Cars. » (< 20 m, présence seule, 4 s) | Niveau 0, `car` / `cars` |
+| Humain | « Person. » + cadran + distance (< 10 m, 2 s) ; ≤ 2 m : « Stop. » immédiat | Niveau 2 |
+| Poteau / lampadaire / panneau | « Pole. » / « Street lamp. » / « Sign. » (< 6 m, 2 s) | Niveau 7 |
+| Grillage / mur / barrière | « Fence. » / « Wall. » / « Barrier. » (< 6 m, 4 s) | Niveau 4 |
+| Bordure | « Curb up. » / « Curb down. » (< 6 m, 2 s) | Niveau 5 |
+| Escalier | Jalons « Stairs up/down, 4/2/1 meters. » + marches (« Five. Steps. », 2 s) | Niveau 6 |
+| Animal / poubelle | « Animal. » / « Trash can. » (< 6 m, 2 s) | Niveau 7 divers |
+| Passage piéton | « Crosswalk ahead/left/right. » (1 fois par vue), « Aligned with the crosswalk. » (au changement), « On the crosswalk. » (1 fois) | Niveau 8 |
+| Trottoir | « Sidewalk ahead/on the left/on the right. » (dérive seule, 10 s) | Niveau 10 |
+| Virage + obstacle | 0 chevauchement : manœuvre (11) et obstacle ne parlent jamais l'un sur l'autre (le plus petit gagne, écrasé jeté) | `VoiceBus` |
+| Traversée, préavis | « Crosswalk ahead. » (niveau 8), jamais de « Straight. » au bord | Niveau 8 |
+| Traversée, mode | « Crossing mode on. » (`cross_on`), chat et GPS muets, dictée active | Niveaux 100-102 |
+| Traversée, verdict | « Cross. » / « Don't cross. » (3 s, changement immédiat) | Niveau 100 |
+| Traversée passée | « Crossing mode off. » (`cross_off`), le guidage reprend | Retour dehors |
+| Rappel GPS | Silence ≥ 15 s : dernière consigne + distance restante (synthèse) | Niveau 3 |
+| Repli | Rien à dire + silence 300 ms : « Left. » / « Right. » / « Straight. » | Niveau 12 |
+| Arrivée | Une seule fois, moteur arrêté | Niveau 11 |
+| Interdits | Aucun « Bus… », « Bicycle… », « Motorcycle… », « Truck… » ; aucune clé dehors ; aucune borne, arbre, portail, bateau ; aucun passage par Google Maps ; aucune voix FR hors chat/GPS | Spec v4 § 0 |
 
 ## Prérequis
 
-- Build du HEAD attendu sur origin (`EXPECT_REF`, défaut `master` : `git
-  ls-remote origin $EXPECT_REF` comparé au SHA du build — règle
-  ISEE-TEST-MASTER-SEUL, « HEAD de la ref recettée » ; le script le fait),
-  APK installé
-  sur le Redmi `2c6852ac` **via le verrou** `~/bin/phone`, prise/libération
-  annoncée dans `BOITE-USER.md`.
-- Réglages iSee : clé ElevenLabs + voix renseignées, bascule « Guider vers
-  la destination confirmée » sur oui, bascule « Guider tout droit (caméra
-  iSee) » activée, **URL Valhalla (`routeBaseUrl`) renseignée** (sans elle,
-  pas de guidage in-app : le repli Maps prend le relais).
-- Terrain : **Île-de-France** (tuiles Valhalla), GPS fixé, réseau OK, **de
-  jour** (la traversée ne traite que le jour, `docs/CALIBRAGE-FEU.md` § 9).
-- Backend `/live` déployé et réveillé : `GET /warm` (boot complet 25-38 s à
-  froid après un deploy, restauration snapshot 2-7 s sinon), puis `/health`
-  (leviers `batch_prompts/cuda_graph/edge:512/snapshot/attn:sdpa`,
-  `vision_accel: ok`) — sans boîtes SAM, ni obstacles ni traversée.
-- Parcours repéré à l'avance (~200 m) : un **poteau** dans le couloir, une
-  **poubelle** (ou benne), un **panneau bas**, un **passage piéton sur
-  l'itinéraire** (pour la traversée auto), un animal si possible, et au
-  moins un **virage** avant l'arrivée.
+- Build du HEAD attendu sur origin (`EXPECT_REF`, défaut `master`),
+  APK installé sur le Redmi `2c6852ac` **via le verrou** `~/bin/phone`.
+- Réglages iSee : clé ElevenLabs + voix renseignées, **URL Valhalla
+  (`routeBaseUrl`) renseignée** (sans elle, pas de guidage : pas de repli
+  Maps — « Guidance unavailable. »).
+- Terrain : **Île-de-France** (tuiles Valhalla), GPS fixé, réseau OK (chat
+  + GPS + SAM), **de jour** (la traversée ne traite que le jour).
+- Parcours repéré (~200 m) : une **voiture qui bouge**, un **humain** (dont
+  un passage à ≤ 2 m), un **poteau**, un **mur ou grillage**, une
+  **bordure** (montée + descente), un **escalier** (jalons 4/2/1 audibles),
+  un **passage piéton sur l'itinéraire**, un **virage** avant l'arrivée, et
+  15 s de marche sans obstacle (rappel GPS) + 300 ms de silence (repli).
 
 ## Recette (une prise, ~15 min)
 
-1. **Dictée.** Appui long ≥ 300 ms sur iSee, dicter
-   « je veux aller à X » (X = adresse à ~200 m, notée au procès-verbal),
-   relâcher. Attendu : transcription affichée, pas de crash, pas de
-   question LLM.
-2. **Confirmation.** Attendu : question vocale
-   « Do you really want to go to X? Travel time: … » ; répondre « yes »
-   (ou « Démarrer »). Attendu ensuite : voix « Navigation vers X ».
-3. **Poteau.** Marcher vers X, approcher un poteau dans le couloir (≤ 4 m).
-   Attendu : « Attention au poteau, à … heure. » **< 1 s après
-   confirmation**, éventuellement doublé d'un mot de côté (« gauche. » /
-   « droite. »). Noter la phrase exacte + l'heure. Capture écran.
-4. **Poubelle/benne.** Attendu : position (« … à N mètres », poubelle
-   0,90 m, benne 1,50 m) et/ou mot de côté. Noter la phrase exacte +
-   l'heure + le délai (< 1 s).
-5. **Panneau bas.** Attendu : mot de côté (« gauche. » / « droite. »),
-   éventuellement position (« … à N mètres », 2,20 m) ; un panneau
-   haut (enseigne) ne dit rien (filtre tête). Phrase exacte +
-   heure + délai (< 1 s).
-6. **Animal (facultatif).** Si un chien/chat passe dans le champ :
-   attendu position (« chien à N mètres »). Sinon noter « non
-   rencontré » — l'item reste vide, pas d'échec.
-7. **Virage.** Attendu : préavis (« Continuez dans cette direction[,
-   rue X]. ») puis ordre sec (« Tournez à …[, rue X]. », sans
-   distance) ; **0 chevauchement** : virage et obstacle ne parlent
-   jamais l'un sur l'autre (file ou coupe franche, jamais deux voix ;
-   obstacle non urgent différé pendant la consigne). Capture écran.
-8. **Traversée.** Attendu : préavis « Passage protégé dans … » ; au
-   rappel proche, « Mode traversée activé. » et la progression se tait ;
-   feu (« Vert, traversez. » / « Rouge, attendez. », binaire) ; une fois
-   passé, « Traversée terminée. » puis **retour
-   au libre** (consigne route ou « Tout droit. »). Capture écran.
-9. **Arrivée.** Marcher jusqu'à X. Attendu : « Vous êtes arrivé à X »,
-   une seule fois ; retour iSee : écran d'accueil, pas de crash.
+1. **Dictée ordre.** Appui long ≥ 300 ms, dicter « mode GPS I want to go
+   to X » (X = adresse à ~200 m). Attendu : « Guidance started. », pas de
+   crash, pas de question LLM. Contre-essai : « je veux aller à X » (sans
+   « mode ») → question LLM, pas de guidage.
+2. **Voiture.** Une voiture bouge à < 20 m. Attendu : « Car. » (ou « Cars. »
+   si plusieurs), sans cadran ni distance, pas plus d'une fois toutes les
+   4 s. Une voiture garée ne dit rien.
+3. **Humain.** Approcher une personne. Attendu : « Person. » + heure du
+   cadran + distance, pas plus d'une fois toutes les 2 s. À ≤ 2 m :
+   « Stop. » immédiat, même si les 2 s ne sont pas écoulées.
+4. **Mobilier.** Poteau, lampadaire, panneau, grillage, mur, barrière à
+   < 6 m. Attendu : le nom seul (« Pole. », « Wall. », …), 2 s (poteaux et
+   mobilier) / 4 s (grillages, murs, barrières).
+5. **Bordures.** Montée puis descente. Attendu : « Curb up. » /
+   « Curb down. », 2 s.
+6. **Escalier.** Marcher vers un escalier. Attendu : jalons à 4 m, 2 m,
+   1 m (« Stairs up, 4 meters. », …) + nombre de marches (« Five. Steps. »).
+7. **Passage piéton.** Attendu : annonce 1 fois par vue, alignement au
+   changement seul, arrivée 1 fois. Noter tout doublon.
+8. **Virage.** Attendu : manœuvre parlée (synthèse) ; **0 chevauchement**
+   avec un obstacle (coupe franche, jamais deux voix). Capture écran.
+9. **Traversée.** Dire « mode crossing on ». Attendu : « Crossing mode on. »,
+   verdict (« Cross. » / « Don't cross. », 3 s, changement immédiat),
+   humains (101) puis bordures (102) après le verdict, **chat et GPS muets**.
+   Passé : « mode crossing off », retour au libre. Capture écran.
+10. **Rappel GPS.** 15 s de marche sans annonce. Attendu : dernière consigne
+    répétée + distance restante (synthèse).
+11. **Repli.** 300 ms de silence sans rien à dire. Attendu : « Left. » /
+    « Right. » / « Straight. » (clips), une fois.
+12. **Arrivée.** Marcher jusqu'à X. Attendu : arrivée une seule fois ;
+    retour iSee : écran d'accueil, pas de crash.
 
-Chaque point : noter le SHA du build, l'heure, et l'observable (phrase
-exacte entendue + texte écran). Le script horodate et range tout dans le
-procès-verbal. Tout écart au tableau ci-dessus part en **issue GitHub**,
-pas en commentaire.
+Chaque point : SHA du build, heure, phrase exacte entendue + texte écran.
+Tout écart au tableau part en **issue GitHub**, pas en commentaire.
 
-## Checklist vierge (une ligne par item : observable + SHA + verdict)
+## Checklist vierge
 
-| # | Observable | SHA build | Heure | Verdict |
+| # | Observable | SHA | Heure | Verdict |
 |---|---|---|---|---|
-| 1 | Transcription de « je veux aller à X » affichée, pas de crash | | | |
-| 2 | « Navigation vers X » entendue après « yes »/« Démarrer » | | | |
-| 3 | « Attention au poteau, à … heure. », phrase exacte : … | | | |
-| 3b | Délai poteau < 1 s après confirmation | | | |
-| 4 | Poubelle/benne, phrase exacte : … | | | |
-| 4b | Délai poubelle/benne < 1 s après confirmation | | | |
-| 5 | Panneau bas, phrase exacte : … | | | |
-| 5b | Délai panneau < 1 s après confirmation | | | |
-| 6 | Animal, phrase exacte (ou « non rencontré ») : … | | | |
-| 7 | Consigne + rappel de virage, phrases exactes : … | | | |
-| 7b | 0 chevauchement virage/obstacle (jamais deux voix) | | | |
-| 8 | « Passage protégé dans … » au préavis | | | |
-| 8b | « Mode traversée activé. » au rappel proche, progression tue | | | |
-| 8c | Feu, phrase exacte : … | | | |
-| 8d | « Traversée terminée. » puis retour au libre | | | |
-| 9 | « Vous êtes arrivé à X », une seule fois, pas de crash | | | |
+| 1 | « Guidance started. » après « mode GPS… » ; sans « mode » → LLM | | | |
+| 2 | « Car. » / « Cars. », présence seule, 4 s ; garée = silence | | | |
+| 3 | « Person. » + cadran + distance, 2 s ; ≤ 2 m → « Stop. » immédiat | | | |
+| 4 | « Pole./Lamp./Sign. » 2 s ; « Fence./Wall./Barrier. » 4 s | | | |
+| 5 | « Curb up./down. », 2 s | | | |
+| 6 | Jalons 4/2/1 + marches dites | | | |
+| 7 | Passage : 1 fois par vue / au changement / 1 fois, sans doublon | | | |
+| 8 | Manœuvre + 0 chevauchement obstacle | | | |
+| 9 | « Crossing mode on. », verdict 3 s + immédiat, chat/GPS muets | | | |
+| 10 | Rappel 15 s : consigne + distance restante | | | |
+| 11 | Repli 300 ms : Left/Right/Straight, une fois | | | |
+| 12 | Arrivée une seule fois, pas de crash | | | |
+| 13 | Interdits : 0 bus/vélo/camion/moto, 0 clés dehors, 0 Maps, 0 FR hors chat/GPS | | | |
 
 ## Première prise
 
-**Non rejouée** : pas d'appareil piloté d'ici (`adb devices` vide,
-verrou `~/bin/phone` absent de cette machine). La checklist ci-dessus
-est prête ; la première prise l'archive (procès-verbal +
-`shot-*.png` du script) et remplit chaque verdict — aucun n'est
-pré-rempli ici. Protocole à rejouer après tout changement build/deploy (clés,
-`network_security`, deploy GPU) : §7 (0 chevauchement) et §8 (traversée) au
-minimum, budget serveur (`/warm` + `/health`) inclus.
-
-## Ce qui est vérifié sans appareil (tests JVM)
-
-Comptés sur cet arbre (`@Test` par fichier) :
-
-- `core/.../nav/VoiceNavEngineTest` (**6**) : fronts loin/près,
-  traversée, écart, arrivée ; `VoiceNavCrossingTest` (**3**),
-  `CrossingManeuverTest` (**4**).
-- `core/.../hazard/HazardConceptsTest` (**6** : « au poteau » reconnu, `isPole`),
-  `HazardWatchTest` (**14** : 2 frames, cooldown 10 s, douceur, poteau 4 m + imminent + ré-armement).
-- `core/.../live/GuidanceWordTest` (**6**), `TwinLiteWordTest` (**9**),
-  `GuidanceAnnouncerTest` (**18**, arbitrage une seule voix),
-  `PositionTextTest` (**14**, cadran + distances).
-- `app/.../speech/VoiceNavPhrasesTest` (**10**, phrases exactes),
-  `VoiceNavPolicyTest` (**29**, seuil 25 m + signatures `ahead`/`now`),
-  `SpeechArbitrationTest` (**6**, file/coupe), `VoiceNavSpeakerTest`
-  (**15**) ; `app/.../voicenav/VoiceNavEngineDriverTest` (**4**,
-  relais traversée), `VoiceNavSessionTest` (**26**, confirmation).
-- `core/.../live/SignConceptsTest` (**10**, filtre tête + composés
-  backend), `LivePromptsTest` (**13**, presets + mondes),
-  `core/.../settings/OutdoorModeTest` (**4**, bascule persistée).
-- `bash scripts/test_scripts.sh` : hygiène du script (usage, gardes,
-  verrou, phrases présentes aux § 4 et § 8) sans appareil ni Gradle.
+**Non rejouée** : pas d'appareil piloté d'ici. La checklist ci-dessus est
+prête ; la première prise l'archive (procès-verbal + captures) et remplit
+chaque verdict — aucun n'est pré-rempli ici.
 
 ## Non mesuré (à ne pas vendre comme vérifié)
 
-- **La recette n'a pas été rejouée sur appareil** : non mesuré.
-- Phrases « Attention … », mots de côté, consignes de virage réellement
-  entendus dans la rue, dans le bon ordre, sans chevauchement : non mesuré
-  (exige le téléphone + la marche).
-- Délai annonce < 1 s après confirmation : non mesuré (chronomètre de
-  l'intégrateur, § Recette).
-- Relais traversée au rappel proche sur un vrai passage piéton
-  (« Mode traversée activé. », feu lu, « Traversée terminée. », retour au
-  libre) : couvert en JVM (`VoiceNavEngineDriverTest`,
-  `VoiceNavCrossingTest`), non rejoué sur appareil.
-- Comportement benne (position chiffrée 1,50 m + prudence) et animal :
-  non mesuré.
-- Filtre tête des panneaux (enseignes tues, panneaux bas gardés) :
-  couvert en JVM (`SignConceptsTest`), seuils non calibrés au
-  téléphone (corpus `VOIX-DANGER.md` § 14 vides).
-- Repli Maps quand Valhalla est injoignable pendant la marche : couvert
-  par la fiche navigation vocale, pas rejoué ici.
+- La recette n'a pas été rejouée sur appareil : non mesuré.
+- Phrases réellement entendues dans la rue, dans le bon ordre, sans
+  chevauchement : non mesuré (exige le téléphone + la marche).
+- Jalons escaliers 4/2/1 audibles aux bonnes distances : non mesuré
+  (profondeur à valider dehors).
+- Repli 300 ms : non mesuré — et **non implémenté** (constante seule,
+  voir `docs/REVUE-V4.md` R-12) : la recette échouera sur ce point
+  jusqu'à son implémentation.
