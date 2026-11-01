@@ -73,9 +73,10 @@ class SeuilsDehorsV4Test {
     }
 
     @Test
-    fun `humain a 10m parle, au dela silence`() {
+    fun `humain a 10m parle, palier loin jusqu'a 15m, au dela silence`() {
         assertTrue(HazardSignal.of(listOf(centered("person", 10f)), 512, 1138).detected)
-        assertFalse(HazardSignal.of(listOf(centered("person", 10.5f)), 512, 1138).detected)
+        assertTrue(HazardSignal.of(listOf(centered("person", 15f)), 512, 1138).detected)
+        assertFalse(HazardSignal.of(listOf(centered("person", 15.5f)), 512, 1138).detected)
     }
 
     @Test
@@ -128,8 +129,14 @@ class SeuilsDehorsV4Test {
     @Test
     fun `mobilier au dela de 6m silence, a 6m parle`() {
         assertFalse(HazardSignal.of(listOf(centered("barrier", 6.5f)), 512, 1138).detected)
-        assertFalse(HazardSignal.of(listOf(centered("pole", 6.1f)), 512, 1138).detected)
         assertTrue(HazardSignal.of(listOf(centered("barrier", 6f)), 512, 1138).detected)
+    }
+
+    @Test
+    fun `poteau palier loin jusqu'a 15m, au dela silence`() {
+        assertTrue(HazardSignal.of(listOf(centered("pole", 6.1f)), 512, 1138).detected)
+        assertTrue(HazardSignal.of(listOf(centered("pole", 15f)), 512, 1138).detected)
+        assertFalse(HazardSignal.of(listOf(centered("pole", 15.5f)), 512, 1138).detected)
     }
 
     @Test
