@@ -26,9 +26,10 @@ import dev.sam3vision.core.nav.NavFix
 import dev.sam3vision.core.nav.NavRoute
 
 /**
- * Le guidage GPS sur l'accueil iSee, sous la caméra : carte (tracé +
- * position, repli schéma si les tuiles échouent), instruction en cours
- * et reste du trajet. La boule et la phrase en cours s'effacent pendant
+ * Le guidage GPS sur l'accueil iSee, sous la caméra : carte réduite
+ * (tracé + position, repli schéma si les tuiles échouent) et instruction
+ * en cours, sans le reste du trajet (ni km ni temps). La boule et la
+ * phrase en cours s'effacent pendant
  * le guidage (la carte prend leur place), la caméra et la sonde
  * continuent (évitement d'obstacles préservé). L'arrêt se fait à la
  * voix (« arrête le guidage »).
@@ -48,14 +49,14 @@ internal fun IseeGuidanceBlock(
         GuidanceMapCard(
             snapshot,
             state.update,
-            Modifier.fillMaxWidth().height(200.dp),
+            Modifier.fillMaxWidth().height(160.dp),
             showAttribution = false,
         )
         GuidanceInstruction(state)
     }
 }
 
-/** Instruction en cours + reste, en grand et encre Portrait (jamais des zéros). */
+/** Instruction en cours, en grand et encre Portrait (sans le reste : ni km ni temps). */
 @Composable
 private fun GuidanceInstruction(state: VoiceNavUiState.Guiding) {
     Text(
@@ -67,22 +68,7 @@ private fun GuidanceInstruction(state: VoiceNavUiState.Guiding) {
         maxLines = 2,
         overflow = TextOverflow.Ellipsis,
     )
-    Text(
-        remainingLine(state),
-        color = Color(IseePortrait.SUB),
-        fontSize = 14.sp,
-        maxLines = 1,
-        overflow = TextOverflow.Ellipsis,
-    )
 }
-
-/** « In 50 m · 2.4 km left · 12 min », ou « calcul en cours » sans résumé. */
-private fun remainingLine(state: VoiceNavUiState.Guiding): String =
-    if (state.summary == null && !state.update.arrived) {
-        "Calculating the route…"
-    } else {
-        "${state.update.maneuver()} · ${state.update.remaining()}"
-    }
 
 /**
  * Sous la caméra : la navigation quand elle a un objectif (calcul
