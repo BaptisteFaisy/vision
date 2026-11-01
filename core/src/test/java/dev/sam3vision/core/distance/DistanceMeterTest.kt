@@ -274,4 +274,45 @@ class DistanceMeterTest {
         assertTrue("une boîte redressée plus petite éloigne", corrected.rawMeters > plain.rawMeters)
         assertEquals(box(200f), corrected.box)
     }
+
+    @Test
+    fun `bordure collee au bas avec pose est mesuree par le sol`() {
+        val meter = DistanceMeter()
+        meter.pose = CameraPose(1.5f)
+        val box = listOf(100f, 300f, 400f, 384f)
+        assertTrue(Pinhole.isVerticallyCut(box, 384))
+        val reading = meter.measure(512, 384, listOf(detection("curb", box))).firstOrNull()
+        assertNotNull(reading)
+        // voie sol pure : curb n'a pas de hauteur stenope, la mesure vient des pieds
+        val focal = LensSpec.Default.focalPx(512, 384)
+        val (_, principalY) = LensSpec.Default.principalPx(512, 384)
+        val expected = GroundPlane.forwardMeters(384f, CameraPose(1.5f), focal, principalY, 384)!!
+        assertEquals(expected, reading!!.rawMeters, 0.001f)
+    }
+
+    @Test
+    fun `bordure collee au bas sans pose ne mesure rien`() {
+        val meter = DistanceMeter()
+        val box = listOf(100f, 300f, 400f, 384f)
+        // sans pose ni hauteur de classe : fail-closed, aucune invention
+        assertTrue(meter.measure(512, 384, listOf(detection("curb", box))).isEmpty())
+        assertTrue(meter.measure(512, 384, listOf(detection("sidewalk", box))).isEmpty())
+    }
+
+    @Test
+    fun `boite coupee avec pose mesure le sol, stenope ecarte`() {
+        val meter = DistanceMeter()
+        meter.pose = CameraPose(1.5f)
+        val box = listOf(100f, 200f, 200f, 384f)
+        assertTrue(Pinhole.isVerticallyCut(box, 384))
+        val reading = meter.measure(512, 384, listOf(detection("personne", box))).firstOrNull()
+        assertNotNull(reading)
+        val focal = LensSpec.Default.focalPx(512, 384)
+        val (_, principalY) = LensSpec.Default.principalPx(512, 384)
+        val ground = GroundPlane.forwardMeters(384f, CameraPose(1.5f), focal, principalY, 384)!!
+        val pinhole = Pinhole.distanceMeters(box, 1.70f, focal)!!
+        // le stenope verrait un autre chiffre (hauteur faussee) : la lecture suit le sol seul
+        assertTrue(kotlin.math.abs(pinhole - ground) > 0.1f)
+        assertEquals(ground, reading!!.rawMeters, 0.001f)
+    }
 }

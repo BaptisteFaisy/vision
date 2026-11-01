@@ -5,7 +5,6 @@ import dev.sam3vision.app.BuildConfig
 import dev.sam3vision.app.debugModelsLine
 import dev.sam3vision.app.live.chosenLens
 import dev.sam3vision.app.speech.VoicePack
-import dev.sam3vision.core.curb.CurbCue
 import dev.sam3vision.core.curb.CurbSignal
 import dev.sam3vision.core.curb.CurbTier
 import dev.sam3vision.core.curb.CurbWatcher
@@ -275,6 +274,9 @@ internal fun obstacleFrame(
     val hazardCue = if (st.crossingActive) null
     else watchers.hazard.onSignal(HazardSignal.of(readings, st.width, st.height), nowMs, lang)
     val decision = decideObstacles(vehicleCue, curbCue, hazardCue)
+    if (BuildConfig.DEBUG) {
+        android.util.Log.d("CurbVoice", curbVoiceLine(readings, curbSignal, curbCue?.phrase, st.crossingActive))
+    }
     decision.safety?.let {
         safety.speak(it)
         watchers.lastSafetyMs = nowMs
@@ -287,16 +289,6 @@ internal fun obstacleFrame(
         scope.launch { softSpeech.withLock { voice.flushPending(playerIdle(), busy) } }
     }
 }
-
-/**
- * Parole bordure : les paliers proches 0,7 / 0,5 m ([CurbTier.NEAR])
- * passent toujours, même en Traversée et même après un stop (une alerte
- * de sécurité ne se tait pour rien) ; la détection et les paliers doux
- * ([CurbTier.FAR]) et le bateau ([CurbTier.NONE]) sont coupés en
- * Traversée. Pure, testée en JVM.
- */
-internal fun shouldSpeakCurb(cue: CurbCue, crossingActive: Boolean): Boolean =
-    cue.tier == CurbTier.NEAR || !crossingActive
 
 /**
  * Guetteur grillage de la sonde, miroir du mobilier : les pans suivis
