@@ -158,6 +158,12 @@ jobs:
       - name: Garde du design Portrait (quarantaine ancien design)
         run: python3 tools/check-isee-design.py
 
+      # Le pack voix colle au code et au catalogue (docs/VOICEPACK.md) : textes
+      # présents dans le Kotlin, MP3 attendus non vides, aucun surplus sur le
+      # disque, vp_voice.txt = LAURE_VOICE_ID. Secondes, stdlib, aucun réseau.
+      - name: Garde du pack voix (catalogue ↔ code ↔ MP3)
+        run: python3 tools/check-voicepack.py
+
       # Porte anti-dérive du budget de latence : un chiffre publié dans
       # docs/LATENCE-BUDGET.md doit être celui du code (voir la lane L23).
       # Quelques secondes, aucune compilation ; le document est écrit par la
