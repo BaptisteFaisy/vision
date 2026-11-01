@@ -3,6 +3,27 @@
 Le journal part du 2026-10-26 après 19 h : le commit de départ, puis une entrée par fait
 livré et ses preuves (tâche, fichiers, chiffres) dans l'arbre.
 
+## 2026-11-01 — voix : audit du pack, tous les MP3 sont bien en voix Laure (branche `feat/audit-voix-pack`)
+
+- **Demande** : « je veux que tous les mp3 enregistrés soient avec la voix de
+  Laure ElevenLabs, et si c'est pas le cas refait les ». Le garde existant ne
+  prouvait que l'existence des fichiers et le stamp `vp_voice.txt` — pas la
+  voix.
+- **Fait** : `tools/check-voicepack-voice.py` (outil manuel, hors CI : réseau +
+  clé + numpy + ffmpeg) synthétise chaque entrée du catalogue avec la voix du
+  pack et compare **par le son** (profil d'énergie 24 bandes log-espacées
+  80 Hz–7 kHz, cosinus, + F0 médiane). Seuil 0,980, calibré sur ce pack : Laure
+  vs Laure 0,987–0,999, Laure vs Rachel 0,938–0,953.
+- **Résultat** : **214/214 fichiers au-dessus du seuil**, 0 sous le seuil, 0 en
+  erreur — les 213 `vp_*.mp3` **et** `intro_isee.mp3` (0,999, modèle
+  `eleven_v3` comme à sa génération). Le moins ressemblant :
+  `vehicle_scooter_moving_en` 0,987, loin devant le plafond d'une autre voix.
+  **Aucun MP3 à régénérer.** Rapport + références : `~/voix-audit-20261101/`.
+- **Preuve** : le script sort 0 sur le pack complet ; `check-voicepack.py`,
+  `check-kotlin-limits.py` et `scripts/test_scripts.sh` inchangés (aucun code
+  Kotlin touché). Doc : `docs/VOICEPACK.md`, section « Vérifier que le pack est
+  bien en voix Laure ».
+
 ## 2026-11-01 — iSee : cycles sans heure, et mouvements joués en mp3 enregistré (branche `fix/mouvement-clip-mp3`)
 
 - **Fait** : suite de l'ordre du 01/11 (« ne me dis plus l'emplacement de la

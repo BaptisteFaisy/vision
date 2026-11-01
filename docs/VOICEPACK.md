@@ -37,6 +37,43 @@ ne colle pas à la voix réglée). `--regenerate` régénère tout.
 chaque MP3 existe et pèse > 0, `vp_voice.txt` = `LAURE_VOICE_ID`.
 `--allow-missing` pour les branches qui codent avant de générer.
 
+## Vérifier que le pack est bien en voix Laure (ordre user du 01/11)
+
+Le garde CI (`check-voicepack.py`) prouve que le catalogue colle au code et que
+les MP3 existent — **pas** que c'est Laure qui parle dedans. `vp_voice.txt` est
+une déclaration, pas une preuve : un clip régénéré avec une autre voix, ou
+ajouté à la main, garderait le bon stamp.
+
+`tools/check-voicepack-voice.py` le vérifie **par le son** : pour chaque entrée
+du catalogue il synthétise le même texte en voix du pack, puis compare les deux
+sons — profil d'énergie sur 24 bandes log-espacées (80 Hz – 7 kHz), normalisé
+et comparé en cosinus, plus la F0 médiane. Calibré sur ce pack le 01/11 :
+
+| Comparaison | Similarité |
+| --- | --- |
+| Laure vs Laure (même texte, régénéré) | **0,987 – 0,999** |
+| Laure vs Rachel (autre voix, même texte) | 0,938 – 0,953 |
+
+Seuil par défaut 0,980 ; tout fichier dessous est listé « À REFAIRE » et le
+script sort en erreur (1). Outil **manuel** (réseau + clé + numpy + ffmpeg),
+hors CI — la clé ne passe que par l'environnement :
+
+```bash
+ELEVENLABS_API_KEY=… python3 tools/check-voicepack-voice.py            # pack entier
+ELEVENLABS_API_KEY=… python3 tools/check-voicepack-voice.py --intro    # + intro_isee.mp3 (v3)
+ELEVENLABS_API_KEY=… python3 tools/check-voicepack-voice.py --id nav_left --limit 5
+```
+
+Réparer un fichier signalé : `ELEVENLABS_API_KEY=… python3
+tools/gen-voicepack.py --regenerate` (tout) ou supprimer le MP3 puis relancer
+`gen-voicepack.py` sans `--regenerate` (lui seul).
+
+Audit du 01/11 (demande user « je veux que tous les mp3 soient avec la voix de
+Laure, sinon refais-les ») : **214/214 fichiers au-dessus du seuil** (le plus
+bas : `vehicle_scooter_moving_en` 0,987), dont `intro_isee.mp3` (0,999, modèle
+`eleven_v3` comme à sa génération). Rien à régénérer. Rapport et références :
+`~/voix-audit-20261101/`.
+
 ## Ce qui n'est jamais un clip
 
 Les phrases qui portent une **mesure** ou un **compte** restent en synthèse :
