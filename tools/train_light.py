@@ -31,6 +31,11 @@ MIN_SAMPLES, MIN_PER_CLASS = 50, 10
 PRECISION_FLOOR = 0.98
 SEED = 42
 
+# Protocole 01/11 : arbre sur les 17 traits, profondeur 5, feuille min 5,
+# seed 42 — la souche `green_frac` embarquee en est le produit (lot
+# lotfinal + fig_243). Les variantes ecartees (exclusions de traits,
+# feuille 2, echantillons epingles) sont narrees en PR, pas conservees ici.
+
 # Socle de surete (verdicts complets, cf. test_train_light.ANCHORS) : 20 verts
 # admis (bonhommes + pose large + 2 disques elances), 11 rouges (rouges +
 # 2 disques ronds + 4 tel). 01/11 : widepose/close_183/st_c01 passent en

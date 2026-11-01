@@ -66,7 +66,7 @@ object CrossingFeatures {
             }
         }
 
-        /** Vecteur de traits normalisé ([total] = pixels du crop, saturés ou non). */
+        /** Vecteur de traits normalisé ([total] = pixels du crop, retenus ou non). */
         fun toFeatures(total: Int): FloatArray {
             val out = FloatArray(COUNT)
             val n = total.toFloat()
