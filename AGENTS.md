@@ -188,6 +188,14 @@ au premier échec, en nommant le coupable.
   copie manuelle diverge en silence (fichiers oubliés, doublons sous un autre
   nom) et la CI ne la voit pas. Passer par `git merge`, `git cherry-pick` ou
   `git checkout <branche> -- <chemin>`, qui gardent la traçabilité.
+- **La branche part à jour** : `git push` rebase d'abord sur `origin/master`
+  (`tools/hooks/pre-push`, installé une fois par `tools/install-hooks.sh`).
+  Mesuré le 01/11 : ~11 ms quand la branche est à jour, ~250 ms pour 400 commits
+  de retard ; 24 % des PR arrivaient avec une base périmée et la moitié finissait
+  chez l'agent de conflit (`docs/CI-QUEUE.md` § 5.2). Si le rebase conflicte, le
+  push est refusé : on résout **tout de suite**, dans son contexte. Jamais de
+  rebase d'un push forcé, de `master` ou d'une branche `mergify/*`. Dépannage :
+  `VISION_NO_FRESH_PUSH=1 git push …`.
 - Un worktree partagé qui sert de référence (miroir de build, arbre
   d'orchestration) n'est jamais un arbre d'édition : il reste sur `master`
   propre, tout le reste vit dans des worktrees dédiés.

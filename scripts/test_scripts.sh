@@ -360,6 +360,13 @@ run python3 "$REPLAY" --bogus
 expect_status 2 'route-replay --bogus sort 2'
 expect_grep 'argument inconnu' 'route-replay nomme l argument inconnu'
 
+# --- 12. hooks git : la branche part à jour --------------------------------
+# Le détail (et les mesures) est dans tools/test-hooks.sh : hook pre-push et
+# installeur, sur des dépôts synthétiques, sans réseau.
+echo "== 12. tools/test-hooks.sh =="
+run bash "${ROOT}/tools/test-hooks.sh"
+expect_status 0 'hooks git : branche à jour, conflit bloqué, push forcé épargné'
+
 # --- bilan -----------------------------------------------------------------
 printf '\n%s tests : %s ok, %s KO\n' "$((PASS + FAIL))" "$PASS" "$FAIL"
 (( FAIL == 0 )) || exit 1

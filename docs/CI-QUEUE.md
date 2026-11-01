@@ -251,6 +251,40 @@ pause », exit 0) au lieu d'échouer — file à l'arrêt jusqu'à sa (re)créat
 Une branche en retard sur `master` reste verte : c'est le rebase du balayeur (état `BEHIND`) qui
 la met à jour, sans check bloquant.
 
+### 5.2 Le conflit ne se répare pas, il s'évite (côté auteur)
+
+Mesure du 01/11/2026 (`python3 tools/pr-conflits.py`, 250 PR fusionnées) : ce n'est
+pas la taille du diff qui fait le conflit, c'est le **temps d'exposition** à
+`master`.
+
+| commits de `master` traversés pendant la vie de la PR | conflits |
+|---|---|
+| 0 – 5 | 4 % (7/177) |
+| 5 – 20 | 14 % (8/57) |
+| 20 – 60 | 13 % (2/15) |
+
+Avec ~300 commits par jour (~12/h), une PR qui vit plus d'une heure est déjà dans
+la zone rouge. En 4 h de balayage, **24 % des PR (10/42) sont arrivées avec une base
+périmée** : le balayeur a dû les rebaser, et la moitié a fini chez
+`conflict_agent.py` — ≈15 min de boucle LLM plus un passage de CI complet.
+
+D'où `tools/hooks/pre-push` (installé une fois par `tools/install-hooks.sh`) : la
+branche est rebasée sur `origin/master` **avant** le push.
+
+- coût mesuré : ~11 ms quand la branche est à jour, ~250 ms pour 400 commits de
+  retard (`bash tools/test-hooks.sh` rejoue les six cas sur des dépôts synthétiques) ;
+- si le rebase conflicte, le push est **refusé** : l'auteur résout tout de suite,
+  dans son contexte, au lieu de laisser le balayeur payer une boucle LLM ;
+- jamais de rebase d'un push forcé (le bail du balayeur et de `conflict_agent.py`
+  reste intact), jamais sur `master` ni sur `mergify/merge-queue/*` ;
+- une branche non linéaire (`master` mergé au lieu d'être rebasé) est remise à plat
+  du même geste — c'est le `GITHUB_REBASE_MERGE_REFUSED` que le balayeur devait
+  rattraper ;
+- dépannage : `VISION_NO_FRESH_PUSH=1 git push …`.
+
+Le hook ne remplace aucun filet : le balayeur continue de rebaser les PR `BEHIND`
+et `conflict_agent.py` reste la dernière porte pour ce qui a échappé au push.
+
 ## 6. Ce qui n'est pas dans ce dépôt
 
 - Aucun gate LLM ni service de revue externe : la seule porte est la CI décrite ci-dessus.
