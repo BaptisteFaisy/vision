@@ -43,19 +43,19 @@ class ProbeEnsureConceptTest {
 
     @Test
     fun `defauts exterieur au plafond, find the x remplace le dernier`() = runTest {
-        // Liste unique normal/Traversée (30/10) : 22 concepts depuis l'ordre
-        // user du 01/11 (boutique + foule), au plafond — « Find the X » dehors
-        // fait sortir le 22e (« dog ») puis reconfigure : sans ça iSee dit
-        // « Looking for … » puis reste muet.
+        // Liste unique normal/Traversée (30/10). Depuis « vire … » (ordre user
+        // du 01/11) le défaut ne fait plus que 17 concepts : « Find the X »
+        // dehors **ajoute** sans évincer (plafond 22), puis reconfigure —
+        // sans ça iSee dit « Looking for … » puis reste muet.
         val (probe, fake) = probeHarness(this)
         val closed = fake.closed
         probe.ensureConcept(Settings.Default, "wallet")
         advanceUntilIdle()
         assertTrue(fake.closed > closed)
         val sent = probe.state.value.conceptsSent
-        assertEquals(22, sent.size)
+        assertEquals(18, sent.size)
         assertTrue(sent.contains("wallet"))
-        assertFalse(sent.contains("dog"))
+        assertTrue(sent.contains("dog"))
     }
 
     @Test
