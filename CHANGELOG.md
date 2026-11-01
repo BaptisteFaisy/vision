@@ -3,6 +3,30 @@
 Le journal part du 2026-10-26 après 19 h : le commit de départ, puis une entrée par fait
 livré et ses preuves (tâche, fichiers, chiffres) dans l'arbre.
 
+## 2026-11-01 — iSee : le mouvement écrase tout, voiture devant humain (branche `feat/isee-mouvement-overwrite`)
+
+- **Ordre user** : voitures en mouvement et humains en mouvement,
+  quand iSee le signale, ça écrase tout ; les voitures en mouvement
+  écrasent les humains en mouvement ; la voiture passe avant les
+  bordures ; la sécurité garde le dessus.
+- **Fait (§ 31 VOIX-DANGER)** : `decideObstacles` ne fusionne plus le
+  mouvement — voiture en mouvement présente → sa phrase seule, sinon
+  personne → sa phrase seule, sinon fusion par rang comme avant
+  (`ObstacleDecision.preempt`, `VoicePreempt`) ; `ProximityVoice`
+  coupe la parole douce en cours (chat, route, annonce) au lieu
+  d'attendre le silence, voix Laure et sous-titres inchangés ; la
+  sécurité et la parole du user gardent le dessus (fenêtre P1/P2,
+  TTS système ou micro en cours → file, urgent prioritaire, mot
+  seul imminent ≤ 2 m parlé en clip même quand une voiture gagne) ;
+  la file douce tient l'ordre (voiture > personne > doux, à rang
+  égal la plus fraîche gagne).
+- **Preuve** : `:app:testDebugUnitTest` verts (0 échec, 0 sauté,
+  dont 4 nouveaux `ObstacleArbiterTest` — voiture écrase, personne
+  écrase, personne écrase l'arrêt, sécu gardée — et 8 nouveaux
+  `ProximityVoicePreemptTest`) ; `:core` non rejoué (aucun fichier
+  touché) ; `check-kotlin-limits.py` OK ; recette téléphone
+  **non mesurée**, exige un APK de cette branche sur appareil réel.
+
 ## 2026-11-01 — iSee : axe pile = droite, comme documenté (branche `hazard-avoidside-axis`)
 
 - **Ordre user** : néant (correctif repris d'un point noté en
@@ -18,7 +42,6 @@ livré et ses preuves (tâche, fichiers, chiffres) dans l'arbre.
   `ProximityVoiceQueueTest` 8, `DistanceKalmanTest` 11) ;
   `check-kotlin-limits.py` OK ; `check-voicepack.py` OK ; UBS : 0
   finding (scanner Kotlin indisponible, comme avant).
-
 ## 2026-11-01 — iSee : humain imminent = mot seul répété 300 ms (branche `hazard-person-300ms`)
 
 - **Ordre user** : juste « humain, passez à droite / gauche », en

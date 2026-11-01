@@ -48,15 +48,16 @@ internal class ObstacleWatchers(
 
 /**
  * Guetteur obstacles de la sonde : véhicules, bordure et mobilier calculés
- * sur la même frame, parlés une fois dans l'ordre P1-P5 (voiture en mouvement
- * > bordure > personne > barrière > reste) au lieu de se couper. La sécurité
- * fusionnée ([SafetyVoice], jamais de « Stop » hors Traversée) part aussitôt,
- * en direct ; le doux fusionné part en coroutine fille, sérialisé ([Mutex] :
- * jamais de chevauchement doux, jamais de frame bloquée par une synthèse) et
- * tenu en file pendant la sécurité ([safetyBusy]) — sauf le danger qui
- * s'approche (`urgent` véhicule : coupe, comme avant). Sans doux frais (hors
- * Traversée), la file est redite au silence ([ProximityVoice.flushPending]).
- * En Traversée, seul l'imminent bordure passe (sa voix rouge/vert est
+ * sur la même frame, arbitrés ([decideObstacles]) — le mouvement gagnant
+ * parle seul et coupe le doux (voiture > personne, § 31), le reste
+ * fusionne dans l'ordre P1-P5. La sécurité ([SafetyVoice], jamais de
+ * « Stop » hors Traversée) part aussitôt, en direct ; le doux part en
+ * coroutine fille, sérialisé ([Mutex] : jamais de chevauchement doux,
+ * jamais de frame bloquée par une synthèse) et tenu en file pendant la
+ * sécurité ([safetyBusy]) — sauf le danger qui s'approche (`urgent`
+ * véhicule : coupe, comme avant). Sans doux frais (hors Traversée), la
+ * file est redite au silence ([ProximityVoice.flushPending]). En
+ * Traversée, seul l'imminent bordure passe (sa voix rouge/vert est
  * propriétaire du son) et les guetteurs coupés n'avancent pas. Rend les
  * guetteurs pour le `reset()` de début de séance. `collect` séquentiel : une
  * alerte confirmée ne s'annule pas.
@@ -84,9 +85,10 @@ internal fun LiveProbe.observeObstacles(
 /**
  * Une frame d'obstacles : les trois signaux relus dans l'état (lectures de
  * distance + dimensions, déjà publiées par frame), arbitrés ([decideObstacles])
- * puis parlés — sécurité aussitôt, doux en fille sérialisée, file au silence.
- * Le mot seul d'une personne imminente est exclu de l'arbitrage et part en
- * clip ([launchImminentWord], jamais fusionné).
+ * puis parlés — sécurité aussitôt, doux (mouvement préemptif, § 31) en
+ * fille sérialisée, file au silence. Le mot seul d'une personne imminente
+ * est exclu de l'arbitrage et part en clip ([launchImminentWord], jamais
+ * fusionné — anti-collision, il parle même quand une voiture gagne).
  */
 internal fun obstacleFrame(
     st: LiveProbeState,
@@ -130,7 +132,7 @@ internal fun obstacleFrame(
     if (soft != null) {
         scope.launch {
             softSpeech.withLock {
-                voice.onPhrase(soft, playerIdle(), urgent = decision.urgent && !heldForUser, queue = true, busy = busy)
+                voice.onPhrase(soft, playerIdle(), urgent = decision.urgent && !heldForUser, queue = true, busy = busy, preempt = decision.preempt)
             }
         }
     } else if (!st.crossingActive) {
