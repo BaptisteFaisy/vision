@@ -1,7 +1,6 @@
 package dev.sam3vision.app.isee
 
 import dev.sam3vision.app.LiveUiState
-import dev.sam3vision.core.cycle.CycleWatcher
 import dev.sam3vision.core.distance.DistanceReading
 import dev.sam3vision.core.model.Detection
 import dev.sam3vision.core.motion.GyroMotion
