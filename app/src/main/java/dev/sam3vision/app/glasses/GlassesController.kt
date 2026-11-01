@@ -92,7 +92,10 @@ class GlassesController(
     /** Question mains-libres : micro des lunettes, transcription, événements. */
     private val talkHost = GlassesTalkHost(
         scope = scope,
-        audio = ::currentAudio,
+        audio = {
+            val snapshot = _state.value
+            GlassesAudioPlan.select(snapshot.connected, snapshot.streaming, snapshot.micAllowed, camera?.audio)
+        },
         engine = ::speechClient,
         settings = frameSettings,
         beep = beeps::invoke,

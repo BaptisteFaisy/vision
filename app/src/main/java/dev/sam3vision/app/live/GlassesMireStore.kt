@@ -70,10 +70,8 @@ class GlassesMireStore(context: Context) {
          * un on/off du direct.
          */
         val mireVersion = MutableStateFlow(0L)
-    }
 
-    private companion object {
-        const val PREFS = "glasses_mire"
+        private const val PREFS = "glasses_mire"
         const val KEY_H = "hFovDeg"
         const val KEY_V = "vFovDeg"
         const val KEY_CX = "principalX"
