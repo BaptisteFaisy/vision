@@ -178,6 +178,13 @@ Cible pour un futur Direct lunettes, si le portage est décidé : **5–8 images
 bout** (lunettes → téléphone → backend), pas 30 — la conversion, l'encodage et le réseau sont
 plus lents que le lien.
 
+> **Amendement 2026-11-01 (direct écran)** : le § ci-dessus vise la cadence **utile bout en
+> bout** (lunettes → backend), pas l'affichage local. Pour l'écran du téléphone, le user
+> exige le maximum (60 i/s si le lien le tient, 30 minimum) : `GLASSES_FRAME_RATE = 60`
+> avec échelle de repli 60 → 30 → 24 → 15 (`GLASSES_FRAME_RATE_LADDER`), repli annoncé
+> (`GlassesMessages.frameRateFallback`), cadence tenue mesurée (`LUNETTES-RECETTE-TEL` §3).
+> 60 n'est pas dans les cadences citées par la doc Meta : c'est un essai, le repli fait foi.
+
 ## 8. Matériel
 
 **Cible retenue : Ray-Ban Meta de deuxième génération, sans écran.** La réponse est lue dans les
