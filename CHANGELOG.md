@@ -42,6 +42,22 @@ livré et ses preuves (tâche, fichiers, chiffres) dans l'arbre.
   `ProximityVoiceQueueTest` 8, `DistanceKalmanTest` 11) ;
   `check-kotlin-limits.py` OK ; `check-voicepack.py` OK ; UBS : 0
   finding (scanner Kotlin indisponible, comme avant).
+## 2026-11-01 — iSee : bloc génération fin semi-transparent + picto sans nom ni carte (branche `fix/isee-picto-sans-confirmation`)
+
+- **Ordre user** : fenêtre « génération en cours » semi-transparente, plus
+  fine et moins haute, avec la boule iSee qui tourne à la place du rond bleu,
+  sans le gros titre « Pictogram », texte noir ; picto sans le nom de l'objet ;
+  un seul picto affiché (le cadre jaune à l'emplacement), pas la carte « en
+  grand ».
+- **Fait** : `PictoGeneratingCard` — bloc blanc à 78 % (220 dp max), boule iSee
+  56 dp tournant en 1,2 s (même motif que `RouteLoadingBlock`), « Generating…
+  (~10 s) » noir, affiché pendant `Generating` seul, jamais dehors ;
+  `PictoLayer` — cadre jaune seul (nom et `IseePictoBig` supprimés, nom gardé
+  en `contentDescription` pour l'accessibilité) ; `META-IMAGE.md` mis à jour.
+- **Preuve** : `:app:testDebugUnitTest` 1 700 verts (0 échec, 0 sauté, dont 3
+  `PictoGeneratingSpinTest` nouveaux) ; `check-isee-design.py` OK (boule
+  gelée intacte) ; `check-kotlin-limits.py` OK.
+
 ## 2026-11-01 — iSee : pictogramme généré armé aussitôt, sans confirmation ni nom (branche `fix/isee-picto-sans-confirmation`)
 
 - **Ordre user** : quand un pictogramme est généré, ne pas demander de le

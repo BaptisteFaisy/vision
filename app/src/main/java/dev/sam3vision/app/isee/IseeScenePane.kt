@@ -32,6 +32,7 @@ import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import dev.sam3vision.app.glasses.GlassesVideoLink
+import dev.sam3vision.app.isee.vm.PictoPhase
 import dev.sam3vision.core.iseedesign.IseePortrait
 import dev.sam3vision.core.iseedesign.IseeScene
 import dev.sam3vision.core.iseedesign.PortraitGeometry
@@ -114,6 +115,9 @@ private fun BoxWithConstraintsScope.PortraitScene(
         state,
         Modifier.align(Alignment.BottomCenter).padding(bottom = navInsetDp() + 10.dp),
     )
+    // Génération picto : le bloc fin semi-transparent survit à la rue
+    // (génération lancée, vidéo coupée), jamais dehors.
+    if (state.placeMode.pictoEnabled && state.picto.phase == PictoPhase.Generating) PictoGeneratingCard()
 }
 
 /** Boucle du temps de la scène : 10 minutes, comme l'ancienne transition infinie. */
