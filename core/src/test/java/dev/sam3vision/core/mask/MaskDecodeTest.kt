@@ -11,6 +11,7 @@ import org.json.JSONObject
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertNotNull
 import org.junit.Assert.assertNull
+import org.junit.Assert.assertTrue
 import org.junit.Test
 
 /**
@@ -109,6 +110,50 @@ class MaskDecodeTest {
         assertEquals("l'encodage de la frame s'applique à l'objet, en minuscules", MASK_ENCODING_RLE, obj.maskEncoding)
         assertEquals(0.5f, obj.maskScale, 0.0001f)
         assertEquals(listOf(listOf(0, 0, 2, 0, 2, 1)), obj.maskPoly)
+    }
+
+    @Test
+    fun `la sonde date base64 image et upscale sans changer les pixels`() {
+        val probe = DecodeProbe()
+        val gray = decodeObjectGray(rleObject, 8, 6, probe)
+        val plain = decodeObjectGray(rleObject, 8, 6)
+
+        assertNotNull(gray)
+        assertEquals(plain!!.pixels.toList(), gray!!.pixels.toList())
+        val split = probe.snapshot(totalMs = 5, masks = 1)
+        assertTrue("b64 daté", split.b64Ms >= 0)
+        assertTrue("runs datés", split.imgMs >= 0)
+        assertTrue("upscale daté (grille 4×3 → frame 8×6)", split.upMs >= 0)
+        assertEquals(1, split.masks)
+        assertTrue(split.known)
+    }
+
+    @Test
+    fun `une sonde nulle ne change ni les pixels ni le cout`() {
+        // `null` = chemin inactif : aucun objet, aucune horloge — même pixels que sans sonde.
+        val withNull = decodeObjectGray(rleObject, 8, 6, null)
+        val plain = decodeObjectGray(rleObject, 8, 6)
+
+        assertNotNull(withNull)
+        assertEquals(plain!!.pixels.toList(), withNull!!.pixels.toList())
+    }
+
+    @Test
+    fun `poly sans upscale laisse up a zero`() {
+        val poly = rleObject.copy(
+            maskEncoding = MASK_ENCODING_POLY,
+            maskPngB64 = "",
+            maskScale = 1f,
+            maskPoly = listOf(listOf(0, 0, 8, 0, 8, 6, 0, 6)),
+        )
+        val probe = DecodeProbe()
+
+        val gray = decodeObjectGray(poly, 8, 6, probe)
+
+        assertNotNull(gray)
+        val split = probe.snapshot(totalMs = 1, masks = 1)
+        assertTrue("remplissage daté", split.imgMs >= 0)
+        assertEquals("pas d'upscale : coût nul, pas -1", 0L, split.upMs)
     }
 
     @Test

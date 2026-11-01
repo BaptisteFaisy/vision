@@ -1,5 +1,6 @@
 package dev.sam3vision.core.live
 
+import dev.sam3vision.core.mask.DecodeSplit
 import dev.sam3vision.core.model.LiveFrame
 import dev.sam3vision.core.net.WireMarks
 
@@ -70,8 +71,8 @@ class ScreenTimings(private val clock: () -> Long = System::nanoTime) : WireMark
     }
 
     /** Instantané d'une frame précise (et non de celle qui est en vol). */
-    fun snapshot(on: LiveTimings, frame: LiveFrame?): FrameTimings =
-        on.snapshot(frame?.elapsedMs ?: -1L, frame?.timingsMs.orEmpty())
+    fun snapshot(on: LiveTimings, frame: LiveFrame?, decode: DecodeSplit = DecodeSplit.EMPTY): FrameTimings =
+        on.snapshot(frame?.elapsedMs ?: -1L, frame?.timingsMs.orEmpty(), decode)
 
     /** Masques décodés et coloriés : la frame est candidate au poste « premier pixel ». */
     fun markOverlays() {
@@ -99,14 +100,14 @@ class ScreenTimings(private val clock: () -> Long = System::nanoTime) : WireMark
     }
 
     /** Instantané de la frame en cours : l'UI ne lit jamais les marques, seulement ceci. */
-    fun snapshot(frame: LiveFrame? = null): FrameTimings =
-        marks.snapshot(frame?.elapsedMs ?: -1L, frame?.timingsMs.orEmpty())
+    fun snapshot(frame: LiveFrame? = null, decode: DecodeSplit = DecodeSplit.EMPTY): FrameTimings =
+        marks.snapshot(frame?.elapsedMs ?: -1L, frame?.timingsMs.orEmpty(), decode)
 
     /**
-     * Instantané après coup (poste « pixel ») : les chiffres serveur viennent de l'instantané
-     * d'avant, les marques de la frame **dessinée** — qui n'est plus la frame en cours quand
-     * le pipeline a déjà entamé la suivante.
+     * Instantané après coup (poste « pixel ») : les chiffres serveur et la décomposition
+     * du décodage viennent de l'instantané d'avant, les marques de la frame **dessinée** —
+     * qui n'est plus la frame en cours quand le pipeline a déjà entamé la suivante.
      */
     fun snapshot(previous: FrameTimings): FrameTimings =
-        (drawn ?: marks).snapshot(previous.serverTotalMs, previous.server)
+        (drawn ?: marks).snapshot(previous.serverTotalMs, previous.server, previous.decode)
 }

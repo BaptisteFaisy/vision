@@ -1,5 +1,6 @@
 package dev.sam3vision.core.live
 
+import dev.sam3vision.core.mask.DecodeSplit
 import kotlin.math.roundToLong
 
 /**
@@ -100,6 +101,22 @@ object TimingsText {
             " · int $intervalMs"
 
     /**
+     * Décomposition du poste `mask` (réponse → masques), loggée 1 frame sur 20 par
+     * le peintre de masques : « decsplit b64 2 · img 28 · up 1 · paint 6 · total 37
+     * · masks 12 ». `b64` = base64 → octets, `img` = octets → niveaux (PNG, zlib
+     * `M1`, runs RLE, remplissage `poly`), `up` = grille réduite → taille de la
+     * frame, `paint` = coloriage par table + écriture dans le bitmap ping-pong,
+     * `total` = temps mural réponse → tampons prêts, `masks` = masques décodés.
+     * `b64 + img + up + paint` retrouve le `mask` de la sonde à ~1 ms près.
+     *
+     * Invisible à `parse_isee_lat.py` (ni `latency`, ni `server:`) : la ligne vit
+     * dans le même dump `ISEE_LAT`, sans fausser le verdict — même contrat que
+     * [capsplit], qui décompose `capt` de la même façon.
+     */
+    fun decsplit(d: DecodeSplit): String =
+        "decsplit ${decodeStages(d)} · total ${ms(d.totalMs)} · masks ${d.masks}"
+
+    /**
      * Frame lunettes rendue puis affichée, en **microsecondes** : « link seq 12 ·
      * lien 30123 · dec 8421 · aff 7110 · percu 45654 ». `lien` = retard variable
      * radio ([GlassesClockOffset]), `dec` = entrée-sortie du rendu, `aff` =
@@ -128,15 +145,21 @@ object TimingsText {
         return "server: $parts"
     }
 
-    /** Une ligne de détail ; l'aller-retour est décomposé quand un chiffre serveur existe. */
+    /** Une ligne de détail ; l'aller-retour et les masques sont décomposés quand c'est daté. */
     private fun poste(t: FrameTimings, poste: Poste): String {
-        val split = if (poste.short == "rtt" && t.networkMs >= 0) {
-            " (incl. server ${t.serverMs} ms, network + queue ${t.networkMs} ms)"
-        } else {
-            ""
+        val split = when {
+            poste.short == "rtt" && t.networkMs >= 0 ->
+                " (incl. server ${t.serverMs} ms, network + queue ${t.networkMs} ms)"
+            poste.short == "mask" && t.decode.known ->
+                " (${decodeStages(t.decode)}, ${t.decode.masks} masks)"
+            else -> ""
         }
         return "${poste.long}: ${poste.value(t)} ms$split"
     }
+
+    /** Les quatre postes du décodage, ordre du trajet : [decsplit] et le détail partagent. */
+    private fun decodeStages(d: DecodeSplit): String =
+        "b64 ${ms(d.b64Ms)} · img ${ms(d.imgMs)} · up ${ms(d.upMs)} · paint ${ms(d.paintMs)}"
 
     /** Clé serveur lisible : `vision_ms` et `vision` désignent le même étage. */
     private fun cleanKey(key: String): String = key.removeSuffix("_ms")

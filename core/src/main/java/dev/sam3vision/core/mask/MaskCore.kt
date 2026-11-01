@@ -47,7 +47,14 @@ private const val BITS_INITIAL_BYTES = 64 * 1024
  * intermédiaire** : le nettoyage (deux allocations de chaîne) n'a lieu que si la lecture
  * directe échoue. Sur 12 masques par frame, c'est une allocation de moins par masque.
  */
-fun base64Bytes(text: String): ByteArray? {
+fun base64Bytes(text: String, probe: DecodeProbe? = null): ByteArray? =
+    probe.timed(DecodeStage.B64) { base64BytesRaw(text) }
+
+/**
+ * Corps de [base64Bytes], hors imputation : la sonde ne couvre que le décodage des masques
+ * (l'appelant réseau passe `null`, donc coût nul — un seul test de nullité).
+ */
+private fun base64BytesRaw(text: String): ByteArray? {
     if (text.isEmpty()) return null
     val decoder = Base64.getDecoder()
     try {
@@ -159,8 +166,13 @@ fun grayFromArgb(pixels: IntArray, width: Int, height: Int): GrayMask {
  * `null` — jamais d'exception — si le base64, l'en-tête, le flux zlib ou la longueur du
  * corps ne collent pas : l'appelant dessine alors la boîte au lieu d'un overlay mort.
  */
-fun decodeBitsMask(maskB64: String): GrayMask? {
-    val raw = base64Bytes(maskB64) ?: return null
+fun decodeBitsMask(maskB64: String, probe: DecodeProbe? = null): GrayMask? {
+    val raw = base64Bytes(maskB64, probe) ?: return null
+    return probe.timed(DecodeStage.IMG) { bitsFromRaw(raw) }
+}
+
+/** Corps de [decodeBitsMask], hors base64 : en-tête, décompression, dépaquetage. */
+private fun bitsFromRaw(raw: ByteArray): GrayMask? {
     if (raw.size <= BITS_HEADER_SIZE) return null
     if (raw[0] != BITS_MAGIC_0 || raw[1] != BITS_MAGIC_1) return null
     val little = readUInt16(raw, 2, littleEndian = true) to readUInt16(raw, 4, littleEndian = true)

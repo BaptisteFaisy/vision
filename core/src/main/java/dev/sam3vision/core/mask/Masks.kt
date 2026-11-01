@@ -34,8 +34,13 @@ fun colorizeMask(src: Bitmap, argb: Int, alpha: Int): Bitmap {
  * Repli sur le décodage ARGB + luminance si le décodeur ne rend pas un bitmap ALPHA_8
  * (PNG palettisé/1 bit, masque d'un ancien backend) ou si les lignes sont rembourrées.
  */
-fun decodeGrayMask(maskPngB64: String): GrayMask? {
-    val bytes = base64Bytes(maskPngB64) ?: return null
+fun decodeGrayMask(maskPngB64: String, probe: DecodeProbe? = null): GrayMask? {
+    val bytes = base64Bytes(maskPngB64, probe) ?: return null
+    return probe.timed(DecodeStage.IMG) { grayFromPngBytes(bytes) }
+}
+
+/** Corps de [decodeGrayMask], hors base64 : PNG → niveaux, repli ARGB compris. */
+private fun grayFromPngBytes(bytes: ByteArray): GrayMask? {
     val bmp = BitmapFactory.decodeByteArray(bytes, 0, bytes.size, GRAY_OPTIONS) ?: return null
     val width = bmp.width
     val height = bmp.height
@@ -52,10 +57,14 @@ fun decodeGrayMask(maskPngB64: String): GrayMask? {
  * Encodage absent ou inconnu ⇒ PNG, donc le comportement d'avant le champ `mask_encoding`
  * — le backend déployé reste lisible.
  */
-fun decodeMaskAny(maskB64: String, encoding: String = MASK_ENCODING_PNG): GrayMask? = when (encoding) {
-    MASK_ENCODING_BITS -> decodeBitsMask(maskB64)
+fun decodeMaskAny(
+    maskB64: String,
+    encoding: String = MASK_ENCODING_PNG,
+    probe: DecodeProbe? = null,
+): GrayMask? = when (encoding) {
+    MASK_ENCODING_BITS -> decodeBitsMask(maskB64, probe)
     MASK_ENCODING_NONE -> null
-    else -> decodeGrayMask(maskB64)
+    else -> decodeGrayMask(maskB64, probe)
 }
 
 /**

@@ -12,15 +12,20 @@ import dev.sam3vision.core.model.SegObject
  *
  * `null` si le masque est illisible ou absent (`"none"`) : l'appelant dessine alors la boîte.
  */
-fun decodeObjectMask(obj: SegObject, frameWidth: Int, frameHeight: Int): GrayMask? =
+fun decodeObjectMask(
+    obj: SegObject,
+    frameWidth: Int,
+    frameHeight: Int,
+    probe: DecodeProbe? = null,
+): GrayMask? =
     when (obj.maskEncoding) {
         MASK_ENCODING_RLE -> compactGrid(obj, frameWidth, frameHeight)
-            ?.let { decodeRleMask(obj.maskPngB64, it.first, it.second) }
+            ?.let { decodeRleMask(obj.maskPngB64, it.first, it.second, probe) }
 
         MASK_ENCODING_POLY -> compactGrid(obj, frameWidth, frameHeight)
-            ?.let { decodePolyMask(obj.maskPoly, it.first, it.second) }
+            ?.let { decodePolyMask(obj.maskPoly, it.first, it.second, probe) }
 
-        else -> decodeMaskAny(obj.maskPngB64, obj.maskEncoding)
+        else -> decodeMaskAny(obj.maskPngB64, obj.maskEncoding, probe)
     }
 
 /**
@@ -28,9 +33,18 @@ fun decodeObjectMask(obj: SegObject, frameWidth: Int, frameHeight: Int): GrayMas
  * puis agrandissement par plus proche voisin quand le codec a réduit la grille
  * (`maskScale < 1`). Les encodages pleine résolution (`png`, `bits`) sortent inchangés.
  */
-fun decodeObjectGray(obj: SegObject, frameWidth: Int, frameHeight: Int): GrayMask? {
-    val mask = decodeObjectMask(obj, frameWidth, frameHeight) ?: return null
-    return if (obj.maskScale < 1f) upscaleToFrame(mask, frameWidth, frameHeight) else mask
+fun decodeObjectGray(
+    obj: SegObject,
+    frameWidth: Int,
+    frameHeight: Int,
+    probe: DecodeProbe? = null,
+): GrayMask? {
+    val mask = decodeObjectMask(obj, frameWidth, frameHeight, probe) ?: return null
+    return if (obj.maskScale < 1f) {
+        probe.timed(DecodeStage.UP) { upscaleToFrame(mask, frameWidth, frameHeight) }
+    } else {
+        mask
+    }
 }
 
 /** Grille réduite d'un objet (`mask_scale`), `null` si elle n'est pas exploitable. */

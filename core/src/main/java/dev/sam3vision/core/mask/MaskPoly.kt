@@ -11,7 +11,15 @@ import kotlin.math.ceil
  * Chaque anneau est **plat** (`x0, y0, x1, y1, …`) et refermé implicitement ; un anneau de
  * moins de trois sommets est ignoré, et un remplissage vide rend `null`.
  */
-fun decodePolyMask(rings: List<List<Int>>, width: Int, height: Int): GrayMask? {
+fun decodePolyMask(
+    rings: List<List<Int>>,
+    width: Int,
+    height: Int,
+    probe: DecodeProbe? = null,
+): GrayMask? = probe.timed(DecodeStage.IMG) { polyFromRings(rings, width, height) }
+
+/** Corps de [decodePolyMask] : arêtes, croisements, remplissage even-odd. */
+private fun polyFromRings(rings: List<List<Int>>, width: Int, height: Int): GrayMask? {
     val total = maskGridSize(width, height) ?: return null
     val edges = polyEdges(rings)
     if (edges.isEmpty()) return null

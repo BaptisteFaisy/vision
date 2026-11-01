@@ -1,5 +1,6 @@
 package dev.sam3vision.core.live
 
+import dev.sam3vision.core.mask.DecodeSplit
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
 import org.junit.Assert.assertTrue
@@ -75,6 +76,19 @@ class ScreenTimingsTest {
         publishFrame()
         screen.reset()
         assertFalse(screen.noteDrawn())
+    }
+
+    @Test
+    fun `le pixel garde le decodage de la frame dessinee`() {
+        val decode = DecodeSplit(2L, 28L, 1L, 6L, 37L, 12)
+        publishFrame()
+        val published = screen.snapshot(decode = decode)
+
+        at(1200); screen.beginFrame(1200 * MS); screen.markReceived()
+        assertTrue(screen.noteDrawn())
+
+        assertEquals("la décomposition suit la frame dessinée, pas celle en cours",
+            decode, screen.snapshot(published).decode)
     }
 
     private companion object {

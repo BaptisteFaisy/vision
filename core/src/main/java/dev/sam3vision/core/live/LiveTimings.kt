@@ -1,5 +1,6 @@
 package dev.sam3vision.core.live
 
+import dev.sam3vision.core.mask.DecodeSplit
 import kotlin.math.roundToLong
 
 /**
@@ -46,6 +47,12 @@ data class FrameTimings(
     val serverTotalMs: Long = -1,
     /** Postes serveur reçus (`"timings_ms"`), vide si le levier est éteint. */
     val server: Map<String, Double> = emptyMap(),
+    /**
+     * Décomposition du poste `mask` (base64 → tampons), [DecodeSplit.EMPTY] si la sonde
+     * était inactive. Hors [known], [totalMs] et [localMs] : c'est une décomposition, le
+     * poste parent la couvre déjà — la compter serait la payer deux fois.
+     */
+    val decode: DecodeSplit = DecodeSplit.EMPTY,
 ) {
     /** Encodage sur le téléphone. */
     val encodeMs: Long get() = captureToJpegMs
@@ -179,7 +186,11 @@ class LiveTimings(private val clock: () -> Long = System::nanoTime) {
 
     /** Instantané immuable pour l'UI (aucune lecture concurrente des marques). */
     @Synchronized
-    fun snapshot(serverTotalMs: Long = -1, server: Map<String, Double> = emptyMap()): FrameTimings =
+    fun snapshot(
+        serverTotalMs: Long = -1,
+        server: Map<String, Double> = emptyMap(),
+        decode: DecodeSplit = DecodeSplit.EMPTY,
+    ): FrameTimings =
         FrameTimings(
             captureToJpegMs = betweenLocked(LiveStage.CAPTURE, LiveStage.ENCODED),
             jpegToSentMs = betweenLocked(LiveStage.ENCODED, LiveStage.SENT),
@@ -192,6 +203,7 @@ class LiveTimings(private val clock: () -> Long = System::nanoTime) {
             captureToPixelMs = betweenLocked(LiveStage.CAPTURE, LiveStage.PIXEL),
             serverTotalMs = serverTotalMs,
             server = server,
+            decode = decode,
         )
 
     private companion object {
