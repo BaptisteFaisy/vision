@@ -47,16 +47,18 @@ class TrainedLightColorTest {
     }
 
     @Test
-    fun `la frontiere verte est 0,0035`() {
-        // 25x20 = 500 px : 2 px verts = 0,004 > 0,0035 (vert ; rouge avant le 01/11).
-        val two = IntArray(500) { BLACK }
+    fun `la frontiere verte est 0,002`() {
+        // 25x40 = 1000 px : 3 px verts = 0,003 > 0,002 (vert ; rouge avant le 01/11).
+        val three = IntArray(1000) { BLACK }
+        three[0] = GREEN
+        three[1] = GREEN
+        three[2] = GREEN
+        assertEquals(CrossingState.Green, TrainedLightColor.classify(three, 25, 40))
+        // 2 px verts = 0,002 : sur le plancher, attend rouge.
+        val two = IntArray(1000) { BLACK }
         two[0] = GREEN
         two[1] = GREEN
-        assertEquals(CrossingState.Green, TrainedLightColor.classify(two, 25, 20))
-        // 1 px vert = 0,002 : sous le seuil, attend rouge.
-        val one = IntArray(500) { BLACK }
-        one[0] = GREEN
-        assertEquals(CrossingState.Red, TrainedLightColor.classify(one, 25, 20))
+        assertEquals(CrossingState.Red, TrainedLightColor.classify(two, 25, 40))
     }
 
     @Test

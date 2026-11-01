@@ -7,12 +7,14 @@ package dev.sam3vision.core.crossing
  * tableaux. Ne pas éditer à la main : régénérer depuis les crops, mêmes
  * hyperparamètres. Traits : [FEATURE_NAMES] dans l'ordre.
  *
- * L'arbre appris est une souche (`green_frac` > 0,0035, ordre user du 01/11 : 0,48 % → 0,35 %) : sur les crops
- * téléphone, la fraction verte sépare à elle seule (verts ≥ 0,017, rouges
- * ≤ 0,0018) et la forme reste du ressort de la porte. Mesuré 01/11 :
- * verdicts 18/20 verts lotfinal au seuil 0,0048, à remesurer (0009 et 0015 : tache trop large, élancement
- * < 1,0 — seuils de porte intacts, non réglés), 32/32 rouges, 0 faux vert ;
- * 18/20 ancres stables (2 disques voiture repassent rouges, sens sûr).
+ * L'arbre appris est une souche (`green_frac` > 0,002, plancher partagé
+ * avec la porte — mêmes pixels, même plancher, voir
+ * [PedLightGate.GREEN_MIN_FRACTION]) : sur les crops téléphone, la fraction
+ * verte sépare à elle seule et la forme reste du ressort de la porte.
+ * Historique des seuils : 0,0048 appris (lot lotfinal), 0,0035 (ordre user du
+ * 01/11), 0,002 (01/11 : balayage 0,002-0,0035 identique sur 933 crops —
+ * 883 FR + 17 lot1 + 33 ancres, précision 1,0 — et +1 vert réel lointain
+ * `at_ampelpaerchen`, fraction 0,0028, bonhomme net cadré caisson).
  *
  * Sous le plancher de pureté de la feuille atteinte, la réponse est
  * [CrossingState.Red] : binaire, une couleur fragile attend (ordre user du
@@ -38,7 +40,7 @@ object TrainedLightColor {
     private const val GREEN_FRAC_INDEX = 13
 
     private val FEATURE = intArrayOf(13, -2, -2)
-    private val THRESHOLD = floatArrayOf(0.0035f, -2.0f, -2.0f)
+    private val THRESHOLD = floatArrayOf(0.002f, -2.0f, -2.0f)
     private val LEFT = intArrayOf(1, -1, -1)
     private val RIGHT = intArrayOf(2, -1, -1)
     private val LEAF_CLASS = intArrayOf(0, 0, 1)

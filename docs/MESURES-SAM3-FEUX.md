@@ -247,3 +247,64 @@ l'attribution et le partage à l'identique des dérivés.
   `PedLightGate` n'est pas dans cet arbre : seuls 9 crops extraits le sont).
 - Le second chemin d'API (`facebookresearch/sam3`, poids officiels gated) n'a **pas** été
   exécuté. Tout ce qui précède utilise le miroir `unsloth/sam3.1` via `transformers`.
+
+## 10. Relevé du 01/11 : rappel par prompt, veto par prompt mort, bout-en-bout
+
+Mêmes 16 photos, poids `unsloth/sam3.1` `bfloat16`, RTX 3060 Ti, seuil de
+score 0,35 (seuil serveur `SCORE_THRESHOLD`), une passe par prompt, sans
+dédup inter-prompts. Le §6 (1 vert/6) est caduc : crop 48 → 96 px,
+recentrage lampe et porte 1,0 ont suivi (doré `RECALL-v4.json` : 6/6).
+
+### Rappel détection (image trouvée si ≥ 1 boîte)
+
+| Prompt | rappel |
+|---|---|
+| `pedestrian traffic light` | 14/16 |
+| `pedestrian signal head` | 11/16 |
+| `pedestrian light` | 13/16 |
+| `pedestrian signal` | 7/16 |
+| union des quatre (prod) | **14/16** |
+| `walk signal` (candidat, mesure seule) | 14/16 |
+| `pedestrian crossing signal` (candidat, mesure seule) | 12/16 |
+
+Les 2 manquées sont les bandeaux LED au sol de Séoul (hors domaine, §2).
+Les candidats n'ajoutent rien à l'union et captent aussi les tricolores :
+non retenus.
+
+### Le veto par prompt est mort
+
+`vehicle traffic light`, `three-lamp traffic light` et `car traffic light`
+tirent 14/16, 12/16 et 14/16 — **sur les mêmes boîtes que le prompt piéton**
+(mêmes coordonnées, scores 0,7-0,93, y compris gros plans piétons sans
+voiture) : aucun wording ne sépare voiture et piéton, activer
+`CarLightVeto` éteindrait les vrais verts. Le veto reste inactif, mesure à
+l'appui. `feu tricolore` brut au modèle : 0/16 (CLIP anglais).
+
+### Bout-en-bout local : 5/7
+
+Chaîne rejouée hors appareil (miroir Python, seuil prod, crop 96 px PIL,
+sans recentrage) sur les 9 scènes étiquetées : 2 sans boîte (bandeaux
+Séoul), 5/7 justes, 2 verts manqués, 0 inversion :
+
+- `at_ampelpaerchen` (bonhomme net, fraction verte 0,0028) : rejeté par le
+  seuil arbre 0,0035. Balayage 0,002-0,0035 **identique** sur 933 crops
+  (883 FR téléphone + 17 lot1 + 33 ancres, précision 1,0) : le seuil passe
+  à 0,002, plancher partagé avec la porte.
+- `nl_panda_10` : la tête (0,48) cadre la lentille **éteinte** quand le
+  caisson (0,89) couvre le boîtier allumé — la préférence tête absolue
+  lisait le noir. Correctif : tête sans lampe vue → le caisson est relu
+  (`selectLightBoxes` + `crossingLightOf`, tests JVM).
+
+Après correctifs (rejoué, mêmes approximations) : **7/7** sur les scènes à
+boîte, 0 inversion. Restent hors portée : bandeaux LED au sol, nuit/pluie
+(non calibrés), feux multi-lentilles ambigus.
+
+### Corpus couleur : le bruit est dans les labels, pas dans la porte
+
+- 2 771 crops PTL (noms de fichiers) : 872 « verts » à pixels rouges et 44
+  « rouges » à pixels verts — les noms ne valent pas vérité, exclus des
+  chiffres (vus à la loupe : feux inversés).
+- 883 crops FR téléphone : précision 1,0, rappel 0,78 — les 116 verts
+  manqués relus sont des cadrages sans lampe visible (feuillage, poteau :
+  labels de scène, pas de crop), que la porte a raison de refuser.
+- Lot1 : 17/17. Ancres : 33/33.

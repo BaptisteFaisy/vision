@@ -135,5 +135,44 @@ class Feuxfr3PatternTest(unittest.TestCase):
             self.assertIn(ppm.name, text, ppm.name)
 
 
+class ThresholdParityTest(unittest.TestCase):
+    """Frontiere verte 0,002 : miroir exact du test JVM (TrainedLightColorTest).
+
+    01/11 : le miroir gardait le seuil appris 0,0048 alors que le Kotlin
+    deploie 0,0035 puis 0,002 — la parite ne couvrait pas la bande.
+    """
+
+    def test_3px_sur_1000_vert(self):
+        px = [BLACK] * 1000
+        px[0] = px[1] = px[2] = GREEN
+        self.assertEqual(lf.tree_classify(lf.extract(px, 25, 40)), "Green")
+
+    def test_2px_sur_1000_rouge(self):
+        px = [BLACK] * 1000
+        px[0] = px[1] = GREEN
+        self.assertEqual(lf.tree_classify(lf.extract(px, 25, 40)), "Red")
+
+    def test_micro_bonhomme_bas_vert(self):
+        # 48x48, barre 2x4 en bas : fraction 0,0035, dans l'ancienne bande.
+        px = [BLACK] * (48 * 48)
+        for y in range(44, 48):
+            for x in (23, 24):
+                px[y * 48 + x] = GREEN
+        self.assertEqual(lf.verdict(px, 48, 48), "Green")
+
+
+class LoadPpmTest(unittest.TestCase):
+    def test_raster_commencant_par_du_blanc(self):
+        import tempfile
+        raw = b"P6\n# commentaire\n2 1\n255\n\tAB\x10\x20\x30"
+        with tempfile.NamedTemporaryFile(suffix=".ppm", delete=False) as f:
+            f.write(raw)
+            path = f.name
+        px, w, h = lf.load_ppm(path)
+        Path(path).unlink()
+        self.assertEqual((w, h), (2, 1))
+        self.assertEqual(px, [0xFF094142, 0xFF102030])
+
+
 if __name__ == "__main__":
     unittest.main()

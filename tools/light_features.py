@@ -40,7 +40,9 @@ GREEN_MIN_PURITY = 0.50
 GREEN_FRAC_INDEX = 13
 
 FEATURE = [13, -2, -2]
-THRESHOLD = [0.004812047118321061, -2.0, -2.0]
+# 01/11 : suit TrainedLightColor.kt (0,002, plancher partage avec la porte) —
+# l'ancienne valeur apprise 0,0048 derivait du deploie sans casser la parite.
+THRESHOLD = [0.002, -2.0, -2.0]
 LEFT = [1, -1, -1]
 RIGHT = [2, -1, -1]
 LEAF_CLASS = [0, 0, 1]
@@ -246,16 +248,34 @@ def verdict(argb: list, w: int, h: int, tree=None) -> str:
 
 
 def load_ppm(path: str | Path) -> tuple:
-    """PPM P6 -> (pixels ARGB int, w, h)."""
+    """PPM P6 -> (pixels ARGB int, w, h).
+
+    En-tete parse a l'octet (commentaires `#` sautes, un seul blanc mange
+    apres maxval) : `bytes.split` mangeait les octets blancs en debut de
+    raster et cassait les fichiers concernes (vu 01/11 sur raw_crops).
+    """
     raw = Path(path).read_bytes()
-    parts = raw.split(None, 4)
-    assert parts[0] == b"P6", path
-    w, h, mx = int(parts[1]), int(parts[2]), int(parts[3])
+    assert raw[:2] == b"P6", path
+    toks: list = []
+    i, n = 2, len(raw)
+    while len(toks) < 3 and i < n:
+        while i < n and raw[i:i + 1].isspace():
+            i += 1
+        if raw[i:i + 1] == b"#":
+            while i < n and raw[i:i + 1] != b"\n":
+                i += 1
+            continue
+        j = i
+        while j < n and not raw[j:j + 1].isspace():
+            j += 1
+        toks.append(raw[i:j])
+        i = j
+    w, h, mx = int(toks[0]), int(toks[1]), int(toks[2])
     assert mx == 255, path
-    data = parts[4][:w * h * 3]
+    data = raw[i + 1:i + 1 + w * h * 3]
     assert len(data) == w * h * 3, path
-    px = [0xFF000000 | (data[i] << 16) | (data[i + 1] << 8) | data[i + 2]
-          for i in range(0, len(data), 3)]
+    px = [0xFF000000 | (data[k] << 16) | (data[k + 1] << 8) | data[k + 2]
+          for k in range(0, len(data), 3)]
     return px, w, h
 
 
