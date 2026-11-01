@@ -13,8 +13,10 @@ coupe la précédente). Fini les deux moteurs qui se parlent dessus.
    01/11 un mobile ne dit plus sa position, donc sa phrase ne varie plus,
    donc elle est enregistrée — § 32 de `VOIX-DANGER.md`).
 2. `tools/gen-voicepack.py` les synthétise **une fois** (voix Laure par défaut,
-   mêmes paramètres que l'app) en `app/src/main/res/raw/vp_<id>_<lang>.mp3` +
-   `assets/vp_voice.txt` (voix du pack).
+   mêmes paramètres que l'app) en `app/src/main/res/raw/vp_<id>_en.mp3` +
+   `assets/vp_voice.txt` (voix du pack). **Anglais seul** depuis le 01/11/2026 :
+   les 99 `vp_*_fr.mp3` sont supprimés (produit anglophone, `SpeechLanguage`
+   migre Fr vers En dans les deux stores) et le catalogue ne porte plus de `fr`.
 3. Au runtime, `VoicePack` rejoue le clip quand la voix réglée est celle du
    pack ; sinon (voix changée, clip manquant, clé absente) : synthèse
    ElevenLabs bornée à 500 ms puis mise en cache, comme `AnnouncementPlayer`
@@ -33,8 +35,9 @@ ne colle pas à la voix réglée). `--regenerate` régénère tout.
 
 ## Garde
 
-`python3 tools/check-voicepack.py` (CI) : chaque texte existe dans le Kotlin,
-chaque MP3 existe et pèse > 0, `vp_voice.txt` = `LAURE_VOICE_ID`.
+`python3 tools/check-voicepack.py` (CI, câblée le 01/11/2026) : chaque texte
+existe dans le Kotlin, chaque MP3 attendu existe et pèse > 0, **aucun MP3
+`vp_*` en surplus** sur le disque, `vp_voice.txt` = `LAURE_VOICE_ID`.
 `--allow-missing` pour les branches qui codent avant de générer.
 
 ## Vérifier que le pack est bien en voix Laure (ordre user du 01/11)
@@ -72,7 +75,8 @@ Audit du 01/11 (demande user « je veux que tous les mp3 soient avec la voix de
 Laure, sinon refais-les ») : **214/214 fichiers au-dessus du seuil** (le plus
 bas : `vehicle_scooter_moving_en` 0,987), dont `intro_isee.mp3` (0,999, modèle
 `eleven_v3` comme à sa génération). Rien à régénérer. Rapport et références :
-`~/voix-audit-20261101/`.
+`~/voix-audit-20261101/`. (Audit mené sur le pack bilingue ; les 99 clips FR
+sont supprimés depuis — reste 114 EN + intro, tous couverts par cet audit.)
 
 ## Ce qui n'est jamais un clip
 
