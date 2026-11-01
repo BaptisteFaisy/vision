@@ -53,7 +53,6 @@ fun SettingsScreen(
     onTestLlm: () -> Unit,
     onTestSam: () -> Unit,
     onTestAsr: () -> Unit,
-    onTestDepth: () -> Unit,
     onSpeak: (String) -> Unit,
     onStopVoice: () -> Unit,
     onOpenLive: () -> Unit,
@@ -81,7 +80,6 @@ fun SettingsScreen(
             onTestLlm = onTestLlm,
             onTestSam = onTestSam,
             onTestAsr = onTestAsr,
-            onTestDepth = onTestDepth,
             onPickRole = onPickRole,
             onStartTracking = onStartTracking,
             onStopTracking = onStopTracking,
@@ -92,13 +90,12 @@ fun SettingsScreen(
 }
 
 /**
- * Milieu de page : prédiction, overlay, navigation, monde et profondeur embarquée.
+ * Milieu de page : prédiction, overlay, navigation et monde.
  * Extrait pour que l'appelant reste sous la garde des 50 lignes.
  */
 @Composable
 private fun PerceptionSettings(
     draft: Settings,
-    onTestDepth: () -> Unit,
     onChange: (Settings) -> Unit,
 ) {
     Column(Modifier.fillMaxWidth(), verticalArrangement = Arrangement.spacedBy(10.dp)) {
@@ -108,7 +105,6 @@ private fun PerceptionSettings(
         LocalOverlaySettings(draft) { onChange(it) }
         NavigationToggle(draft) { onChange(it) }
         WorldModeSettings(draft) { onChange(it) }
-        DepthSettings(onTestDepth)
     }
 }
 
@@ -303,7 +299,6 @@ internal fun TechnicalSection(
     onTestLlm: () -> Unit,
     onTestSam: () -> Unit,
     onTestAsr: () -> Unit,
-    onTestDepth: () -> Unit,
     onStartTracking: (Settings) -> Unit,
     onStopTracking: () -> Unit,
     nav: NavCallbacks,
@@ -319,7 +314,7 @@ internal fun TechnicalSection(
         DistanceSettings(draft) { onChange(it) }
         LightCropCollectSettings(draft) { onChange(it) }
         CameraHalSettings(draft) { onChange(it) }
-        PerceptionSettings(draft, onTestDepth) { onChange(it) }
+        PerceptionSettings(draft) { onChange(it) }
         TtsSettings(
             draft = draft,
             speaking = speaking,

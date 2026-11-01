@@ -21,13 +21,13 @@ import org.junit.Test
  * Mur et concepts = obstacles bloquants, de bout en bout : la chaîne de
  * production (`LiveProbe.publish`) rejouée en JVM — `DistanceMeter.measure`
  * (sténopé), affinage profondeur (`DepthReadings`, le cœur pur de
- * `LiveDepthMeter.readingsFor`), `placedLabels`, `Guidance.decide`, mot et
+ * `ServerDepthMeter.readingsFor`), `placedLabels`, `Guidance.decide`, mot et
  * phrase.
  *
  * Physique assumée, pas contournée : un mur à 2 m remplit l'image (boîte
  * coupée haut/bas), donc le sténopé ne le mesure pas — le couloir bloque par
  * prudence avec le côté de sortie. Le contact à 0,5 m demande une mesure :
- * profondeur (serveur `with_depth` ou carte embarquée) ou petit objet
+ * profondeur serveur (`with_depth`) ou petit objet
  * mesurable au sténopé — et le cap droit contourne toujours, même au
  * contact. Aucune distance inventée nulle part.
  */

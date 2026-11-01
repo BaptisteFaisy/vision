@@ -14,11 +14,7 @@ import dev.sam3vision.app.vm.AppImageLoader
 import dev.sam3vision.app.vm.AppStatusText
 import dev.sam3vision.app.vm.AppVoice
 import dev.sam3vision.app.vm.StateUpdate
-import dev.sam3vision.core.depth.syntheticGradientArgb
 import dev.sam3vision.core.live.PositionText
-import dev.sam3vision.app.depth.DepthBench
-import dev.sam3vision.app.depth.DepthEstimators
-import dev.sam3vision.app.depth.ModelDownloader
 import dev.sam3vision.core.mask.colorizedMaskBitmap
 import dev.sam3vision.core.mask.colorizedOverlays
 import dev.sam3vision.core.model.Analysis
@@ -316,35 +312,6 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
 
     fun testSam() = viewModelScope.launch { diagnostics.testSam() }
 
-    /**
-     * Banc profondeur embarqué : 5 inférences DA2 sur une image synthétique,
-     * verdict dans la ligne de statut (et logcat `DepthBench`).
-     */
-    fun testDepth() = viewModelScope.launch {
-        val target = _state.value.settings.depthBackend
-        _state.update { it.copy(statusLine = "Model ${target.code}: checking…") }
-        val ensured = ModelDownloader.ensure(getApplication(), target) { done, total ->
-            val pct = (done * 100 / total.coerceAtLeast(1)).toInt()
-            _state.update { it.copy(statusLine = "Downloading ${target.code}… $pct %") }
-        }
-        if (ensured.isFailure) {
-            val cause = ensured.exceptionOrNull()?.message ?: "unknown failure"
-            _state.update { it.copy(statusLine = "Depth: download failed — $cause") }
-            return@launch
-        }
-        _state.update { it.copy(statusLine = "Testing depth… (${target.code})") }
-        val verdict = withContext(Dispatchers.Default) {
-            val estimator = DepthEstimators.open(getApplication(), target)
-            try {
-                val image = syntheticGradientArgb(BENCH_SIZE, BENCH_SIZE)
-                DepthBench.run(estimator, image, BENCH_SIZE, BENCH_SIZE)
-            } finally {
-                estimator.close()
-            }
-        }
-        _state.update { it.copy(statusLine = "Depth: ${DepthBench.summary(verdict)}") }
-    }
-
     // ————— Dictée (appui long partout, bouton « Dictate » dans le chat) —————
 
     /** Bouton « Dictate » du chat : ouvre le micro jusqu'au prochain Stop. */
@@ -385,9 +352,6 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
     companion object {
         /** Bord max envoyé : le serveur travaille à 640 px, inutile d'envoyer plus. */
         const val PHOTO_SEND_EDGE = 640
-
-        /** Côté de l'image synthétique du banc profondeur (carré, px). */
-        const val BENCH_SIZE = 256
 
         /** Fenêtre anti-rallumage : deux réveils rapprochés ne servent à rien. */
         const val PREWARM_WINDOW_MS = 120_000L

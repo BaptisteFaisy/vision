@@ -5,7 +5,6 @@ import android.os.SystemClock
 import androidx.compose.ui.graphics.toArgb
 import dev.sam3vision.core.crossing.CrossingAnnouncer
 import dev.sam3vision.core.crossing.NoLightGate
-import dev.sam3vision.core.depth.DepthBackend
 import dev.sam3vision.core.live.FrameTimings
 import dev.sam3vision.core.live.GuidanceWord
 import dev.sam3vision.core.live.ScreenTimings
@@ -59,9 +58,6 @@ class LiveProbe(
     private val clock: () -> Long = { SystemClock.elapsedRealtimeNanos() },
     /** Exécuteur du travail hors thread principal : sérialisation de la frame, masques. */
     internal val background: CoroutineDispatcher = Dispatchers.Default,
-    /** Moteur (Réglages) : lu via this@LiveProbe (un défaut y verrait le paramètre OFF). */
-    @Volatile
-    private var depthEngine: DepthBackend = DepthBackend.DA2,
     /**
      * Fabrique de client du direct : les tests y branchent un faux transport, sans réseau.
      * Les knobs du codec masques ([LiveMaskTransport]) voyagent avec le client : la grille
@@ -70,7 +66,7 @@ class LiveProbe(
     clientFor: ((String, Long, WireMarks?) -> LiveClient)? = null,
     /** Contexte app (profondeur + collecte crops) ; `null` = désactivés (tests). */
     internal val appContext: Context? = null,
-    /** Mètre de profondeur : les tests y branchent un faux, sans modèle ni Android. */
+    /** Mètre de profondeur (serveur en production) : les tests y branchent un faux. */
     depthMeter: DepthMeter? = null,
     /** Fabrique du verrou Wi-Fi haute-perf : les tests y branchent un faux, sans radio. */
     wifiLockFactory: WifiLockFactory? = null,
@@ -80,7 +76,7 @@ class LiveProbe(
         LiveMaskTransport.clientFor(base, timeout, marks, withDepth = true)
     }
     /** Profondeur embarquée de la sonde : mêmes frames capturées, resets communs. */
-    internal val meters = ProbeMeters(scope, background, appContext, depthMeter, { depthEngine },
+    internal val meters = ProbeMeters(scope, depthMeter,
         onPredictions = { layer -> _state.update { it.copy(distanceLayer = layer, motion = ProbeBackgroundMotion.lastDebug) } })
     internal val pulse = ProbePulse(scope) { p -> _state.update { it.copy(pulse = p) } }
 
@@ -176,7 +172,6 @@ class LiveProbe(
         language: SpeechLanguage = SpeechLanguage.DEFAULT,
         crossingActive: Boolean = false,
         modelsLine: String = "",
-        depth: DepthBackend = DepthBackend.DA2,
         collectCrops: Boolean = false,
         followed: List<String> = emptyList(),
     ) {
@@ -186,7 +181,6 @@ class LiveProbe(
         voice.announce = announce
         voice.language = language
         speechLanguage = language
-        depthEngine = depth
         distances.enabled = distancesOn
         distances.setLens(lens)
         // Un fichier par configuration : recouper l'interrupteur change de fichier.
@@ -351,7 +345,6 @@ _state.update { it.cleared() }
      */
     fun onFrame(jpegB64: String, captureAtNs: Long = 0L) {
         if (!foregroundGate.foreground || jpegB64.isBlank()) return
-        meters.offer(jpegB64) // profondeur embarquée, même sans session SAM.
         val exposedAtMs = if (captureAtNs > 0L) captureAtNs / 1_000_000L else System.currentTimeMillis()
         ProbeBackgroundMotion.offer(jpegB64, exposedAtMs) // fond V1 pour les veilleurs.
         val encodedAtNs = clock()

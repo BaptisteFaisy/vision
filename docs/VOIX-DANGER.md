@@ -54,8 +54,8 @@ consigne de côté.
 **Distance** : les plans au sol (`stairs`, `sidewalk`, `crosswalk`, `pole`)
 sont `DEPTH_ONLY` (`core/.../distance/KnownSizes.kt:88`) — aucune hauteur
 typique n'est défendable, donc **jamais de sténopé**. La distance vient de la
-branche profondeur embarquée (médiane par masque calibrée, `docs/DEPTH.md`)
-ou du plan de sol si la pose est réglée.
+des médianes de profondeur du serveur (`with_depth`, médiane par masque
+calibrée, `docs/DEPTH.md`) ou du plan de sol si la pose est réglée.
 
 **Garde-fous** (miroir `StairWatcher`) : confirmation sur N frames
 consécutives (un positif isolé ne parle pas), long cooldown (un trottoir ne
@@ -135,7 +135,7 @@ fonce sur quelqu'un. Nouveau contrat, qui **remplace** le § 3 :
   `Escalier devant.` (sens inconnu). Le sens vient des mots du libellé
   (« stairs going up », exact) sinon de la hauteur de la boîte (escalier cadré
   net au-dessus du bas = montée, `StairLabelSignals`) ; le Canny seul ne voit
-  pas le sens et le gradient de profondeur embarqué reste le successeur prévu.
+  pas le sens et le gradient de profondeur (carte serveur) reste le successeur prévu.
   Un escalier ne bloque jamais le couloir : c'est une info, pas une consigne
   d'évitement.
 

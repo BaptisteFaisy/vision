@@ -96,7 +96,6 @@ internal fun LiveProbe.configureFrom(
     glassesLens: LensSpec? = null,
     fromGlasses: Boolean = GlassesVideoLink.live.value,
 ) {
-    android.util.Log.i("DepthLive", "configure profondeur=" + settings.depthBackend)
     val effective = if (prompts.isEmpty() || prompts == LivePrompts.default || prompts == LivePrompts.indoor) {
         LivePrompts.forMode(settings.outdoorMode)
     } else {
@@ -118,7 +117,6 @@ internal fun LiveProbe.configureFrom(
         language = settings.speechLanguage,
         crossingActive = crossingActive,
         modelsLine = debugModelsLine(settings),
-        depth = settings.depthBackend,
         followed = LivePrompts.followedOf(effective, settings.outdoorMode),
     )
     adaptive.configure(settings.adaptiveUploadEnabled, settings.keyframeSchedulerEnabled)

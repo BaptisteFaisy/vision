@@ -201,11 +201,9 @@ avant d'être présentés comme validés :
 - la **vérification de bascule de région EU/US** (« Tester SAM ») ;
 - les **recettes lunettes** (`app/…/glasses/` et le banc `app/…/glasses/bench/`, `Route.Bench`).
 
-## 5. Tests instrumentés (8 + 1 banc)
+## 5. Tests instrumentés (7 + 1 banc)
 
-`app/src/androidTest/…/cleanup/CaptureCleanupTest.kt` (6 tests),
-`app/src/androidTest/…/depth/DepthBenchDeviceTest.kt` (1 test : DA2 tourne sur
-appareil) et
+`app/src/androidTest/…/cleanup/CaptureCleanupTest.kt` (6 tests) et
 `app/src/androidTest/…/media/MediaDowngradeTest.kt` (1 test : rétrogradation v2
 vers v1 recréée vide, sans crash) ;
 `app/src/androidTestDebug/…/glasses/bench/MockGlassesTest.kt` (1 test — source set
@@ -216,15 +214,12 @@ jamais d'émulateur — flotte arrêtée) :
 ```bash
 phone take --task "tests instrumentés"   # depuis le poste (relâche auto après 5 min)
 cd builds/<worktree> && ANDROID_SERIAL=2c6852ac \
-  ./gradlew :app:connectedDebugAndroidTest --offline   # les 9 tests instrumentés
+  ./gradlew :app:connectedDebugAndroidTest --offline   # les 8 tests instrumentés
 phone release
 # ou, après `:app:assembleDebug :app:assembleDebugAndroidTest`, classe par classe :
 adb -s 2c6852ac install -r app/build/outputs/apk/androidTest/debug/app-debug-androidTest.apk
 adb -s 2c6852ac shell am instrument -w \
   -e class dev.sam3vision.app.cleanup.CaptureCleanupTest \
-  dev.sam3vision.app.test/androidx.test.runner.AndroidJUnitRunner
-adb -s 2c6852ac shell am instrument -w \
-  -e class dev.sam3vision.app.depth.DepthBenchDeviceTest \
   dev.sam3vision.app.test/androidx.test.runner.AndroidJUnitRunner
 adb -s 2c6852ac shell am instrument -w \
   -e class dev.sam3vision.app.media.MediaDowngradeTest \
@@ -253,13 +248,13 @@ et `TapZonesTest.kt`, listées séparément). Table régénérée mécaniquement
 (attribution positionnelle des `@Test` aux classes, vérifiée : totaux = `grep`) ;
 le script jetable n'est pas versionné.
 
-### `:core` — 2957
+### `:core` — 2972
 
 - **audio** (15) : PcmPreviewBufferTest 2, SentenceChunkerTest 5, TempWavStoreTest 5, WavTest 3
 - **crossing** (278) : CaissonEvalTest 4, CrossingAnnouncerTest 13, CrossingApproachTest 10, CrossingArrivalTest 13, CrossingFeaturesTest 4, CrossingGuidanceTest 27, CrossingLightDueTest 4, CrossingOfferTest 9, CrossingOnPathTest 18, CrossingStateTest 38, CrossingTextTest 8, CrossingTriggerExitDecisionTest 7, CrossingVoiceCommandTest 17, CrossingVoiceHysteresisTest 5, CrosswalkScanTest 21, HeadTraversePassTest 1, NoLightCrossingTest 12, PedLightColorTest 13, PedLightGateFuzzTest 5, PedLightGateLimitsTest 7, PedLightGateTest 35, TrainedLightColorTest 7
 - **curb** (87) : CurbAnnounceTest 23, CurbWatcherTest 23, SidewalkKeepTest 14, SidewalkRailTest 16, SidewalkWatcherTest 11
 - **cycle** (25) : CycleConceptsTest 5, CycleMotionTest 10, CycleWatcherTest 10
-- **depth** (56) : DepthAffineTest 7, DepthConfirmTest 9, DepthEstimatorTest 2, DepthFusionTest 9, DepthMapTest 5, DepthReadingsTest 18, SerialRunGuardTest 6
+- **depth** (48) : DepthAffineTest 7, DepthConfirmTest 9, DepthFusionTest 9, DepthMapTest 5, DepthReadingsTest 18
 - **distance** (191) : CalibrationSolverTest 3, DistanceBenchmarkTest 5, DistanceEstimatorTest 9, DistanceFusionTest 14, DistanceKalmanTest 11, DistanceMeterTest 26, DistanceTextEnglishTest 7, DistanceTextTest 8, DistortionTest 5, GroundPlaneTest 18, KnownSizesTest 28, LensSpecTest 17, OpticsTest 30, ReadingQualityTest 10
 - **exposure** (7) : ExposureGovernorTest 7
 - **gesture** (19) : IseeGestureBrainTest 5, LongPressTriggerTest 10, TapOrHoldTest 4
@@ -287,15 +282,14 @@ le script jetable n'est pas versionné.
 - **usecase** (33) : DictationUseCaseTest 4, NavigationRouterTest 15, UseCasesTest 14
 - **voicenav** (23) : NavClarifyTest 8, VoiceDestinationParserTest 15
 
-### `:app` — 1838
+### `:app` — 1843
 
 - **(racine)** (206) : BuildInfoTest 2, CaregiverShareLinkTest 6, DistanceLayoutTest 20, FirstRunPermissionsTest 3, GlassesPhotoRoutingTest 3, GoogleMapsSeedTest 3, GpuStatusLineTest 1, GpuWakeTest 8, HomePresetRequestTest 3, LiveCrossingPublishTest 5, LiveFrameDropsTest 1, LiveLocalOverlayTest 13, LiveMaskTransportTest 4, LiveMemoryContextTest 3, LiveStagePublishTest 3, LiveStateTest 21, LiveVoiceRequestTest 3, LiveVoiceTest 4, LocaleIndependenceTest 2, MicBusTest 5, ModelPinTest 7, ParentShareTest 5, PhotoTimingsTest 2, PictoOverlayTest 2, PrewarmTest 2, RouteBaseUrlSeedTest 3, RouteSeedTest 3, RouteStatusTextTest 3, SettingsSeedTest 29, ShareTrackingPolicyTest 3, SpeechClientsTest 6, TtsLogicTest 9, UiLogicTest 19
 - **cleanup** (15) : CaptureCleanerTest 6, CaptureScannerTest 5, CleanupDowngradeTest 4
-- **depth** (21) : DepthDecodeCacheTest 3, DepthInferenceNeededTest 3, DepthPreprocessTest 8, LiveDepthMeterTest 2, ModelDownloaderTest 5
 - **glasses** (177) : GlassesAnnexBTest 15, GlassesAudioPlanTest 7, GlassesAudioRouteTest 11, GlassesAutoListenTest 5, GlassesBackgroundFramesTest 6, GlassesBitmapCropTest 5, GlassesFrameCollectorTest 13, GlassesMessagesTest 8, GlassesPermissionTest 6, GlassesPhaseMappingTest 3, GlassesPolicyTest 13, GlassesSessionLifecycleTest 4, GlassesSessionRetryTest 3, GlassesStreamConfigTest 5, GlassesTalkPolicyTest 8, GlassesTalkTest 14, GlassesToggleTest 4, GlassesUiStateTest 8, GlassesVideoCropTest 5, GlassesVideoDecoderTest 10, GlassesVideoLinkTest 16, GlassesVideoRecorderTest 3, GlassesVoiceRouteTest 5
 - **glasses.bench** (98) : ChaineCompleteTest 8, CycleLatchTest 5, GlassesFrameEncoderTest 4, GlassesFramePolicyTest 32, LinkGateTest 3, SessionPolicyTest 18, SpikeLaunchTest 9, SpikeLogTest 6, YuvConverterTest 13
 - **guidemap** (8) : GuideMapStyleTest 8
-- **isee** (610) : BubbleCountTest 2, CameraHalProcessingTest 5, CrossingChipZoneTest 1, CrossingLateralTest 17, CrossingOverlayLayoutTest 19, CrossingPeopleTest 25, CrossingRecenterTest 7, CrossingSteeringTest 8, CrossingVehicleTest 16, CrossingWiringTest 19, CrosswalkScanDisplayTest 10, CrosswalkScanWiringTest 12, CutSpeakingTest 2, FramePolicyTest 2, IseeCameraLightTest 7, IseeCaptionStateTest 3, IseeGlassesInboxTest 5, IseeGlassesPhotoTest 6, IseeGuidanceMapTest 2, IseePlaybackTest 12, IseeRenderTest 12, IseeSamFrameTest 1, IseeSceneGlassesTest 8, IseeScenePhotoTest 3, IseeSceneTest 17, IseeShareTest 5, IseeStatusLineTest 5, LightCropLoggerTest 4, LiveProbeCadenceTest 7, LiveProbeCalibrationTest 6, LiveProbeCrowdTest 2, LiveProbeDepthOfferTest 2, LiveProbeForegroundTest 2, LiveProbeGuidanceTest 7, LiveProbePublishSplitTest 2, LiveProbeSchedulingTest 2, LiveProbeStateTest 1, LiveProbeSteeringTest 5, LiveProbeStopTest 5, LiveProbeTextTest 24, LiveProbeWakeTest 3, LiveVehicleVoiceTest 6, LiveWifiLockTest 14, NavButtonZonesTest 3, NoLightCrossingTest 14, ObstacleArbiterTest 17, ObstacleCurbVoiceTest 3, OnboardingGesturesTest 6, OrbGravityTest 8, OrbShaderTest 3, PictoGeneratingSpinTest 3, PictoStoreTest 8, PicturingGateTest 4, ProbeBackgroundMotionTest 7, ProbeEnsureConceptTest 7, ProbeFrameTest 2, ProbeHazardsTest 8, ProbeMetersPredictionsTest 1, ProbePulseTest 4, ProbeSlicesTest 6, ProbeSpokenFlowTest 5, ProbeStairsCountVoiceTest 5, ProbeStairsGateTest 2, ProbeStairsPriorityTest 7, ProbeStairsRoiTest 3, ProbeVoiceFenceHoleTest 2, ProbeVoiceSidewalkTest 6, ProbeVoiceTest 12, ProbeWiringSpokenTest 6, ProbeWiringStairsCountTest 5, ProbeWiringTracksTest 6, ProbeWiringWatchersTest 5, ProximityVoiceArrivalTest 6, ProximityVoicePreemptTest 10, ProximityVoiceQueueTest 8, ProximityVoiceRecordedTest 5, ProximityVoiceRepeatTest 8, ProximityVoiceRetryTest 4, ProximityVoiceRouteTest 6, ProximityVoiceTest 20, ProximityVoiceUserTest 7, ProximityVoiceWordTest 7, RevealShiftTest 4, SafetyVoiceTest 5, SendingGateTest 4, SharedCameraFrameTest 3, SoftHeldForUserTest 4, SpeakableTextTest 3, StairCannyCountTest 15
+- **isee** (611) : BubbleCountTest 2, CameraHalProcessingTest 5, CrossingChipZoneTest 1, CrossingLateralTest 17, CrossingOverlayLayoutTest 19, CrossingPeopleTest 25, CrossingRecenterTest 7, CrossingSteeringTest 8, CrossingVehicleTest 16, CrossingWiringTest 19, CrosswalkScanDisplayTest 10, CrosswalkScanWiringTest 12, CutSpeakingTest 2, FramePolicyTest 2, IseeCameraLightTest 7, IseeCaptionStateTest 3, IseeGlassesInboxTest 5, IseeGlassesPhotoTest 6, IseeGuidanceMapTest 2, IseePlaybackTest 12, IseeRenderTest 12, IseeSamFrameTest 1, IseeSceneGlassesTest 8, IseeScenePhotoTest 3, IseeSceneTest 17, IseeShareTest 5, IseeStatusLineTest 5, LightCropLoggerTest 4, LiveProbeCadenceTest 7, LiveProbeCalibrationTest 6, LiveProbeCrowdTest 2, LiveProbeForegroundTest 2, LiveProbeGuidanceTest 7, LiveProbePublishSplitTest 2, LiveProbeSchedulingTest 2, LiveProbeStateTest 1, LiveProbeSteeringTest 5, LiveProbeStopTest 5, LiveProbeTextTest 24, LiveProbeWakeTest 3, LiveVehicleVoiceTest 6, LiveWifiLockTest 14, NavButtonZonesTest 3, NoLightCrossingTest 14, ObstacleArbiterTest 17, ObstacleCurbVoiceTest 3, OnboardingGesturesTest 6, OrbGravityTest 8, OrbShaderTest 3, PictoGeneratingSpinTest 3, PictoStoreTest 8, PicturingGateTest 4, ProbeBackgroundMotionTest 7, ProbeEnsureConceptTest 7, ProbeFrameTest 5, ProbeHazardsTest 8, ProbeMetersPredictionsTest 1, ProbePulseTest 4, ProbeSlicesTest 6, ProbeSpokenFlowTest 5, ProbeStairsCountVoiceTest 5, ProbeStairsGateTest 2, ProbeStairsPriorityTest 7, ProbeStairsRoiTest 3, ProbeVoiceFenceHoleTest 2, ProbeVoiceSidewalkTest 6, ProbeVoiceTest 12, ProbeWiringSpokenTest 6, ProbeWiringStairsCountTest 5, ProbeWiringTracksTest 6, ProbeWiringWatchersTest 5, ProximityVoiceArrivalTest 6, ProximityVoicePreemptTest 10, ProximityVoiceQueueTest 8, ProximityVoiceRecordedTest 5, ProximityVoiceRepeatTest 8, ProximityVoiceRetryTest 4, ProximityVoiceRouteTest 6, ProximityVoiceTest 20, ProximityVoiceUserTest 7, ProximityVoiceWordTest 7, RevealShiftTest 4, SafetyVoiceTest 5, SendingGateTest 4, SharedCameraFrameTest 3, SoftHeldForUserTest 4, SpeakableTextTest 3, StairCannyCountTest 15
 - **isee.vm** (157) : IseeAnswersPreemptTest 2, IseeAnswersTest 22, IseeCameraCoordinatorTest 6, IseeDictationTest 13, IseeGlassesOrderTest 4, IseeLiveDictationTest 3, IseePhotoShotTest 17, IseePictoTest 20, IseePictoVoiceTest 19, IseeStatusTextTest 4, IseeSteeringOrdersTest 11, IseeStreamDictationTest 9, IseeTranscriptTest 5, IseeVoiceGateTest 6, MaisonEnterOrderTest 3, NavigationHookTest 7, PlaceModeOrderTest 6
 - **live** (160) : CalibrationSnapshotsTest 3, DistanceTickerTest 6, GlassesMireTest 7, LiveAdaptiveTest 9, LiveAskDestinationTest 5, LiveAskForgetTest 1, LiveAskSessionTest 24, LiveAskVoiceTest 6, LiveFpsMeterTest 6, LiveFrameCadenceTest 9, LiveFrameDispatcherTest 10, LiveLatencyLogTest 9, LiveLensTest 15, LiveMaskDecoderTest 6, LiveNarrationTest 5, LiveNavOrdersTest 5, LivePositionVoiceTest 7, LivePredictionTest 9, LiveTrackFallbackTest 3, LiveWakeGuardTest 7, TrackFrameBridgeTest 2, TrackTrailsTest 6
 - **locked** (10) : LockedMicAnswerTest 10
