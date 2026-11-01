@@ -112,9 +112,9 @@ object IseeClipsEn {
     const val GO_STRAIGHT_TEXT = "Straight."
 
     // Traversée exclusive : verdict (feu piéton puis voitures).
-    const val VERDICT_CROSS = "verdict_cross"
-    const val VERDICT_CROSS_TEXT = "Cross now."
-    const val VERDICT_WAIT = "verdict_wait"
+    const val VERDICT_CROSS = "verdict-cross"
+    const val VERDICT_CROSS_TEXT = "Cross."
+    const val VERDICT_WAIT = "verdict-dont-cross"
     const val VERDICT_WAIT_TEXT = "Don't cross."
 
     // Ordres dictée : modes dehors/dedans + traversée (clips existants).
