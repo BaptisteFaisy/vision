@@ -344,7 +344,7 @@ _state.update { it.cleared() }
         if (!foregroundGate.foreground || jpegB64.isBlank()) return
         meters.offer(jpegB64) // profondeur embarquée, même sans session SAM.
         val exposedAtMs = if (captureAtNs > 0L) captureAtNs / 1_000_000L else System.currentTimeMillis()
-        ProbeBackgroundMotion.offer(jpegB64, exposedAtMs) // fond V1 pour les veilleurs.
+        ProbeBackgroundMotion.post(jpegB64, exposedAtMs) // fond V1 pour les veilleurs, hors thread analyseur
         val encodedAtNs = clock()
         val active = (if (warmed) session else coldSession) ?: run {
             android.util.Log.w("sam3vision", "frame ignorée : aucune session SAM (endpoint vide ?)")
