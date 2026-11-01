@@ -143,6 +143,13 @@ class WsLiveClient(
     /** Vrai tant que le socket est ouvert — l'UI s'en sert pour dire « WebSocket » ou « KO ». */
     val isConnected: Boolean get() = synchronized(lock) { connected }
 
+    /**
+     * Handshake anticipé : ouvre le socket sans envoyer, pour que la première frame parte
+     * sur un transport déjà prêt. Idempotent ([openLocked] ne rouvre jamais un socket
+     * ouvert) et sans attente : le handshake se fait en fond, l'appelant continue.
+     */
+    override fun preconnect(): Boolean = synchronized(lock) { openLocked() }
+
     /** Le WebSocket ne sert pas au health : un seul appel `/health`, celui du client HTTP. */
     override suspend fun health(): Result<LiveHealth> = http.health()
 

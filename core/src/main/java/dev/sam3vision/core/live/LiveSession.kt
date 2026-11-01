@@ -97,6 +97,12 @@ class LiveSession(
     val socketOpen: Boolean get() = (client as? WsLiveClient)?.isConnected ?: false
 
     /**
+     * Handshake anticipé (voir [LiveClient.preconnect]) : à appeler dès la liaison caméra,
+     * pour que la première frame parte sans attendre l'ouverture du socket.
+     */
+    fun preconnect(): Boolean = client.preconnect()
+
+    /**
      * Régulateur de latence : referme à un créneau dès que la moyenne dépasse le budget,
      * ne rouvre que si elle est **franchement** en dessous ([RELAX_RATIO]). L'hystérésis
      * évite le va-et-vient : sans elle, on rouvrirait, la latence doublerait, on

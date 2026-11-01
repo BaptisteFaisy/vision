@@ -203,7 +203,7 @@ class LiveViewModel(app: Application) : AndroidViewModel(app) {
             LiveTransportLog.info("session track ouverte base=" + base)
         } else {
             val live = LiveMaskTransport.clientFor(base, marks = chronology)
-            client = live
+            client = live.also { it.preconnect() } // handshake anticipé : la 1re frame part prête.
             session = LiveSession(live, prompts = _state.value.prompts, maxObjects = this.settings.objectsOnScreen)
         }
         LiveTransportLog.info("start transport=" + if (trackerEnabled) TRANSPORT_TRACK else TRANSPORT_WS)

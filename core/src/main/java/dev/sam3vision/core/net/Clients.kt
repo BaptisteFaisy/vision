@@ -68,6 +68,14 @@ interface LiveClient {
 
     suspend fun health(): Result<LiveHealth>
 
+    /**
+     * Ouvre le transport sans envoyer (`false` = pas de socket, ou ouverture refusée).
+     * Idempotent : la frame suivante réutilise le socket déjà ouvert au lieu de payer le
+     * handshake sur son chemin critique. Appelé dès la liaison caméra, le handshake (~1
+     * aller-retour) recouvre l'encodage JPEG au lieu de suivre la première frame.
+     */
+    fun preconnect(): Boolean = false
+
     /** Libère les ressources (socket, connexions) : sans effet pour un client HTTP. */
     fun close() {}
 }
