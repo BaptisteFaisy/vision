@@ -1,5 +1,7 @@
 package dev.sam3vision.core.live
 
+import java.util.concurrent.atomic.AtomicLong
+
 /**
  * Pompe du direct : **une frame en vol, une seule en réserve, jamais de file**.
  *
@@ -39,8 +41,19 @@ class LivePump(
     /** Une frame attend-elle en réserve ? */
     val pending: Boolean get() = reserve.pending
 
-    /** Frames **jetées** parce que la réserve était déjà pleine (jamais mises en file). */
-    val droppedFrames: Long get() = reserve.droppedFrames
+    /**
+     * Offres refusées par la cadence (créneau libre mais échéance pas écoulée) :
+     * jetées sans passer par la réserve. Compteur atomique : la caméra dépose
+     * pendant que le thread des réponses vide.
+     */
+    private val droppedEarly = AtomicLong()
+
+    /**
+     * Frames **jetées** : réserve pleine (remplacées par une plus fraîche) et
+     * offres trop précoces (jamais mises en file). Les vides et les sans-session
+     * ne comptent pas : il n'y avait rien à jeter.
+     */
+    val droppedFrames: Long get() = reserve.droppedFrames + droppedEarly.get()
 
     /** Nouvelle séance : le prochain créneau est immédiat et la réserve est vidée. */
     fun reset() {
@@ -63,8 +76,8 @@ class LivePump(
     /**
      * Dépose une frame caméra. `true` = elle doit partir **maintenant** (l'appelant envoie
      * avec ses propres valeurs) ; `false` = elle est en réserve (une requête est en vol) ou
-     * jetée (offerte trop tôt, jamais mise en file). Une frame vide n'est jamais ni envoyée
-     * ni réservée.
+     * jetée (offerte trop tôt, jamais mise en file, comptée dans [droppedFrames]).
+     * Une frame vide n'est jamais ni envoyée ni réservée.
      */
     fun offer(jpegB64: String, captureAtNs: Long = 0L, encodedAtNs: Long = 0L): Boolean {
         if (jpegB64.isBlank()) return false
@@ -74,7 +87,10 @@ class LivePump(
             return false
         }
         val now = clock()
-        if (now < nextTickAt) return false
+        if (now < nextTickAt) {
+            droppedEarly.incrementAndGet()
+            return false
+        }
         markTick(active, now)
         return true
     }

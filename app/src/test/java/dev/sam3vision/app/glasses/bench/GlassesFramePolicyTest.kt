@@ -1,5 +1,6 @@
 package dev.sam3vision.app.glasses.bench
 
+import dev.sam3vision.app.glasses.COLLECTOR_THROTTLE_MS
 import dev.sam3vision.app.glasses.CropRect
 import dev.sam3vision.app.glasses.FRAME_THROTTLE_MS
 import dev.sam3vision.app.glasses.FrameVerdict
@@ -194,6 +195,19 @@ class GlassesFramePolicyTest {
     fun `la fenetre par defaut est celle du LLM`() {
         assertEquals(1_500L, FRAME_THROTTLE_MS)
         assertEquals(FRAME_THROTTLE_MS, throttleDelayMs(lastSentAtMs = 5L, nowMs = 5L))
+    }
+
+    @Test
+    fun `la fenetre de production est de 400 ms`() {
+        assertEquals(400L, COLLECTOR_THROTTLE_MS)
+        assertEquals(
+            1L,
+            throttleDelayMs(lastSentAtMs = 10_000L, nowMs = 10_000L + COLLECTOR_THROTTLE_MS - 1, throttleMs = COLLECTOR_THROTTLE_MS),
+        )
+        assertEquals(
+            0L,
+            throttleDelayMs(lastSentAtMs = 10_000L, nowMs = 10_000L + COLLECTOR_THROTTLE_MS, throttleMs = COLLECTOR_THROTTLE_MS),
+        )
     }
 
     // ---- Verdict sur une frame brute ---------------------------------------

@@ -1,10 +1,13 @@
 package dev.sam3vision.app.glasses
 
 import com.meta.wearable.dat.camera.types.VideoFrame
+import dev.sam3vision.core.live.LinkDrop
 import java.nio.ByteBuffer
+import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.flow
 import kotlinx.coroutines.flow.flowOf
 import kotlinx.coroutines.runBlocking
+import kotlinx.coroutines.withTimeout
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertTrue
 import org.junit.Test
@@ -15,10 +18,11 @@ import org.junit.Test
  * (`Bitmap`) sont injectés en faux — seul le vrai chemin YUV brut
  * ([videoFrameToArgb]) tourne ici, avec une frame 2×2 construite à la main.
  *
- * Ce que ces tests verrouillent : un throttling d'~1 frame/1,5 s par rejet
+ * Ce que ces tests verrouillent : un throttling d'~1 frame/400 ms par rejet
  * (pas d'attente qui suspendrait le flux), le routage compressé → décodeur /
- * brut → YUV / config → `csd-0`, et le silence documenté de chaque jet
- * (journalisé, jamais levé).
+ * brut → YUV / config → `csd-0`, le pipeline (le décodage chevauche l'envoi
+ * précédent, les envois restent ordonnés), et le silence documenté de chaque
+ * jet (journalisé et compté par cause, jamais levé).
  */
 class GlassesFrameCollectorTest {
 
@@ -28,6 +32,7 @@ class GlassesFrameCollectorTest {
         var failDecode: Boolean = false,
     ) : GlassesVideoDecoder() {
         var stashed = 0
+        @Volatile
         var decoded = 0
         var released = false
 
@@ -48,6 +53,7 @@ class GlassesFrameCollectorTest {
     private var now = 100_000L
     private val frames = mutableListOf<JpegFrame>()
     private val journal = mutableListOf<String>()
+    private val drops = mutableListOf<LinkDrop>()
 
     private fun collector(decoder: FakeDecoder) = GlassesFrameCollector(
         decoder = decoder,
@@ -55,6 +61,7 @@ class GlassesFrameCollectorTest {
         onLog = { journal += it },
         nowMs = { now },
         encode = { image, _ -> JpegFrame("b64-${image.width}x${image.height}", image.width, image.height, 1L) },
+        onDrop = { drops += it },
     )
 
     /** Frame brute 2×2 I420 valide (4 Y + 1 U + 1 V) : le vrai YUV la convertit. */
@@ -173,5 +180,94 @@ class GlassesFrameCollectorTest {
         collector(decoder).close()
 
         assertTrue(decoder.released)
+    }
+
+    @Test
+    fun `la fenetre de production est de 400 ms`() = runBlocking {
+        val video = flow {
+            emit(rawFrame())
+            now += COLLECTOR_THROTTLE_MS - 1
+            emit(rawFrame())
+            now += 1
+            emit(rawFrame())
+        }
+
+        collector(FakeDecoder()).run(video)
+
+        assertEquals("2 frames dues sur 3", 2, frames.size)
+        assertEquals(listOf(LinkDrop.THROTTLE), drops)
+    }
+
+    @Test
+    fun `une frame etranglee est comptee avant toute copie ni decodage`() = runBlocking {
+        val decoder = FakeDecoder()
+        var encoded = 0
+        val pump = GlassesFrameCollector(
+            decoder = decoder,
+            onFrame = { frames += it },
+            onLog = { journal += it },
+            nowMs = { now },
+            encode = { image, _ ->
+                encoded += 1
+                JpegFrame("b64", image.width, image.height, 1L)
+            },
+            onDrop = { drops += it },
+        )
+
+        // Même instant : la seconde est étranglée avant de toucher le décodeur.
+        pump.run(flowOf(compressedFrame(), compressedFrame()))
+
+        assertEquals(1, frames.size)
+        assertEquals("seule la frame due est décodée", 1, decoder.decoded)
+        assertEquals("seule la frame due est encodée", 1, encoded)
+        assertEquals(listOf(LinkDrop.THROTTLE), drops)
+    }
+
+    @Test
+    fun `un encodage en echec est compte ENCODE_FAIL`() = runBlocking {
+        val muet = GlassesFrameCollector(
+            decoder = FakeDecoder(),
+            onFrame = { frames += it },
+            onLog = { journal += it },
+            nowMs = { now },
+            encode = { _, _ -> null },
+            onDrop = { drops += it },
+        )
+
+        muet.run(flowOf(rawFrame()))
+
+        assertTrue(frames.isEmpty())
+        assertEquals(listOf(LinkDrop.ENCODE_FAIL), drops)
+    }
+
+    @Test
+    fun `le decodage chevauche l envoi precedent, les envois restent ordonnes`() = runBlocking {
+        val decoder = FakeDecoder()
+        var encoded = 0
+        val pipe = GlassesFrameCollector(
+            decoder = decoder,
+            // Chaque envoi attend le second décodage : en séquentiel, le premier
+            // envoi s'achèverait avant lui et le garde temporel lâcherait.
+            onFrame = { frame ->
+                withTimeout(5_000L) { while (decoder.decoded < 2) delay(10L) }
+                frames += frame
+            },
+            onLog = { journal += it },
+            nowMs = { now },
+            encode = { image, _ ->
+                encoded += 1
+                JpegFrame("b64-$encoded", image.width, image.height, 1L)
+            },
+        )
+        val video = flow {
+            emit(compressedFrame())
+            now += COLLECTOR_THROTTLE_MS
+            emit(compressedFrame())
+        }
+
+        pipe.run(video)
+
+        assertEquals("deux décodages, deux envois", 2, decoder.decoded)
+        assertEquals("envois dans l'ordre d'admission", listOf("b64-1", "b64-2"), frames.map { it.base64 })
     }
 }
