@@ -173,7 +173,7 @@ internal fun UserSection(
     }
 }
 
-/** Blind / Caregiver reliés : un seul segment blanc à contour noir, pastille à coche sur le choix actif. */
+/** Linked Blind / Caregiver: a single white black-outlined segment, checked dot on the active pick. */
 @Composable
 private fun RoleSegmentedControl(isCaregiver: Boolean, onBlind: () -> Unit, onCaregiver: () -> Unit) {
     Row(

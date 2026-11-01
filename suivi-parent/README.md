@@ -1,147 +1,146 @@
-# Suivi caregiver — session iSee partagée
+# Caregiver tracking — shared iSee session
 
-> **Site abandonné (2026-10-28).** Le relais que l'app utilise par défaut est
-> `../suivi-relais/` (Worker + D1) ; ce déploiement Vercel est resté figé au
-> 27/10 21 h 03 et refusait les écritures des installations neuves (403). Ce
-> dossier ne sert plus que de source de la page embarquée dans l'APK (tâche
-> Gradle `caregiverAssets`) et de référence pour l'ancien contrat.
+> **Abandoned site (2026-10-28).** The relay the app uses by default is
+> `../suivi-relais/` (Worker + D1); this Vercel deployment stayed frozen at
+> 27/10 9:03 PM and refused writes from fresh installs (403). This
+> folder now only serves as the source of the page embedded in the APK (Gradle
+> task `caregiverAssets`) and as a reference for the old contract.
 
-Page mobile utilisée par le lien envoyé au proche et par la WebView Caregiver
-Android : fond blanc, boule Portrait cacao et caramel en haut, **image du
-téléphone accompagné** en bas (dernière frame caméra, 480 px, pleine largeur
-fondue dans le blanc comme la rue côté accompagné), **dessins des objets
-reconnus** et, pendant un trajet guidé, une **barre de progression liquide**
-du départ à l'arrivée. Aucune phrase sous la boule.
+Mobile page used by the link sent to the loved one and by the Android Caregiver
+WebView: white background, cocoa-and-caramel Portrait orb on top, the
+**accompanied phone's picture** at the bottom (latest camera frame, 480 px, full
+width fading into white like the street on the accompanied side), **drawings of
+the recognized objects** and, during a guided trip, a **liquid progress bar**
+from start to destination. No sentence under the orb.
 
-L'interface Android est embarquée dans chaque APK depuis ce dossier (tâche
-Gradle `caregiverAssets`). La WebView intercepte uniquement ces fichiers locaux
-sous `/.isee-caregiver/` ; les appels `/api/state` restent sur l'origine du lien
-partagé. Une ancienne version du site ne peut donc plus remplacer le design
-de l'app installée.
+The Android UI ships in every APK from this folder (Gradle task
+`caregiverAssets`). The WebView only intercepts these local files under
+`/.isee-caregiver/`; `/api/state` calls stay on the shared link's origin. An
+older version of the site can therefore never replace the installed app's
+design.
 
-L'écran tient dans la hauteur du téléphone, sans défilement, barre de retour
-ni titre Caregiver : la boule en haut, puis les objets et le trajet, puis
-l'image du proche qui occupe le bas jusqu'au bord, sans cadre ni contour,
-fondue dans le blanc vers le haut (miroir de la rue côté accompagné, qui est
-en haut). L'état LIVE / SIGNAL LOST / OFFLINE est dans une pastille arrondie
-en haut à droite, aux dimensions du badge Portrait. La roue dentée noire ouvre
-les paramètres Android (lien reçu), sans aucun réglage de fond de carte : la
-carte a été retirée.
+The screen fits the phone height, with no scrolling, no back bar and no
+Caregiver title: the orb on top, then objects and trip, then the loved one's
+picture filling the bottom to the edge, with no frame or outline, fading into
+white upwards (mirroring the street on the accompanied side, which sits on
+top). The LIVE / SIGNAL LOST / OFFLINE state lives in a rounded pill at the
+top right, sized like the Portrait badge. The black cog opens the Android
+settings (received link), with no map-background setting of any kind: the
+map was removed.
 
-## Ouvrir la bonne session sur un autre téléphone
+## Opening the right session on another phone
 
-1. Sur le téléphone accompagné : configurer un identifiant de flux par proche
-   dans Réglages → Suivi parent, puis « Partager le suivi ».
-2. Le caregiver ouvre le lien reçu (`https://…/?share=<identifiant>`) dans son
-   navigateur, ou le colle dans **Settings → THE USER → Invite link or code**
-   dans son app en rôle Caregiver.
-3. La page lit uniquement ce flux. Sans lien valide, aucune session implicite
-   n'est choisie. Aucune position du téléphone caregiver n'est demandée.
+1. On the accompanied phone: set one stream id per loved one in
+   Settings → Share tracking, then share it.
+2. The caregiver opens the received link (`https://…/?share=<id>`) in their
+   browser, or pastes it into **Settings → THE USER → Invite link or code**
+   in their app in the Caregiver role.
+3. The page reads only that stream. Without a valid link, no implicit session
+   is picked. No position from the caregiver phone is ever requested.
 
-Le rôle Caregiver interdit aussi les publications Android : ni l'écran Direct
-ni un ancien service de suivi ne peut envoyer sa position à la place du proche.
+The Caregiver role also forbids Android publishing: neither the Direct screen
+nor an old tracking service can send its position instead of the loved one.
 
-## Rendu et données
+## Rendering and data
 
-- La boule reprend le shader Portrait Android, avec un liquide cacao et caramel
-  (proposition 32 de la planche de couleurs), un rayon de 24 % de la largeur et
-  un plafond de 100 px CSS. À la racine, `python tools/export-caregiver-orb.py`
-  régénère son port WebGL depuis la source AGSL, qui reste la seule vérité :
-  le haut du verre y répond en deux teintes du liquide (le bleu profond de la
-  palette et son or ; ici deux cacao), sans rose ni vert, et sans laver la boule
-  de couleur. Repli en verre cacao et caramel si WebGL est indisponible (mêmes
-  variables `--orb-color-*`).
-- Aucune phrase affichée : la narration (`session.mjs`, encore testée) ne
-  remonte plus à l'écran ; seuls le badge d'état et la note de la zone caméra
-  parlent (lien absent, lien mort).
-- Les déplacements GPS distinguent avance, recul et décalage par rapport au
-  cap précédent. Le déplacement doit dépasser la somme des incertitudes GPS et
-  être compatible avec une marche. Aucun petit pas en intérieur ni contournement
-  n'est affirmé à partir d'une simple consigne. Sans position (paquet sans
-  GPS), aucun déplacement n'est affirmé. La précision reste limitée par
-  le GPS du téléphone accompagné.
-- Image : la caméra du proche s'affiche **seulement pendant qu'il la fait
-  tourner** — flux LIVE et frame de moins de 8 s, en `object-fit: cover`,
-  pleine largeur jusqu'au bord bas, sans cadre ni contour, fondue dans le
-  blanc vers le haut. Hors de là, aucun cadre, aucune image ni texte : la
-  section se replie et l'image la rouvre dès que la caméra tourne. Seuls un
-  lien absent (« Open the tracking link shared by your loved one. ») et un lien
-  mort (`NO_STREAM_TEXT`) s'écrivent dans la zone caméra. L'avis caméra de la
-  salle (`{"type":"camera","on":false}`) efface l'image aussitôt, direct comme
-  photo lente, sans attendre les 8 s.
-- **Direct** : quand le relais expose la salle WebSocket (`/ws`), la page s'y
-  connecte (`live-stream.mjs`) et affiche les frames **au fil de l'eau** —
-  15 im/s, une image de moins de 600 ms vaut « maintenant ». La photo de
-  `/api/state` (une toutes les 2 s) reste le repli si le WebSocket échoue ou
-  n'existe pas : la page ne dépend d'aucun déploiement pour fonctionner.
-  La salle dit aussi quand la caméra s'allume ou s'éteint
-  (`{"type":"camera","on":…}`, émis ou transmis depuis le téléphone) : la page
-  efface l'image dès `on:false` et repart sur `on:true` ou la frame suivante.
-- Repères : les objets reconnus par le téléphone (pictogrammes créés à la voix)
-  s'affichent en bandeau, **en dessins** avec leur nom — flux LIVE et détection
-  de moins de 8 s, comme l'image. Sans détection, pas de bandeau.
-- Trajet : pendant un guidage iSee, une barre du départ à l'arrivée. Le liquide
-  (dégradé bleu → vert de la boule) et la bille avancent à `progress` ; le reste
-  s'écrit « 300 m to go · 4 min ». La barre disparaît dès que le guidage
-  s'arrête et se fige (atténuée) quand le flux n'est plus LIVE.
-- LIVE avant 12 s ; SIGNAL LOST jusqu'à 2 min (objets et position figés en gris) ;
-  OFFLINE ensuite (aucun repère). Aucune simulation en production.
-- NO STREAM quand le relais ne connaît pas l'identifiant (`{ok:true, live:false}`
-  sans `serverAt`, ou flux purgé après 24 h) : la zone caméra le dit et propose de
-  redemander le lien, au lieu d'attendre indéfiniment un téléphone qui n'existe
-  plus — un lien périmé (app réinstallée, nouvel identifiant) ne ressemble plus
-  trait pour trait à un proche pas encore en direct.
+- The orb reuses the Android Portrait shader, with a cocoa-and-caramel liquid
+  (proposal 32 of the color board), a 24%-of-width radius and a 100 CSS px cap.
+  From the root, `python tools/export-caregiver-orb.py` regenerates its WebGL
+  port from the AGSL source, which stays the single truth: the glass top
+  answers in two liquid hues (the palette's deep blue and its gold; here two
+  cocoas), with no pink or green, and without washing the orb in color. Cocoa-
+  and-caramel glass fallback when WebGL is unavailable (same `--orb-color-*`
+  variables).
+- No sentence shown: the narration (`session.mjs`, still tested) no longer
+  reaches the screen; only the state badge and the camera-area note speak
+  (missing link, dead link).
+- GPS moves tell forward, back and sideways apart against the previous
+  heading. A move must exceed the summed GPS uncertainties and fit a walk. No
+  small indoor step or detour is ever claimed from a mere instruction. With no
+  position (packet without GPS), no move is claimed. Accuracy stays limited by
+  the accompanied phone's GPS.
+- Picture: the loved one's camera shows **only while they run it** — LIVE
+  stream and frame under 8 s, in `object-fit: cover`, full width to the bottom
+  edge, with no frame or outline, fading into white upwards. Anywhere else, no
+  frame, picture or text: the section folds and the picture reopens it as soon
+  as the camera runs. Only a missing link (« Open the tracking link shared by
+  your loved one. ») and a dead link (`NO_STREAM_TEXT`) are written in the
+  camera area. The room's camera notice (`{"type":"camera","on":false}`) clears
+  the picture at once, live and slow photo alike, without waiting out the 8 s.
+- **Live**: when the relay exposes the WebSocket room (`/ws`), the page
+  connects (`live-stream.mjs`) and shows frames **as they flow** — 15 fps, a
+  picture under 600 ms old counts as "now". The `/api/state` photo (one every
+  2 s) stays the fallback when the WebSocket fails or does not exist: the page
+  depends on no deployment to work. The room also tells when the camera turns
+  on or off (`{"type":"camera","on":…}`, emitted or forwarded from the phone):
+  the page clears the picture on `on:false` and resumes on `on:true` or the
+  next frame.
+- Landmarks: the objects the phone recognized (voice-created pictograms) show
+  in a strip, **as drawings** with their name — LIVE stream and detection
+  under 8 s, like the picture. No detection, no strip.
+- Trip: during iSee guidance, a bar from start to destination. The liquid
+  (the orb's liquid gradient) and the ball advance with `progress`; the rest
+  reads « 300 m to go · 4 min ». The bar goes away as soon as guidance stops
+  and freezes (dimmed) when the stream is no longer LIVE.
+- LIVE before 12 s; SIGNAL LOST up to 2 min (objects and position frozen in
+  grey); OFFLINE after (no landmarks). No simulation in production.
+- NO STREAM when the relay does not know the id (`{ok:true, live:false}`
+  without `serverAt`, or stream pruned after 24 h): the camera area says so
+  and offers to ask for the link again, instead of endlessly waiting for a
+  phone that no longer exists — a stale link (reinstalled app, new id) no
+  longer looks exactly like a loved one not yet live.
 
-## Flux
+## Flow
 
-Le téléphone accompagné publie toutes les deux secondes pendant iSee ou Direct :
+The accompanied phone publishes every two seconds during iSee or Direct:
 
 ```text
 POST /api/share
 {shareId, writeKey, fix?:{lat,lon,accM,headingDeg,atMs,indoor},
  objects:[{label,distM,angleDeg}], scene:{text,fromUser,speaking},
  photo:{jpeg,atMs}, trip:{destination,totalM,remainingM,remainingS,progress}}
-GET /api/state?share=<identifiant>
+GET /api/state?share=<id>
 ```
 
-`fix`, `scene`, `photo` et `trip` sont facultatifs : un téléphone sans GPS
-(intérieur, démarrage, permission refusée) publie quand même sa caméra, sa
-phrase et ses repères — sinon la page restait OFFLINE alors que la caméra
-tournait ; un paquet sans position n'invente aucun déplacement. Le texte est
-borné à 2 000 caractères et l'image base64 à 120 000. Le
-service reprend la position seule en arrière-plan, sans inventer les objets
-d'une caméra fermée ; le relais iSee conserve alors la dernière image avec son
-âge, et la page ne l'affiche jamais : une caméra s'affiche parce qu'elle tourne,
-pas parce qu'une image traîne. Le relais
-utilise l'origine du site, même si les réglages contiennent un lien complet avec
+`fix`, `scene`, `photo` and `trip` are optional: a phone without GPS
+(indoors, starting up, refused permission) still publishes its camera, its
+sentence and its landmarks — otherwise the page stayed OFFLINE while the
+camera ran; a packet without a position invents no move. Text is capped at
+2,000 characters and the base64 picture at 120,000. The
+service resumes position alone in the background, without inventing the
+objects of a closed camera; the iSee relay then keeps the last picture with
+its age, and the page never shows it: a camera shows because it runs,
+not because a picture lingers. The relay
+uses the site's origin, even when the settings hold a full link with
 `?share=`.
 
-## Vérification locale
+## Local check
 
-Depuis la racine, sans dépendance npm :
+From the root, with no npm dependency:
 
 ```bash
 node --test suivi-parent/test/session.test.mjs suivi-parent/test/relay.test.mjs suivi-parent/test/live-view.test.mjs
 node suivi-parent/test/preview-server.cjs
 ```
 
-Prévisualisation : `http://127.0.0.1:8836/?share=ton-flux`. Le serveur local
-utilise les handlers Vercel et un stockage mémoire isolé de la production.
-Tests : deux flux indépendants, rétrocompatibilité, cap des objets, déconnexion,
-bruit GPS, image et trajet reçus, éclairage des mots.
+Preview: `http://127.0.0.1:8836/?share=your-stream`. The local server
+uses the Vercel handlers and memory storage isolated from production.
+Tests: two independent streams, backward compatibility, object cap,
+disconnect, GPS noise, received picture and trip, word highlight.
 
-## Hébergement
+## Hosting
 
-Racine Vercel : `suivi-parent/`, framework « Other », build vide. Les modules
-`.mjs`, le CSS et le shader généré sont statiques ; `api/` n'a pas de dépendance npm.
+Vercel root: `suivi-parent/`, « Other » framework, empty build. The
+`.mjs` modules, CSS and generated shader are static; `api/` has no npm
+dependency.
 
-- `SHARE_WRITE_KEY` : si définie, même clé dans les réglages de l'émetteur.
-- `UPSTASH_REDIS_REST_URL` + `UPSTASH_REDIS_REST_TOKEN`, ou les noms Vercel KV
-  `KV_REST_API_URL` + `KV_REST_API_TOKEN` : stockage partagé entre instances.
-  Le repli mémoire est réservé au développement.
+- `SHARE_WRITE_KEY`: when set, same key in the sender's settings.
+- `UPSTASH_REDIS_REST_URL` + `UPSTASH_REDIS_REST_TOKEN`, or the Vercel KV names
+  `KV_REST_API_URL` + `KV_REST_API_TOKEN`: storage shared across instances.
+  The memory fallback is for development only.
 
-La page ne dépend plus d'aucun fournisseur de carte : ni MapLibre, ni clé
-Google, ni appel réseau tiers. L'image affichée est celle que le téléphone
-publié dans `photo` (frame JPEG base64) et la barre lit `trip` ; les deux
-champs sont facultatifs, donc un appareil d'avant continue de partager
-position, objets et phrase.
+The page no longer depends on any map provider: no MapLibre, no Google
+key, no third-party network call. The shown picture is the one the phone
+published in `photo` (base64 JPEG frame) and the bar reads `trip`; both
+fields are optional, so an older device keeps sharing
+position, objects and sentence.

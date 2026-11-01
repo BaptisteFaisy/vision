@@ -6,13 +6,13 @@ import java.text.Normalizer
 
 const val CAREGIVER_ASSET_PREFIX = "/.isee-caregiver/"
 
-/** Seul identifiant accepté par le relais et par `?share=`. */
+/** Only id accepted by the relay and by `?share=`. */
 private val SHARE_ID = Regex("[a-z0-9-]{1,32}")
 
 /**
- * Identifiant de flux assaini : le relais n'accepte que `[a-z0-9-]{1,32}` et lit
- * `?share=` tel quel. Sans ça, « Léo » partait en POST mais répondait 400, pendant
- * que la page lisait un autre flux — suivi noir des deux côtés, sans un mot.
+ * Sanitized stream id: the relay only accepts `[a-z0-9-]{1,32}` and reads
+ * `?share=` as-is. Without this, "Léo" went out in POST but answered 400,
+ * while the page read another stream — black tracking on both sides, not a word.
  */
 fun normalizeShareId(raw: String): String {
     val ascii = Normalizer.normalize(raw.trim().lowercase(), Normalizer.Form.NFD)
@@ -20,9 +20,9 @@ fun normalizeShareId(raw: String): String {
 }
 
 /**
- * Identifiant de flux porté par une invitation : lien complet (`?share=`), paramètre
- * seul (`?share=leo`) ou code nu (`leo`). `null` = rien d'exploitable : un lien sans
- * identifiant ne retombe **jamais** sur le flux local de ce téléphone.
+ * Stream id carried by an invite: full link (`?share=`), lone parameter
+ * (`?share=leo`) or bare code (`leo`). `null` = nothing usable: a link
+ * without an id **never** falls back to this phone's local stream.
  */
 fun shareIdOf(raw: String): String? {
     val text = raw.trim()
@@ -33,10 +33,10 @@ fun shareIdOf(raw: String): String? {
 }
 
 /**
- * Lien de suivi d'un identifiant, **toujours reconstruit sur le relais de l'app**
- * ([Settings.DEFAULT_PARENT_SITE_URL]). Un ancien lien (`suivi-parent.vercel.app`,
- * `…freebuff.page`) n'en garde que son identifiant : ces hôtes ne servent plus rien
- * et refusent les écritures, donc le rouvrir ne montrerait rien.
+ * Tracking link of an id, **always rebuilt on the app relay**
+ * ([Settings.DEFAULT_PARENT_SITE_URL]). An old link (`suivi-parent.vercel.app`,
+ * `…freebuff.page`) only keeps its id: those hosts no longer serve anything
+ * and refuse writes, so reopening it would show nothing.
  */
 fun relayShareLink(shareId: String, base: String = Settings.DEFAULT_PARENT_SITE_URL): String? {
     val id = normalizeShareId(shareId)
@@ -49,17 +49,18 @@ fun relayShareLink(shareId: String, base: String = Settings.DEFAULT_PARENT_SITE_
 }
 
 /**
- * Anciens relais, abandonnés : le site Vercel (déploiement figé, écritures refusées)
- * et l'hôte gratuit `…freebuff.page` (502 « Site unavailable » le 29/10 au soir, alors
- * que le Worker répondait encore). Un lien reçu d'avant la bascule n'en garde que son
- * identifiant : le rouvrir ne montrerait rien puisque la page y appelle `/api/state`.
+ * Old relays, abandoned: the Vercel site (frozen deploy, refused writes)
+ * and the free `…freebuff.page` host (502 "Site unavailable" on the evening
+ * of 29/10, while the Worker still answered). A link from before the switch
+ * only keeps its id: reopening it would show nothing since the page calls
+ * `/api/state` there.
  */
 private val LEGACY_RELAY_HOSTS = setOf("suivi-parent.vercel.app")
 
-/** Suffixes d'hébergement gratuits abandonnés : l'identifiant du site varie, l'hôte non. */
+/** Abandoned free-hosting suffixes: the site id varies, the host does not. */
 private val LEGACY_RELAY_SUFFIXES = listOf(".freebuff.page")
 
-/** Vrai si l'URL vient d'un relais abandonné, quel que soit son chemin (`?share=` compris). */
+/** True when the URL comes from an abandoned relay, whatever its path (`?share=` included). */
 fun isLegacyRelayUrl(url: String): Boolean {
     val at = url.indexOf("://")
     val host = url.substring(if (at >= 0) at + 3 else 0)
@@ -68,17 +69,17 @@ fun isLegacyRelayUrl(url: String): Boolean {
 }
 
 /**
- * Base réellement utilisée pour publier : une URL vide ou héritée du site abandonné
- * retombe sur le relais de l'app. Sans ça, une installation d'avant la bascule
- * continuait de poster dans le vide jusqu'à ce que l'écran des Réglages s'ouvre.
+ * Base actually used to publish: an empty URL, or one inherited from the
+ * abandoned site, falls back to the app relay. Without this, a pre-switch
+ * install kept posting into the void until the Settings screen opened.
  */
 fun relayBaseOf(url: String): String =
     if (url.isBlank() || isLegacyRelayUrl(url)) Settings.DEFAULT_PARENT_SITE_URL else url
 
 /**
- * Même origine que le relais : la page vient de l'APK, les appels `/api/state` du
- * relais. Seuls `share` (le flux) et `embedded` traversent l'URL ; une ancienne
- * clé de fond de carte (`key`, carte supprimée) est retirée du lien reçu.
+ * Same origin as the relay: the page comes from the APK, `/api/state` calls
+ * from the relay. Only `share` (the stream) and `embedded` cross the URL; an
+ * old map-background key (`key`, map removed) is stripped from the received link.
  */
 fun caregiverPageUrl(link: String): String {
     val url = link.toHttpUrlOrNull() ?: Settings.DEFAULT_PARENT_SITE_URL.toHttpUrlOrNull()!!
@@ -88,7 +89,7 @@ fun caregiverPageUrl(link: String): String {
         .build().toString()
 }
 
-/** Seuls les fichiers de l'interface embarquée peuvent être lus dans assets/. */
+/** Only the embedded UI files may be read from assets/. */
 fun caregiverAssetName(url: String, pageUrl: String): String? {
     val request = url.toHttpUrlOrNull() ?: return null
     val page = pageUrl.toHttpUrlOrNull() ?: return null

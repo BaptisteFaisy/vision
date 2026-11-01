@@ -7,19 +7,19 @@ import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 
 /**
- * Dernier problème du suivi, lisible dans les Réglages : refus du relais, relais
- * injoignable, ou position jamais reçue (localisation refusée). Sans ce retour, un
- * partage qui échoue est indiscernable d'un proche qui n'a rien à envoyer — c'est
- * exactement ce qui a laissé la carte de l'app vide sans un mot.
+ * Latest tracking problem, readable in Settings: relay refusal, unreachable
+ * relay, or never-received position (refused location). Without this
+ * feedback, a failing share is indistinguishable from a loved one with
+ * nothing to send — exactly what left the app map empty without a word.
  */
 object ShareHealth {
 
     private val _message = MutableStateFlow<String?>(null)
 
-    /** Message courant, `null` quand tout est parti au dernier envoi. */
+    /** Current message, `null` when everything left on the last send. */
     val message: StateFlow<String?> = _message.asStateFlow()
 
-    /** Enregistre le résultat d'un envoi ; seul un succès efface l'alerte. */
+    /** Records a send result; only a success clears the alert. */
     fun note(result: ShareSend) {
         when (result) {
             ShareSend.Sent -> clear()
@@ -28,7 +28,7 @@ object ShareHealth {
         }
     }
 
-    /** Aucune position : permission refusée, GPS coupé ou fix pas encore obtenu. */
+    /** No position: refused permission, cut GPS or fix not yet taken. */
     fun noFix() {
         _message.value = "Unknown position: allow the phone location to be tracked."
     }

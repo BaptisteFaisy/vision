@@ -9,12 +9,12 @@ import dev.sam3vision.core.settings.Settings
 import dev.sam3vision.core.share.SharedScene
 import dev.sam3vision.core.share.sharedPictosOf
 
-/** Le proche reçoit les détections, l'image de cette caméra, le trajet et la phrase courante. */
+/** The loved one gets the detections, this camera's picture, the trip and the current sentence. */
 @Composable
 internal fun IseeShare(state: IseeUiState, viewModel: IseeViewModel, settings: Settings) {
     val probe by viewModel.probe.state.collectAsState()
     val nav by viewModel.voiceNavState.collectAsState()
-    // Direct de la caméra : les frames partent par le WebSocket de la salle.
+    // Camera live stream: frames leave over the room WebSocket.
     IseeLiveStream(settings)
     ShareRelay(
         layer = if (state.recordingVideo) probe.distanceLayer else null,
@@ -26,7 +26,7 @@ internal fun IseeShare(state: IseeUiState, viewModel: IseeViewModel, settings: S
     )
 }
 
-/** Une consigne ne devient jamais une affirmation qu'un mouvement a été effectué. */
+/** An instruction never becomes a claim that a move happened. */
 internal fun sharedSceneOf(state: IseeUiState, probe: LiveProbeState): SharedScene? {
     if (state.recordingVideo && !probe.spoken.isNullOrBlank()) return SharedScene(probe.spoken)
     val entry = selectedEntry(state)

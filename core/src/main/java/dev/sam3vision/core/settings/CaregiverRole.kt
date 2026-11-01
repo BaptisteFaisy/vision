@@ -1,15 +1,15 @@
 package dev.sam3vision.core.settings
 
 /**
- * Rôle de ce téléphone : appareil de la personne accompagnée ([Blind], iSee) ou
- * appareil de l'accompagnant ([Caregiver], page de suivi du proche).
+ * Role of this phone: the accompanied person's device ([Blind], iSee) or
+ * the companion's device ([Caregiver], the loved one's tracking page).
  *
- * Le rôle ne retire aucune fonction à l'app : il choisit seulement la **page
- * d'accueil** — iSee, ou la page Caregiver qui suit la position du proche. Le
- * défaut reste [Blind] : une installation neuve ouvre iSee comme avant.
+ * The role removes no app function: it only picks the **home
+ * page** — iSee, or the Caregiver page following the loved one's position.
+ * The default stays [Blind]: a fresh install opens iSee as before.
  */
 enum class CaregiverRole(
-    /** Libellé des Réglages, celui que l'utilisateur choisit. */
+    /** Settings label, the one the user picks. */
     val label: String,
 ) {
     Blind("Blind person"),
@@ -17,7 +17,7 @@ enum class CaregiverRole(
     ;
 
     companion object {
-        /** Nom persisté → rôle ; valeur inconnue ou absente ⇒ [Blind] (défaut). */
+        /** Persisted name → role; unknown or missing value ⇒ [Blind] (default). */
         fun fromName(name: String?): CaregiverRole =
             entries.firstOrNull { it.name.equals(name, ignoreCase = true) } ?: Blind
     }

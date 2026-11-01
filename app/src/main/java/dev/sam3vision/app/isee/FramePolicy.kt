@@ -2,8 +2,8 @@ package dev.sam3vision.app.isee
 
 /**
  * Politique de frame SAM de la page caméra : 480 px envoyés, jamais agrandis.
- * Le capteur est demandé en 640×480 et le direct aidant prend la même géométrie :
- * un seul pack NV21 sert alors les deux (voir Nv21JpegEncoder).
+ * The sensor is asked for 640×480 and the caregiver live stream takes the same
+ * geometry: a single NV21 pack then serves both (see Nv21JpegEncoder).
  *
  * Le 2026-10-26, la conversion d'une frame coûtait 12-42 ms côté téléphone parce que
  * l'on demandait 320 px au capteur qui livrait 640×480, redimensionné ensuite pour rien

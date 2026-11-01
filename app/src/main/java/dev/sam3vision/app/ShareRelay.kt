@@ -19,11 +19,12 @@ import dev.sam3vision.core.share.canPublishShare
 import kotlinx.coroutines.delay
 
 /**
- * Même publication pour Direct et iSee : le service reprend dès que l'écran s'efface.
+ * Same publishing for Direct and iSee: the service resumes as soon as the screen fades.
  *
- * [photo] est relue à chaque envoi (dernière frame caméra, `null` quand elle a
- * vieilli), [trip] porte le guidage en cours et [pictos] les repères reconnus :
- * la page caregiver reçoit image, barre et dessins sans passer par l'état Compose.
+ * [photo] re-reads on every send (latest camera frame, `null` once stale),
+ * [trip] carries the guidance in progress and [pictos] the recognized
+ * landmarks: the caregiver page gets picture, bar and drawings with no Compose
+ * state in between.
  */
 @Composable
 fun ShareRelay(

@@ -1,21 +1,21 @@
-// Le direct de la caméra : les frames arrivent par le WebSocket de la salle
-// (`/ws`, un Durable Object par flux). Rien n'est stocké — le relais D1 garde la
-// position et les phrases, l'image passe par ici et n'existe que le temps d'une
-// image à l'écran.
+// The camera live stream: frames arrive over the room WebSocket
+// (`/ws`, one Durable Object per stream). Nothing is stored — the D1 relay keeps
+// the position and sentences, the picture passes through here and only lives
+// as long as one frame on screen.
 
 /**
- * Une frame plus vieille que ça n'est plus du direct : on revient à l'état lent.
- * À 10 im/s, 600 ms couvrent 6 frames — assez pour le jitter, assez strict pour
- * voir une chute de cadence (l'hystérésis du chien de garde évite le flapping).
+ * A frame older than this is no longer live: fall back to the slow state.
+ * At 10 fps, 600 ms cover 6 frames — enough for jitter, strict enough to
+ * notice a rate drop (the watchdog hysteresis avoids flapping).
  */
 export const STREAM_FRESH_MS = 600;
 
-/** Reconnexion : courte au début (l'aidant regarde), plafonnée ensuite. */
+/** Reconnect: short at first (the caregiver is watching), capped afterwards. */
 const RETRY_MS = [500, 1_000, 2_000, 4_000, 8_000];
 
 /**
- * URL du flux, **même origine que la page** (`wss` en https) : l'identification
- * du flux est la même que celle de `/api/state`, un identifiant suffit.
+ * Stream URL, **same origin as the page** (`wss` over https): stream
+ * identification matches `/api/state`, one id is enough.
  */
 export function streamUrl(href) {
   const page = new URL(href);
@@ -25,9 +25,9 @@ export function streamUrl(href) {
 }
 
 /**
- * État caméra porté par un message texte de la salle, `null` si ce n'en est
- * pas un. Même contrat que `room.js` côté relais : les deux côtés lisent
- * `{"type":"camera","on":…}` avec un booléen strict, le reste est ignoré.
+ * Camera state carried by a room text message, `null` when it is not one.
+ * Same contract as the relay-side `room.js`: both sides read
+ * `{"type":"camera","on":…}` with a strict boolean, the rest is ignored.
  */
 export function cameraOnOf(data) {
   if (typeof data !== 'string') return null;
@@ -44,9 +44,9 @@ export function cameraOnOf(data) {
 }
 
 /**
- * Blob URL d'une frame reçue, `null` si ce n'est pas une image exploitable. Le
- * socket livre des `Blob` (`binaryType = 'blob'`) : ils passent tels quels, sans
- * la copie `new Blob([arraybuffer])` d'avant ; un `ArrayBuffer` reste accepté.
+ * Blob URL of a received frame, `null` when it is not a usable picture. The
+ * socket delivers `Blob`s (`binaryType = 'blob'`): they pass through as-is, with
+ * no `new Blob([arraybuffer])` copy as before; an `ArrayBuffer` is still accepted.
  */
 export function frameSrcOf(data, create = (blob) => URL.createObjectURL(blob)) {
   if (typeof Blob !== 'undefined' && data instanceof Blob) {
@@ -57,15 +57,15 @@ export function frameSrcOf(data, create = (blob) => URL.createObjectURL(blob)) {
 }
 
 /**
- * Ouvre (et rouvre) le flux. `onFrame(src)` reçoit un blob URL par image, et
- * seuls les deux derniers survivent (l'affiché + celui en décodage) — l'avant-
- * dernier est révoqué à la frame suivante, au lieu d'une douzaine en attente ;
- * `onState('live' | 'idle')` prévient la page. `onFrame` n'est jamais appelé
- * avec `null`. `onCamera(true | false)` prévient quand la caméra du proche
- * s'allume ou s'éteint : la page efface l'image tout de suite, sans attendre
- * que la dernière frame périme.
+ * Opens (and reopens) the stream. `onFrame(src)` gets one blob URL per frame, and
+ * only the last two survive (the shown one + the decoding one) — the one before
+ * is revoked at the next frame, instead of a dozen pending ones;
+ * `onState('live' | 'idle')` notifies the page. `onFrame` is never called
+ * with `null`. `onCamera(true | false)` fires when the loved one's camera
+ * turns on or off: the page clears the picture at once, without waiting
+ * for the last frame to expire.
  *
- * `open` est injectable pour que la logique se teste sans navigateur.
+ * `open` is injectable so the logic tests without a browser.
  */
 export function watchStream({
   href,
@@ -119,7 +119,7 @@ export function watchStream({
       attempt += 1;
       timerId = timer.set(connect, wait);
     };
-    socket.onerror = () => { try { socket.close(); } catch { /* déjà fermé */ } };
+    socket.onerror = () => { try { socket.close(); } catch { /* already closed */ } };
   };
 
   connect();
@@ -127,7 +127,7 @@ export function watchStream({
     close() {
       closed = true;
       if (timerId) timer.clear(timerId);
-      try { socket && socket.close(); } catch { /* déjà fermé */ }
+      try { socket && socket.close(); } catch { /* already closed */ }
       release();
     },
   };

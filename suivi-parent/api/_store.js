@@ -1,10 +1,10 @@
-// Stockage de l'état de suivi : Upstash Redis (prod, multi-instances) ou
-// mémoire (dev / préview mono-instance). Aucune dépendance : REST via fetch.
+// Tracking-state storage: Upstash Redis (prod, multi-instance) or
+// memory (dev / single-instance preview). No dependency: REST over fetch.
 const mem = globalThis.__suiviStore || (globalThis.__suiviStore = new Map());
 
 function upstash() {
-  // Deux jeux de noms selon l'installation : Upstash direct (UPSTASH_*) ou
-  // l'intégration Vercel KV (KV_REST_API_*).
+  // Two name sets depending on setup: direct Upstash (UPSTASH_*) or
+  // the Vercel KV integration (KV_REST_API_*).
   const url = process.env.UPSTASH_REDIS_REST_URL || process.env.KV_REST_API_URL;
   const token = process.env.UPSTASH_REDIS_REST_TOKEN || process.env.KV_REST_API_TOKEN;
   return url && token ? { url: String(url).replace(/\/$/, ''), token } : null;
@@ -60,7 +60,7 @@ async function storeSet(key, value, ttlSeconds = 120) {
   return true;
 }
 
-/** Identifiant de flux : un par proche suivi, glissé dans `?share=`. */
+/** Stream id: one per tracked loved one, carried in `?share=`. */
 function validId(id) {
   return typeof id === 'string' && /^[a-z0-9-]{1,32}$/.test(id);
 }

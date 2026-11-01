@@ -1,6 +1,6 @@
-// Stockage du relais : une ligne par identifiant de flux dans la base D1.
-// L'adaptateur est la seule pièce qui connaît le SQL, donc celle que les tests
-// remplacent par une base en mémoire.
+// Relay storage: one row per stream id in the D1 base.
+// The adapter is the only piece knowing SQL, so the one tests
+// replace with an in-memory base.
 
 const SCHEMA = `CREATE TABLE IF NOT EXISTS streams (
   id TEXT PRIMARY KEY,
@@ -18,9 +18,9 @@ WHERE streams.write_key = excluded.write_key`;
 const PRUNE = 'DELETE FROM streams WHERE updated_at < ?';
 
 /**
- * Adaptateur D1 (Cloudflare). `read` rend la ligne décodée ou `null` ;
- * `write` rend `false` quand une **autre clé** a déjà lié ce flux ; les erreurs
- * de base remontent (le worker répond alors 503, jamais un faux succès).
+ * D1 adapter (Cloudflare). `read` yields the decoded row or `null`;
+ * `write` yields `false` when **another key** already bound this stream; base
+ * errors bubble up (the worker then answers 503, never a fake success).
  */
 export function d1Store(db) {
   let ready = null;
@@ -33,7 +33,7 @@ export function d1Store(db) {
   };
   return {
     async read(id) {
-      if (!(await ensure())) throw new Error('schéma indisponible');
+      if (!(await ensure())) throw new Error('schema unavailable');
       const row = await db.prepare(SELECT).bind(id).first();
       if (!row) return null;
       let doc;
@@ -41,9 +41,9 @@ export function d1Store(db) {
       return { ...doc, serverAt: row.updated_at, key: String(row.write_key ?? '') };
     },
     async write(id, doc, key, now) {
-      if (!(await ensure())) throw new Error('schéma indisponible');
+      if (!(await ensure())) throw new Error('schema unavailable');
       const out = await db.prepare(UPSERT).bind(id, JSON.stringify(doc), now, key).run();
-      if (!out || out.success === false) throw new Error('écriture refusée');
+      if (!out || out.success === false) throw new Error('write rejected');
       const changes = out.meta ? out.meta.changes : 1;
       return changes !== 0;
     },

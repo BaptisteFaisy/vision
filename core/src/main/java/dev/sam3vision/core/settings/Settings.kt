@@ -144,35 +144,35 @@ data class Settings(
      */
     val glassesFovDeg: Float = 0f,
     /**
-     * Rôle de ce téléphone : [CaregiverRole.Blind] (défaut, iSee) ou
-     * [CaregiverRole.Caregiver] (page de suivi du proche). Persisté : l'app
-     * rouvre sur la page du rôle choisi.
+     * Role of this phone: [CaregiverRole.Blind] (default, iSee) or
+     * [CaregiverRole.Caregiver] (the loved one's tracking page). Persisted:
+     * the app reopens on the picked role's page.
      */
     val caregiverRole: CaregiverRole = CaregiverRole.Blind,
     /**
-     * Base du relais de suivi (Worker `suivi-relais/`) : c'est l'origine de la page
-     * caregiver embarquée dans l'APK et de ses appels `/api/state`. Une base par
-     * flux est construite à partir de [shareId] ; vider le champ retombe sur le
-     * relais par défaut.
+     * Base of the tracking relay (`suivi-relais/` Worker): the origin of the
+     * caregiver page embedded in the APK and of its `/api/state` calls. One
+     * base per stream is built from [shareId]; clearing the field falls back
+     * to the default relay.
      */
     val parentSiteUrl: String = DEFAULT_PARENT_SITE_URL,
     /** Clé du fond de carte Google, préremplie par le build ; modifiable dans Réglages. */
     val googleMapsApiKey: String = "",
-    /** Envoi de la position + objets au relais pendant le Direct (site parent). */
+    /** Position + objects sent to the relay during the Direct (parent site). */
     val shareEnabled: Boolean = true,
     /**
-     * Invitation collée par le proche (rôle Caregiver) : le lien ou le code que la
-     * personne aveugle lui a envoyé. Acceptée telle quelle (« léo », « ?share=léo »
-     * ou le lien complet) — voir `parseCaregiverInvite`. Vide = pas d'invitation.
+     * Invite pasted by the loved one (Caregiver role): the link or code the
+     * blind person sent them. Taken as-is ("léo", "?share=léo" or the full
+     * link) — see `parseCaregiverInvite`. Empty = no invite.
      */
     val caregiverInvite: String = "",
     /**
-     * Identifiant du flux de partage (relais `suivi-<shareId>`), **propre à ce
-     * téléphone** : attribué au chargement des réglages par `seedShareRelay`, vide
-     * tant qu'il ne l'a pas encore été. Jamais saisi à la main.
+     * Share stream id (relay `suivi-<shareId>`), **this phone's own**:
+     * granted at settings load by `seedShareRelay`, empty until then.
+     * Never typed by hand.
      */
     val shareId: String = "",
-    /** Clé d'écriture vérifiée par le relais (jamais exposée côté site). */
+    /** Write key checked by the relay (never exposed site-side). */
     val shareWriteKey: String = "",
     /** Plafond d'objets affichés à l'écran, commun au direct et à la photo. */
     val maxObjects: Int = ObjectLimits.DEFAULT_ON_SCREEN,
@@ -262,30 +262,30 @@ data class Settings(
         const val DEFAULT_ASR_MODEL = "muse-voice-transcribe-1.0"
 
         /**
-         * Relais de suivi de l'app (`suivi-relais/`, Worker + D1) : un état par
-         * identifiant de flux. C'est lui qui reçoit la position et que lit la page
-         * caregiver — plus aucun site web à maintenir.
+         * App tracking relay (`suivi-relais/`, Worker + D1): one state per
+         * stream id. It receives the position and the caregiver page reads
+         * it — no website left to maintain.
          *
-         * L'adresse est celle du Worker lui-même (`wrangler` le publie sous
-         * `isee-suivi.<compte>.workers.dev`), pas un domaine d'apparence plus jolie :
-         * l'hôte gratuit `…freebuff.page` retenu le 29/10 a rendu **502 « Site
-         * unavailable »** le soir même, ce qui laissait la page caregiver en NO STREAM
-         * alors que le Worker répondait encore. Un relais qui sert des personnes doit
-         * pointer sur l'infrastructure qu'on déploie, pas sur une redirection.
+         * The address is the Worker's own (`wrangler` publishes it as
+         * `isee-suivi.<account>.workers.dev`), not a prettier-looking domain:
+         * the free `…freebuff.page` host picked on 29/10 answered **502 "Site
+         * unavailable"** that same evening, leaving the caregiver page on NO
+         * STREAM while the Worker still answered. A relay serving people must
+         * point at infrastructure one deploys, not at a redirect.
          */
         const val DEFAULT_PARENT_SITE_URL = "https://isee-suivi.duello.workers.dev/"
 
         /**
-         * Ancien relais du site Vercel, abandonné (déploiement figé, écritures
-         * refusées). Reconnu à la lecture pour que les installations d'avant la
-         * bascule repointent sur [DEFAULT_PARENT_SITE_URL] sans rien saisir.
+         * Old Vercel-site relay, abandoned (frozen deploy, refused writes).
+         * Recognized on read so pre-switch installs repoint to
+         * [DEFAULT_PARENT_SITE_URL] with nothing to type.
          */
         const val LEGACY_PARENT_SITE_URL = "https://suivi-parent.vercel.app/"
 
         /**
-         * Ancien identifiant d'usine, commun à **toutes** les installations (« un
-         * seul proche suivi ») : il n'est plus attribué, seulement reconnu pour
-         * qu'une installation d'avant reçoive enfin son identifiant unique.
+         * Old factory id, shared by **every** install ("a single tracked loved
+         * one"): no longer granted, only recognized so an older install
+         * finally gets its unique id.
          */
         const val LEGACY_SHARE_ID = "leo"
 

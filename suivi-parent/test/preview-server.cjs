@@ -1,4 +1,4 @@
-// Serveur local de revue : mêmes handlers que Vercel, stockage mémoire uniquement.
+// Local review server: same handlers as Vercel, memory storage only.
 const http = require('node:http');
 const fs = require('node:fs/promises');
 const path = require('node:path');

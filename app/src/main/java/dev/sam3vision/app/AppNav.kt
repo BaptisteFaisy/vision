@@ -87,8 +87,8 @@ sealed interface Route {
     data object Settings : Route
 
     /**
-     * Page du proche qui suit la position partagée (rôle `Caregiver` des Réglages) :
-     * le Portrait embarqué dans la WebView, alimenté par le lien reçu.
+     * Loved one page following the shared position (`Caregiver` role from
+     * Settings): the Portrait embedded in the WebView, fed by the received link.
      */
     data object Caregiver : Route
 
@@ -215,7 +215,7 @@ fun AppNav(
             liveViewModel = liveViewModel,
             push = push,
             pop = pop,
-            // Blind person choisi : retour immédiat à iSee, comme Caregiver ouvre la page.
+            // Blind person picked: straight back to iSee, as Caregiver opens the page.
             onHome = home,
             // À la racine, la roue dentée et le retour système ouvrent les Réglages.
             onCaregiverBack = { if (stack.size > 1) pop() else push(Route.Settings) },
@@ -227,8 +227,8 @@ fun AppNav(
 }
 
 /**
- * Le rôle enregistré choisit la page d'accueil, une seule fois au lancement :
- * iSee pour la personne accompagnée (défaut), la carte du proche pour Caregiver.
+ * The saved role picks the home page, once at launch: iSee for the
+ * accompanied person (default), the loved one's map for Caregiver.
  */
 @Composable
 private fun StartRouteEffect(settings: Settings, ready: Boolean, onCaregiverHome: () -> Unit) {
@@ -387,8 +387,8 @@ private fun ChatRoute(state: UiState, viewModel: AppViewModel, pop: () -> Unit) 
 
 /**
  * Réglages : le banc des lunettes est fourni par un `CompositionLocal` (`remember` :
- * la valeur ne doit pas changer à chaque recomposition). Choisir le rôle Caregiver
- * enregistre le rôle **et** ouvre la carte du proche.
+ * la valeur ne doit pas changer à chaque recomposition). Picking the Caregiver
+ * role saves the role **and** opens the loved one's map.
  */
 @Composable
 private fun SettingsEntry(

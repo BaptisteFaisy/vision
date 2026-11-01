@@ -1,8 +1,8 @@
 #!/usr/bin/env python3
-"""Tests de `tools/export-caregiver-orb.py`.
+"""Tests for `tools/export-caregiver-orb.py`.
 
-Lancer : python3 -m unittest tools/test_export_caregiver_orb.py -v
-Aucune dépendance externe : uniquement `unittest` et la bibliothèque standard.
+Run: python3 -m unittest tools/test_export_caregiver_orb.py -v
+No external dependency: only `unittest` and the standard library.
 """
 import importlib.util
 import os
@@ -19,8 +19,8 @@ SPEC = importlib.util.spec_from_file_location("export_caregiver_orb", SCRIPT)
 ORBE = importlib.util.module_from_spec(SPEC)
 SPEC.loader.exec_module(ORBE)
 
-# Le plus petit shader qui passe le portage : déclaration AGSL, bloc liquide
-# à factoriser en helper, point d'entrée à renommer.
+# The smallest shader surviving the port: AGSL declaration, liquid block
+# to factor into a helper, entry point to rename.
 SOURCE_FIXTURE = """import x
 
 const val ORB_AGSL = \"\"\"
@@ -33,51 +33,51 @@ vec4 main(vec2 fc) { return vec4(col, 1.0); }
 
 
 class RenderTest(unittest.TestCase):
-    """Le rendu est pur : mêmes marqueurs, mêmes échappements."""
+    """Rendering is pure: same markers, same escapes."""
 
-    def test_marqueurs(self):
-        rendu = ORBE.render(SOURCE_FIXTURE)
-        self.assertIn("export const fragmentShader = `", rendu)
-        self.assertIn("precision highp float;", rendu)
-        self.assertIn("vec3 liquid(vec3 col, vec2 q)", rendu)
-        self.assertIn("vec4 orb(vec2 fc)", rendu)
-        self.assertIn("void main() { gl_FragColor =", rendu)
+    def test_markers(self):
+        rendered = ORBE.render(SOURCE_FIXTURE)
+        self.assertIn("export const fragmentShader = `", rendered)
+        self.assertIn("precision highp float;", rendered)
+        self.assertIn("vec3 liquid(vec3 col, vec2 q)", rendered)
+        self.assertIn("vec4 orb(vec2 fc)", rendered)
+        self.assertIn("void main() { gl_FragColor =", rendered)
 
-    def test_types_agsl_portes(self):
-        rendu = ORBE.render(SOURCE_FIXTURE)
-        self.assertIn("float(2.0)", rendu)
-        self.assertIn("vec2(1.0, 2.0)", rendu)
-        self.assertNotRegex(rendu, r"\bhalf\d?\b")
+    def test_agsl_types_ported(self):
+        rendered = ORBE.render(SOURCE_FIXTURE)
+        self.assertIn("float(2.0)", rendered)
+        self.assertIn("vec2(1.0, 2.0)", rendered)
+        self.assertNotRegex(rendered, r"\bhalf\d?\b")
 
-    def test_sans_declaration_erreur_claire(self):
+    def test_missing_declaration_clear_error(self):
         with self.assertRaises(ValueError):
-            ORBE.render("const val AUTRE = 1\n")
+            ORBE.render("const val OTHER = 1\n")
 
 
 class CheckTest(unittest.TestCase):
-    """--check compare le .mjs versionné au shader, sans rien écrire."""
+    """--check compares the committed .mjs to the shader, writing nothing."""
 
-    def test_arbre_courant_a_jour(self):
-        lance = subprocess.run([sys.executable, SCRIPT, "--check"],
-                               capture_output=True, text=True, timeout=60)
-        self.assertEqual(lance.returncode, 0, lance.stderr)
-        self.assertIn("OK", lance.stdout)
+    def test_current_tree_fresh(self):
+        run = subprocess.run([sys.executable, SCRIPT, "--check"],
+                             capture_output=True, text=True, timeout=60)
+        self.assertEqual(run.returncode, 0, run.stderr)
+        self.assertIn("OK", run.stdout)
 
-    def test_derive_detectee(self):
+    def test_drift_detected(self):
         with tempfile.TemporaryDirectory() as tmp:
-            cible = Path(tmp) / "orb-shader.mjs"
-            cible.write_text("// périmé\n", encoding="utf-8")
-            avant = ORBE.TARGET
-            ORBE.TARGET = cible
+            target = Path(tmp) / "orb-shader.mjs"
+            target.write_text("// stale\n", encoding="utf-8")
+            before = ORBE.TARGET
+            ORBE.TARGET = target
             try:
                 self.assertFalse(ORBE.check())
             finally:
-                ORBE.TARGET = avant
+                ORBE.TARGET = before
 
-    def test_argument_inconnu_sort_2(self):
-        lance = subprocess.run([sys.executable, SCRIPT, "--bogus"],
-                               capture_output=True, text=True, timeout=60)
-        self.assertEqual(lance.returncode, 2)
+    def test_unknown_argument_exits_2(self):
+        run = subprocess.run([sys.executable, SCRIPT, "--bogus"],
+                             capture_output=True, text=True, timeout=60)
+        self.assertEqual(run.returncode, 2)
 
 
 if __name__ == "__main__":

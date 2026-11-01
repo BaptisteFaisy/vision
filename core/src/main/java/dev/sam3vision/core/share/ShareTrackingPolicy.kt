@@ -1,17 +1,17 @@
 package dev.sam3vision.core.share
 
 /**
- * Politique de cadence du service de suivi permanent (batterie) : pure et
- * testable sans appareil. Écran allumé = cadence normale du partage ; écran
- * éteint = position seule, espacée ; pendant le Direct l'écran publie déjà
- * l'état complet, le service se contente d'attendre.
+ * Rate policy of the permanent tracking service (battery): pure and
+ * device-free testable. Screen on = normal share rate; screen off = lone
+ * spaced-out position; while the Direct publishes the screen already sends
+ * the full state, so the service just waits.
  */
 object ShareTrackingPolicy {
 
-    /** Cadence en poche (écran éteint, app en arrière-plan). */
+    /** Pocket rate (screen off, app in background). */
     const val SCREEN_OFF_DELAY_MS = 15_000L
 
-    /** Attente pendant que le Direct publie (recheck rapide de l'état). */
+    /** Wait while the Direct publishes (quick state recheck). */
     const val SCREEN_BUSY_DELAY_MS = 1_000L
 
     fun nextDelayMs(interactive: Boolean, directPublishing: Boolean): Long = when {

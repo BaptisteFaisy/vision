@@ -7,17 +7,17 @@ import org.junit.Test
 class CaregiverInviteTest {
 
     @Test
-    fun `code nu = identifiant du flux`() {
+    fun `bare code means stream id`() {
         assertEquals(CaregiverInvite(siteUrl = "", shareId = "leo"), parseCaregiverInvite("leo"))
     }
 
     @Test
-    fun `parametre seul = identifiant sans site`() {
+    fun `lone parameter means id with no site`() {
         assertEquals(CaregiverInvite(siteUrl = "", shareId = "marie"), parseCaregiverInvite("?share=marie"))
     }
 
     @Test
-    fun `lien complet = site et identifiant separes`() {
+    fun `full link means site and id split`() {
         assertEquals(
             CaregiverInvite(
                 siteUrl = "https://suivi-parent.vercel.app/",
@@ -28,15 +28,15 @@ class CaregiverInviteTest {
     }
 
     @Test
-    fun `parametres supplementaires apres le partage ignores`() {
+    fun `extra parameters after the share are ignored`() {
         assertEquals(
             "paul",
-            parseCaregiverInvite("https://suivi-parent.vercel.app/?share=paul&theme=sombre")?.shareId,
+            parseCaregiverInvite("https://suivi-parent.vercel.app/?share=paul&theme=dark")?.shareId,
         )
     }
 
     @Test
-    fun `site seul sans parametre = site, identifiant a venir`() {
+    fun `lone site with no parameter means site, id to come`() {
         assertEquals(
             CaregiverInvite(siteUrl = "https://suivi-parent.vercel.app/", shareId = ""),
             parseCaregiverInvite("https://suivi-parent.vercel.app/"),
@@ -44,13 +44,13 @@ class CaregiverInviteTest {
     }
 
     @Test
-    fun `vide ou espaces = pas d invitation`() {
+    fun `empty or blank means no invite`() {
         assertNull(parseCaregiverInvite(""))
         assertNull(parseCaregiverInvite("   "))
     }
 
     @Test
-    fun `espaces autour pardonnes`() {
+    fun `surrounding spaces are forgiven`() {
         assertEquals(
             CaregiverInvite(siteUrl = "", shareId = "leo"),
             parseCaregiverInvite("  leo  "),

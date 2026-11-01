@@ -36,9 +36,9 @@ import kotlinx.coroutines.withContext
  *
  * Mesuré depuis le téléphone : le coût **serveur** ne bouge pas entre 256 et 448 px,
  * mais l'upload et les masques sont proportionnels — 18 Ko à 320 contre 32 Ko à 448.
- * Le 01/11, un couplage unique à 480 px/q65 avec le direct aidant avait ajouté +88 ms
- * de `capt` (campagne 6b) : SAM garde son 320/q55, l'aidant son 480 (encodé à part,
- * seulement quand il regarde).
+ * On 01/11, a single 480 px/q65 coupling with the caregiver live stream had added
+ * +88 ms of `capt` (campaign 6b): SAM keeps its 320/q55, the caregiver their 480
+ * (encoded apart, only while watching).
  */
 const val ISEE_FRAME_EDGE = 320
 
@@ -46,14 +46,14 @@ const val ISEE_FRAME_EDGE = 320
 const val ISEE_FRAME_QUALITY = 55
 
 /**
- * Côté long de la frame du **direct aidant** (px) : 480, lisible plein écran.
+ * Long side of the **caregiver live** frame (px): 480, readable fullscreen.
  *
- * Encodé dans une passe NV21 séparée, seulement quand un aidant regarde
- * (`shareDue`) : le chemin chaud SAM ne paie jamais ces pixels.
+ * Encoded in a separate NV21 pass, only while a caregiver watches
+ * (`shareDue`): the hot SAM path never pays for these pixels.
  */
 const val SHARE_FRAME_EDGE = 480
 
-/** Qualité JPEG du direct aidant : 70 efface les aplats visibles à q65. */
+/** JPEG quality of the caregiver live stream: 70 clears the flats visible at q65. */
 const val SHARE_FRAME_QUALITY = 70
 
 /**
@@ -97,7 +97,7 @@ class IseeCameraHost(private val context: Context) {
         get() = stats.blurryFrames
         private set(value) { stats.blurryFrames = value }
 
-    /** Dernier encodage du direct : la cadence du direct, pas celle du capteur. */
+    /** Latest live encode: the live rate, not the sensor's. */
     private var lastShareEncodeMs = 0L
 
     /** Entrée précédente de l'analyseur (ns) : la cadence réellement obtenue, pas demandée. */
@@ -240,14 +240,15 @@ class IseeCameraHost(private val context: Context) {
             ResolutionSelector.Builder()
                 .setResolutionStrategy(
                     ResolutionStrategy(
-                        // On demande 640×480 : à 480×480 demandés, le Redmi ne
-                        // livrait que 320×240 (mesuré au log `conversion:`,
-                        // build 1.0.685) et le direct restait en 320. SAM et le direct
-                        // partagent leur 480 px, packé une fois dans la passe NV21 —
-                        // la passe est pilotée par la destination, pas la source.
-                        // Le repli prend le plus proche en dessous ; sous 480 px,
-                        // SAM et le direct partent à la taille du buffer, jamais agrandis.
-                        // Coût actuel mesuré au log `conversion:`.
+                        // 640×480 is asked: at 480×480 asked, the Redmi only
+                        // delivered 320×240 (measured at the `conversion:` log,
+                        // build 1.0.685) and the live stream stayed at 320. SAM and
+                        // the live stream share their 480 px, packed once in the
+                        // NV21 pass — the pass is driven by the destination, not
+                        // the source. The fallback takes the closest below; under
+                        // 480 px, SAM and the live stream leave at buffer size,
+                        // never upscaled. Current cost measured at the
+                        // `conversion:` log.
                         Size(640, 480),
                         ResolutionStrategy.FALLBACK_RULE_CLOSEST_LOWER_THEN_HIGHER,
                     ),
@@ -296,8 +297,8 @@ class IseeCameraHost(private val context: Context) {
         val enteredAtNs = SystemClock.elapsedRealtimeNanos()
         val startedAt = SystemClock.elapsedRealtime()
         try {
-            // Passe unique : un seul pack NV21 (ou un seul Bitmap de repli) pour SAM
-            // et le direct aidant — plus un encodage JPEG par consommateur.
+            // Single pass: one NV21 pack (or one fallback Bitmap) for SAM
+            // and the caregiver live stream — plus one JPEG encode per consumer.
             val quality = jpegQuality?.invoke() ?: ISEE_FRAME_QUALITY
             val shareDue = SharedCameraFrame.audience && startedAt - lastShareEncodeMs >= STREAM_FRAME_MS
             val encStart = SystemClock.elapsedRealtime()
@@ -332,11 +333,11 @@ class IseeCameraHost(private val context: Context) {
     }
 
     /**
-     * SAM en 320 px à chaque frame admise, plus le direct aidant en 480 px seulement
-     * quand il regarde (`shareDue`, passe NV21 séparée — les lectures sont absolues,
-     * le second pack ne perturbe pas le premier, et `encodeJpeg` sans luminance
-     * n'écrase pas le tampon réutilisé de la passe SAM).
-     * La luminance NV21 part aussi à [onLuma] (compteur de marches), sur le même fil.
+     * SAM at 320 px on every admitted frame, plus the caregiver live stream at
+     * 480 px only while it watches (`shareDue`, separate NV21 pass — reads are
+     * absolute, the second pack never disturbs the first, and luminance-free
+     * `encodeJpeg` never crushes the SAM pass reused buffer).
+     * The NV21 luminance also goes to [onLuma] (step counter), on the same wire.
      */
     private fun encodeSinglePass(proxy: ImageProxy, quality: Int, shareDue: Boolean): SinglePass {
         val framed = encoder.encodeJpegLuma(proxy, ISEE_FRAME_EDGE, quality)
@@ -354,13 +355,13 @@ class IseeCameraHost(private val context: Context) {
     }
 
     /**
-     * Offre la frame du direct aidant, déjà encodée par la passe unique.
-     * Retourne la taille offerte (−1 si rien n'est parti).
-     * La cadence du direct est testée avant l'encodage, pas ici.
+     * Offers the caregiver live frame, already encoded by the single pass.
+     * Returns the offered size (−1 when nothing left).
+     * The live rate is checked before encoding, not here.
      */
     private fun offerEncodedShare(encoded: SinglePass, nowMs: Long): Int {
         val share = encoded.share
-        // Nul sans aidant ou hors cadence : la passe unique ne compresse que ce qui sert.
+        // Null with no caregiver or off-rate: the single pass only compresses what serves.
         if (share == null) return -1
         lastShareEncodeMs = nowMs
         SharedCameraFrame.offerBytes(share)
@@ -368,9 +369,9 @@ class IseeCameraHost(private val context: Context) {
     }
 
     /**
-     * Repli `Bitmap` unique (buffer non YUV 4:2:0) : décodé une fois, compressé une
-     * fois pour SAM plus une fois pour le direct si dû — jamais deux `toBitmap`.
-     * La luminance vient des pixels ARGB (même garde nuit/noir que la passe NV21).
+     * Single `Bitmap` fallback (non-YUV 4:2:0 buffer): decoded once, compressed
+     * once for SAM plus once for the live stream when due — never two `toBitmap`.
+     * Luminance comes from ARGB pixels (same night/black guard as the NV21 pass).
      */
     private fun bitmapFallback(proxy: ImageProxy, quality: Int, shareDue: Boolean): SinglePass {
         val upright = uprightScaled(proxy.toBitmap(), proxy.imageInfo.rotationDegrees, ISEE_FRAME_EDGE)

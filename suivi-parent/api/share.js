@@ -1,14 +1,14 @@
-// POST /api/share — le téléphone pousse son état toutes les 2 s pendant le Direct.
-// Corps : {shareId, writeKey, fix:{lat,lon,accM,headingDeg,atMs,indoor}, objects:[{label,distM,angleDeg}],
+// POST /api/share — the phone pushes its state every 2 s during the Direct.
+// Body: {shareId, writeKey, fix:{lat,lon,accM,headingDeg,atMs,indoor}, objects:[{label,distM,angleDeg}],
 //         scene, photo:{jpeg,atMs}, trip:{destination,totalM,remainingM,remainingS,progress}}.
-// Si SHARE_WRITE_KEY est défini côté Vercel, la clé doit correspondre (sinon 403).
+// When SHARE_WRITE_KEY is set on Vercel, the key must match (403 otherwise).
 const { storeSet, validId } = require('./_store');
 
 function num(v, min, max) {
   return typeof v === 'number' && Number.isFinite(v) && v >= min && v <= max;
 }
 
-// Optionnel : les anciennes versions de l'app continuent d'envoyer GPS + objets seuls.
+// Optional: older app versions keep sending GPS + objects alone.
 function sceneOf(scene) {
   if (!scene || typeof scene.text !== 'string') return null;
   return {
@@ -18,7 +18,7 @@ function sceneOf(scene) {
   };
 }
 
-/** Image courante de la caméra (JPEG base64) ; null = absente, false = illisible. */
+/** Current camera picture (base64 JPEG); null = missing, false = unreadable. */
 function photoOf(photo) {
   if (photo === undefined || photo === null) return null;
   if (typeof photo !== 'object' || typeof photo.jpeg !== 'string') return false;
@@ -27,7 +27,7 @@ function photoOf(photo) {
   return { jpeg, atMs: num(photo.atMs, 0, 9e15) ? photo.atMs : Date.now() };
 }
 
-/** Trajet guidé en cours ; null = aucun, false = illisible. */
+/** Guided trip in progress; null = none, false = unreadable. */
 function tripOf(trip) {
   if (trip === undefined || trip === null) return null;
   if (typeof trip !== 'object') return false;
@@ -52,27 +52,27 @@ function fixOf(f) {
 
 module.exports = async (req, res) => {
   res.setHeader('Cache-Control', 'no-store');
-  if (req.method !== 'POST') return res.status(405).json({ ok: false, error: 'POST attendu' });
+  if (req.method !== 'POST') return res.status(405).json({ ok: false, error: 'POST expected' });
   const b = req.body && typeof req.body === 'object' ? req.body : {};
-  if (!validId(b.shareId)) return res.status(400).json({ ok: false, error: 'shareId invalide' });
+  if (!validId(b.shareId)) return res.status(400).json({ ok: false, error: 'invalid shareId' });
   const f = b.fix || {};
   if (!num(f.lat, -90, 90) || !num(f.lon, -180, 180) || !num(f.accM, 0, 500)) {
-    return res.status(400).json({ ok: false, error: 'fix invalide' });
+    return res.status(400).json({ ok: false, error: 'invalid fix' });
   }
   const expected = process.env.SHARE_WRITE_KEY;
   if (expected && b.writeKey !== expected) {
-    return res.status(403).json({ ok: false, error: 'clé invalide' });
+    return res.status(403).json({ ok: false, error: 'invalid key' });
   }
   const objects = Array.isArray(b.objects) ? b.objects.slice(0, 8) : [];
   for (const o of objects) {
     if (typeof o.label !== 'string' || !num(o.distM, 0, 60) || !num(o.angleDeg, -180, 180)) {
-      return res.status(400).json({ ok: false, error: 'objet invalide' });
+      return res.status(400).json({ ok: false, error: 'invalid object' });
     }
   }
   const photo = photoOf(b.photo);
-  if (photo === false) return res.status(400).json({ ok: false, error: 'photo invalide' });
+  if (photo === false) return res.status(400).json({ ok: false, error: 'invalid photo' });
   const trip = tripOf(b.trip);
-  if (trip === false) return res.status(400).json({ ok: false, error: 'trip invalide' });
+  if (trip === false) return res.status(400).json({ ok: false, error: 'invalid trip' });
   const stored = await storeSet('suivi:' + b.shareId, {
     fix: fixOf(f),
     objects: objects.map((o) => ({ label: String(o.label).slice(0, 40), distM: o.distM, angleDeg: o.angleDeg })),
@@ -81,6 +81,6 @@ module.exports = async (req, res) => {
     trip,
     serverAt: Date.now(),
   });
-  if (!stored) return res.status(503).json({ ok: false, error: 'relais indisponible' });
+  if (!stored) return res.status(503).json({ ok: false, error: 'relay unavailable' });
   return res.status(200).json({ ok: true });
 };

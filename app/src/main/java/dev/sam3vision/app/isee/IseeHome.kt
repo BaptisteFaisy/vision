@@ -13,7 +13,7 @@ import dev.sam3vision.core.settings.Settings
 /**
  * L'accueil Portrait : fond blanc, une seule boule de verre et la phrase courante.
  * La caméra se fond en haut pendant la capture ; aucun historique ni satellite.
- * Le partage relaie les objets et le texte vers le lien reçu par le caregiver.
+ * Sharing relays objects and text to the link the caregiver received.
  *
  * Toute l'interaction passe par les gestes de `IseeRootLayout` ; le pane reste muet.
  */

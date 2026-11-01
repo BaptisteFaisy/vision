@@ -15,41 +15,41 @@ import dev.sam3vision.core.share.shareJson
 import dev.sam3vision.core.share.sharedObjectsOf
 
 /**
- * Relais vers le site parent, piloté par les écrans iSee et Direct (et non le ViewModel,
- * pour garder [LiveViewModel] sous la limite de taille) : position GPS + cap
- * ([SharePosition]) et objets en cap absolu, au plus toutes les 2 s.
+ * Relay to the parent site, driven by the iSee and Direct screens (not the
+ * ViewModel, to keep [LiveViewModel] under the size limit): GPS position +
+ * heading ([SharePosition]) and objects in absolute heading, at most every 2 s.
  *
- * Silencieux sans position (permission refusée), relais injoignable ou partage
- * coupé : le site garde alors le dernier état et l'affiche périmé.
+ * Silent with no position (refused permission), unreachable relay or cut
+ * share: the site then keeps the last state and shows it stale.
  */
 class ShareBroadcaster(context: Context) {
 
     private val positions = SharePosition(context)
     private val reporter = ShareReporter()
 
-    /** Démarre ou coupe l'écoute GPS selon la bascule des Réglages. */
+    /** Starts or cuts the GPS listen following the Settings switch. */
     fun start(enabled: Boolean) {
         reporter.reset()
         if (enabled) positions.start() else positions.stop()
     }
 
-    /** Coupe l'écoute et oublie la position (sortie du Direct). */
+    /** Cuts the listen and forgets the position (leaving the Direct). */
     fun stop() {
         positions.stop()
         reporter.reset()
     }
 
     /**
-     * Envoie l'état courant. Sans position (GPS pas encore accroché, intérieur,
-     * permission refusée), la caméra, la phrase et les repères partent quand
-     * même : sinon la page caregiver restait OFFLINE alors que la caméra
-     * tournait. Sans objet mesuré (couche nulle, calibrage inconnu, scène
-     * vide), la position part quand même.
-     * L'identifiant est normalisé (`normalizeShareId`) : brut, « Léo » répond
-     * 400 côté relais. Un champ site effacé retombe sur le site par défaut.
-     * [photo], [trip] et [pictos] sont facultatifs : sans caméra, hors guidage
-     * ou sans repère reconnu, le paquet reste celui d'avant (position, objets,
-     * phrase).
+     * Sends the current state. With no position (GPS not locked yet, indoors,
+     * refused permission), camera, sentence and landmarks still go: otherwise
+     * the caregiver page stayed OFFLINE while the camera ran. With no measured
+     * object (null layer, unknown calibration, empty scene), the position
+     * still goes.
+     * The id is normalized (`normalizeShareId`): raw, "Léo" answers 400
+     * relay-side. A cleared site field falls back to the default site.
+     * [photo], [trip] and [pictos] are optional: with no camera, outside
+     * guidance or with no recognized landmark, the packet stays the earlier
+     * one (position, objects, sentence).
      */
     suspend fun publish(
         nowMs: Long,
