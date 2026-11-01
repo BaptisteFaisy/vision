@@ -2,6 +2,9 @@ package dev.sam3vision.core.traverse
 
 import dev.sam3vision.core.model.Detection
 import dev.sam3vision.core.motion.MotionSample
+import dev.sam3vision.core.predict.Box
+import dev.sam3vision.core.predict.BoxPredictor
+import dev.sam3vision.core.predict.MotionModel
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
 import org.junit.Assert.assertNotNull
@@ -415,4 +418,41 @@ class VehicleApproachTest {
         val heightPx = widthPx * 0.6f
         return listOf(320f - widthPx / 2f, 240f - heightPx / 2f, 320f + widthPx / 2f, 240f + heightPx / 2f)
     }
+
+    @Test
+    fun `saut de piste - run remis a zero et tau desarme (coupe de scene)`() {
+        val track = armedTrack()
+        // Nouvel objet large ailleurs (croissance brute mais saut) : pas de tau sans run.
+        val jumped = Box.fromProto(listOf(10f, 10f, 210f, 130f))!!
+        feedTrackRun(track, jumped, 1200L, maxSpeedPx())
+        assertEquals("saut : nouvel objet", 0, track.growthRun)
+        assertFalse("l'armement S2 meurt au saut", track.tauArmed)
+        assertFalse("pas de tau sans run", tauEligible(track, 640, 200f, null, 0L))
+    }
+
+    @Test
+    fun `frame sans date - run remis a zero, armement conserve (anomalie horloge)`() {
+        val track = armedTrack()
+        feedTrackRun(track, centeredBox(150f), 1000L, maxSpeedPx())
+        assertEquals("STALE : run cassé", 0, track.growthRun)
+        assertTrue("STALE n'est pas un nouvel objet", track.tauArmed)
+        assertTrue("le tau tient sur vélocité", tauEligible(track, 640, 150f, null, 0L))
+    }
+
+    /** Piste armée : 5 croissances brutes puis éligibilité constatée (run-5). */
+    private fun armedTrack(): VehicleApproach.Track {
+        val track = VehicleApproach.Track("car", MotionModel(centeredBox(100f), 0L), 0L)
+        listOf(110f, 120f, 130f, 140f, 150f).forEachIndexed { index, width ->
+            feedTrackRun(track, centeredBox(width), (index + 1) * 200L, maxSpeedPx())
+        }
+        assertEquals(5, track.growthRun)
+        assertTrue("run-5 + vélocité : armé", tauEligible(track, 640, 150f, null, 0L))
+        return track
+    }
+
+    /** Vitesse max piste (miroir de l'association). */
+    private fun maxSpeedPx(): Float = 640f * BoxPredictor.DEFAULT_MAX_SPEED_RATIO
+
+    /** Boîte centrée 640x480 (miroir de [box], objet [Box]). */
+    private fun centeredBox(widthPx: Float): Box = Box.fromProto(box(widthPx))!!
 }
