@@ -1,6 +1,7 @@
 package dev.sam3vision.app.glasses
 
 import dev.sam3vision.app.MAX_IMAGE_EDGE
+import dev.sam3vision.core.distance.CropGeometry
 import java.util.Locale
 import kotlin.math.max
 import kotlin.math.roundToInt
@@ -72,19 +73,8 @@ internal data class CropRect(val x: Int, val y: Int, val width: Int, val height:
  *   (image d'un pixel : on garde l'image entière plutôt qu'un recadrage vide).
  */
 internal fun cropTo16x9(width: Int, height: Int): CropRect? {
-    if (width <= 0 || height <= 0) return null
-    // Comparaison sans flottant : `largeur × 9` contre `hauteur × 16`.
-    val wide = width * 9
-    val tall = height * 16
-    if (wide == tall) return null
-    if (wide < tall) {
-        val cropped = wide / 16
-        if (cropped < 1) return null
-        return CropRect(0, (height - cropped) / 2, width, cropped)
-    }
-    val cropped = tall / 9
-    if (cropped < 1) return null
-    return CropRect((width - cropped) / 2, 0, cropped, height)
+    val crop = CropGeometry.centerCropToAspect(width, height, aspectW = 16, aspectH = 9) ?: return null
+    return CropRect(crop.x, crop.y, crop.width, crop.height)
 }
 
 /**
