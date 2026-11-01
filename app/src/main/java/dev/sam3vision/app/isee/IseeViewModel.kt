@@ -9,23 +9,23 @@ import dev.sam3vision.app.isIntroDisablePhrase
 import dev.sam3vision.app.media.CacheCleanerManager
 import dev.sam3vision.app.media.MediaCacheStore
 import dev.sam3vision.app.media.MediaDatabase
-import dev.sam3vision.app.navigation.AndroidNavigationLauncher
 import dev.sam3vision.app.loadedSettings
 import dev.sam3vision.app.pose.PitchMeter
-import dev.sam3vision.app.speech.NavigationAnnouncer
 import dev.sam3vision.app.speech.SystemTtsEngine
 import dev.sam3vision.app.speechClient
 import dev.sam3vision.app.voicenav.GuidanceLifecycle
 import dev.sam3vision.app.voicenav.VoiceNavSession
 import dev.sam3vision.app.voicenav.VoiceNavUiState
+import dev.sam3vision.app.isee.vm.DictationActions
+import dev.sam3vision.app.isee.vm.DictationRouterText
 import dev.sam3vision.app.isee.vm.IseeAnswers
 import dev.sam3vision.app.isee.vm.IseeCameraCoordinator
 import dev.sam3vision.app.isee.vm.IseeDictation
+import dev.sam3vision.app.isee.vm.IseeDictationRouter
 import dev.sam3vision.app.isee.vm.IseeGlassesOrder
 import dev.sam3vision.app.isee.vm.IseeHoldMic
 import dev.sam3vision.app.isee.vm.IseeLiveDictation
 import dev.sam3vision.app.isee.vm.IseeStreamDictation
-import dev.sam3vision.app.isee.vm.IseeNavClarify
 import dev.sam3vision.app.isee.vm.IseeSpeedOrder
 import dev.sam3vision.app.isee.vm.IseePhotoShot
 import dev.sam3vision.app.isee.vm.IseePicto
@@ -36,8 +36,7 @@ import dev.sam3vision.app.isee.vm.IseeTranscript
 import dev.sam3vision.app.isee.vm.IseeVoice
 import dev.sam3vision.app.isee.vm.IseeModeOrders
 import dev.sam3vision.app.isee.vm.IseeVoiceNav
-import dev.sam3vision.app.isee.vm.MaisonEnterOrder
-import dev.sam3vision.app.isee.vm.NavigationHook
+import dev.sam3vision.app.isee.vm.PictoPhase
 import dev.sam3vision.core.glasses.CaptureAction
 import dev.sam3vision.core.nav.NavFix
 import dev.sam3vision.core.nav.NavRoute
@@ -166,14 +165,6 @@ class IseeViewModel(app: Application) : AndroidViewModel(app) {
         prune = ::enforceFifo,
     )
 
-    /** Ordre vocal « je veux aller à X » : Google Maps + annonce, avant le LLM. */
-    private val navigation = NavigationHook(
-        launcher = AndroidNavigationLauncher(getApplication()),
-        guidanceEnabled = { settings.navigationGuidanceEnabled },
-        announcer = NavigationAnnouncer({ settings }) { _, text -> speakNavigation(text) },
-        update = ::update,
-    )
-
     /**
      * Navigation vocale in-app ([IseeVoiceNav], paresseuse) : active dès que
      * `routeBaseUrl` est seedée — coût nul sans URL Valhalla.
@@ -198,8 +189,9 @@ class IseeViewModel(app: Application) : AndroidViewModel(app) {
     /** La session sous-jacente (boutons de l'écran navigation). */
     fun voiceNav(): VoiceNavSession = voiceNav.session
 
-    /** Ordre dicté sur le direct : navigation puis traversée (mêmes parseurs que l'accueil). */
+    /** Ordre dicté sur le direct : routeur « mode … » d'abord, repli historique ensuite. */
     suspend fun acceptNavOrder(transcript: String): Boolean {
+        if (dictationRouter.run(transcript)) return true
         if (voiceNav.run(transcript)) return true
         return steering.runCrossing(transcript)
     }
@@ -207,11 +199,32 @@ class IseeViewModel(app: Application) : AndroidViewModel(app) {
     /** Arrêter le guidage (bouton du bandeau d'accueil) ou quitter l'écran navigation. */
     fun dismissVoiceNav() = voiceNav.dismiss()
 
-    /** Ordres de mode (maison, carte, picto) : avant la navigation et le LLM. */
+    /** Ordres de mode (lieu, picto), rejoués par le routeur sous leurs phrases canoniques. */
     private val modes = IseeModeOrders({ settings }, ::speakNavigation, ::update, picto::labels, ::runFindOrder, picto::findObject, { _state.value.picto.hits }, { _state.value.placeMode })
 
-    /** Ordre navigation sans destination comprise : demande, jamais le LLM. */
-    private val navClarify = IseeNavClarify({ settings }, ::speakNavigation, ::update)
+    /**
+     * Routeur de dictée (spec v4) : les 10 ordres « mode … » rejouent les
+     * collaborateurs existants sous leurs phrases canoniques ; tout le reste
+     * part au LLM comme question. Sans condition de mode : actif partout,
+     * traversée comprise. « mode glasses on/off » rejoue la bascule « iSee »
+     * (pas d'API on/off explicite côté lunettes, voir rapport).
+     */
+    private val dictationRouter = IseeDictationRouter(object : DictationActions {
+        override suspend fun onOutdoor() { modes.run("mode dehors") }
+        override suspend fun onIndoor() { modes.run("mode dedans") }
+        override suspend fun onCrossing(active: Boolean) {
+            steering.runCrossing(if (active) "crossing mode on" else "crossing mode off")
+        }
+        override suspend fun onFind(label: String) { modes.run("find the " + label) }
+        override suspend fun onFindOff() {
+            val confirm = DictationRouterText.findStopped(settings.speechLanguage)
+            update { it.copy(picto = it.picto.copy(phase = PictoPhase.Idle, hits = emptyList()), status = confirm) }
+            speakNavigation(confirm)
+        }
+        override suspend fun onGpsGo(destination: String) { voiceNav.run("I want to go to " + destination) }
+        override suspend fun onGpsOff() { voiceNav.runOrder("disable the GPS") }
+        override suspend fun onGlasses(on: Boolean) { glassesOrder.run("iSee") }
+    })
     private val glassesInbox = IseeGlassesInbox(viewModelScope, shots, { _state.value }, ::update, ::silenceForGlasses, ::answerHeard, cameraOps::stopVideo, probe::stop, { cameraOps.startVideo(); syncProbe() })
     private val holdTalk = IseeHoldTalk(viewModelScope, { active }, ::silenceForGlasses, shots, { _state.value }, ::update, haptics, dictation, liveDictation, streamDictation, { settings }, cameraOps, ::transcribeAndAnswer, glassesInbox::onTap)
     private val glassesOrder = IseeGlassesOrder(::speakNavigation, ::update, { glassesSession })
@@ -408,19 +421,10 @@ class IseeViewModel(app: Application) : AndroidViewModel(app) {
         }
         // Pas de garde « thinking » : une nouvelle parole écrase la réponse en vol
         // (ordres locaux directs, question préemptée dans `IseeAnswers.answer`).
-        if (modes.run(text)) return
-        if (steering.runSteering(text)) return
-        // Ordre GPS (« arrête / désactive / active le GPS ») : consommé même
-        // sans URL Valhalla (guidage Maps), avant le handoff navigation.
-        if (voiceNav.runOrder(text)) return
-        // Destination (avec ou sans « à », voir NavigationIntent) : l'ordre ne
-        // part jamais au LLM ; sans destination comprise, la voix la redemande.
-        if (voiceNav.run(text)) return
-        if (navigation.onTranscript(text)) return
-        // Ordre « traverser » / « crossing mode on/off » / « crosswalk on/off » : consommé ici (mode Traversée + voix), jamais une question LLM.
-        if (steering.runCrossing(text)) return
-        // Ordre navigation sans destination comprise : demande, jamais une description LLM.
-        if (navClarify.run(text)) return
+        // Routeur (spec v4) : « mode … » ⇒ ordre exécuté ; tout le reste ⇒ question LLM.
+        // Les anciens ordres sans « mode » (maison, cap, GPS, traversée, clarification)
+        // sont supprimés : leurs phrases partent au LLM comme questions.
+        if (dictationRouter.run(text)) return
         val row = answers.recordQuestion(pcm, text)
         enforceFifo()
         transcript.refresh()
