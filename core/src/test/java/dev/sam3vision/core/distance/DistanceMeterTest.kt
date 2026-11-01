@@ -325,7 +325,7 @@ class DistanceMeterTest {
     }
 
     @Test
-    fun `sol coupe en lunettes-live : objet au sol sans taille connue n'est plus mesure`() {
+    fun `sol coupe en lunettes-live, objet au sol sans taille connue n'est plus mesure`() {
         val feet = box(200f) // pieds à 300 px, bien sous l'horizon
         val phone = DistanceMeter().apply { pose = CameraPose(1.5f, 0.1f) }
         assertEquals(1, phone.measure(512, 384, listOf(detection("licorne", feet))).size)
@@ -339,7 +339,7 @@ class DistanceMeterTest {
     }
 
     @Test
-    fun `sol coupe : le stenope ne subit aucune traction de la fusion`() {
+    fun `sol coupe, le stenope ne subit aucune traction de la fusion`() {
         val feet = box(200f)
         val focal = LensSpec.Default.focalPx(512, 384)
         val pinhole = Pinhole.distanceMeters(feet, 1.70f, focal)!!
