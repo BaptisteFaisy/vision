@@ -150,7 +150,7 @@ masques et les distances :
 
 | | valeur | source |
 |---|---|---|
-| rafraîchissement du cadre | **1 fois par frame analysée** (cadence du direct : 150 ms en `Cadence.Fast`, 350/500/900 ms en cadence prudente) | `core/live/LiveSession.kt`, `docs/LATENCE-BUDGET.md` |
+| rafraîchissement du cadre | **1 fois par frame analysée** (cadence du direct : 150 ms en `Cadence.Fast`, moitié de la latence bornée 33-900 ms en `Cadence.Direct` régulée) | `core/live/LiveSession.kt`, `docs/LATENCE-BUDGET.md` |
 | retard du cadre sur l'aperçu | l'A/R complet : **422 ms médian**, plancher 123,7 ms | `docs/LATENCE-BUDGET.md` § étages (`HTTP`) |
 | coût ajouté par frame | un décodage JPEG complet + crop : **10-25 ms**, comparable à l'étage `DECODE` | idem |
 | thread | `Dispatchers.Default` (`scope.launch(background) { runFrame(...) }`) : **aucun à-coup** sur l'UI | `isee/LiveProbe.kt` |

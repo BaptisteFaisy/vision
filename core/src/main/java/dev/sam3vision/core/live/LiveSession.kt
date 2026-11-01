@@ -12,10 +12,11 @@ import dev.sam3vision.core.net.WsLiveClient
  * - [fastMs] : plancher, on n'envoie pas plus souvent ;
  * - [targetMs] : entre les deux.
  *
- * Le Direct garde la cadence prudente (350/500/900 ms) ; la page caméra d'iSee
- * part sur [Cadence.Fast] (pas de plancher : `fastMs = 0`, on repart dès qu'un
- * créneau se libère, budget 150 ms) : le GPU répond en ~115 ms, la limite réelle
- * est alors l'aller-retour réseau, pas la carte.
+ * Le Direct suit la cadence régulée (moitié de la latence, bornée 33-900 ms —
+ * O8, fin des paliers 350/500/900) ; la page caméra d'iSee part sur
+ * [Cadence.Fast] (pas de plancher : `fastMs = 0`, on repart dès qu'un créneau
+ * se libère, budget 150 ms) : le GPU répond en ~115 ms, la limite réelle est
+ * alors l'aller-retour réseau, pas la carte.
  */
 data class Cadence(
     val fastMs: Long,
@@ -30,7 +31,7 @@ data class Cadence(
     val latencyBudgetMs: Long = 0,
 ) {
     companion object {
-        /** Direct : prudent, une frame toutes les 350 ms au mieux. */
+        /** Direct : régulé (moitié de la latence, 33-900 ms), 500 ms sans mesure. */
         val Direct = Cadence(fastMs = 350L, targetMs = 500L, slowMs = 900L)
 
         /**
@@ -166,22 +167,29 @@ class LiveSession(
     }
 
     /**
-     * Intervalle de capture conseillé d'après la latence moyenne :
-     * > [Cadence.slowMs] → on ralentit, < [Cadence.fastMs] → plancher, sinon la cible.
+     * Intervalle de capture conseillé d'après la latence moyenne. Le Direct
+     * ([Cadence.Direct]) suit la cadence régulée ([intervalMsContinuous],
+     * moitié de la latence bornée 33-900 ms — O8, fin des paliers 350/500/900) ;
+     * les autres cadences gardent leurs paliers : > [Cadence.slowMs] → on
+     * ralentit, < [Cadence.fastMs] → plancher, sinon la cible.
      */
-    override fun intervalMsAdaptive(): Long = when {
-        stats.averageMs > cadence.slowMs -> cadence.slowMs
-        stats.averageMs < cadence.fastMs -> cadence.fastMs
-        else -> cadence.targetMs
+    override fun intervalMsAdaptive(): Long {
+        if (cadence == Cadence.Direct) return intervalMsContinuous()
+        return when {
+            stats.averageMs > cadence.slowMs -> cadence.slowMs
+            stats.averageMs < cadence.fastMs -> cadence.fastMs
+            else -> cadence.targetMs
+        }
     }
 
     /**
      * Intervalle continu de la pompe ([LivePump], u01) : la **moitié** de la latence
-     * moyenne, bornée [MIN_MS]-[MAX_MS]. C'est la fin de l'échelle à trois paliers de
-     * [intervalMsAdaptive] : le plancher de 350 ms attendait pour rien quand le backend
-     * répond en 50 ms, et la cible de 500 ms en faisait autant à 422 ms (u01 : 2,03 →
-     * 2,47 ips, −71 ms par frame). Sans mesure, on garde [Cadence.targetMs] : la première
-     * frame paie le démarrage du conteneur, elle ne doit pas régler la cadence.
+     * moyenne, bornée [MIN_MS]-[MAX_MS]. Depuis O8, c'est aussi ce que rend
+     * [intervalMsAdaptive] pour le Direct : le plancher de 350 ms attendait pour
+     * rien quand le backend répond en 50 ms, et la cible de 500 ms en faisait
+     * autant à 422 ms (u01 : 2,03 → 2,47 ips, −71 ms par frame). Sans mesure, on
+     * garde [Cadence.targetMs] : la première frame paie le démarrage du
+     * conteneur, elle ne doit pas régler la cadence.
      */
     fun intervalMsContinuous(): Long {
         val average = stats.averageMs

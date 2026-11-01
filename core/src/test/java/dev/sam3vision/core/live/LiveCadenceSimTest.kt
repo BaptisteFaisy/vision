@@ -10,8 +10,9 @@ import org.junit.Test
  * (une frame offerte toutes les 33 ms), une réponse par envoi après `latence` ms, une seule
  * frame en vol. Les deux régulateurs reçoivent exactement les mêmes entrées :
  *
- *  - **avant** : l'échelle à trois paliers (350/500/900 ms, [LiveSession.intervalMsAdaptive])
- *    et **pas de réserve** — une frame offerte pendant un envoi est jetée ;
+ *  - **avant** : l'échelle à trois paliers (350/500/900 ms, figée ici — le Direct
+ *    suit la cadence régulée depuis O8) et **pas de réserve** — une frame offerte
+ *    pendant un envoi est jetée ;
  *  - **après** : [LivePump] — cadence continue ([LiveSession.intervalMsContinuous], latence/2
  *    bornée 33-900 ms) et **une** frame en réserve, envoyée dès la libération du créneau.
  *
@@ -138,11 +139,21 @@ class LiveCadenceSimTest {
             val active = pump
             if (active == null) {
                 if (session.saturated || now < nextTickAt) return
-                nextTickAt = now + session.intervalMsAdaptive()
+                nextTickAt = now + steppedIntervalMs(stats.averageMs)
                 dispatch(now)
                 return
             }
             if (active.offer("jpeg", capturedNs(), capturedNs())) dispatch(now)
+        }
+
+        /**
+         * Ancienne échelle à paliers du Direct (350/500/900 ms, avant O8) : le
+         * bras « avant » la fige localement pour garder la comparaison honnête.
+         */
+        private fun steppedIntervalMs(averageMs: Long): Long = when {
+            averageMs > Cadence.Direct.slowMs -> Cadence.Direct.slowMs
+            averageMs < Cadence.Direct.fastMs -> Cadence.Direct.fastMs
+            else -> Cadence.Direct.targetMs
         }
 
         /** Envoi d'une frame : créneau pris, réponse posée à `now + latence`. */

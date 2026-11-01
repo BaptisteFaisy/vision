@@ -1,6 +1,9 @@
 package dev.sam3vision.app.depth
 
+import java.nio.ByteBuffer
+import java.nio.ByteOrder
 import org.junit.Assert.assertEquals
+import org.junit.Assert.assertSame
 import org.junit.Test
 
 class DepthPreprocessTest {
@@ -39,5 +42,49 @@ class DepthPreprocessTest {
         assertEquals((px - 0.485f) / 0.229f, buf.get(0), 1e-6f)
         assertEquals((px - 0.456f) / 0.224f, buf.get(4), 1e-6f)
         assertEquals((px - 0.406f) / 0.225f, buf.get(8), 1e-6f)
+    }
+
+    @Test
+    fun `resize avec sortie reutilise le tampon fourni`() {
+        val src = IntArray(6 * 6) { 0xFF102030.toInt() }
+        val out = IntArray(12 * 12)
+        val same = DepthPreprocess.resizeArgbBilinear(src, 6, 6, 12, out)
+        assertSame(out, same)
+        out.forEach { assertEquals(0xFF102030.toInt(), it) }
+    }
+
+    @Test
+    fun `resize carre identique recopie dans le tampon fourni`() {
+        val src = IntArray(4 * 4) { it }
+        val out = IntArray(4 * 4) { -1 }
+        val same = DepthPreprocess.resizeArgbBilinear(src, 4, 4, 4, out)
+        assertSame(out, same)
+        assertEquals(src.toList(), out.toList())
+    }
+
+    @Test
+    fun `normalizeCHW avec sortie reutilise le tampon fourni`() {
+        val out = ByteBuffer.allocateDirect(2 * 2 * 3 * 4).order(ByteOrder.nativeOrder()).asFloatBuffer()
+        val gray = 0xFF808080.toInt()
+        val same = DepthPreprocess.normalizeCHW(
+            IntArray(2 * 2) { gray }, 2,
+            floatArrayOf(0.485f, 0.456f, 0.406f),
+            floatArrayOf(0.229f, 0.224f, 0.225f),
+            out,
+        )
+        assertSame(out, same)
+        assertEquals(2 * 2 * 3, same.remaining())
+        val px = 0x80 / 255f
+        assertEquals((px - 0.485f) / 0.229f, same.get(0), 1e-6f)
+        assertEquals((px - 0.406f) / 0.225f, same.get(8), 1e-6f)
+    }
+
+    @Test
+    fun `le scratch rend le meme jeu de tampons sur un fil`() {
+        val scratch = DepthScratch(8)
+        assertSame(scratch.resized(), scratch.resized())
+        assertSame(scratch.chw(), scratch.chw())
+        assertEquals(8 * 8, scratch.resized().size)
+        assertEquals(8 * 8 * 3, scratch.chw().capacity())
     }
 }

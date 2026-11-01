@@ -208,13 +208,18 @@ class Nv21JpegEncoder {
     /** Tampon JPEG réutilisé : `reset()` plutôt qu'un nouvel objet par frame. */
     private val jpeg = ByteArrayOutputStream(JPEG_BUFFER_BYTES)
 
+    /** Échantillonneur de luminance : tables et plan réutilisés (zéro alloc par frame). */
+    private val lumaSampler = LumaSampler()
+
     /**
      * Frame → JPEG base64 **et** plan de luminance [LumaPlane] : la luminance est lue sur
      * le plan Y du NV21 déjà tourné et réduit — même géométrie que l'ancien bitmap
      * `uprightScaled`, donc le calque local ne paie pas un bitmap par frame.
      *
-     * Le plan de luminance est un tampon **neuf** : il devient la référence de mouvement
-     * du keyframe, il ne doit pas être réécrit par la frame suivante.
+     * Le plan de luminance est un tampon **réutilisé** ([LumaSampler]) : il n'est
+     * valide que jusqu'au prochain appel sur cet encodeur — les consommateurs
+     * permanents (référence de mouvement du keyframe) le copient, les autres le
+     * lisent sur place, sur le même fil.
      *
      * `null` si le buffer n'est pas en YUV 4:2:0 : l'appelant garde alors son chemin
      * `Bitmap` en repli.
@@ -244,9 +249,10 @@ class Nv21JpegEncoder {
 
     /**
      * Frame → JPEG **brut** + plan de luminance [LumaPlane] : le compteur de
-     * marches lit la luminance déjà tournée et réduite, sans bitmap. `null`
-     * si le buffer n'est pas en YUV 4:2:0 (repli `Bitmap` de l'appelant, sans
-     * luminance : le compte vieillit jusqu'à expirer).
+     * marches lit la luminance déjà tournée et réduite, sans bitmap. Le plan
+     * est le tampon réutilisé de l'encodeur (même contrat qu'[encodeFrame]).
+     * `null` si le buffer n'est pas en YUV 4:2:0 (repli `Bitmap` de l'appelant,
+     * sans luminance : le compte vieillit jusqu'à expirer).
      */
     fun encodeJpegLuma(proxy: ImageProxy, edge: Int, quality: Int): JpegLuma? {
         val size = pack(proxy, edge) ?: return null
@@ -277,25 +283,8 @@ class Nv21JpegEncoder {
     }
 
     /** Plan Y du NV21 (déjà tourné) → plan de référence [LumaPlane], au plus proche voisin. */
-    private fun lumaPlan(size: Packed): ByteArray {
-        // Tables ligne/colonne (`H + W` divisions `Long`) au lieu d'une paire par
-        // pixel (`H × W`) : même formule, même plan.
-        val rows = IntArray(LumaPlane.HEIGHT) { y ->
-            (y.toLong() * size.height / LumaPlane.HEIGHT).toInt() * size.width
-        }
-        val cols = IntArray(LumaPlane.WIDTH) { x ->
-            (x.toLong() * size.width / LumaPlane.WIDTH).toInt()
-        }
-        val out = ByteArray(LumaPlane.SIZE)
-        var index = 0
-        for (y in 0 until LumaPlane.HEIGHT) {
-            val row = rows[y]
-            for (x in 0 until LumaPlane.WIDTH) {
-                out[index++] = nv21[row + cols[x]]
-            }
-        }
-        return out
-    }
+    private fun lumaPlan(size: Packed): ByteArray =
+        lumaSampler.sample(nv21, size.width, size.height)
 
     /** Les trois plans du buffer caméra ; `null` si la forme attendue n'est pas là. */
     private fun planesOf(proxy: ImageProxy): Yuv420Planes? {
@@ -335,6 +324,50 @@ class Nv21JpegEncoder {
 
     /** Taille de la frame packée en NV21 : ce que `packNv21` vient d'écrire. */
     private class Packed(val width: Int, val height: Int)
+}
+
+/**
+ * Plan Y du NV21 (déjà tourné, [width]×[height]) → plan de référence
+ * [LumaPlane], au plus proche voisin. Pur JVM (aucun Android) : testé sans
+ * appareil, comme [packNv21].
+ *
+ * Les tables ligne/colonne (`H + W` divisions `Long` au lieu d'une paire par
+ * pixel) ne sont reconstruites que quand la taille packée change, et le plan
+ * de sortie est réutilisé : zéro allocation par frame en régime établi (O8
+ * cpu-max). Le plan rendu n'est valide que jusqu'au prochain appel — une
+ * instance par encodeur, jamais partagée entre fils.
+ */
+internal class LumaSampler {
+    private var packedWidth = 0
+    private var packedHeight = 0
+    private var rows = IntArray(0)
+    private var cols = IntArray(0)
+    private val out = ByteArray(LumaPlane.SIZE)
+
+    /** Échantillonne [nv21] dans le plan réutilisé (même instance à chaque appel). */
+    fun sample(nv21: ByteArray, width: Int, height: Int): ByteArray {
+        if (width != packedWidth || height != packedHeight) retable(width, height)
+        var index = 0
+        for (y in 0 until LumaPlane.HEIGHT) {
+            val row = rows[y]
+            for (x in 0 until LumaPlane.WIDTH) {
+                out[index++] = nv21[row + cols[x]]
+            }
+        }
+        return out
+    }
+
+    /** Reconstruit les tables pour une taille packée ([width]×[height]). */
+    private fun retable(width: Int, height: Int) {
+        packedWidth = width
+        packedHeight = height
+        rows = IntArray(LumaPlane.HEIGHT) { y ->
+            (y.toLong() * height / LumaPlane.HEIGHT).toInt() * width
+        }
+        cols = IntArray(LumaPlane.WIDTH) { x ->
+            (x.toLong() * width / LumaPlane.WIDTH).toInt()
+        }
+    }
 }
 
 /** Frame encodée : JPEG base64 (sans préfixe `data:`) et son plan de luminance. */

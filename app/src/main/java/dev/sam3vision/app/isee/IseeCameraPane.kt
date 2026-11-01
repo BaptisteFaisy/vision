@@ -327,14 +327,15 @@ class IseeCameraHost(private val context: Context) {
     /**
      * SAM en 320 px à chaque frame admise, plus le direct aidant en 480 px seulement
      * quand il regarde (`shareDue`, passe NV21 séparée — les lectures sont absolues,
-     * le second pack ne perturbe pas le premier).
+     * le second pack ne perturbe pas le premier, et `encodeJpeg` sans luminance
+     * n'écrase pas le tampon réutilisé de la passe SAM).
      * La luminance NV21 part aussi à [onLuma] (compteur de marches), sur le même fil.
      */
     private fun encodeSinglePass(proxy: ImageProxy, quality: Int, shareDue: Boolean): SinglePass {
         val framed = encoder.encodeJpegLuma(proxy, ISEE_FRAME_EDGE, quality)
         if (framed != null) {
             val share = if (shareDue) {
-                encoder.encodeJpegLuma(proxy, SHARE_FRAME_EDGE, SHARE_FRAME_QUALITY)?.jpeg
+                encoder.encodeJpeg(proxy, SHARE_FRAME_EDGE, SHARE_FRAME_QUALITY)
             } else {
                 null
             }

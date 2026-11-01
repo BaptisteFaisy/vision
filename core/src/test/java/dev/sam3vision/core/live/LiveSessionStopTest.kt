@@ -121,14 +121,14 @@ class LiveSessionStopTest {
         val client = HeldLiveClient()
         val session = LiveSession(client)
         session.stats.record(1_400L) // backend lent : la cadence était ralentie
-        assertEquals(900L, session.intervalMsAdaptive())
+        assertEquals(700L, session.intervalMsAdaptive())
 
         session.reset()
 
         assertEquals("les mesures de la séance précédente sont oubliées", 0, session.stats.samples)
         assertEquals(
-            "la cadence repart du plancher, pas du direct précédent",
-            Cadence.Direct.fastMs,
+            "la cadence repart de la cible sans mesure, pas du direct précédent",
+            Cadence.Direct.targetMs,
             session.intervalMsAdaptive(),
         )
         assertFalse("aucune frame en vol", session.inFlight)
