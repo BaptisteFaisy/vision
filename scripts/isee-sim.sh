@@ -217,7 +217,7 @@ ensure_avd() {
       die "image système absente : $sdk/system-images/android-35/google_apis/x86_64 (sdkmanager 'system-images;android-35;google_apis;x86_64')"
     echo "→ création de l'AVD $AVD ($SYSIMG)"
     printf 'no\n' | env ANDROID_HOME="$sdk" ANDROID_SDK_ROOT="$sdk" \
-      timeout 300 "$AVDM" create avd -n "$AVD" -k "$SYSIMG" -d pixel_6 --force >/dev/null ||
+      timeout 300 "$AVDM" create avd -n "$AVD" -k "$SYSIMG" -d pixel_6 >/dev/null ||
       die "avdmanager n'a pas pu créer l'AVD $AVD (image système installée ? sdkmanager --list)"
     [[ -f "$ini" ]] || die "config.ini absente après création de l'AVD : $ini"
   fi
@@ -476,8 +476,8 @@ main() {
   }
   require_uint "--seconds" "$SECONDS_REC"
   (( SECONDS_REC > 0 )) || die "--seconds doit être supérieur à 0"
-  resolve_tools
   ensure_apk
+  resolve_tools
   make_tmpdir
   OUT_DIR="$(mktemp -d "${TMPDIR:-/tmp}/isee-sim-out.XXXXXX")" ||
     die "mktemp -d a échoué (TMPDIR='${TMPDIR:-/tmp}')"
