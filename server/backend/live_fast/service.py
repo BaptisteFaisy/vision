@@ -380,7 +380,8 @@ class Sam3LiveService:
                     "attn_impl": self.ctx.get("attn_impl"),
                     "detr_patch": self.ctx.get("detr_patch"),
                     "detr_graph": (self.ctx["detr_graphs"].status()
-                                   if self.ctx.get("detr_graphs") else None)}}
+                                   if self.ctx.get("detr_graphs") else None),
+                    "post": levers().get("post", "hf")}}
 
     @asynccontextmanager
     async def _lifespan(self, _api):

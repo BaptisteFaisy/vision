@@ -16,6 +16,9 @@ Copie de travail T5 (objectif < 200 ms) — le contrat HTTP de ``live_app.py`` e
 * ``FAST_PREPROCESS=fast`` — ``pixel_values`` fusionnés torch (resize + normalisation en
   une passe, sur GPU si dispo) au lieu de l'appel HF ; ``hf`` (défaut) garde le chemin
   historique ;
+* ``FAST_POST_KEPT_ONLY=1`` — post-traitement DETR à sigmoid différé
+  (``fast_post.py`` : seuillage avant sigmoid, bit-identique au HF) au lieu de
+  ``post_process_instance_segmentation`` ; ``0`` (défaut) garde le chemin historique ;
 * ``FAST_SNAPSHOT=1``      — snapshot mémoire Modal (poids figés, réveil 2-7 s).
 
 Les poids et leurs chargements vivent dans ``weights.py`` (ré-exportés ici).
@@ -80,6 +83,7 @@ DEPTH_EVERY = max(1, min(30, env_int(os.environ.get("FAST_DEPTH_EVERY"), 5)))
 # Pré-traitement : "hf" (appel processeur historique) ou "fast" (pixels_fast fusionné,
 # même sémantique à ±1 LSB 8 bits près, repli HF si la config sort du supporté).
 PREPROCESS = (os.environ.get("FAST_PREPROCESS") or "hf").strip().lower()
+POST_KEPT_ONLY = env_bool(os.environ.get("FAST_POST_KEPT_ONLY"))
 # Snapshot mémoire Modal (poids figés après le 1er démarrage) : défaut False — honnête
 # pour Baseten (pas de snapshot) ; le déploiement Modal pose FAST_SNAPSHOT=1.
 SNAPSHOT = env_bool(os.environ.get("FAST_SNAPSHOT"))
@@ -91,7 +95,8 @@ def levers() -> dict:
             "compile": COMPILE, "cuda_graph": CUDA_GRAPH, "detr_graph": DETR_GRAPH,
             "dtype": DTYPE_NAME, "snapshot": SNAPSHOT, "attn": ATTN_IMPL or "eager",
             "warmups": WARMUPS, "timing": TIMING, "sync_timing": SYNC_TIMING,
-            "depth_every": DEPTH_EVERY, "preprocess": PREPROCESS}
+            "depth_every": DEPTH_EVERY, "preprocess": PREPROCESS,
+            "post": "kept-only" if POST_KEPT_ONLY else "hf"}
 
 
 def _torch():
@@ -328,9 +333,9 @@ def _detections(model, processor, device, dtype, vision, concepts, work_size, ti
     _sync_cuda()
     add_ms(timers, "detr_ms", elapsed_ms(started))
     started = now()
-    found = processor.post_process_instance_segmentation(
-        outputs, threshold=SCORE_THRESHOLD, mask_threshold=MASK_THRESHOLD,
-        target_sizes=[(work_size[1], work_size[0])] * len(concepts))
+    from fast_post import post_detections
+    found = post_detections(processor, outputs, concepts, work_size, POST_KEPT_ONLY,
+                            SCORE_THRESHOLD, MASK_THRESHOLD)
     _sync_cuda()
     add_ms(timers, "post_ms", elapsed_ms(started))
     return found

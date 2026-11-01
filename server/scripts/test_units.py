@@ -29,7 +29,7 @@ if __name__ == "__main__": sys.modules.setdefault("test_units", sys.modules["__m
 from tests_units import (boot_tests, concepts_street_tests, crossing_concepts_tests,  # noqa: E402
                          depth_tests, feux_guard_tests, latency_tests,
                          live_fast_tests, live_fast_perf_tests, llm_tests, merge_tests,
-                         native_tests, preproc_tests, tracking_tests, weights_tests,
+                         native_tests, post_tests, preproc_tests, tracking_tests, weights_tests,
                          ws_binary_tests)
 
 BACKEND_DIR = Path(__file__).resolve().parent.parent / "backend"
@@ -456,6 +456,14 @@ RUNNERS = (
      preproc_tests.test_preprocess_equivalence),
     ("live_fast : pré-traitement (levier déployé)", "timing",
      preproc_tests.test_preprocess_deploy),
+    ("live_fast : post (levier FAST_POST_KEPT_ONLY)", "timing",
+     post_tests.test_post_lever),
+    ("live_fast : post (validation des tailles)", "timing",
+     post_tests.test_post_validation),
+    ("live_fast : post (parité bit-à-bit HF)", "timing",
+     post_tests.test_post_parity),
+    ("live_fast : post (gain mesuré)", "timing",
+     post_tests.test_post_faster),
 )
 
 
