@@ -23,6 +23,7 @@ package dev.sam3vision.core.crossing
  * tranche — allongé, avec de l'intérieur, masse non entassée en haut.
  * Mesuré : rappel vert 81/183 → 90/183, fuites inchangées (0 rouge,
  * 100 voiture, 6 éteints), seuils existants intacts.
+ * 01/11 : bande élargie 20-35 % → 15-35 % (même ordre, jitter ±1 px).
  *
  * Seuils publics (surface de calibrage, voir aussi [PedLightColor]).
  */
@@ -74,18 +75,26 @@ object PedLightGate {
     /** R1b : masse verte max du tiers haut de bbox (bonhomme non entassé en haut). */
     const val TOP3_MAX = 0.38f
 
-    /** R1b : fraction max de pixels verts en lisière (un disque n'est que contour). */
-    const val EDGE_MAX = 0.72f
+    /**
+     * R1b : fraction max de pixels verts en lisière (un disque n'est que
+     * contour). 0,75 depuis le 01/11 (ordre user : vert plus facile —
+     * `st_g02` décalé de 1 px vers le haut sort à 0,73 ; bascules jitter
+     * ±2 px sur 31 ancres : 11 → 5, 0 rouge bougé).
+     */
+    const val EDGE_MAX = 0.75f
 
     /** R1b : allongement vertical min du nuage (1,0 comme la bbox, même ordre). */
     private const val CLOUD_ELONGATION_MIN = 1.0f
 
     /**
-     * R1b : plancher bas — à 20 % ou moins, rejet dur sans appel (contrat
-     * historique : la garde bas garde ses dents, la forme ne tranche que
-     * dans la bande 20-35 %, les quasi-ratés).
+     * R1b : plancher bas — à 15 % ou moins, rejet dur sans appel (la garde
+     * bas garde ses dents : les rouges à bruit vert sortent à 0,00 ; la
+     * forme tranche dans la bande 15-35 %, les quasi-ratés). 0,15 depuis
+     * le 01/11 (ordre user : vert plus facile — `tel_g07` téléphone à
+     * 0,23 basculait rouge sur 1 px de jitter de boîte ; bascules 11 → 5
+     * sur 31 ancres, 0 rouge bougé).
      */
-    const val R1B_BOTTOM_FLOOR = 0.20f
+    const val R1B_BOTTOM_FLOOR = 0.15f
 
     /**
      * Verdict sûr du crop [argb] ([width] x [height]) : le vert de l'arbre ne

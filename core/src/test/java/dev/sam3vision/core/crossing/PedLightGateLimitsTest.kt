@@ -59,7 +59,7 @@ class PedLightGateLimitsTest {
     @Test
     fun `bande R1b - 30 pourcent accepte par la forme, 10 pourcent refuse dur`() {
         assertTrue("barre a 30 % en bas : nuage allonge, non entasse", PedLightGate.acceptGreen(barAt(3), 20, 20))
-        assertFalse("barre a 10 % en bas : sous le plancher 20 %", PedLightGate.acceptGreen(barAt(1), 20, 20))
+        assertFalse("barre a 10 % en bas : sous le plancher 15 %", PedLightGate.acceptGreen(barAt(1), 20, 20))
     }
 
     @Test
