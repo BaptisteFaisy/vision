@@ -516,3 +516,23 @@ pour s'aligner — et le guidage retombait au-delà de 3 m en Traversée.
 - **preuves** : `CrossingApproachTest` (silence au-delà de 6 m, borne 6 m
   incluse, loin-puis-proche), `CrossingGuidanceTest` et
   `CrossingOfferTest` (bornes 6 m).
+
+## 18. Sans feu : « Traversez. » après 3 s sans voiture en mouvement (01/11)
+
+Ordre user : en Traversée sans feu, « Traversez. » ne se dit que si
+aucune voiture en mouvement n'a été détectée durant les 3 dernières
+secondes. Avant, 2 frames calmes (~0,4 s) suffisaient — une voiture qui
+venait de passer libérait le verdict aussitôt.
+
+- **noyau** : `NoLightAnnouncer.CALM_MS = 3_000L` — le premier
+  « Traversez. » exige 3 s de calme continu (mouvement brut seul, une
+  garée ne rouvre jamais la fenêtre) ; tout danger la rouvre, et une
+  phrase véhicules sur calme (« à l'arrêt ») recule le délai sans la
+  rouvrir. « Attendez. » inchangé (2 frames, coupe le délai après un
+  « Traversez. », redit toutes les 2 s comme le verdict) ;
+- **avec feu** : inchangé — le vert confirmé + veto trafic décide, cette
+  règle ne couvre que la branche sans-feu ;
+- **preuves** : `NoLightCrossingTest` :core (silence avant 3 s, fenêtre
+  rouverte par un danger, phrase calme qui ne rouvre pas) et :app
+  (câblage : calme, garée proche, pan sur garée lointaine, voiture qui
+  démarre).
