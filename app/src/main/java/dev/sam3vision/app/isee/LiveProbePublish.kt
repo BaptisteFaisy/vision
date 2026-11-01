@@ -64,7 +64,7 @@ internal suspend fun LiveProbe.publishPixels(
             latencyMs = active.stats.averageMs,
             p95Ms = active.stats.p95Ms,
             serverMs = frame.elapsedMs,
-            timings = chronology.snapshot(shown, frame),
+            timings = chronology.snapshot(shown, frame, painter.lastDecode),
             width = frame.width,
             height = frame.height,
             fps = rate.rate,
