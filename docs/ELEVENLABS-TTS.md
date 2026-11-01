@@ -30,9 +30,11 @@ Deux sujets distincts, souvent mélangés :
 | Origine de la clé | `Settings.ttsApiKey`, complétée par `local.properties` (`tts.api.key`) via `seededFromBuild()` | `app/SettingsSeed.kt:34`, `:66-72` |
 
 ⚠️ **Correction** — l'ancienne note « modèle `eleven_v3`, voix par défaut » ne décrit **pas**
-ce que l'app envoie. `git grep eleven_v3` dans le code Kotlin ne donne qu'**une** occurrence :
-un préfixe de clé de cache dans `SpeechUseCaseTest.kt:42` (§ à ne pas confondre avec le modèle des appels) : `eleven_v3` est le modèle qui a servi à **fabriquer** le
-MP3 de l'intro embarquée, pas le modèle des appels. Tout appel runtime part en
+ce que l'app envoie. `git grep eleven_v3` ne donne plus **aucune** occurrence dans le
+Kotlin (l'unique mention était un préfixe de clé de cache dans l'ancien
+`SpeechUseCaseTest`, supprimé le 01/11/2026 avec le use case jamais branché) :
+`eleven_v3` est le modèle qui a servi à **fabriquer** le MP3 de l'intro
+embarquée, pas le modèle des appels. Tout appel runtime part en
 `eleven_v4_turbo`, avec Laure si l'utilisateur n'a rien choisi.
 
 ⚠️ **Vitesse = lecture locale, jamais cloud.** `eleven_v4_turbo` ignore le réglage
@@ -76,10 +78,10 @@ Content-Type: application/json
 - **Refus locaux, sans réseau** : texte vide, clé absente, voix absente.
 - **Limite dure du service** : 5 000 caractères par requête (`400 text_too_long`). Cette limite
   n'apparaît nulle part dans le code de cet arbre : c'est le contrat d'ElevenLabs, pas une garde locale.
-  `core/audio/SentenceChunker` (`MAX_CHARS = 1_200`, `SentenceChunker.kt:10`) +
-  `core/usecase/SpeechUseCase` (`MAX_ENTRIES = 6`, `SpeechUseCase.kt:43`) découpent aux phrases et
-  tiennent un cache LRU de 6 réponses — **toujours pas branché** : `git grep SpeechUseCase app/` ne
-  trouve aucun appel dans l'app (seuls `SpeechUseCaseTest` et le fichier du use case le mentionnent).
+  `core/audio/SentenceChunker` (`MAX_CHARS = 1_200`, `SentenceChunker.kt:10`) découpe aux
+  phrases (branché : `app/isee/IseePlayback.kt`). L'ancien `core/usecase/SpeechUseCase`
+  (cache LRU de 6 réponses) a été **supprimé le 01/11/2026** : jamais branché
+  (`git grep SpeechUseCase app/` ne trouvait aucun appel dans l'app).
 
 ## Déclenchement : une bascule **ET** une clé
 
@@ -200,7 +202,7 @@ annonce muette n'est donc jamais une raison de redéployer.
 | Client HTTP TTS | `core/net/ElevenLabsTtsClient.kt` (pur JVM, testé : URL, erreurs, audio) |
 | Réglages (clé, voix, bascule) | `core/settings/Settings.kt` (`ttsApiKey`, `ttsVoiceId`, `ttsAnnouncePositions`, `announcePositions`) |
 | Clé de build | `app/SettingsSeed.kt` (`seededFromBuild`) |
-| Découpage + cache d'énoncés | `core/audio/SentenceChunker.kt`, `core/usecase/SpeechUseCase.kt` — **pas branchés** |
+| Découpage d'énoncés | `core/audio/SentenceChunker.kt` (branché : `app/isee/IseePlayback.kt`) ; l'ancien cache LRU (`SpeechUseCase`) est supprimé depuis le 01/11/2026 (jamais branché) |
 | Lecture MP3 | `app/SpeechPlayer.kt` (`MediaPlayer`) ; `voice` (bandeaux), `isee-play` (iSee), `positions` (Direct) |
 | Bandeaux de dictée | `app/VoiceAnnouncer.kt` |
 | Positions (mots) | `core/live/PositionText.kt`, `core/live/PositionAnnouncer.kt` |
@@ -248,8 +250,9 @@ Un énoncé déjà en cache disque (bulle du chat) coûte **0** caractère.
 
 - Aucun test instrumenté de la voix des positions (pas de vérification automatique du
   silence « bascule coupée » / « clé absente »).
-- `SpeechUseCase` (découpage + LRU) n'est pas branché : une réponse de plus de
-  5 000 caractères échouerait toujours en `400 text_too_long`.
+- Plus de cache LRU de réponses (`SpeechUseCase` supprimé le 01/11/2026, jamais
+  branché) : une réponse de plus de 5 000 caractères échouerait toujours en
+  `400 text_too_long`.
 - La clé du compte n'a pas `voices_read` : le champ voix est un ID libre, pas une
   liste réelle du compte.
 - Sur l'écran Direct, l'annonce des positions n'est pas exclusive avec la voix du
