@@ -58,10 +58,10 @@ data class GuidanceDecision(
  * Le cap droit projette un **trait** : la largeur du marcheur
  * ([RAY_HALF_WIDTH_M] de chaque côté de l'axe) à la distance de l'objet —
  * large de près, fin de loin ; les caps latéraux gardent la moitié visée.
- * Un objet qui coupe le trait, à portée ([RANGE_METERS]), bloque la marche.
- * Sans bords ou sans distance connus, repli prudent sur la bande centrale
- * historique (`centerX` entre 0,34 et 0,66) ; un objet lointain ne bloque
- * pas, même au centre.
+ * Un objet qui coupe le trait, à portée de l'axe ([AXIS_RANGE_METERS]),
+ * bloque la marche. Sans bords ou sans distance connus, repli prudent sur
+ * la bande centrale historique (`centerX` entre 0,34 et 0,66) ; un objet
+ * au-delà de la portée de l'axe ne bloque pas, même au centre.
  *
  * Tout est pur et testé en JVM : la décision ([decide]), sa mise en mots
  * ([phrase], FR/EN comme les positions) et sa signature anti-répétition
@@ -69,8 +69,18 @@ data class GuidanceDecision(
  */
 object Guidance {
 
-    /** Au-delà, un objet au centre est trop loin pour un pas : il ne bloque pas. */
+    /**
+     * Portée du champ proche (m) : caps latéraux (demi-image visée), côtés,
+     * chemin optimal et évitement latéral — au-delà, le proche ne se juge plus.
+     */
     const val RANGE_METERS = 4f
+
+    /**
+     * Portée de l'axe marché (m, ordre user du 01/11) : un obstacle pile sur
+     * le trait droit bloque dès 15 m, le temps de préparer l'évitement. Seul
+     * le cap droit en profite : un cap latéral vise une demi-image, pas un axe.
+     */
+    const val AXIS_RANGE_METERS = 15f
 
     /** Contact mesuré (m) : à cette distance ou moins, on touche presque. */
     const val CONTACT_METERS = 0.6f
@@ -117,6 +127,12 @@ object Guidance {
      * + obstacle mesuré au contact (≤ [CONTACT_METERS]) = stop ([contactStop],
      * audit 31/10 : on ne monte pas une bordure dans un obstacle) ; [curbEdge]
      * porte le sens connu du bord (`null` = incertain).
+     *
+     * Cap droit : le trait voit loin ([axisRangeMeters], 15 m par défaut) ;
+     * le reste (côtés, chemin, caps latéraux) juge au champ proche
+     * ([rangeMeters]). Un obstacle lointain sur l'axe bloque donc avec un
+     * côté de sortie au jugé proche — le plus souvent l'opposé de son
+     * décalage, le champ proche étant vide.
      */
     fun decide(
         labels: List<PlacedLabel>,
@@ -124,9 +140,10 @@ object Guidance {
         rangeMeters: Float = RANGE_METERS,
         hfovDeg: Float = LensSpec.DEFAULT_H_FOV_DEG,
         curbEdge: CurbEdge? = null,
+        axisRangeMeters: Float = AXIS_RANGE_METERS,
     ): GuidanceDecision {
         val cleaned = labels.filter { isObstacle(it) }
-        val blocking = cleaned.filter { blocks(it, cap, rangeMeters, hfovDeg) }
+        val blocking = cleaned.filter { blocks(it, cap, rangeMeters, hfovDeg, axisRangeMeters) }
         val curbContact = curbAtContact(labels, cap)
         if (blocking.isEmpty()) {
             return GuidanceDecision(blocked = false, cap = cap, curbContact = curbContact, curbEdge = curbEdge)
@@ -231,12 +248,22 @@ object Guidance {
     fun key(decision: GuidanceDecision): String = word(decision).key
 
     /**
-     * Le label bouche-t-il le cap marché ? Droit = le trait coupe la boîte,
-     * latéral = la moitié visée (inchangé).
+     * Le label bouche-t-il le cap marché ? Droit = le trait voit loin
+     * ([axisRangeMeters]) et coupe la boîte ; latéral = la moitié visée au
+     * champ proche ([rangeMeters]).
      */
-    private fun blocks(label: PlacedLabel, cap: SteeringCap, rangeMeters: Float, hfovDeg: Float): Boolean {
-        if (!inRange(label, rangeMeters)) return false
-        if (cap != SteeringCap.Straight) return inCorridor(label.centerX, cap)
+    private fun blocks(
+        label: PlacedLabel,
+        cap: SteeringCap,
+        rangeMeters: Float,
+        hfovDeg: Float,
+        axisRangeMeters: Float,
+    ): Boolean {
+        if (cap != SteeringCap.Straight) {
+            if (!inRange(label, rangeMeters)) return false
+            return inCorridor(label.centerX, cap)
+        }
+        if (!inRange(label, axisRangeMeters)) return false
         return rayBlocks(label, hfovDeg)
     }
 
