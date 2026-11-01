@@ -10,7 +10,7 @@ document.getElementById('shared-link-form').onsubmit = event => {
   event.preventDefault();
   const input = document.getElementById('shared-link');
   const id = shareIdOf(input.value.trim());
-  input.setCustomValidity(id ? '' : 'Colle le lien complet reçu depuis l’app de ton proche.');
+  input.setCustomValidity(id ? '' : "Paste the full link from your loved one's app.");
   if (input.reportValidity()) location.assign(input.value.trim());
 };
 document.getElementById('shared-link').oninput = event => event.target.setCustomValidity('');
