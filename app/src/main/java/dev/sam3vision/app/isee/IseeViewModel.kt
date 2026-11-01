@@ -103,7 +103,7 @@ class IseeViewModel(app: Application) : AndroidViewModel(app) {
         store = PictoStore(pictosDir(app.filesDir)),
         clientOf = { s -> MetaImageClient(s.asrBaseUrl, s.asrApiKey) }, placeMode = { _state.value.placeMode }, probeState = probe.state,
         update = ::update,
-        scope = viewModelScope,
+        scope = viewModelScope, photoTemplateBox = { file, box -> templateFromPhoto(file, box) },
         onFound = ::postFoundClip,
     )
     /** Zone tactile publiée par la puce Traversée (exemption d'interception racine). */
@@ -204,7 +204,7 @@ class IseeViewModel(app: Application) : AndroidViewModel(app) {
 
     /** Ordre dicté sur le direct : routeur « mode … » d'abord, repli historique ensuite. */
     suspend fun acceptNavOrder(transcript: String): Boolean {
-        if (dictationRouter.run(transcript)) return true
+        if (dictationRouter.run(transcript, picto.hunting())) return true
         if (voiceNav.run(transcript)) return true
         return steering.runCrossing(transcript)
     }
@@ -213,7 +213,7 @@ class IseeViewModel(app: Application) : AndroidViewModel(app) {
     fun dismissVoiceNav() = voiceNav.dismiss()
 
     /** Ordres de mode (lieu, picto), rejoués par le routeur sous leurs phrases canoniques. */
-    private val modes = IseeModeOrders({ settings }, ::speakNavigation, ::update, picto::labels, { label -> runFindOrder(probe, settings, camera?.lensSpec, lensFeeds, picto, label) }, picto::findObject, { _state.value.picto.hits }, { _state.value.placeMode }, onFindOff = { picto.cancelHunt() }, post = { level, text, clip -> VoiceBus.post(level, text, clip) })
+    private val modes = IseeModeOrders({ settings }, ::speakNavigation, ::update, picto::labels, { label -> runFindOrder(probe, settings, camera?.lensSpec, lensFeeds, picto, label) }, { label -> runFindOrder(probe, settings, camera?.lensSpec, lensFeeds, picto, label) }, { _state.value.picto.hits }, { _state.value.placeMode }, onFindOff = { picto.cancelHunt() }, post = { level, text, clip -> VoiceBus.post(level, text, clip) }, onPlaceMode = (IseePlaceSync({ settings }, { settings = it }, viewModelScope, prefs::save, ::syncProbe))::onPlaceMode)
 
     /** Colonne vocale v4 : bus, bascule Traversée, parole GPS, reprise chat, trouvé (voir [IseeVoiceSpine]). */
     private val spine: IseeVoiceSpine = IseeVoiceSpine(viewModelScope, { probe.state.value.crossingActive }, { _state.value.placeMode }, ::cutSpeech, voiceNav::stopVoice, { playback.speakPending() })
@@ -433,7 +433,7 @@ class IseeViewModel(app: Application) : AndroidViewModel(app) {
         // Routeur (spec v4) : « mode … » ⇒ ordre exécuté ; tout le reste ⇒ question LLM.
         // Les anciens ordres sans « mode » (maison, cap, GPS, traversée, clarification)
         // sont supprimés : leurs phrases partent au LLM comme questions.
-        if (dictationRouter.run(text)) return
+        if (dictationRouter.run(text, picto.hunting())) return
         val row = answers.recordQuestion(pcm, text)
         enforceFifo()
         transcript.refresh()

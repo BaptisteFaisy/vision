@@ -1,5 +1,6 @@
 package dev.sam3vision.core.speech
 
+import dev.sam3vision.core.distance.KnownSizes
 import dev.sam3vision.core.picto.FindIndoorTarget
 import dev.sam3vision.core.picto.PictoVoiceOrder
 
@@ -64,14 +65,20 @@ object DictationOrders {
     /** Préfixe obligatoire, en premier mot de la phrase dictée. */
     const val PREFIX = "mode"
 
+    /** Auxiliaires acceptes par la reprise pronominale (present + imparfait). */
+    private val OU_PRONOUN_BE = setOf("est", "sont", "etait", "etaient")
+
+    /** Pronoms repris par la chasse en cours ("ou etaient-elles ?"). */
+    private val OU_PRONOUNS = setOf("elle", "elles", "il", "ils", "le", "la", "les", "lui", "ca", "cela")
+
     /**
      * Ordre porté par [text] dicté, `null` si ce n'en est pas un (le texte
      * part alors au LLM comme question).
      */
-    fun parse(text: String): DictationOrder? {
+    fun parse(text: String, hunting: String? = null): DictationOrder? {
         val words = text.trim().split(Regex("\\s+")).filter { it.isNotEmpty() }
         if (words.isEmpty()) return null
-        if (!isWord(words[0], PREFIX)) return findWithoutMode(text)
+        if (!isWord(words[0], PREFIX)) return findWithoutMode(text, hunting)
         val rest = words.drop(1)
         if (rest.isEmpty()) return null
         val keys = rest.map { key(it) }
@@ -102,12 +109,30 @@ object DictationOrders {
      * détection, comme « mode find my X »). Toute autre question (`null` :
      * hors des 10, « where is the exit », « où est la gare ») part au LLM.
      */
-    private fun findWithoutMode(text: String): DictationOrder? {
+    private fun findWithoutMode(text: String, hunting: String?): DictationOrder? {
         val label = PictoVoiceOrder.parseOuSont(text)
             ?: PictoVoiceOrder.parseWhere(text)
             ?: PictoVoiceOrder.parseFind(text)
-            ?: return null
-        val target = FindIndoorTarget.fromSpoken(label) ?: return null
+        if (label != null) {
+            val target = FindIndoorTarget.fromSpoken(label) ?: return null
+            return DictationOrder.Find(target.concept)
+        }
+        return pronounHunt(text, hunting)
+    }
+
+    /**
+     * Reprise pronominale ("ou etaient-elles ?") : quand une chasse est en
+     * cours ([hunting], le label chasse), le pronom la reprend au lieu de
+     * partir au LLM. Sans chasse : `null` (question LLM comme avant).
+     */
+    private fun pronounHunt(text: String, hunting: String?): DictationOrder? {
+        if (hunting.isNullOrBlank()) return null
+        val words = KnownSizes.canonical(text).split(' ').filter { it.isNotEmpty() }
+        if (words.size < 3 || words[0] != "ou") return null
+        if (!OU_PRONOUN_BE.contains(words[1])) return null
+        val rest = words.drop(2).dropLastWhile { it == "please" || it == "plait" }
+        if (rest.size != 1 || !OU_PRONOUNS.contains(rest[0])) return null
+        val target = FindIndoorTarget.fromSpoken(hunting) ?: return null
         return DictationOrder.Find(target.concept)
     }
 

@@ -72,6 +72,16 @@ class IseeDictationRouterTest {
     }
 
     @Test
+    fun `le pronom reprend la chasse en cours, sinon llm`() = runTest {
+        calls.clear()
+        assertTrue(router.run("où étaient-elles", hunting = "keys"))
+        assertEquals(listOf("find:keys"), calls)
+        calls.clear()
+        assertFalse(router.run("où étaient-elles"))
+        assertTrue(calls.isEmpty())
+    }
+
+    @Test
     fun `les questions partent au llm sans effet`() = runTest {
         val questions = listOf(
             "décris-moi la pièce",

@@ -56,6 +56,9 @@ object PictoVoiceOrder {
     /** Articles et possessifs retirés après « où est/sont » (« mes clés »). */
     private val OU_SONT_LEADERS = setOf("mes", "mon", "ma", "les", "le", "la")
 
+    /** Auxiliaires acceptes apres "ou" : present et imparfait. */
+    private val OU_SONT_BE = setOf("est", "sont", "etait", "etaient")
+
     /** Démonstratifs : l'objet est filmé, aucun nom à guider (« de ça »). */
     private val NAMELESS = setOf("ca", "cela")
 
@@ -124,8 +127,9 @@ object PictoVoiceOrder {
     fun parseOuSont(text: String): String? {
         val words = KnownSizes.canonical(text).split(' ').filter { it.isNotEmpty() }
         if (words.size < 3 || words[0] != "ou") return null
-        if (words[1] != "est" && words[1] != "sont") return null
+        if (!OU_SONT_BE.contains(words[1])) return null
         val rest = words.drop(2).dropWhile { OU_SONT_LEADERS.contains(it) }
+            .dropLastWhile { it == "please" || it == "plait" }
         if (rest.size != 1) return null
         return HomeModes.conceptForWord(rest[0])
     }

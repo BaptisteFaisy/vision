@@ -55,7 +55,14 @@ class PictoStore(private val root: File) {
             ?.filter { it.isDirectory && it.name.startsWith(PICTO_PREFIX) }
             ?.forEach { dir ->
                 val target = File(root, dir.name)
-                if (!target.exists() && readDir(dir) != null) dir.renameTo(target)
+                if (!target.exists() && readDir(dir) != null && !dir.renameTo(target)) {
+                    // renameTo silencieux (FS reticent) : copie + suppression.
+                    runCatching {
+                        target.mkdirs()
+                        dir.listFiles()?.forEach { it.copyTo(File(target, it.name), overwrite = true) }
+                        if (readDir(target) != null) dir.deleteRecursively()
+                    }
+                }
             }
     }
 
@@ -69,11 +76,26 @@ class PictoStore(private val root: File) {
 
     /** Enregistre un repère validé ; lève sur écriture impossible. */
     fun save(label: String, png: ByteArray, template: PictoTemplate): StoredPicto {
+        // Ecriture atomique : dossier temporaire puis renommage - un echec
+        // (I/O, kill) ne laisse jamais un dossier partiel liste.
         val dir = newPictoDir()
-        dir.mkdirs()
-        File(dir, LABEL_FILE).writeText(label.trim().ifEmpty { DEFAULT_LABEL }, Charsets.UTF_8)
-        File(dir, PNG_FILE).writeBytes(png)
-        File(dir, TEMPLATE_FILE).writeBytes(encodeTemplate(template))
+        val tmp = File(root, dir.name + TMP_SUFFIX)
+        tmp.deleteRecursively()
+        try {
+            check(tmp.mkdirs()) { "pictos dir not writable" }
+            File(tmp, LABEL_FILE).writeText(label.trim().ifEmpty { DEFAULT_LABEL }, Charsets.UTF_8)
+            File(tmp, PNG_FILE).writeBytes(png)
+            File(tmp, TEMPLATE_FILE).writeBytes(encodeTemplate(template))
+            if (!tmp.renameTo(dir)) {
+                dir.mkdirs()
+                tmp.listFiles()?.forEach { it.copyTo(File(dir, it.name), overwrite = true) }
+                tmp.deleteRecursively()
+            }
+        } catch (e: Exception) {
+            tmp.deleteRecursively()
+            dir.deleteRecursively()
+            throw e
+        }
         return readDir(dir) ?: throw IllegalStateException("landmark unreadable after write")
     }
 
@@ -123,6 +145,7 @@ class PictoStore(private val root: File) {
         private const val PNG_FILE = "picto.png"
         private const val TEMPLATE_FILE = "template.bin"
         internal const val PICTO_PREFIX = "picto-"
+        private const val TMP_SUFFIX = ".tmp"
 
         /** Nom quand aucun nom n'est donné (bouton : stockage direct). */
         const val DEFAULT_LABEL = "Object"

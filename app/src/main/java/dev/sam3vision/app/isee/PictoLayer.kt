@@ -61,16 +61,20 @@ internal fun PictoLayer(hits: List<PictoHit>, pngOf: (String) -> ByteArray?, mod
                 }
                 // `?.let`, jamais `?: return@key` : le retour étiqueté émet une
                 // classe synthétique que D8 refuse (« NON_LOCAL_RETURN », vu au dex).
-                image?.let { bitmap ->
-                    val left = fullW * hit.x
-                    val top = fullH * hit.y
-                    Box(
-                        Modifier
-                            .offset(left, top)
-                            .size(fullW * hit.w, fullH * hit.h)
-                            .border(2.dp, PICTO_YELLOW, RoundedCornerShape(8.dp)),
-                    ) {
+                val left = fullW * hit.x
+                val top = fullH * hit.y
+                Box(
+                    Modifier
+                        .offset(left, top)
+                        .size(fullW * hit.w, fullH * hit.h)
+                        .border(2.dp, PICTO_YELLOW, RoundedCornerShape(8.dp)),
+                    contentAlignment = Alignment.Center,
+                ) {
+                    val bitmap = image
+                    if (bitmap != null) {
                         Image(bitmap, contentDescription = hit.label, modifier = Modifier.fillMaxSize(), contentScale = ContentScale.Fit)
+                    } else {
+                        Text(hit.label, color = PICTO_YELLOW, fontSize = 10.sp, fontWeight = FontWeight.Bold)
                     }
                 }
             }

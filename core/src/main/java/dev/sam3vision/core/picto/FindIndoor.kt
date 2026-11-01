@@ -21,7 +21,7 @@ enum class FindIndoorTarget(
     val spoken: Set<String>,
     val clipBase: String,
 ) {
-    KEYS("keys", "keys", "Keys", "clés", setOf("keys", "key", "cles", "cle"), "keys"),
+    KEYS("keys", "keys", "Keys", "clés", setOf("keys", "key", "cles", "cle", "clef", "clefs"), "keys"),
     MEDICINE_BOX(
         "medicine box", "medicine box", "Medicine box", "boîte de médicaments",
         setOf("medicine box", "medicine", "medicines", "medicaments", "medicament", "boite de medicaments"),

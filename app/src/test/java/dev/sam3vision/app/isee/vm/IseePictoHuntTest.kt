@@ -138,6 +138,18 @@ class IseePictoHuntTest {
         assertEquals(1, state.value.picto.armed)
     }
 
+    @Test
+    fun `chasse en francais matche les detections anglaises`() = runTest {
+        val coordinator = picto(armedRoot())(this)
+        coordinator.refresh()
+        advanceUntilIdle()
+        coordinator.findObject("cles")
+        coordinator.onDetections(listOf(huntKeysAt(0.2f, 0.3f, 0.5f, 0.6f)))
+        advanceUntilIdle()
+        assertEquals(listOf(Pair("cles", 11)), found)
+        assertEquals("keys", state.value.picto.hits.single().label)
+    }
+
     private fun tempDir(prefix: String): File =
         Files.createTempDirectory(prefix).toFile().apply { deleteOnExit() }
 

@@ -58,8 +58,8 @@ class IseeDictationRouter(
      * Vrai si [text] était un ordre (exécuté, consommé) ; faux si c'est une
      * question pour le LLM (rien n'est appelé).
      */
-    suspend fun run(text: String): Boolean {
-        return when (val order = DictationOrders.parse(text)) {
+    suspend fun run(text: String, hunting: String? = null): Boolean {
+        return when (val order = DictationOrders.parse(text, hunting)) {
             null -> false
             DictationOrder.Outdoor -> { actions.onOutdoor(); true }
             DictationOrder.Indoor -> { actions.onIndoor(); true }

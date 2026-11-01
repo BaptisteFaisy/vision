@@ -99,6 +99,7 @@ object HomeModes {
      * canoniques ([KnownSizes.canonical]).
      */
     private val WORD_ALIASES = mapOf(
+        "clef" to "keys",
         "medicaments" to "medicine box",
         "mouchoirs" to "tissue box",
         "etui" to "glasses case",

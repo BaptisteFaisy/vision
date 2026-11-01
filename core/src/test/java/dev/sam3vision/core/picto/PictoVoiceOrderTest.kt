@@ -96,6 +96,15 @@ class PictoVoiceOrderTest {
     }
 
     @Test
+    fun `ou imparfait et please final rendent le concept`() {
+        assertEquals("keys", PictoVoiceOrder.parseOuSont("où étaient mes clés"))
+        assertEquals("phone", PictoVoiceOrder.parseOuSont("où était mon téléphone"))
+        assertEquals("keys", PictoVoiceOrder.parseOuSont("où sont mes clés please"))
+        assertEquals("keys", PictoVoiceOrder.parseOuSont("où est ma clef"))
+        assertEquals("keys", PictoVoiceOrder.parseOuSont("où sont les clefs"))
+    }
+
+    @Test
     fun `ou sont refuse l anglais l inconnu le compose et le vide`() {
         assertNull(PictoVoiceOrder.parseOuSont("Where are my keys"))
         assertNull(PictoVoiceOrder.parseOuSont("où est mon doudou"))
