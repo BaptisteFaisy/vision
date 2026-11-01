@@ -101,7 +101,7 @@ class LiveProbe(
     /** Échéance partagée avec le Direct ; la réserve d'une frame reste locale (ci-dessous). */
     internal val cadence = LiveFrameCadence()
 
-    /** Envois adaptatifs (Q8+Q9) : paliers qualité + keyframes, éteints par défaut. */
+    /** Envois adaptatifs (Q8+Q9) : paliers qualité + keyframes, allumés par défaut. */
     internal val adaptive = LiveAdaptive(baseQuality = ISEE_FRAME_QUALITY)
 
     /** Qualité JPEG à encoder : la constante éteint, le palier courant allumé. */

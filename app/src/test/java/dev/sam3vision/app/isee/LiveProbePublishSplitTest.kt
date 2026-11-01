@@ -11,7 +11,6 @@ import kotlinx.coroutines.test.StandardTestDispatcher
 import kotlinx.coroutines.test.TestScope
 import kotlinx.coroutines.test.runTest
 import org.junit.Assert.assertEquals
-import org.junit.Assert.assertNull
 import org.junit.Assert.assertTrue
 import org.junit.Test
 
@@ -44,12 +43,15 @@ class LiveProbePublishSplitTest {
         val active = LiveSession(NeverClient(), clock = { ns })
         val shown = LiveTimings(clock = { ns })
 
+        val before = probe.state.value
         probe.publishPixels(active, frame(listOf(personne())), shown)
         val pixels = probe.state.value
         assertEquals(1, pixels.pixelSeq)
         assertEquals("frames n'avance qu'en #2", 0, pixels.frames)
         assertTrue("pas de détections en #1", pixels.samDetections.isEmpty())
-        assertNull("pas de phrase en #1", pixels.spoken)
+        // Avis d'armement (markWarming) : #1 le laisse intact, sans émission.
+        assertEquals("phrase inchangée en #1", before.spoken, pixels.spoken)
+        assertEquals("pas d'émission voix en #1", before.spokenSeq, pixels.spokenSeq)
         assertTrue("chrono posée en #1", pixels.timings.known)
 
         val rest = probe.computeRest(frame(listOf(personne())), "A", 8_000_000L)

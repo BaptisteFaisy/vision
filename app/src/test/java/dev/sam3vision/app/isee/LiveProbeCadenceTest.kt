@@ -194,13 +194,15 @@ class LiveProbeCadenceTest {
         probe.onFrame("A", captureAtNs = 1_000_000L)
         advanceUntilIdle()
         probe.onFrame("B", captureAtNs = 2_000_000L)
+        advanceUntilIdle()
+        probe.onFrame("C", captureAtNs = 3_000_000L)
         assertFalse("réserve fraîche : pas de conversion", probe.wantsFrame())
 
         at(10)
         assertFalse("10 ms : encore fraîche", probe.wantsFrame())
         at(60)
         assertTrue("60 ms : périmée, on réalimente", probe.wantsFrame())
-        assertEquals("aucun envoi pendant le vol de A", 1, fake.sent)
+        assertEquals("aucun envoi pendant les vols de A et B", 2, fake.sent)
         fake.release(frame())
         advanceUntilIdle()
     }
