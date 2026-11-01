@@ -278,8 +278,12 @@ internal fun fovText(deg: Float): String =
     if (deg > 0f) String.format(Locale.US, "%.1f", deg).removeSuffix(".0") else ""
 
 /** Tolerant field-of-view input: comma accepted, [LensSpec] bounds, 0 = auto. */
+/** Tolerant float input: comma accepted, surrounding blanks ignored, `null` when unreadable. */
+private fun parseLooseFloat(text: String): Float? =
+    text.replace(',', '.').trim().toFloatOrNull()
+
 internal fun parseFov(text: String): Float {
-    val value = text.replace(',', '.').trim().toFloatOrNull() ?: return 0f
+    val value = parseLooseFloat(text) ?: return 0f
     return if (value <= 0f) 0f else value.coerceIn(LensSpec.FOV_MIN, LensSpec.FOV_MAX)
 }
 
@@ -289,7 +293,7 @@ internal fun heightText(meters: Float): String =
 
 /** Tolerant height input: comma accepted, hand-held bounds, `null` when unreadable. */
 internal fun parseHeight(text: String): Float? {
-    val value = text.replace(',', '.').trim().toFloatOrNull() ?: return null
+    val value = parseLooseFloat(text) ?: return null
     if (!value.isFinite()) return null
     return value.coerceIn(CameraPose.MIN_HEIGHT_M, CameraPose.MAX_HEIGHT_M)
 }
@@ -300,7 +304,7 @@ internal fun parseHeight(text: String): Float? {
  * not silently calibrate on a wrong number).
  */
 internal fun parseCalibrationMeters(text: String, min: Float, max: Float): Float? {
-    val value = text.replace(',', '.').trim().toFloatOrNull() ?: return null
+    val value = parseLooseFloat(text) ?: return null
     if (!value.isFinite() || value !in min..max) return null
     return value
 }
