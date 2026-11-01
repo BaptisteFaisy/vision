@@ -25,8 +25,8 @@ import kotlinx.coroutines.launch
  * marche, par compteur Canny frais de la caméra ([StairCannyCount] — 0 = non
  * compté, pas « zéro marche ») ou par profondeur (< 1 m, lue ici). Lecture
  * séquentielle, comme le trottoir : une alerte confirmée ne s'annule pas.
- * [stairsAudible] ignore la sourdine GPS (chat libre suffit) : la sécurité
- * passe avant le silence (contrat `IseeVoiceGate`). L'esquive en cours
+ * [stairsAudible] ne regarde que le chat (chat libre suffit) : la sécurité
+ * passe avant le silence (porte GPS supprimée, SPEC v4). L'esquive en cours
  * ([stairsYieldToAvoidance]) tait l'annonce : les humains priment, même sur
  * les escaliers.
  */
@@ -124,8 +124,8 @@ internal fun LiveProbe.stairsYieldToAvoidance(): Boolean {
  * coroutine fille : le battement ne s'arrête jamais pour une synthèse lente
  * (le lecteur coupe le précédent, dernier gagnant). Sans escalier nommé ou
  * sans compte frais : silence (auto-muet caméra coupée, séance finie). Rend
- * le compteur pour le `reset()` de séance. [stairsAudible] ignore la sourdine
- * GPS, comme l'annonce (sécurité). [nowMs] est l'horloge du compteur
+ * le compteur pour le `reset()` de séance. [stairsAudible] ne regarde que
+ * le chat, comme l'annonce (sécurité). [nowMs] est l'horloge du compteur
  * (injectée en test).
  */
 internal fun LiveProbe.observeStairsCount(

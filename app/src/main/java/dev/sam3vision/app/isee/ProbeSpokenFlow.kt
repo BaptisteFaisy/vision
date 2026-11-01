@@ -1,14 +1,10 @@
 package dev.sam3vision.app.isee
 
-import dev.sam3vision.core.live.GuidanceStarvation
-import dev.sam3vision.core.live.StarvationEvent
-import dev.sam3vision.core.speech.SpeechLanguage
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.cancelAndJoin
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.collect
-import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.launch
 
 /**
@@ -63,35 +59,7 @@ internal fun CoroutineScope.observeSpokenEmissions(
  * sinon la consigne pollue sa dictée) — mais jamais aux attentes
  * silencieuses (transcription, réflexion LLM, synthèse réseau) : muette
  * jusqu'à 75 s sans rien jouer, la voix de sécurité se taisait sans raison
- * audible. [ambientAllowed] garde l'ordre « GPS désactivé ».
+ * audible. La porte GPS est supprimée (SPEC v4) : plus de troisième garde.
  */
-internal fun canGuideSpeech(playerIdle: Boolean, userHolding: Boolean, ambientAllowed: Boolean): Boolean =
-    playerIdle && !userHolding && ambientAllowed
-
-/**
- * Guetteur de famine du guidage : le battement 500 ms dit si la boucle
- * est vivante (`pulse.stale`) ; passé 6 s sans consigne fraîche alors
- * qu'on guide ([guiding] : vidéo, guidage, hors Traversée — sa voix
- * rouge/vert est propriétaire), la voix de sécurité prévient (TTS
- * système hors-ligne : la famine, c'est souvent le réseau), puis annonce
- * la reprise. Une seule alerte par famine, un seul retour par reprise.
- */
-internal fun LiveProbe.observeStarvation(
-    scope: CoroutineScope,
-    safety: SafetyVoice,
-    guiding: () -> Boolean,
-    language: () -> SpeechLanguage,
-    clockMs: () -> Long = { System.currentTimeMillis() },
-    watcher: GuidanceStarvation = GuidanceStarvation(),
-) {
-    scope.launch {
-        state.map { it.pulse }.collect { pulse ->
-            val event = watcher.onTick(clockMs(), fresh = pulse != null && !pulse.stale, guiding = guiding())
-            when (event) {
-                StarvationEvent.Warn -> safety.speak(GuidanceStarvation.warnPhrase(language()))
-                StarvationEvent.Resumed -> safety.speak(GuidanceStarvation.resumedPhrase(language()))
-                null -> Unit
-            }
-        }
-    }
-}
+internal fun canGuideSpeech(playerIdle: Boolean, userHolding: Boolean): Boolean =
+    playerIdle && !userHolding
