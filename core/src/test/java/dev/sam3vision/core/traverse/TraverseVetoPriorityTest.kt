@@ -120,16 +120,19 @@ class TraverseVetoPriorityTest {
     }
 
     @Test
-    fun `veto plus vert parle rouge apres deux frames - chaine jusqu a la voix`() {
+    fun `veto plus vert parle rouge en chaine jusqu a la voix`() {
         val veto = TraverseVeto()
         val announcer = CrossingAnnouncer()
-        val first = veto.update(true, listOf(detection("car", 0.9f, nearBox)), focalPx)
-        assertEquals(CrossingState.Red, first.crossingState())
-        assertNull(announcer.onFrame(0L, first.crossingState()))
+        val first = veto.update(true, listOf(detection("car", 0.9f, smallBox)), focalPx)
+        assertEquals(CrossingState.Green, first.crossingState())
+        assertEquals("You can cross", announcer.onFrame(0L, first.crossingState())?.phrase)
         val second = veto.update(true, listOf(detection("car", 0.9f, nearBox)), focalPx)
-        val cue = announcer.onFrame(200L, second.crossingState())
+        assertEquals(CrossingState.Red, second.crossingState())
+        assertNull("rouge pas encore confirmé", announcer.onFrame(200L, second.crossingState()))
+        val third = veto.update(true, listOf(detection("car", 0.9f, listOf(0f, 0f, 220f, 220f))), focalPx)
+        val cue = announcer.onFrame(400L, third.crossingState())
         assertEquals("Don't cross yet", cue?.phrase)
-        assertFalse(cue?.urgent ?: true)
+        assertTrue("retour au rouge après vert : urgent", cue?.urgent ?: false)
         assertEquals(CrossingState.Red, cue?.state)
     }
 
