@@ -43,9 +43,9 @@ class ProbeEnsureConceptTest {
 
     @Test
     fun `defauts exterieur au plafond, find the x remplace le dernier`() = runTest {
-        // Liste unique normal/Traversée (30/10) : 18 concepts, au plafond —
-        // « Find the X » dehors fait sortir le 18e (« wall » depuis l'ordre
-        // user du 01/11) puis reconfigure : sans ça iSee dit
+        // Liste unique normal/Traversée (30/10) : 22 concepts depuis l'ordre
+        // user du 01/11 (boutique + foule), au plafond — « Find the X » dehors
+        // fait sortir le 22e (« dog ») puis reconfigure : sans ça iSee dit
         // « Looking for … » puis reste muet.
         val (probe, fake) = probeHarness(this)
         val closed = fake.closed
@@ -53,9 +53,9 @@ class ProbeEnsureConceptTest {
         advanceUntilIdle()
         assertTrue(fake.closed > closed)
         val sent = probe.state.value.conceptsSent
-        assertEquals(18, sent.size)
+        assertEquals(22, sent.size)
         assertTrue(sent.contains("wallet"))
-        assertFalse(sent.contains("wall"))
+        assertFalse(sent.contains("dog"))
     }
 
     @Test
@@ -85,13 +85,13 @@ class ProbeEnsureConceptTest {
     @Test
     fun `plafond, find the x remplace le dernier, trop long refuse`() = runTest {
         val (probe, fake) = probeHarness(this)
-        val eighteen = (1..18).map { "concept$it" }
-        probe.configure(PROBE_TEST_ENDPOINT, prompts = eighteen)
+        val full = (1..22).map { "concept$it" }
+        probe.configure(PROBE_TEST_ENDPOINT, prompts = full)
         val closed = fake.closed
         probe.ensureConcept(Settings.Default, "keys")
         advanceUntilIdle()
         assertTrue(fake.closed > closed)
-        val expected = eighteen.dropLast(1) + "keys"
+        val expected = full.dropLast(1) + "keys"
         assertEquals(expected, probe.state.value.conceptsSent)
         val closedAfterKeys = fake.closed
         probe.ensureConcept(Settings.Default, "x".repeat(33))
