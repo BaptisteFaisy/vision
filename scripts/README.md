@@ -15,6 +15,16 @@ contient `scripts/`, ce que chaque outil lit, écrit, et les règles communes.
 | `scripts/lib/common.sh` | socle sourcé : `ROOT`, `die`, `warn`, `require_cmd`, `require_uint`, `std_args`, `safe_rm_rf`, `make_tmpdir`, `resolve_adb` | — | rien | aucun | — |
 | `scripts/test_scripts.sh` | les tests de cette page, en une seule commande | — | temporaires dans `$TMPDIR/test-scripts.XXXXXX` (supprimés à la sortie) | aucun | `bash`, `grep`, `sed`, `awk`, `wc` |
 | `scripts/gen_mask_golden.py` | fixtures dorées des masques (`bits`/`M1`) + IoU + arbitrage de variante ; `--write` écrit les deux artefacts, `--check` les compare (porte anti-dérive), `--selftest` réencode six vecteurs réels du dépôt à l'octet près | rien (aucun argument, aucun fichier d'entrée) | `core/src/test/java/dev/sam3vision/core/mask/MaskGoldenData.kt` (fixtures générées) et `docs/MESURES-u11c.txt` | aucun | `python3` (bibliothèque standard seule) |
+| `scripts/verify-longpress-port.sh` | recette du port appui long sur émulateur (salve au seuil, silence tenu, queue 200 ms, WAV rangé, tap court intact) | `EMULATOR_SERIAL`, `APK`, `ADB` | stdout + procès-verbal | aucun — le logcat est **compté**, jamais recopié | `adb`, `timeout` |
+| `scripts/verify-voice-nav.sh` | recette navigation vocale en une prise sur téléphone (`adb` direct) : commande parlée, confirmation, guidage Maps, hors-trace, arrivée | `PHONE_SERIAL`, `APK`, `ADB` | stdout + checklist | aucun — le logcat est **compté**, jamais recopié | `adb`, `timeout` |
+| `scripts/verify-street.sh` | recette rue en une prise (~15 min, destination à 200 m, obstacles, traversée, arrivée) | `PHONE_SERIAL`, `APK`, `ADB`, `PHONE_BIN`, `PHONE_WAIT`, `EXPECT_REF` | stdout + checklist + dossier de preuves `mktemp` (**conservé**) | aucun — le logcat est **compté**, jamais recopié | `adb`, `timeout`, `~/bin/phone` |
+| `scripts/mesure-distances.sh` | vérifie un CSV de relevés terrain (protocole `docs/RECETTE-DISTANCES.md`) : biais médian, p90, pires cas, verdict | fichier CSV en argument | stdout (verdict) | aucun | `bash`, `awk` |
+| `scripts/isee-sim.sh` | harnais iSee sans téléphone : transcode la balade (cache par empreinte), boote l'AVD avec `-camera-back videofile:…`, installe, ouvre iSee, rejoue le trajet, filme l'écran | `APK`, `ADB`, `EMULATOR`, `FFMPEG`, `ISEESIM_SIZE`, `BOOT_TIMEOUT`, `ISEESIM_CACHE` | vidéo transcodée (cache), enregistrement d'écran rapatrié | aucun | `adb`, émulateur Android, `ffmpeg` |
+| `scripts/sim/route-replay.py` | rejoue un trajet GPS (CSV ou GPX) à 1 Hz via le receiver de simulation du build debug (repli `--mode geofix`) | fichier trajet en argument | positions poussées sur l'émulateur | aucun | `python3`, `adb` |
+| `scripts/budget_latence.py` | source unique des chiffres de `docs/LATENCE-BUDGET.md` : `--write-doc` génère les 7 blocs, `--check-doc` les compare (porte anti-dérive) | rien | `docs/LATENCE-BUDGET.md` (`--write-doc`) | aucun | `python3` (bibliothèque standard seule) |
+| `scripts/check-budget-provenance.py` | chaque chiffre publié du budget dit sa provenance (campagnes datées, vocabulaire fermé) ; `--selftest` | rien | stdout (verdict) | aucun | `python3` (bibliothèque standard seule) |
+| `scripts/parse_isee_lat.py` | verdict 500 ms max / 300 ms en moyenne sur un dump `logcat -s ISEE_LAT` ; `--selftest` | dump en argument ou stdin | stdout (verdict) | aucun | `python3` (bibliothèque standard seule) |
+| `scripts/parse_glasses_link.py` | verdict B2 lunettes (`LUNETTES-RECETTE-TEL` § 3) sur un dump `logcat -s GlassesLink` | dump en argument ou stdin | stdout (verdict) | aucun | `python3` (bibliothèque standard seule) |
 
 Aucun script n'affiche ni ne copie `local.properties` (les clés y vivent, le fichier est
 gitignoré). Une seule exception, en lecture par Gradle seulement : `install-phone-latest.sh`
@@ -45,7 +55,7 @@ exécutions parallèles ne se marchent pas dessus.
 ## Lancer les tests
 
 ```bash
-bash scripts/test_scripts.sh      # 128 assertions (mesuré le 29/10/2026), code 0 si tout passe
+bash scripts/test_scripts.sh      # 177 tests (mesuré le 01/11/2026), code 0 si tout passe
 python3 scripts/gen_mask_golden.py --selftest   # 11 assertions sur l'encodeur de masques
 python3 scripts/gen_mask_golden.py --check      # fixtures dorées <-> générateur
 ```
@@ -53,9 +63,10 @@ python3 scripts/gen_mask_golden.py --check      # fixtures dorées <-> générat
 Les tests n'ouvrent ni Gradle ni un appareil réel : `adb` est remplacé par un faux binaire
 dans un dossier temporaire (émulateur en ligne, hors ligne ou capture factice au choix).
 Ils couvrent : syntaxe `bash -n`, présence de `set -euo pipefail`, `--help` (code 0) et
-argument inconnu (code 2) sur les trois outils, gardes `ANDROID_HOME` / `GRADLE_TIMEOUT` / JDK
+argument inconnu (code 2) sur les neuf outils shell, gardes `ANDROID_HOME` / `GRADLE_TIMEOUT` / JDK
 de `build.sh`, APK manquant et émulateur hors ligne de `install-emulator.sh`, `ADB` non
-exécutable, APK manquant de `verify-tap-voix.sh`, les refus de `safe_rm_rf`, et des garde-fous
+exécutable, APK manquant des quatre recettes `verify-*.sh`, CSV invalide de `mesure-distances.sh`,
+les refus de `safe_rm_rf`, et des garde-fous
 statiques (pas d'`eval`, pas de `/tmp` à nom fixe, pas de `/home/...` en dur, jamais
 d'affichage de `local.properties`, un seul `rm -rf` — celui de `safe_rm_rf`), plus la limite
 des 500 lignes.
