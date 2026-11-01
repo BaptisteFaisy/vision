@@ -52,11 +52,14 @@ class TraverseVetoDepthTest {
         val veto = TraverseVeto()
         frame(veto, 100f, 0L, 0.4f)
         frame(veto, 110f, 100L, 0.5f)
-        val third = frame(veto, 120f, 200L, 0.6f)
+        frame(veto, 120f, 200L, 0.6f)
+        frame(veto, 130f, 300L, 0.7f)
+        frame(veto, 140f, 400L, 0.8f)
+        val sixth = frame(veto, 150f, 500L, 0.9f)
 
-        assertTrue(third.veto)
-        assertNotNull(third.approachTtcSeconds)
-        assertTrue("tau ~2,4 s", third.approachTtcSeconds!! in 1.0f..3.0f)
+        assertTrue(sixth.veto)
+        assertNotNull(sixth.approachTtcSeconds)
+        assertTrue("tau ~1,8 s", sixth.approachTtcSeconds!! in 1.0f..3.0f)
     }
 
     @Test
@@ -64,9 +67,12 @@ class TraverseVetoDepthTest {
         val veto = TraverseVeto()
         frame(veto, 100f, 0L, null)
         frame(veto, 110f, 100L, null)
-        val third = frame(veto, 120f, 200L, null)
+        frame(veto, 120f, 200L, null)
+        frame(veto, 130f, 300L, null)
+        frame(veto, 140f, 400L, null)
+        val sixth = frame(veto, 150f, 500L, null)
 
-        assertTrue(third.veto)
-        assertNotNull(third.approachTtcSeconds)
+        assertTrue(sixth.veto)
+        assertNotNull(sixth.approachTtcSeconds)
     }
 }

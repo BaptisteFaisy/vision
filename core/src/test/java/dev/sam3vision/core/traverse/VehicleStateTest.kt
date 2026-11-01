@@ -56,20 +56,29 @@ class VehicleStateTest {
     }
 
     @Test
-    fun `voiture qui approche - mouvement a la 3e frame, urgent au centre`() {
-        val watcher = VehicleStateWatcher()
+    fun `voiture qui approche - mouvement des la 2e frame, urgent a la 6e`() {
+        val watcher = VehicleStateWatcher(confirmFrames = 1, movingCooldownMs = 0L)
         assertNull(watcher.update(listOf(det("car", box(100f))), listOf(reading("car", 5f, box(100f))), atMs = 0L))
-        assertNull("croissance seule : confirmation en cours", watcher.update(listOf(det("car", box(110f))), listOf(reading("car", 5f, box(110f))), atMs = 100L))
-        val third = watcher.update(
-            listOf(det("car", box(120f))),
-            listOf(reading("car", 5f, box(120f))),
-            atMs = 200L,
+        listOf(110f, 120f, 130f, 140f).forEachIndexed { index, width ->
+            val cue = watcher.update(
+                listOf(det("car", box(width))),
+                listOf(reading("car", 5f, box(width))),
+                atMs = (index + 1) * 100L,
+                language = SpeechLanguage.Fr,
+            )
+            assertEquals("Voiture.", cue!!.phrase)
+            assertFalse("croissance seule, tau run < 5 : pas urgent", cue.urgent)
+        }
+        val sixth = watcher.update(
+            listOf(det("car", box(150f))),
+            listOf(reading("car", 5f, box(150f))),
+            atMs = 500L,
             language = SpeechLanguage.Fr,
         )
 
-        assertEquals("Voiture.", third!!.phrase)
-        assertEquals(5f, third.meters!!, 0.001f)
-        assertTrue("tau < 3 s + proche + centre : urgent", third.urgent)
+        assertEquals("Voiture.", sixth!!.phrase)
+        assertEquals(5f, sixth.meters!!, 0.001f)
+        assertTrue("tau run 5 + proche + centre : urgent", sixth.urgent)
     }
 
     @Test

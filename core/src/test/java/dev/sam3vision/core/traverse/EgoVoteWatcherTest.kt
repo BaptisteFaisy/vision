@@ -38,18 +38,23 @@ class EgoVoteWatcherTest {
     }
 
     @Test
-    fun `fond immobile prouve + approche - mobile, urgent au centre`() {
+    fun `fond immobile prouve + approche - mobile, urgent a la 6e frame`() {
         val motion = FrameMotion(MotionSample(0f, 0f, 1f, 0.9f), 96, 96, 100L)
-        val watcher = VehicleStateWatcher()
+        val watcher = VehicleStateWatcher(confirmFrames = 1, movingCooldownMs = 0L)
         assertNull(watcher.update(listOf(det("car", box(100f))), listOf(reading("car", 5f, box(100f))),
             atMs = 0L, motion = motion))
-        assertNull(watcher.update(listOf(det("car", box(110f))), listOf(reading("car", 5f, box(110f))),
-            atMs = 100L, motion = motion))
-        val third = watcher.update(listOf(det("car", box(120f))), listOf(reading("car", 5f, box(120f))),
-            atMs = 200L, language = SpeechLanguage.Fr, motion = motion)
+        listOf(110f, 120f, 130f, 140f).forEachIndexed { index, width ->
+            val cue = watcher.update(listOf(det("car", box(width))), listOf(reading("car", 5f, box(width))),
+                atMs = (index + 1) * 100L, language = SpeechLanguage.Fr, motion = motion)
+            assertEquals("Voiture.", cue!!.phrase)
+            assertFalse("croissance seule, tau run < 5 : pas urgent", cue.urgent)
+        }
+        val sixth = watcher.update(listOf(det("car", box(150f))), listOf(reading("car", 5f, box(150f))),
+            atMs = 500L, language = SpeechLanguage.Fr, motion = motion)
 
-        assertEquals("Voiture.", third!!.phrase)
-        assertTrue("tau + 5 m + centre : urgent", third.urgent)
+        assertEquals("Voiture.", sixth!!.phrase)
+        assertTrue("tau run 5 + 5 m + centre : urgent", sixth.urgent)
+        assertEquals("Stop, voiture en mouvement.", sixth.safetyPhrase)
     }
 
     @Test
@@ -138,16 +143,18 @@ class EgoVoteWatcherTest {
         // sous zoom qui l'explique le tau se tait — verdict roulant, pas tu.
         val motion = FrameMotion(MotionSample(0f, 0f, 1.08f, 0.5f), 256, 103, 200L)
         val loud = VehicleApproach()
-        assertFalse(loud.update(listOf(car(100f, 320f)), atMs = 0L).approaching)
-        assertFalse(loud.update(listOf(car(120f, 350f)), atMs = 200L).approaching)
-        val third = loud.update(listOf(car(140f, 380f)), atMs = 400L)
-        assertTrue("tau ~2,4 s : le contrôle approche", third.approaching)
+        listOf(100f to 320f, 120f to 350f, 140f to 380f, 160f to 410f, 180f to 440f).forEachIndexed { index, (w, cx) ->
+            assertFalse("run < 5 : le tau attend", loud.update(listOf(car(w, cx)), atMs = index * 200L).approaching)
+        }
+        val sixth = loud.update(listOf(car(200f, 470f)), atMs = 1000L)
+        assertTrue("tau franc : le contrôle approche", sixth.approaching)
 
         val muted = VehicleApproach()
-        assertFalse(muted.update(listOf(car(100f, 320f)), atMs = 0L, motion = motion).approaching)
-        assertFalse(muted.update(listOf(car(120f, 350f)), atMs = 200L, motion = motion).approaching)
-        assertFalse("zoom 8 % : le tau est décoté",
-            muted.update(listOf(car(140f, 380f)), atMs = 400L, motion = motion).approaching)
+        listOf(100f to 320f, 120f to 350f, 140f to 380f, 160f to 410f, 180f to 440f).forEachIndexed { index, (w, cx) ->
+            assertFalse(muted.update(listOf(car(w, cx)), atMs = index * 200L, motion = motion).approaching)
+        }
+        assertFalse("zoom 8 % : le tau est décoté, run 5 ou pas",
+            muted.update(listOf(car(200f, 470f)), atMs = 1000L, motion = motion).approaching)
         assertEquals(Verdict.VEHICLE_MOVED, muted.lastVerdicts.values.first().verdict)
     }
 

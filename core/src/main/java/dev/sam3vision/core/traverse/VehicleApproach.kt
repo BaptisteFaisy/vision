@@ -8,7 +8,6 @@ import dev.sam3vision.core.motion.GyroMotion
 import dev.sam3vision.core.motion.MotionSample
 import dev.sam3vision.core.predict.Box
 import dev.sam3vision.core.predict.BoxPredictor
-import dev.sam3vision.core.predict.EgoCompensator // PISTE1
 import dev.sam3vision.core.predict.MotionModel
 import kotlin.math.abs
 
@@ -48,13 +47,16 @@ data class ApproachVerdict(
  */
 class VehicleApproach {
 
-    private class Track(
+    internal class Track(
         var label: String,
         val motion: MotionModel,
         var lastSeenMs: Long,
         // PISTE2 : proximités première/dernière vues — la profondeur confirme l'expansion.
         var firstCloseness: Float? = null,
         var lastCloseness: Float? = null,
+        // Run de croissance brute (statique tenu, retrait casse) + tau armé (voir VehicleTauGate).
+        var growthRun: Int = 0,
+        var tauArmed: Boolean = false,
     )
 
     // PISTE2 : [key] = boîte proto, clé des proximités ([DepthConfirm]).
@@ -236,14 +238,14 @@ class VehicleApproach {
                 claimed += id
                 val revived = dropped.remove(id)!!
                 revived.track.label = vehicle.label
-                revived.track.motion.observe(vehicle.box, atMs, maxSpeed)
+                feedTrackRun(revived.track, vehicle.box, atMs, maxSpeed)
                 revived.track.lastSeenMs = atMs
                 tracks[id] = revived.track
             } else {
                 claimed += id
                 val track = tracks.getValue(id)
                 track.label = vehicle.label
-                track.motion.observe(vehicle.box, atMs, maxSpeed)
+                feedTrackRun(track, vehicle.box, atMs, maxSpeed)
                 track.lastSeenMs = atMs
                 // PISTE2 : la dernière proximité suit la boîte (sans mesure, on garde l'ancienne).
                 closenessOf(depthByBox, vehicle.key)?.let { track.lastCloseness = it }
@@ -339,9 +341,7 @@ class VehicleApproach {
                     radialLabel = track.label
                 }
             }
-            if (track.motion.velocity.width <= frameWidth * MIN_GROWTH_RATIO) continue
-            // PISTE1 : croissance expliquée par le zoom du fond — pas une approche.
-            if (EgoCompensator.discountGrowth(track.motion.velocity.width / width, lastGlobal, lastGlobalDtMs).discounted) continue
+            if (!tauEligible(track, frameWidth, width, lastGlobal, lastGlobalDtMs)) continue
             val tau = width / track.motion.velocity.width
             if (tau.isFinite() && tau < bestTtc) {
                 bestTtc = tau

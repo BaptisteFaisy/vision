@@ -5,6 +5,7 @@ import dev.sam3vision.core.model.Detection
 import dev.sam3vision.core.motion.MotionSample
 import dev.sam3vision.core.speech.SpeechLanguage
 import org.junit.Assert.assertEquals
+import org.junit.Assert.assertFalse
 import org.junit.Assert.assertNotNull
 import org.junit.Assert.assertNull
 import org.junit.Assert.assertTrue
@@ -95,21 +96,29 @@ class VehicleStateBackgroundTest {
     }
 
     @Test
-    fun `mouvement à 8 m pile - stop, frontiere proche`() {
+    fun `mouvement à 8 m pile - stop, urgent a la 6e frame`() {
         // V1 (signal fond absent) : la frontière proche (≤ 8 m) parle en stop.
-        val watcher = VehicleStateWatcher()
+        val watcher = VehicleStateWatcher(confirmFrames = 1, movingCooldownMs = 0L)
         watcher.update(listOf(det("car", box(100f))), listOf(reading("car", 8f, box(100f))), atMs = 0L)
-        watcher.update(listOf(det("car", box(110f))), listOf(reading("car", 8f, box(110f))), atMs = 100L)
-        val third = watcher.update(
-            listOf(det("car", box(120f))),
-            listOf(reading("car", 8f, box(120f))),
-            atMs = 200L,
+        listOf(110f, 120f, 130f, 140f).forEachIndexed { index, width ->
+            val cue = watcher.update(
+                listOf(det("car", box(width))),
+                listOf(reading("car", 8f, box(width))),
+                atMs = (index + 1) * 100L,
+                language = SpeechLanguage.En,
+            )
+            assertEquals("Car.", cue!!.phrase)
+            assertEquals("Stop, car moving.", cue.safetyPhrase)
+            assertFalse("croissance seule, tau run < 5 : pas urgent", cue.urgent)
+        }
+        val sixth = watcher.update(
+            listOf(det("car", box(150f))),
+            listOf(reading("car", 8f, box(150f))),
+            atMs = 500L,
             language = SpeechLanguage.En,
         )
 
-        assertEquals("Car.", third!!.phrase)
-        assertEquals("Stop, car moving.", third.safetyPhrase)
-        assertTrue("tau + 8 m + centre : urgent", third.urgent)
+        assertTrue("tau run 5 + 8 m + centre : urgent", sixth!!.urgent)
     }
 
     private fun det(label: String, box: List<Float>): Detection =
