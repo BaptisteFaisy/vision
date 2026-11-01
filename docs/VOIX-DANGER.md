@@ -1077,3 +1077,34 @@ Verrouillé par `SafetyVoiceTest` (+1 : urgence externe grave),
 Recette téléphone : « Stop, car moving. » en Traversée et sortie de trace
 sonnent graves, distincts du doux et du guidage — **non mesurée**, exige
 un APK de cette branche sur appareil réel.
+
+## 30. Annonces « Attention … » cadencées, parole du user devant tout (ordre user du 1/11)
+
+Deux plaintes de recette, une même racine : le direct parle trop, et il
+parle par-dessus le user.
+
+- **cadence des « Attention … »** (`core/live/AttentionCadence`, branchée
+  dans `ProximityVoice`) : une annonce déjà dite ne se redit pas avant
+  20 s, deux annonces différentes sont séparées de 6 s, deux annonces
+  urgentes de 2 s. La clé est la phrase sans ses nombres — « à 2 heures »
+  et « à 3 heures » sont la même annonce, le cadran qui tremble ne fait
+  pas une phrase neuve. Seules les phrases qui disent « Attention » /
+  « Caution » passent par la cadence : états de véhicule, consignes de
+  route et mots du guidage ne sont jamais filtrés.
+- **parole du user devant tout** : tant qu'il tient le micro ou qu'une
+  transcription court (`IseeViewModel` : `holding || transcribing`),
+  aucune voix de proximité ne parle. La lecture en cours est coupée une
+  fois (fanion rendu : `player.stop()` + `onSpeaking("")`, sinon le
+  lecteur resterait cru occupé), les phrases attendent en file
+  (`flushPending`, 5 s) et se redisent au silence. Une alerte de sécurité
+  de la frame obstacles (`decideObstacles().safety`) ne part plus en voix
+  de sécurité quand le user parle : elle rejoint le doux, derrière sa
+  phrase, et attend le silence (`softOf`).
+- **seule exception** : le stop de Traversée (`GuidanceWord.isStopPhrase`)
+  n'attend jamais la fin de la dictée.
+
+Verrouillé par `AttentionCadenceTest` (7), `ProximityVoiceUserTest` (7 :
+silence pendant la parole, redite au silence, sécurité retenue, stop qui
+passe, cadence) et `SoftHeldForUserTest` (4). Recette téléphone : parler
+en marchant devant un obstacle fixe ne donne plus une annonce toutes les
+4 s — **non mesurée**, exige un APK de cette branche.
