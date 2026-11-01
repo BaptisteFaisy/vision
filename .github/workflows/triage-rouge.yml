@@ -22,6 +22,22 @@ on:
   workflow_run:
     workflows: [CI]
     types: [completed]
+  # Rejouer un triage à la main (après un run rouge précis) : même chemin.
+  workflow_dispatch:
+    inputs:
+      pr:
+        description: "Numéro de PR à trier"
+        required: true
+        type: string
+      run:
+        description: "Identifiant du run CI en échec"
+        required: true
+        type: string
+      reparer:
+        description: "Appeler l'agent de réparation (décocher pour un essai à blanc)"
+        required: false
+        default: true
+        type: boolean
 
 permissions:
   contents: read
@@ -30,23 +46,24 @@ permissions:
 
 concurrency:
   # Une seule passe par tête : un run annulé ne doit pas trier deux fois.
-  group: triage-rouge-${{ github.event.workflow_run.head_sha }}
+  group: triage-rouge-${{ github.event.workflow_run.head_sha || inputs.pr }}
   cancel-in-progress: true
 
 jobs:
   triage:
     if: >-
-      github.event.workflow_run.conclusion == 'failure' &&
-      github.event.workflow_run.event == 'pull_request' &&
-      github.event.workflow_run.pull_requests[0].number != null
+      github.event_name == 'workflow_dispatch' ||
+      (github.event.workflow_run.conclusion == 'failure' &&
+       github.event.workflow_run.event == 'pull_request' &&
+       github.event.workflow_run.pull_requests[0].number != null)
     runs-on: [self-hosted, linux, x64, vision]
     timeout-minutes: 25
     env:
       GH_TOKEN: ${{ github.token }}
       GH_ECRITURE: ${{ secrets.AUTOMERGE_PAT }}
       REPO: ${{ github.repository }}
-      PR: ${{ github.event.workflow_run.pull_requests[0].number }}
-      RUN_ID: ${{ github.event.workflow_run.id }}
+      PR: ${{ inputs.pr || github.event.workflow_run.pull_requests[0].number }}
+      RUN_ID: ${{ inputs.run || github.event.workflow_run.id }}
       TEST_AGENT: ${{ vars.TEST_AGENT }}
       FIREWORKS_API_KEY: ${{ secrets.FIREWORKS_API_KEY }}
       FIREWORKS_MODEL: ${{ vars.FIREWORKS_MODEL }}
@@ -59,7 +76,8 @@ jobs:
           SHA="$(gh api "repos/$REPO/pulls/$PR" --jq .head.sha)"
           BRANCH="$(gh api "repos/$REPO/pulls/$PR" --jq .head.ref)"
           DEJA="$(gh api --paginate "repos/$REPO/issues/$PR/comments" \
-            --jq '[.[] | select(.body | contains("<!-- triage sha='"$SHA"' -->"))] | length')"
+            --jq '.[].body' 2>/dev/null | grep -cF "<!-- triage sha=$SHA -->")"
+          DEJA="${DEJA:-0}"
           echo "sha=$SHA" >> "$GITHUB_OUTPUT"
           echo "branch=$BRANCH" >> "$GITHUB_OUTPUT"
           printf 'triage de la PR #%s (tête %s), marque déjà posée : %s\n' \
@@ -88,7 +106,8 @@ jobs:
         run: |
           set -uo pipefail
           gh api "repos/$REPO/contents/tools/triage_test.py" \
-            -H 'Accept: application/vnd.github.raw' > /tmp/triage.py || exit 1
+            -H 'Accept: application/vnd.github.raw' > /tmp/triage.py \
+            || { echo "triage introuvable sur master, rien à faire"; exit 0; }
           gh run view "$RUN_ID" --log-failed > /tmp/run.log 2>/dev/null || true
           gh pr diff "$PR" --name-only > /tmp/diff.txt 2>/dev/null || true
           wc -l /tmp/run.log /tmp/diff.txt
@@ -132,7 +151,9 @@ jobs:
       # Réparation : même pilote que le balayeur, mais avec l'indice du triage
       # (c'est ce qui manquait le 01/11 — l'agent cherchait à l'aveugle).
       - name: Réparation avec indice (agent borné, une fois par tête)
-        if: steps.ctx.outputs.pret == '1' && steps.tri.outputs.code != '3'
+        if: >-
+          steps.ctx.outputs.pret == '1' && steps.tri.outputs.code != '3' &&
+          (github.event_name != 'workflow_dispatch' || inputs.reparer)
         run: |
           set -uo pipefail
           if [ "${TEST_AGENT:-1}" = "0" ]; then
