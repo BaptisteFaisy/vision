@@ -14,8 +14,9 @@ private const val TAG = "GlassesHeadPose"
 /**
  * Pose tête DAT Motion : attache, collecte, publie — puis s'efface.
  *
- * Démarrée avec la session (`GlassesController.attachLocked`, à côté de
- * `GlassesInputs`), arrêtée avec elle (`releaseCapabilities`). Chaque
+ * Démarrée avec la session (`GlassesVideoLink.attachHeadPose`, depuis
+ * `GlassesController.attachLocked`), arrêtée avec elle (`detachHeadPose` via
+ * `clear()`). Chaque
  * `MotionSample.orientation` donne une pose yeux (`HeadPoseMath`, pure) publiée
  * dans [GlassesVideoLink] ; orientation `null` (appareil sans fusion), erreur
  * Motion, refus d'attache (canal bêta, paire sans Motion) ou arrêt → `null`
