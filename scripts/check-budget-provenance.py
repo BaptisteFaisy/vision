@@ -3,7 +3,7 @@
 
 `docs/LATENCE-BUDGET.md` porte une colonne « provenance » par étage. Cette porte la vérifie
 contre une **archive de campagnes datées** (`CAMPAGNES` ci-dessous) et contre un vocabulaire
-fermé. Trois contrôles :
+fermé. Cinq contrôles :
 
 A. **vocabulaire** — chaque étage porte exactement une étiquette parmi `mesuré`, `calculé`,
    `estimé`, `simulation`, `hypothèse`. Zéro étiquette = provenance implicite (celle qui se
@@ -16,21 +16,34 @@ C. **contradiction** — si une campagne archivée mesure un étage, le budget n
    01/11/2026 : `CAPTURE` était publié à 25 ms (**simulation**, « jamais lu sur un
    appareil ») alors que l'appareil mesurait 86 ms, et `ENCODE` à 5–8 ms (**estimé**)
    alors que l'appareil mesurait 27 ms. Rien ne reliait l'étiquette à une campagne.
+D. **campagnes** — toute ligne du tableau `mesures` (§ 10) porte un N (entier > 0) ;
+   toute NOUVELLE ligne (absente de la base git) porte des conditions datées. Les lignes
+   anciennes sans date sont averties, pas refusées (clause grand-père) ; sans base git
+   (checkout superficiel de la CI), la nouveauté est invérifiable et la date n'est
+   qu'avertie — le N, lui, est exigible sans base et reste une erreur partout.
+E. **branches** — avertissement si la PR touche le périmètre latence
+   (`PERIMETRE_LATENCE` : budget, cette porte, `parse_isee_lat.py`) alors que des
+   branches `lat-*` résiduelles (non fusionnées dans la base) existent : risque de
+   conflit, rebase avant merge. Best-effort git local, silencieux sans git ; jamais
+   une erreur.
 
 L'archive est le seul endroit où une mesure entre dans ce dépôt : elle porte la date, la
 source, la valeur par étage et le N. Une campagne sans N est refusée en avertissement
 (une moyenne dont on ne connaît pas l'effectif n'est pas un p50/p95 vérifiable).
 
 Réutilisation : les chiffres publiés viennent de `scripts/budget_latence.py` (source unique),
-chargé comme module — cette porte ne réécrit aucun nombre, elle les confronte.
+chargé comme module — cette porte ne réécrit aucun nombre, elle les confronte ; les lectures
+git viennent de `scripts/git_lecture.py` (best-effort, partageable entre portes).
 
 Usage :
     python3 scripts/check-budget-provenance.py            # contrôle du document
     python3 scripts/check-budget-provenance.py --strict   # avertissements = erreurs
     python3 scripts/check-budget-provenance.py --list     # archive et étiquettes publiées
-    python3 scripts/check-budget-provenance.py --selftest # 12 assertions, sans document
+    python3 scripts/check-budget-provenance.py --selftest # assertions, sans document
 
 Bibliothèque standard seule ; aucun réseau, aucun fichier temporaire, aucun appareil.
+Git n'est lu qu'en best-effort (base, branches) : sans lui, D dégrade en
+avertissement et E se tait.
 """
 
 import argparse
@@ -39,10 +52,15 @@ import os
 import re
 import sys
 
+import git_lecture
+
 RACINE = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 DOC_DEFAUT = os.path.join(RACINE, "docs", "LATENCE-BUDGET.md")
 BUDGET = os.path.join(RACINE, "scripts", "budget_latence.py")
 BLOC = re.compile(r"<!-- table:étages -->\n(.*?)<!-- /table:étages -->", re.S)
+BLOC_MESURES = re.compile(r"<!-- table:mesures -->\n(.*?)<!-- /table:mesures -->", re.S)
+PERIMETRE_LATENCE = ("docs/LATENCE-BUDGET.md", "scripts/budget_latence.py",
+                     "scripts/check-budget-provenance.py", "scripts/parse_isee_lat.py")
 PROVENANCES = ("mesuré", "calculé", "estimé", "simulation", "hypothèse")
 DATE = re.compile(r"\b(?:\d{2}/\d{2}/\d{4}|\d{4}-\d{2}-\d{2})\b")
 NOMBRE = re.compile(r"\d+(?:[.,]\d+)?")
@@ -125,6 +143,71 @@ def valeurs(cellule):
     return (min(trouves), max(trouves)) if trouves else None
 
 
+def n_valide(cellule):
+    """Un N est un entier strictement positif (« 1 257 » accepté)."""
+    chiffres = "".join(c for c in (cellule or "") if c.isdecimal())
+    return chiffres != "" and int(chiffres) > 0
+
+
+def normalise_campagne(nom):
+    """Nom de campagne comparé sans casse ni décoration."""
+    return NETTOYAGE.sub("", nom or "").strip().lower()
+
+
+def campagnes_du_doc(texte):
+    """[(numéro, campagne, N, conditions)] du bloc `table:mesures`, ou None si absent."""
+    if not texte:
+        return None
+    bloc = BLOC_MESURES.search(texte)
+    if not bloc:
+        return None
+    depart = texte[:bloc.start()].count("\n") + 2
+    entete, i_n, i_cond, sortie = None, None, None, []
+    for rang, brute in enumerate(bloc.group(1).splitlines()):
+        if not brute.strip().startswith("|"):
+            continue
+        cols = cellules(brute)
+        if entete is None:
+            entete = [NETTOYAGE.sub("", c).lower().strip() for c in cols]
+            i_n = next((i for i, c in enumerate(entete) if c == "n"), None)
+            i_cond = next((i for i, c in enumerate(entete) if c.startswith("conditions")), None)
+            continue
+        if set(NETTOYAGE.sub("", brute).strip()) <= set("-:|"):
+            continue                                   # ligne séparatrice
+        if not cols:
+            continue
+        nom = NETTOYAGE.sub("", cols[0]).strip()
+        n_cell = cols[i_n] if i_n is not None and i_n < len(cols) else ""
+        cond = cols[i_cond] if i_cond is not None and i_cond < len(cols) else ""
+        sortie.append((depart + rang, nom, n_cell, cond))
+    if entete is None or i_n is None or i_cond is None:
+        return [("?", "—", "", "")]                   # tableau sans N ni conditions datables
+    return sortie
+
+
+def controle_campagnes(actuelles, noms_ref):
+    """Contrôle D : N partout ; conditions datées pour toute NOUVELLE campagne."""
+    if actuelles is None:
+        return [], []
+    erreurs, avertissements = [], []
+    for numero, nom, cellule_n, conditions in actuelles:
+        if not n_valide(cellule_n):
+            erreurs.append("ligne %s : campagne « %s » sans N (« %s ») : une moyenne sans "
+                           "effectif n'est pas un p50/p95 vérifiable"
+                           % (numero, nom, (cellule_n or "—").strip() or "—"))
+        if not DATE.search(conditions or ""):
+            message = ("ligne %s : campagne « %s » — conditions sans date (« %s ») : une "
+                       "campagne date ses conditions (`JJ/MM/AAAA`)"
+                       % (numero, nom, (conditions or "—")[:40]))
+            if noms_ref is not None and normalise_campagne(nom) not in noms_ref:
+                erreurs.append(message)
+            else:
+                avertissements.append(message + (" (antérieure à la porte : à dater)"
+                                                 if noms_ref is not None
+                                                 else " (base git absente : nouveauté non vérifiée)"))
+    return erreurs, avertissements
+
+
 def controle_etiquette(numero, etage, provenance):
     """Contrôle A : une étiquette, et une seule, parmi le vocabulaire fermé."""
     trouvees = etiquettes(provenance)
@@ -171,22 +254,51 @@ def controle_contradiction(numero, etage, valeur, trouvees):
     return erreurs
 
 
-def verifie(texte):
-    """Les trois contrôles sur le document : (erreurs, avertissements)."""
+def controle_branches(residuelles, fichiers_pr, par_branche):
+    """Contrôle E : warning si la PR touche le périmètre latence encore couvert."""
+    if not residuelles or not fichiers_pr:
+        return []
+    if not (set(PERIMETRE_LATENCE) & set(fichiers_pr)):
+        return []
+    avertissements = []
+    for branche in residuelles:
+        fichiers = (par_branche or {}).get(branche)
+        if fichiers is None:
+            continue
+        communs = sorted(set(fichiers) & set(fichiers_pr))
+        if communs:
+            avertissements.append("PR touche %s, aussi modifié(s) par la branche latence "
+                                  "résiduelle « %s » : rebase avant merge, sinon conflit"
+                                  % (", ".join("« %s »" % f for f in communs), branche))
+    if not avertissements:
+        avertissements.append("PR touche le périmètre latence alors que %d branche(s) "
+                              "résiduelle(s) existe(nt) (%s) : rebase avant merge"
+                              % (len(residuelles), ", ".join(residuelles)))
+    return avertissements
+
+
+def verifie(texte, noms_ref=None, residuelles=(), fichiers_pr=frozenset(),
+            par_branche=None):
+    """Les cinq contrôles sur le document : (erreurs, avertissements)."""
     etages = etages_du_doc(texte)
     if etages is None:
-        return [], ["tableau « étages » absent : aucune provenance à contrôler"]
-    erreurs, avertissements = [], []
-    for numero, etage, valeur, provenance in etages:
-        trouvees = etiquettes(provenance)
-        erreurs += controle_etiquette(numero, etage, provenance)
-        erreurs += controle_source(numero, etage, provenance, trouvees)
-        erreurs += controle_contradiction(numero, etage, valeur, trouvees)
+        erreurs = []
+        avertissements = ["tableau « étages » absent : aucune provenance à contrôler"]
+    else:
+        erreurs, avertissements = [], []
+        for numero, etage, valeur, provenance in etages:
+            trouvees = etiquettes(provenance)
+            erreurs += controle_etiquette(numero, etage, provenance)
+            erreurs += controle_source(numero, etage, provenance, trouvees)
+            erreurs += controle_contradiction(numero, etage, valeur, trouvees)
     for nom, date, _, source, effectif in CAMPAGNES:
         if effectif is None:
             avertissements.append("campagne « %s » du %s sans N : la moyenne n'est pas un "
                                   "p50/p95 vérifiable (%s)" % (nom, date, source))
-    return erreurs, avertissements
+    actuelles = campagnes_du_doc(texte)
+    err_d, avt_d = controle_campagnes(actuelles, noms_ref)
+    return erreurs + err_d, avertissements + avt_d + controle_branches(
+        residuelles, fichiers_pr, par_branche)
 
 
 def grand_total(budget):
@@ -197,8 +309,8 @@ def grand_total(budget):
             source, "non archivé" if effectif is None else effectif)
 
 
-def liste(texte):
-    """`--list` : l'archive, puis les étiquettes réellement publiées."""
+def liste(texte, residuelles=()):
+    """`--list` : l'archive, les étiquettes publiées, les branches résiduelles."""
     print("archive des campagnes :")
     for ligne in grand_total(None):
         print("  " + ligne)
@@ -206,6 +318,8 @@ def liste(texte):
     for numero, etage, valeur, provenance in etages_du_doc(texte) or ():
         print("  %-9s %-14s %s" % (etage, "/".join(etiquettes(provenance)) or "?",
                                    (valeur or "—")[:24]))
+    print("branches latence résiduelles :")
+    print("  " + (", ".join(residuelles) if residuelles else "aucune"))
     return []
 
 
@@ -226,11 +340,68 @@ def rapport(erreurs, avertissements, strict):
     return 0
 
 
+def bloc_test(table, entete, lignes):
+    """Un bloc `table:…` en mémoire pour le selftest."""
+    return ("x\n<!-- table:%s -->\n%s\n%s\n<!-- /table:%s -->\n"
+            % (table, entete, "\n".join(lignes), table))
+
+
+def selftest_campagnes():
+    """Contrôle D en mémoire : N exigé partout, date exigée des seules nouvelles."""
+    entete = "| campagne | N | moyenne (ms) | conditions |\n|---|---:|---:|---|"
+    cas = [
+        ("N + date", ["| c1 | 38 | 100 | écran iSee, le 01/11/2026 |"], set(), 0, 0),
+        ("sans N", ["| c2 | — | 100 | banc, le 01/11/2026 |"], set(), 1, 0),
+        ("N nul", ["| c3 | 0 | 100 | banc, le 01/11/2026 |"], set(), 1, 0),
+        ("nouvelle sans date", ["| c4 | 38 | 100 | scène vide |"], set(), 1, 0),
+        ("ancienne sans date", ["| c4 | 38 | 100 | scène vide |"], {"c4"}, 0, 1),
+        ("base inconnue", ["| c4 | 38 | 100 | scène vide |"], None, 0, 1),
+        ("N espacé + ISO", ["| c5 | 1 257 | 100 | banc 2026-11-01 |"], set(), 0, 0),
+    ]
+    echecs = 0
+    for libelle, lignes, noms_ref, att_err, att_avt in cas:
+        erreurs, avertis = controle_campagnes(
+            campagnes_du_doc(bloc_test("mesures", entete, lignes)), noms_ref)
+        ok = len(erreurs) == att_err and len(avertis) == att_avt
+        echecs += 0 if ok else 1
+        print("%s %-18s %d erreur(s)/%d avert. attendu(s), %d/%d trouvé(s)"
+              % ("OK  " if ok else "KO  ", libelle, att_err, att_avt,
+                 len(erreurs), len(avertis)))
+    assert campagnes_du_doc("aucun tableau ici") is None
+    assert controle_campagnes(None, set()) == ([], [])
+    assert n_valide("38 lignes") and not n_valide("—") and not n_valide("")
+    print("OK   %d assertions campagnes" % (len(cas) + 3))
+    return echecs
+
+
+def selftest_branches():
+    """Contrôle E en mémoire : warning si la PR touche le périmètre encore couvert."""
+    perimetre = {"docs/LATENCE-BUDGET.md"}
+    cas = [
+        ("chevauchement", ["lat-parse"], perimetre,
+         {"lat-parse": {"docs/LATENCE-BUDGET.md"}}, 1),
+        ("sans chevauchement", ["lat-parse"], perimetre,
+         {"lat-parse": {"app/x.kt"}}, 1),
+        ("hors périmètre", ["lat-parse"], {"app/x.kt"},
+         {"lat-parse": {"app/x.kt"}}, 0),
+        ("sans résiduelle", [], perimetre, {}, 0),
+        ("PR vide", ["lat-parse"], set(),
+         {"lat-parse": {"docs/LATENCE-BUDGET.md"}}, 0),
+        ("fichiers inconnus", ["lat-parse"], {"scripts/budget_latence.py"}, {}, 1),
+    ]
+    echecs = 0
+    for libelle, residuelles, fichiers, par_branche, attendu in cas:
+        trouves = controle_branches(residuelles, fichiers, par_branche)
+        ok = len(trouves) == attendu
+        echecs += 0 if ok else 1
+        print("%s %-18s %d avertissement(s) attendu(s), %d trouvé(s)"
+              % ("OK  " if ok else "KO  ", libelle, attendu, len(trouves)))
+    print("OK   %d assertions branches" % len(cas))
+    return echecs
+
+
 def selftest():
     """Assertions sur des tableaux en mémoire : aucune lecture de document."""
-    def bloc(*lignes):
-        return "x\n<!-- table:étages -->\n" + "\n".join(lignes) + "\n<!-- /table:étages -->\n"
-
     entete = "| étage | couvre | valeur (ms) | provenance | plancher |\n|---|---|---:|---|---|"
     cas = [
         ("mesuré daté", "| `CAPTURE` | c | 86 | **mesuré** 86 le 01/11/2026 (ISEE_LAT) | p |", 0, 0),
@@ -248,21 +419,24 @@ def selftest():
     ]
     echecs = 0
     for libelle, ligne, attendu, _ in cas:
-        erreurs, _ = verifie(bloc(entete, ligne))
+        erreurs, _ = verifie(bloc_test("étages", entete, [ligne]))
         ok = len(erreurs) == attendu
         echecs += 0 if ok else 1
         print("%s %-24s %d erreur(s) attendue(s), %d trouvée(s)"
               % ("OK  " if ok else "KO  ", libelle, attendu, len(erreurs)))
     assert etages_du_doc("aucun tableau ici") is None
     assert len(verifie("aucun tableau ici")[1]) == 1        # avertissement, pas erreur
-    assert etages_du_doc(bloc(entete, "| `A` | c | 1 | **mesuré** 01/11/2026 | p |"))[0][0] == 5
+    assert etages_du_doc(bloc_test(
+        "étages", entete, ["| `A` | c | 1 | **mesuré** 01/11/2026 | p |"]))[0][0] == 5
     assert etiquettes("u07 **simulation** (jamais lu)") == ["simulation"]
     assert valeurs("5–8") == (5.0, 8.0) and valeurs("81") == (81.0, 81.0)
     assert valeurs("calculée") is None
-    sans_prov = bloc("| étage | couvre | valeur (ms) | plancher |", "|---|---|---:|---|",
-                     "| `A` | c | 1 | p |")
+    sans_prov = bloc_test("étages", "| étage | couvre | valeur (ms) | plancher |",
+                          ["|---|---|---:|---|", "| `A` | c | 1 | p |"])
     assert verifie(sans_prov)[0], "un tableau sans colonne provenance doit échouer"
-    print(f"OK   {len(cas) + 9} assertions check-budget-provenance")
+    echecs += selftest_campagnes()
+    echecs += selftest_branches()
+    print(f"OK   {len(cas) + 9 + 10 + 6} assertions check-budget-provenance")
     return 1 if echecs else 0
 
 
@@ -291,9 +465,22 @@ def main(argv=None):
     if texte is None:
         print("::warning::%s absent : aucune provenance à contrôler." % args.doc)
         return 0
+    base = git_lecture.base(args.root)
+    reference = git_lecture.fichier_sur_base(args.root, chemin, base) if base else None
+    noms_ref = None
+    if reference is not None:
+        lignes_ref = campagnes_du_doc(reference)
+        noms_ref = set() if lignes_ref is None else {normalise_campagne(n)
+                                                     for _, n, _, _ in lignes_ref}
+    residuelles = git_lecture.branches_non_fusionnees(
+        args.root, base, ("lat-*",), ("origin/lat-*",),
+        git_lecture.branche_courante(args.root))
     if args.list:
-        return rapport(liste(texte), [], args.strict)
-    return rapport(*verifie(texte), strict=args.strict)
+        return rapport(liste(texte, residuelles), [], args.strict)
+    fichiers = git_lecture.fichiers_diff(args.root, base, "HEAD") or set()
+    par_branche = {b: git_lecture.fichiers_diff(args.root, base, b) for b in residuelles}
+    return rapport(*verifie(texte, noms_ref, residuelles, fichiers, par_branche),
+                   strict=args.strict)
 
 
 if __name__ == "__main__":
