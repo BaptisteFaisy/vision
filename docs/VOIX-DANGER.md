@@ -96,7 +96,8 @@ une annonce avalée ne consomme pas son tour).
 | `gps-reminder` | 3 rappel | sans antirépétition (le 15 s est le déclencheur, pas une fenêtre) |
 | `fence` | 4 grillages/murs/barrières | 4 s |
 | `curb` | 5 bordures | 2 s |
-| `stairs` | 6 escaliers | 2 s |
+| `stairs` | 6 escaliers (annonce, jalons, montée) | 2 s |
+| `stairs-count` | 6 compte des marches | 0,5 s (§ 37) |
 | `pole` | 7 poteaux + mobilier vertical | 2 s |
 | `misc` | 7 divers (animal, poubelle, souvenirs) | 2 s |
 | `crosswalk-announce` | 8 annonce | **1 fois par vue** (oubli explicite à la vue suivante) |
@@ -234,3 +235,29 @@ postés niveau 2/7 en clip dès la 1re frame), `AntiRepeatTest` +
 Recette téléphone : gens ou poteau droit devant → « Droite. »/« Gauche. »
 répété en continu jusqu'à son départ — **non mesuré**, exige un APK sur
 appareil réel.
+
+## 37. Compteur de marches : répétition toutes les 0,5 s (ordre user du 01/11)
+
+Le user, dans l'escalier avec iSee, veut le compte deux fois plus
+souvent qu'aux 2 s de la v4. Nouveau contrat, qui amende le § 5
+(`stairs-count`, pas `stairs`) : « N marches. » se répète toutes les
+0,5 s tant que l'escalier reste vu.
+
+- **deux portes à 0,5 s** (`StairCountVoice.REPEAT_MS` et `AntiRepeat`
+  clé `stairs-count`, 500 ms — le changement parle aussitôt, clé
+  paramétrée `stairs-count:<compte>`, battement 300 ms inchangé) : la
+  synthèse (~1 s) est coupée à chaque répétition (le bus écrase,
+  dernier gagnant) au lieu de chevaucher ;
+- **inchangé** : annonce « Escalier… », jalons 4/2/1 m, « Plus que N
+  marches. » et « Dernière marche. » (clé `stairs`, 2 s), niveaux du
+  bus, traversée et esquive (coupent le compteur comme avant).
+
+Verrouillé par `StairCountVoiceTest` (répétition après 0,5 s, pas
+avant), `AntiRepeatTest` + `IseeSpecV4AntiRepeatTest` (clé
+`stairs-count` 500 ms), `ProbeStairsCountVoiceTest` (2 répétitions
+par fenêtre), `ProbeHazardsTest` (silence à 499 ms) et
+`SeuilsDehorsV4Test` (compte 0,5 s, annonce 2 s).
+`check-kotlin-limits.py` vert.
+
+Recette téléphone : escalier nommé → « N marches. » puis répétition
+toutes les 0,5 s — **non mesuré**, exige un APK sur appareil réel.

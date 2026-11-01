@@ -26,7 +26,7 @@ même temps** (bus vocal : le plus petit niveau gagne, écrasé jeté).
 | Poteau / lampadaire / panneau | « Pole. » / « Street lamp. » / « Sign. » (< 6 m, 2 s) | Niveau 7 |
 | Grillage / mur / barrière | « Fence. » / « Wall. » / « Barrier. » (< 6 m, 4 s) | Niveau 4 |
 | Bordure | « Curb up. » / « Curb down. » (< 6 m, 2 s) | Niveau 5 |
-| Escalier | Jalons « Stairs up/down, 4/2/1 meters. » + marches (« Five. Steps. », 2 s) | Niveau 6 |
+| Escalier | Jalons « Stairs up/down, 4/2/1 meters. » (2 s) + marches (« Five. Steps. », 0,5 s) | Niveau 6 |
 | Animal / poubelle | « Animal. » / « Trash can. » (< 6 m, 2 s) | Niveau 7 divers |
 | Passage piéton | « Crosswalk ahead/left/right. » (1 fois par vue), « Aligned with the crosswalk. » (au changement), « On the crosswalk. » (1 fois) | Niveau 8 |
 | Trottoir | « Sidewalk ahead/on the left/on the right. » (dérive seule, 10 s) | Niveau 10 |
