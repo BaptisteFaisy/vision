@@ -231,12 +231,12 @@ class DistanceMeter(
         // la mesure (hauteur vraie, pieds exacts) ; la lecture garde la boîte
         // détecteur (overlay, appariement profondeur).
         val box = detection.maskBox?.takeIf { it.size >= 4 } ?: detection.box
-        if (Pinhole.isVerticallyCut(box, height)) return null
+        val cut = Pinhole.isVerticallyCut(box, height)
         // Boîte redressée (identité sans distorsion mesurée) : les deux branches
         // — sténopé via [rawMeters], plan de sol via [groundMeters] — lisent des
         // bords haut/bas sur leurs rayons idéaux.
         val measured = undistortedBox(box, width, height, principalX, principalY)
-        val raw = rawMeters(detection.label, measured, focalPx, principalY, height) ?: return null
+        val raw = rawMeters(detection.label, measured, focalPx, principalY, height, cut) ?: return null
         val id = trackId ?: UNTRACKED_ID
         val smoothed = if (trackId == null) {
             raw.meters
@@ -253,7 +253,8 @@ class DistanceMeter(
      * [DistanceFusion] (poids sténopé [KnownSizes.fusionWeight], poids sol
      * [GroundWeight] depuis la dépression des pieds). Un objet sans hauteur de
      * classe connue peut donc être mesuré s'il est posé au sol et que la pose est
-     * réglée — sans jamais inventer de chiffre.
+     * réglée — sans jamais inventer de chiffre. Une boîte coupée ([verticallyCut])
+     * tait le sténopé (hauteur faussée), jamais le sol (pieds exacts).
      */
     private fun rawMeters(
         label: String,
@@ -261,8 +262,9 @@ class DistanceMeter(
         focalPx: Float,
         principalY: Float,
         height: Int,
+        verticallyCut: Boolean = false,
     ): RawReading? {
-        val standing = KnownSizes.heightMeters(label)
+        val standing = if (verticallyCut) null else KnownSizes.heightMeters(label)
             ?.let { Pinhole.distanceMeters(box, it, focalPx) }
         val ground = groundMeters(box, focalPx, principalY, height)
         val meters = DistanceFusion.combine(
@@ -315,9 +317,9 @@ class DistanceMeter(
     /**
      * Plan de sol : la ligne des **pieds** (bas de la boîte) donne la distance sans rien savoir
      * de la classe. Le centre optique est celui du calibrage ([LensSpec.principalPx],
-     * centre de l'image par défaut) et la ligne des pieds vient d'une boîte non coupée
-     * et déjà redressée : c'est [readOne], en amont, qui l'a garanti (coupe sur la
-     * boîte brute, mesure sur la boîte redressée).
+     * centre de l'image par défaut) ; la ligne des pieds vient de la boîte
+     * déjà redressée, même coupée (bas collé au bord = pieds exacts) : [readOne]
+     * ne coupe que le sténopé (hauteur faussée), jamais le sol.
      */
     private fun groundMeters(
         box: List<Float>,
