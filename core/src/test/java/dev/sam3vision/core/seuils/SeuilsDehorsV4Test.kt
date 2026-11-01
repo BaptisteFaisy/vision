@@ -400,12 +400,13 @@ class SeuilsDehorsV4Test {
     fun `voiture presence seule sans cadran ni distance et pluriel`() {
         val car = VehicleStateText.nameOf("car")
         assertNotNull(car)
-        assertEquals("Car moving.", VehicleStateText.movingPhrase(car!!, En))
+        assertEquals("Car.", VehicleStateText.movingPhrase(car!!, En))
         assertFalse(VehicleStateText.movingPhrase(car, En).contains("o'clock"))
         assertFalse(VehicleStateText.movingPhrase(car, En).contains("meter"))
-        assertEquals("3 vehicles moving.", VehicleStateText.movingPluralPhrase(3, En))
-        assertEquals("vehicle_car_moving", VehicleStateText.movingClipId(car))
-        assertEquals("vehicle_car_moving", VehicleStateText.clipIdFor("Car moving."))
+        assertEquals("Cars.", VehicleStateText.movingPluralPhrase(3, En))
+        assertEquals("car", VehicleStateText.movingClipId(car))
+        assertEquals("car", VehicleStateText.clipIdFor("Car."))
+        assertEquals("cars", VehicleStateText.clipIdFor("Cars."))
     }
 
     // Contrats partagés v4.
