@@ -19,6 +19,19 @@ import kotlin.math.hypot
  */
 internal object ProbeBackgroundMotion {
 
+    /**
+     * Fil dédié : `backgroundOf` décode un JPEG entier (base64 → bitmap → échelle →
+     * luminance) et l'appelant est le thread de l'analyseur caméra. Le faire ici ne
+     * coûtait que ~22 ms par frame sur un budget de 33 ms.
+     */
+    private val worker = java.util.concurrent.Executors.newSingleThreadExecutor { t ->
+        Thread(t, "probe-bg-motion").apply { isDaemon = true }
+    }
+
+    /** Une seule frame en cours : au-delà, on laisse tomber (jamais d'empilement). */
+    private val busy = java.util.concurrent.atomic.AtomicBoolean(false)
+
+
     private val source = BlockMotionSource()
     private var prev: BackgroundFrame? = null
     private var prevAtMs: Long = 0L
@@ -42,6 +55,25 @@ internal object ProbeBackgroundMotion {
      * précédente et le retient dans [lastMotion] (`null` = pas d'avis :
      * première frame, recadrage ou fond plat).
      */
+    /**
+     * Comme [offer], mais **sans bloquer l'appelant** : le décodage part sur [worker].
+     * Une frame pendant qu'une autre se décode est ignorée — l'estimation compare des
+     * paires consécutives et tolère un trou (`offer` rend `null` quand il n'a pas
+     * d'avis), un empilement serait pire que le trou.
+     */
+    fun post(jpegB64: String, atMs: Long) {
+        if (!busy.compareAndSet(false, true)) return
+        worker.execute {
+            try {
+                offer(jpegB64, atMs)
+            } catch (_: Throwable) {
+                // frame illisible : la suivante arrive
+            } finally {
+                busy.set(false)
+            }
+        }
+    }
+
     fun offer(jpegB64: String, atMs: Long): FrameMotion? {
         val cur = backgroundOf(jpegB64)
         val previous = prev
