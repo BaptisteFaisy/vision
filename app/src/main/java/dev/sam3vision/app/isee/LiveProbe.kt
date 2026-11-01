@@ -257,6 +257,7 @@ class LiveProbe(
         coldSession?.serverStats?.reset()
         distances.reset()
 resetPipeline()
+        globalsNouvelleSeance()
         _state.update { it.cleared() }
         markWarming()
         pulse.start(); meters.startPredictions(distances)

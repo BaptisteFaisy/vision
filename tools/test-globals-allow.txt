@@ -1,0 +1,9 @@
+# Dette tolérée de la garde des globaux de séance (tools/check-test-globals.py)
+#
+# Un fichier de test listé ici pilote une publication (`probe.onFrame`) sans
+# remettre les globaux de séance à zéro. La liste est VIDE et doit le rester :
+# une exemption est une pollution qui attend son heure.
+#
+# Pour vider une entrée : ajouter `@After fun x() = seanceVide()` au test, puis
+# relancer la garde (`python3 tools/check-test-globals.py`) — elle signale
+# elle-même les exemptions devenues inutiles.

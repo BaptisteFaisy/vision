@@ -396,6 +396,16 @@ echo "== 12. tools/test-hooks.sh =="
 run bash "${ROOT}/tools/test-hooks.sh"
 expect_status 0 'hooks git : branche à jour, conflit bloqué, push forcé épargné'
 
+# --- 14. globaux de séance : un test qui publie nettoie ---------------------
+# Vécu le 01/11 (PR #919) : un test qui publie de vraies frames sans remettre
+# les globaux de séance (`ProbeTracks`…) faisait tomber la classe suivante, que
+# la PR n'avait pas touchée. Détail dans tools/test_check_test_globals.py.
+echo "== 14. garde des globaux de séance =="
+run python3 "${ROOT}/tools/check-test-globals.py"
+expect_status 0 'tests qui publient : globaux de séance remis à zéro'
+run bash -c "cd '${ROOT}' && python3 -m unittest tools/test_check_test_globals.py"
+expect_status 0 'garde des globaux de séance : ses propres tests passent'
+
 # --- bilan -----------------------------------------------------------------
 printf '\n%s tests : %s ok, %s KO\n' "$((PASS + FAIL))" "$PASS" "$FAIL"
 (( FAIL == 0 )) || exit 1

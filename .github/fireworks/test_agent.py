@@ -179,8 +179,14 @@ def extrait_journal(runs, limite=MAX_JOURNAL_LIGNES):
     return "\n".join(garde[-limite:])
 
 
-def prompt_fix(repo, pr, dossier, extrait, etapes=""):
-    """Prompt de réparation : le dépôt, les erreurs, les règles, le verdict."""
+def prompt_fix(repo, pr, dossier, extrait, etapes="", indice=""):
+    """Prompt de réparation : le dépôt, les erreurs, les règles, le verdict.
+
+    [indice] = verdict de `tools/triage_test.py` (workflow `triage-rouge`) :
+    sans lui, l'agent cherche à l'aveugle et rend « budget dépassé » (#919).
+    """
+    if indice.strip():
+        etapes = etapes or "après triage"
     return "\n".join([
         "Tu es l'agent de réparation de la CI de %s (application Android "
         "Kotlin/KMP, code et commentaires en français)." % repo,
@@ -191,6 +197,8 @@ def prompt_fix(repo, pr, dossier, extrait, etapes=""):
         "```",
         extrait or "(journal indisponible)",
         "```",
+    ] + (["", "Triage automatique (déjà fait, ne le refais pas) :", "",
+          indice.strip()] if indice.strip() else []) + [
         "",
         "Mission : corriger la CAUSE, au plus petit diff possible.",
         "Règles strictes :",
@@ -394,9 +402,9 @@ def preflight(repo, pr, sha):
     return runs, extrait_journal(runs)
 
 
-def lancer_sur_clone(repo, pr, extrait):
-    """Fait travailler l'agent fw dans le clone. Rend (fichiers, sortie)."""
-    prompt = prompt_fix(repo, pr, os.getcwd(), extrait)
+def lancer_sur_clone(repo, pr, extrait, indice=""):
+    """Fait travailler l'agent fw dans le clone (rend fichiers, sortie)."""
+    prompt = prompt_fix(repo, pr, os.getcwd(), extrait, indice=indice)
     log("agent fw lancé (%d lignes de journal)" % extrait.count("\n"))
     debut = time.time()
     ok, sortie = lancer_agent(prompt, os.getcwd())
@@ -459,7 +467,14 @@ def cmd_fix(args):
     if not ok:
         comment(args.repo, args.pr, "Clone de la PR impossible : %s." % message)
         return 1
-    fichiers, sortie = lancer_sur_clone(args.repo, args.pr, extrait)
+    indice = ""  # triage : jamais d'exception, il ne fait qu'aider
+    if isinstance(args.indice, str) and args.indice:
+        try:
+            with open(args.indice, encoding="utf-8", errors="replace") as f:
+                indice = f.read()[:4000]
+        except OSError:  # indice disparu : l'agent travaille sans, comme avant
+            pass
+    fichiers, sortie = lancer_sur_clone(args.repo, args.pr, extrait, indice)
     if fichiers is None:
         # Outillage absent : aucune marque, aucun commentaire (le balayeur le dit
         # dans son journal), l'unique tentative de la tête reste ouverte.
@@ -475,6 +490,7 @@ def main(argv=None):
     ap.add_argument("--pr", required=True)
     ap.add_argument("--branch", required=True)
     ap.add_argument("--sha", required=True)
+    ap.add_argument("--indice", default="", help="triage (tools/triage_test.py)")
     args = ap.parse_args(argv)
     return cmd_fix(args)
 

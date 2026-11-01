@@ -300,6 +300,48 @@ tel quel est le bon arbitrage : une entrée générée après merge remplacerait
 journal écrit à la main (172 entrées, Constat/Fait/Preuve) par des titres de PR,
 pour zéro conflit gagné.
 
+### 5.3 Un test rouge se trie avant de se réparer (01/11/2026)
+
+Cas vécu, PR #919 : `ci-app` tombe sur `ProbeStairsPriorityTest`, une classe que
+la PR **ne touche pas**. Le nouveau test de la PR publiait de vraies frames sans
+remettre les globaux de séance (`ProbeTracks`), donc la classe suivante — même
+JVM, ordre alphabétique — se taisait. Le balayeur a appelé l'agent de réparation
+deux fois ; sans diagnostic, il a rendu « budget de 150 s dépassé » (deux fois) et
+la PR a attendu **une demi-heure** pour une ligne à ajouter.
+
+Trois pièces, dans cet ordre :
+
+1. **`triage-rouge.yml`** (déclenché par la fin en échec de `CI`, un passage par
+   tête). Il lit le journal du run et le diff, puis `tools/triage_test.py` — pris
+   sur `master`, jamais sur la PR — sort la classe tombée, dit si la PR la touche,
+   **relance la classe seule** (`--verifier`) et désigne les suspects : les tests
+   de la PR qui appellent `probe.onFrame`/`probe.dispatch`, donc écrivent les
+   globaux de séance.
+   - verte seule → verdict `pollution` : dépendance d'ordre entre tests, pas le
+     code de la PR (constaté sur #919) ;
+   - rouge seule → la classe échoue vraiment (`perimetre` si la PR la modifie) ;
+   - `compilation` → pas un test, l'agent de réparation prend le relais comme
+     avant.
+2. **Rapport** : un commentaire `<!-- triage sha=… -->` (un par tête) et un label
+   (`pollution-inter-tests`, `test-de-la-pr`, `test-hors-perimetre`). Rien de
+   bloquant, aucune porte : seule la CI verte fait merger.
+3. **Réparation** : le même pilote borné qu'avant (`test_agent.py`, zeroclaw
+   `fw`, une tentative par tête, porte de compilation, 20 fichiers / 1 500
+   lignes), mais il reçoit le verdict en **indice** (`--indice`) : il ne cherche
+   plus la panne à l'aveugle.
+
+Qui répare : dès que `TRIAGE_TEST` ≠ `0` (défaut), c'est `triage-rouge` — le
+balayeur ne saisit plus l'agent lui-même, sinon il consommerait l'unique
+tentative de la tête **sans** l'indice, exactement ce qui a échoué le 01/11.
+`TRIAGE_TEST=0` rend la réparation au balayeur, `TEST_AGENT=0` coupe l'agent.
+
+Côté code, la règle est plus simple que le symptôme : **piloter une publication,
+c'est démarrer une séance**. `LiveProbe.begin()` remet les globaux de séance à
+zéro (`globalsNouvelleSeance`), et `tools/check-test-globals.py` (appelé par
+`scripts/test_scripts.sh`, donc par la CI) refuse un fichier de test `app/` qui
+appelle `probe.onFrame` sans `begin()` ni `seanceVide()` — aucune exemption au
+01/11.
+
 ## 6. Ce qui n'est pas dans ce dépôt
 
 - Aucun gate LLM ni service de revue externe : la seule porte est la CI décrite ci-dessus.
