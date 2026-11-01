@@ -26,6 +26,9 @@ WASHOUT_MIN_SAT, WASHOUT_MIN_VAL = 0.15, 0.90
 GREEN_MIN_FRACTION = 0.002  # 31/10, ordre user : suit PedLightGate.kt (feux lointains)
 RED_MAX_FRACTION = 0.02
 ELONGATION_MIN = 1.0  # 31/10, ordre user : suit PedLightGate.kt (détection au plus large)
+# 01/11 : tache plus large que haute = disque de face, sauf si elle est ajourée.
+# Un disque allumé remplit 0,75-0,88 de sa boîte, un bonhomme large 0,09-0,16.
+WIDE_FILL_MAX = 0.35
 BBOX_MIN_PX = 3
 GREEN_BOTTOM_MIN = 0.35
 R1B_BOTTOM_FLOOR = 0.20
@@ -213,7 +216,7 @@ def accept_green(argb: list, w: int, h: int) -> bool:
     bw, bh = s["maxx"] - s["minx"] + 1, s["maxy"] - s["miny"] + 1
     if bh < BBOX_MIN_PX:
         return False
-    if float(bh) < bw * ELONGATION_MIN:
+    if float(bh) < bw * ELONGATION_MIN and s["green"] > bw * bh * WIDE_FILL_MAX:
         return False
     bottom = s["green_bot"] / s["green"]
     if bottom >= GREEN_BOTTOM_MIN:

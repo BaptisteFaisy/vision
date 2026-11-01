@@ -1,4 +1,4 @@
-# Échantillon téléphone (tests `PedLightGateTest`) — 11 ancres lotfinal
+# Échantillon téléphone (tests `PedLightGateTest`) — 13 ancres lotfinal
 
 Ancres issues du lot téléphone (collecte terrain `docs/COLLECTE-FEUX.md`,
 crops ≤ 48 px convertis en PPM) : elles verrouillent le rappel vert sur
@@ -18,6 +18,8 @@ de licence externe requise. Ligne par crop :
 | `tel_g05.ppm` | lotfinal 2026-10-31, `s8_15_20_53_1.png` (G, bonhomme net) | Green |
 | `tel_g06.ppm` | lotfinal 2026-10-31, `s8_15_20_55_7.png` (G, LED bleutée) | Green |
 | `tel_g07.ppm` | lotfinal 2026-10-31, `s8_15_20_57_0.png` (G, bonhomme net) | Green |
+| `tel_g08.ppm` | lotfinal 2026-10-31, `0009.png` (G, tache **plus large que haute** 28×23, ajourée — refusée jusqu'au 01/11) | Green |
+| `tel_g09.ppm` | lotfinal 2026-10-31, `0015.png` (G, halo large 48×36, ajouré — refusé jusqu'au 01/11) | Green |
 | `tel_r01.ppm` | lotfinal 2026-10-31, `0001.png` (R, bonhomme rouge net centré) | Red |
 | `tel_r02.ppm` | lotfinal 2026-10-31, `0008.png` (R, bonhomme rouge net 48×48) | Red |
 | `tel_r03.ppm` | lotfinal 2026-10-31, `0000.png` (R, feu rouge net) | Red |

@@ -17,6 +17,30 @@ livré et ses preuves (tâche, fichiers, chiffres) dans l'arbre.
   `GuidanceFenceOpeningTest` et 2 nouveaux `ProbeVoiceFenceHoleTest`) ;
   `check-kotlin-limits.py` OK ; recette rue **non mesurée**, exige un parcours
   réel avec grillage.
+## 2026-11-01 — Traversée : les verts larges et ajourés passent (rappel 18/20 → 20/20)
+
+- **Origine** : cinq essais en parallèle sur les 49 crops téléphone ont montré que
+  l'arbre n'est plus le facteur limitant — un arbre constant « vert » obtient déjà
+  18/20 verts, 0 faux vert et 31/31 ancres. Le plafond est la **porte**
+  (`accept_green`), qui refusait deux vrais verts parce que leur tache verte est
+  **plus large que haute** (`ELONGATION_MIN = 1,0`), signature qu'on croyait
+  réservée aux disques voiture.
+- **Fait** : `PedLightGate.WIDE_FILL_MAX = 0,35` — une tache large n'est refusée
+  que si elle est **pleine**. Un disque allumé remplit 0,75-0,88 de sa boîte
+  (`fr_cardisc_367` 0,75, `st_c02` 0,75), un bonhomme large laisse des trous
+  (`0009` 0,09 ; `0015` 0,16). La mesure ne bouge pas entre 0,30 et 0,40 : ce
+  n'est pas un seuil ajusté à un cas, et 0,85 est la borne où les deux disques
+  de face repassent (vérifiée).
+- **Preuves** : crops téléphone **20/20 verts** (18/20 avant), 0 faux vert,
+  **31/31 → 33/33 ancres** (`tel_g08`/`tel_g09` promues : les deux verts réels
+  qui tombaient) ; :core 2 872 tests verts, parité Python 33 ancres,
+  `check-kotlin-limits` OK. Contrôle hors domaine : 400 crops PTL (Shanghaï,
+  open source) — faux verts **inchangés (13)**, verts 100 → 101 sur 179.
+- **Non fait, volontairement** : aucun réentraînement d'arbre. Les cinq essais
+  (pondération PTL 0,05-1,0, ancres sur-pondérées 5-50, jeu de traits glouton,
+  augmentation photométrique ×5 et ×20, filtrage PTL par domaine K=100-1000)
+  donnent tous au mieux 18/20 : l'arbre ne peut pas dépasser le plafond de la
+  porte, et le seuil actuel est déjà atteint par une souche d'un seul trait.
 
 ## 2026-11-01 — iSee : le mouvement écrase tout, voiture devant humain (branche `feat/isee-mouvement-overwrite`)
 
