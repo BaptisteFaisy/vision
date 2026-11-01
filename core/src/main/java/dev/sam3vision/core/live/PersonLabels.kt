@@ -12,6 +12,7 @@ object PersonLabels {
     private val KEYS = setOf(
         "person", "persons", "people", "pedestrian", "pedestrians",
         "child", "children", "personne", "personnes", "humain", "humains",
+        "human", "humans",
         "homme", "hommes", "femme", "femmes", "enfant", "enfants",
         "pieton", "pietons",
     )

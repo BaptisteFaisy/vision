@@ -14,7 +14,7 @@ import org.junit.Test
 /**
  * Arbitrage voix des obstacles en mode normal : quand SAM confirme plusieurs
  * obstacles sur la même frame, l'ordre de parole est P1 (voiture en
- * mouvement) > P2 (bordure) > P3 (poteau) > P4 (barrière) > reste (ordre de
+ * mouvement) > P2 (bordure) > P3 (personne) > P4 (barrière) > reste (ordre de
  * détection). Les alertes de sécurité fusionnent dans cet ordre (tout est
  * entendu), les phrases douces aussi — une alerte confirmée ne se perd plus,
  * elle attend son rang. Jamais de « Stop » ici : le stop roulant ne se dit
@@ -50,7 +50,7 @@ class ObstacleArbiterTest {
             listOf(
                 ObstacleRank.VEHICLE_MOVING,
                 ObstacleRank.CURB,
-                ObstacleRank.POLE,
+                ObstacleRank.PERSON,
                 ObstacleRank.BARRIER,
                 ObstacleRank.OTHER,
             ),
@@ -64,13 +64,13 @@ class ObstacleArbiterTest {
             vehicle(safety = "Stop, car moving."),
             curb(phrase = "Step up now.", tier = CurbTier.NEAR, safety = "Montez le rebord."),
             hazard(
-                phrase = "Attention au poteau, passez à droite.",
-                kind = HazardKind.POLE,
-                safety = "Poteau, passez à droite.",
+                phrase = "Attention à la personne, passez à droite.",
+                kind = HazardKind.PERSON,
+                safety = "Attention à la personne, passez à droite.",
             ),
         )
 
-        assertEquals("Montez le rebord. Poteau, passez à droite.", decision.safety)
+        assertEquals("Montez le rebord. Attention à la personne, passez à droite.", decision.safety)
         assertEquals("Car moving, 12 meters away.", decision.soft)
         assertFalse(decision.urgent)
     }
@@ -93,8 +93,8 @@ class ObstacleArbiterTest {
             vehicle(),
             curb(),
             hazard(
-                phrase = "Attention au poteau, passez à droite.",
-                kind = HazardKind.POLE,
+                phrase = "Attention à la personne, passez à droite.",
+                kind = HazardKind.PERSON,
             ),
         )
 
@@ -102,7 +102,7 @@ class ObstacleArbiterTest {
         assertEquals(
             "Car moving, 12 meters away. " +
                 "Step up in 1 meter. " +
-                "Attention au poteau, passez à droite.",
+                "Attention à la personne, passez à droite.",
             decision.soft,
         )
         assertFalse(decision.urgent)
@@ -131,19 +131,19 @@ class ObstacleArbiterTest {
     }
 
     @Test
-    fun `barriere passe apres poteau, devant le reste`() {
-        val poleThenBarrier = decideObstacles(
+    fun `barriere passe apres personne, devant le reste`() {
+        val personThenBarrier = decideObstacles(
             null,
             null,
             hazard(
-                phrase = "Attention au poteau, passez à droite.",
-                kind = HazardKind.POLE,
+                phrase = "Attention à la personne, passez à droite.",
+                kind = HazardKind.PERSON,
             ),
         )
         val barrierOnly = decideObstacles(null, null, hazard())
         val otherOnly = decideObstacles(null, null, hazard("Attention à la borne.", HazardKind.OTHER))
 
-        assertEquals("Attention au poteau, passez à droite.", poleThenBarrier.soft)
+        assertEquals("Attention à la personne, passez à droite.", personThenBarrier.soft)
         assertEquals("Attention à la barrière.", barrierOnly.soft)
         assertEquals("Attention à la borne.", otherOnly.soft)
     }
@@ -164,18 +164,18 @@ class ObstacleArbiterTest {
     }
 
     @Test
-    fun `poteau imminent = securite seule, doux abandonne`() {
+    fun `personne imminente = securite seule, doux abandonne`() {
         val decision = decideObstacles(
             null,
             null,
             hazard(
-                phrase = "Attention au poteau, passez à droite.",
-                kind = HazardKind.POLE,
-                safety = "Poteau, passez à droite.",
+                phrase = "Attention à la personne, passez à droite.",
+                kind = HazardKind.PERSON,
+                safety = "Attention à la personne, passez à droite.",
             ),
         )
 
-        assertEquals("Poteau, passez à droite.", decision.safety)
+        assertEquals("Attention à la personne, passez à droite.", decision.safety)
         assertNull(decision.soft)
     }
 

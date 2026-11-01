@@ -291,10 +291,12 @@ qui remplace l'urgence du § 10 (gardée pour mémoire) :
   le chat lit (`LiveProbeState.spokenUrgent` = `GuidanceWord.isStopPhrase`,
   + `TwinLiteWord.isStopPhrase` depuis § 12) ;
 - **« Attention à … »** : trottoir (« Attention à la marche. », ex-« levez la
-  jambe »), escaliers (« Escalier montant. », inchangé) et mobilier suivi
-  (« Attention à la barrière. », `HazardConcepts` : barrière, poteau, borne,
-  clôture, portail — FR/EN, 3 m, 2 frames, 10 s de silence) parlent en douceur
-  (`urgent = false`, synthèse réseau, jamais de coupure) ;
+  jambe »), escaliers (« Escalier montant. », inchangé), personne proche
+  (« Attention à la personne, passez à droite. », `HazardConcepts` :
+  personne, barrière, borne, clôture, portail — FR/EN, 4 m la personne,
+  3 m le reste, 2 frames, 10 s de silence ; le poteau ne parle plus, § 26)
+  et mobilier suivi parlent en douceur (`urgent = false`, synthèse réseau,
+  jamais de coupure) ;
 - **stop gardé en attendant** : le stop interne (contact mesuré ≤ 0,6 m,
   « obstacle, arrêtez-vous. » TwinLite depuis § 12) reste le seul urgent
   (coupe tout, chat compris) jusqu'au branchement du modèle externe —
@@ -519,25 +521,26 @@ Recette téléphone : voiture qui roule à ~12 m → « Car moving, 12 meters
 away. » doux ; qui s'approche sous 8 m → pareil en doux en normal,
 « Stop, car moving. » urgent en Traversée ; arrêt « Car stopped… » doux
 — **non mesuré**, exige un APK de cet arbre sur appareil réel.
-## 18. Poteau à 4 m, 3e priorité, rattrapage (ordre user du 30/10)
+## 18. Personne à 4 m, 3e priorité, rattrapage (ordre user du 30/10)
 
-Le user marche avec l'app : les poteaux ne sont pas dits, ou trop tard —
-un poteau entre 3 et 4 m était ignoré (`HAZARD_METERS = 3 m`), et la phrase
-douce tue par le chat ou la route était mémorisée puis perdue (jamais
-redite). Nouveau contrat, qui amende le § 11 pour le seul poteau :
+Le user marche avec l'app : les personnes proches ne sont pas dites, ou
+trop tard — une personne entre 3 et 4 m était ignorée
+(`HAZARD_METERS = 3 m`), et la phrase douce tue par le chat ou la route
+était mémorisée puis perdue (jamais redite). Nouveau contrat, qui amende
+le § 11 pour la seule personne :
 
-- **portée 4 m** : un poteau dans le couloir à 4 m ou moins est détecté
-  (`HazardConcepts.isPole`, `HazardWatcher.POLE_METERS`) ; les autres
-  mobiliers restent à 3 m ;
-- **imminent ≤ 2 m** : annonce dès la 1re frame, urgente (miroir de la
+- **portée 4 m** : une personne dans le couloir à 4 m ou moins est détectée
+  (`HazardConcepts.isPerson`, `HazardWatcher.PERSON_METERS`) ; les autres
+  dangers restent à 3 m ;
+- **imminente ≤ 2 m** : annonce dès la 1re frame, urgente (miroir de la
   marche imminente, `CurbWatcher.onNear`) ;
-- **3e priorité** : le poteau ne coupe ni ne chevauche P1/P2 (alertes
+- **3e priorité** : la personne ne coupe ni ne chevauche P1/P2 (alertes
   `SafetyVoice`, § 16) — `ProbeWiring.p1p2Busy` (mouvement dit il y a
   moins de 4 s, marche imminente dite il y a moins de 2 s) tient la
   phrase en file (`ProbePriority`, `busy`) ;
 - **dit une fois puis ré-armé** : après l'annonce, silence jusqu'à 3
-  frames sans poteau (`POLE_REARM_FRAMES`) — un poteau qui clignote à la
-  frontière ne rabâche pas ; cooldown 10 s inchangé ;
+  frames sans personne (`PERSON_REARM_FRAMES`) — une personne qui
+  clignote à la frontière ne rabâche pas ; cooldown 10 s inchangé ;
 - **rattrapage** : la phrase douce tue part en file (une seule, la plus
   fraîche) et est redite au silence dans les 3 s
   (`ProximityVoice.flushPending`, `PENDING_TTL_MS`) — une alerte
@@ -546,9 +549,10 @@ redite). Nouveau contrat, qui amende le § 11 pour le seul poteau :
 Fenêtres 4 s / 2 s / 3 s provisoires, non mesurées : à valider rue (si P3
 parle sur P1/P2, élargir ; s'il se tait trop, resserrer).
 
-Verrouillé par `HazardWatchTest` (+5 : poteau 3,5 m détecté, 4,5 m muet,
-2 frames doux, imminent urgent, ré-armement), `HazardConceptsTest` (+1 :
-`isPole`), `VehicleStateTest` (+1 : `lastMovingAlertMs`),
+Verrouillé par `HazardWatchTest` (+5 : personne 3,5 m détectée, 4,5 m
+muette, 2 frames doux, imminente urgente, ré-armement),
+`HazardConceptsTest` (+1 : `isPerson`), `VehicleStateTest` (+1 :
+`lastMovingAlertMs`),
 `CurbAnnounceTest` (+1 : `lastNearMs`), `ProbeWiringWatchersTest` (+2 :
 `p1p2Busy`, `shouldCutForHazard`) et `ProximityVoiceQueueTest` (8 : file,
 péremption, P1/P2, fraîcheur, route, reset, sans-file-perdu, busy).
@@ -628,11 +632,12 @@ Recette téléphone : deux alertes rapprochées (voiture qui roule puis
 rebord sous le pied) — la seconde coupe la première, pas de
 chevauchement, pas d'attente — **non mesuré**, exige un APK de cette
 branche sur appareil réel.
-## 21. Voitures au pluriel, poteau qui dit comment l'éviter, rebord à 0,7 m (ordre user du 31/10)
+## 21. Voitures au pluriel, personne qui dit comment l'éviter, rebord à 0,7 m (ordre user du 31/10)
 
 Le user marche avec l'app : plusieurs voitures en mouvement n'étaient dites
-qu'au singulier (la plus proche), le poteau ne disait pas comment l'éviter,
-et la marche imminente parlait à 0,4 m — trop tard pour lever le pied.
+qu'au singulier (la plus proche), la personne proche ne disait pas comment
+l'éviter, et la marche imminente parlait à 0,4 m — trop tard pour lever le
+pied.
 Nouveau contrat, qui amende les § 16-19 :
 
 - **pluriel véhicules** : deux types mobiles ou plus dans la même frame =
@@ -642,12 +647,13 @@ Nouveau contrat, qui amende les § 16-19 :
   distance du plus proche) ; le « Stop » suit (« Stop, 2 vehicles
   moving. ») ; le singulier est inchangé (`VehicleStateText`,
   `VehicleStateCue.movingCount`) ;
-- **poteau + évitement** : « Attention au poteau, à 2 heures, passez à
-  gauche. » / « Attention, pole, at 2 o'clock, pass on the left. » — le
-  côté conseillé est l'opposé du poteau (poteau à gauche de l'axe = on
-  passe à droite) ; axe pile ou heure inconnue = droite par défaut
-  (prior, à valider rue : on serre à droite) ; doux comme imminent
-  (`HazardText.polePhrase`) ; les autres mobiliers restent descriptifs ;
+- **personne + évitement** : « Attention à la personne, à 2 heures,
+  passez à gauche. » / « Attention, person, at 2 o'clock, pass on the
+  left. » — le côté conseillé est l'opposé de la personne (personne à
+  gauche de l'axe = on passe à droite) ; axe pile ou heure inconnue =
+  droite par défaut (prior, à valider rue : on serre à droite) ; doux
+  comme imminent (`HazardText.personPhrase`) ; les autres dangers restent
+  descriptifs ;
 - **rebord à 0,7 m** : la marche imminente parle à 0,7 m
   (`STEP_NEAR_METERS`), hystérésis 0,7 / 0,9 m (`STEP_REARM_METERS`) ; la
   pré-alerte à 1 m, les phrases (« …, maintenant. » ≈ un pas), le sens
@@ -659,7 +665,7 @@ Nouveau contrat, qui amende les § 16-19 :
 
 Verrouillé par `VehicleStateTest` (+1 : deux types mobiles = pluriel EN/FR,
 stop pluriel), `HazardWatchTest` (+1 : évitement côté opposé FR/EN, défaut
-droite ; 3 attentes poteau mises au nouveau contrat), `CurbWatcherTest`
+droite ; 3 attentes personne mises au nouveau contrat), `CurbWatcherTest`
 (palier 0,7) et `CurbAnnounceTest` (double annonce 1 m / 0,7 m, ré-armement
 0,9, frontière 0,65 parlé / 0,75 doux).
 
@@ -898,32 +904,35 @@ occupé par la section « Voix obstacles » de la branche, conservée
 ci-dessous telle quelle) ; aucun des deux contrats n'est fusionné ni
 abandonné.*
 
-## 26. Voix obstacles : hiérarchie P1-P5, poteau imminent en sécurité (ordre user du 31/10)
+## 26. Voix obstacles : hiérarchie P1-P5, personne imminente en sécurité (ordre user du 31/10)
 
 Le user marche avec l'app : quand SAM confirme plusieurs obstacles en même
 temps, l'ordre de parole n'était pas défini (trois guetteurs indépendants,
-chacun sa voix) et le poteau imminent partait en synthèse réseau (lente).
+chacun sa voix) et la personne imminente partait en synthèse réseau (lente).
 Nouveau contrat, qui amende les § 16, § 18 et § 20 dans le cadre du § 22
 (jamais de « Stop » hors Traversée) :
 
-- **hiérarchie** : P1 voiture en mouvement > P2 bordure > P3 poteau > P4
+- **hiérarchie** : P1 voiture en mouvement > P2 bordure > P3 personne > P4
   barrière > reste (arrêt, bateau, bornes…, dans l'ordre de détection) ;
 - **un seul guetteur** (`LiveProbe.observeObstacles`) calcule les trois
-  signaux (véhicules, bordure, mobilier) sur la même frame et parle une
+  signaux (véhicules, bordure, danger) sur la même frame et parle une
   fois : les alertes de sécurité fusionnent dans l'ordre des rangs
-  (« Bordure à 0,5 mètre. Poteau, passez à droite. », voix de sécurité,
+  (« Bordure à 0,5 mètre. Attention à la personne, passez à droite. »,
+  voix de sécurité,
   immédiat, sans « Stop »), les phrases douces aussi (voix ElevenLabs,
   file d'attente au silence) — une alerte confirmée ne se perd plus,
   elle attend son rang ; le véhicule ne fournit que du doux ici (son
   stop roulant ne se dit qu'en Traversée, § 22), P1 en tête ;
-- **poteau imminent en sécurité** : à 2 m ou moins, « Poteau, passez à
-  droite. » / « Pole, pass on the right. » (côté d'évitement gardé,
-  heure abandonnée : à un pas, le côté prime) — deuxième consigne de
-  sécurité après le rebord (§ 22), qui coupe tout ; l'imminent ne
-  consomme pas le cooldown doux (la barrière suit sans attendre 10 s) ;
-- **poteau avant barrière** : même frame, le poteau parle d'abord (signal
-  préféré), la barrière suit en repli dès le poteau dit (compteurs de
-  confirmation séparés par sorte, cooldown doux partagé) ;
+- **personne imminente en sécurité** : à 2 m ou moins, « Attention à la
+  personne, passez à droite. » / « Attention, person, pass on the
+  right. » (côté d'évitement gardé, heure abandonnée : à un pas, le côté
+  prime — on garde « Attention à la personne » car « Personne, … » seul
+  s'entendrait comme nobody) — deuxième consigne de sécurité après le
+  rebord (§ 22), qui coupe tout ; l'imminente ne consomme pas le
+  cooldown doux (la barrière suit sans attendre 10 s) ;
+- **personne avant barrière** : même frame, la personne parle d'abord
+  (signal préféré), la barrière suit en repli dès la personne dite
+  (compteurs de confirmation séparés par sorte, cooldown doux partagé) ;
 - **doux sérialisé** : la voix douce ne bloque plus la frame (coroutine
   fille + mutex — la sécurité reste instantanée même pendant une
   synthèse) et ne chevauche plus la sécurité (fenêtre
@@ -937,15 +946,16 @@ Nouveau contrat, qui amende les § 16, § 18 et § 20 dans le cadre du § 22
 
 Verrouillé par `ObstacleArbiterTest` (10 : ordre des rangs, fusion
 sécurité P2-P3, stop roulant ignoré en normal, doux ordonnés, urgent
-véhicule, barrière après poteau, reste en ordre de détection, poteau
-imminent, silence, fenêtre), `HazardWatchTest` (+6 : préférence poteau,
-repli barrière, compteurs par sorte, consigne poteau FR/EN, cooldown
+véhicule, barrière après personne, reste en ordre de détection, personne
+imminente, silence, fenêtre), `HazardWatchTest` (+6 : préférence personne,
+repli barrière, compteurs par sorte, consigne personne FR/EN, cooldown
 gardé, sorte divers), `HazardConceptsTest` (+2 : `isBarrier`, `kindOf`),
 `VehicleStateTest` (+1 : flag `moving`) et `ProbeWiringWatchersTest`
 (`p1p2Busy`/`shouldCutForHazard` supprimés, remplacés par l'arbitre).
 
-Recette téléphone : voiture qui roule + marche + poteau cadrés ensemble
-→ « Bordure à 0,5 mètre. Poteau, passez à droite. » puis « Car moving,
+Recette téléphone : voiture qui roule + marche + personne cadrées ensemble
+→ « Bordure à 0,5 mètre. Attention à la personne, passez à droite. »
+puis « Car moving,
 12 meters away. … » en doux, premier son immédiat, aucun « Stop » —
 **non mesuré**, exige un APK de cette branche sur appareil réel.
 ## 27. Évitement 80 cm partout, mesuré ou non (ordre user du 31/10)

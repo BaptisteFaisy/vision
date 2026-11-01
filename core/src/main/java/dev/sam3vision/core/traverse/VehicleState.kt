@@ -103,7 +103,7 @@ class VehicleStateWatcher(
     val lastAlertMs: Long?
         get() = listOf(lastMovingAtMs, lastStoppedAtMs).filter { it != NO_INSTANT }.maxOrNull()
 
-    /** Dernière annonce de mouvement, `null` si aucune (P1 : le poteau attend quand elle est fraîche). */
+    /** Dernière annonce de mouvement, `null` si aucune (P1 : la personne attend quand elle est fraîche). */
     val lastMovingAlertMs: Long?
         get() = lastMovingAtMs.takeIf { it != NO_INSTANT }
 
