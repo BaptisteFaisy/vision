@@ -28,8 +28,10 @@ actif), mathématiquement identiques, pinnés à `transformers==5.20.2` :
   mémoïsé par formes ;
 - `Sam3DetrDecoder._get_coords` alloue `torch.arange` à chaque forward (son
   `lru_cache` keye des tenseurs 0-d par identité, donc miss systématique) →
-  grilles mémoïsées par stockage parent **et** dimensions lues (`_coords_key` :
-  le `data_ptr` seul resservait une grille périmée — mort prod du 29/10).
+  grilles mémoïsées par stockage parent **et** dimensions (`_coords_key` :
+  le `data_ptr` seul resservait une grille périmée — mort prod du 29/10),
+  dimensions résolues via la table latérale `_spatial_dims` — zéro sync,
+  car `int()` pendant la capture = capture refusée (8/8 sur 3060 Ti, 01/11).
 """
 
 from types import SimpleNamespace
@@ -44,6 +46,14 @@ _spatial_cache: dict = {}
 # Grilles RPB mémoïsées par stockage parent (même budget).
 _COORDS_MAX = MAX_SHAPES + 1
 _coords_cache: dict = {}
+# Dimensions spatiales par stockage, `(ptr, device)` → `((h, w), ...)` par niveau.
+# Remplie par `_cached_shapes` (H/W = int Python issus de `.shape`, zéro sync),
+# lue par `_cached_coords` (zéro sync). L'allocateur réutilisant les stockages,
+# l'entrée d'un ptr est écrasée à chaque nouvel alloc : une grille périmée
+# (anciennes H/W) n'est plus jamais adressable. Bornée : une entrée perdue
+# vaut juste un repli eager, jamais une grille fausse.
+_SPATIAL_DIMS_MAX = 16
+_spatial_dims: dict = {}
 
 
 def enabled() -> bool:
@@ -247,12 +257,50 @@ def graph_holder(ctx):
 
 
 def _coords_key(storage_ptr: int, height: int, width: int, dtype, device) -> tuple:
-    """Clé des grilles RPB : stockage parent **et** dimensions lues.
+    """Clé des grilles RPB : stockage parent **et** dimensions résolues sans sync.
 
     Le `data_ptr` seul ne suffit pas — l'allocateur réutilise les stockages
     (voir `_cached_coords`). Testée sans torch (`test_detr_coords_key`).
     """
     return (storage_ptr, height, width, str(dtype), str(device))
+
+
+def _record_spatial_dims(storage_ptr: int, device, key) -> None:
+    """Mémorise les H/W Python d'un tenseur `spatial_shapes` (zéro sync).
+
+    `key` : tuple `((h, w), ...)` par niveau, int Python issus de `.shape`.
+    Réinsertion en fin : l'éviction FIFO n'éjecte jamais l'entrée du forward
+    courant, relue par `_cached_coords` juste après. Testée sans torch
+    (`test_detr_coords_no_sync`).
+    """
+    skey = (storage_ptr, str(device))
+    _spatial_dims.pop(skey, None)
+    _spatial_dims[skey] = tuple(key)
+    if len(_spatial_dims) > _SPATIAL_DIMS_MAX:
+        _spatial_dims.pop(next(iter(_spatial_dims)))
+
+
+def _lookup_coords_dims(storage_ptr: int, data_ptr: int, elem_size: int, device):
+    """`(H, W)` Python d'une vue 0-d de `spatial_shapes`, `None` si inconnu.
+
+    Pure arithmétique sur métadonnées (zéro sync) : le niveau se déduit de
+    l'offset de la vue dans le stockage (`spatial_shapes` = `[niveaux, 2]`).
+    `None` = stockage inconnu (tenseur hors `_cached_shapes`) ou offset hors
+    table → l'appelant bascule sur le repli eager. Testée sans torch
+    (`test_detr_coords_no_sync`).
+    """
+    dims = _spatial_dims.get((storage_ptr, str(device)))
+    if dims is None or elem_size <= 0:
+        return None
+    level = ((data_ptr - storage_ptr) // elem_size) // 2
+    if level < 0 or level >= len(dims):
+        return None
+    return dims[level]
+
+
+def _coords_hw_eager(height, width) -> tuple:
+    """Lecture sync des H/W : eager UNIQUEMENT, jamais pendant une capture."""
+    return int(height), int(width)
 
 
 def patch_detr_capture() -> str:
@@ -273,20 +321,40 @@ def patch_detr_capture() -> str:
         pos = torch.cat([p.flatten(2).transpose(1, 2) for p in vision_pos_embeds], dim=1)
         entry = _spatial_cache.get((key, str(feats.device)))
         if entry is None:
+            # Copie CPU→CUDA interdite en capture : le warmup eager précède
+            # toujours la capture, donc un miss ici est anormal → erreur
+            # propre (eager conservé), jamais d'erreur CUDA à effet différé.
+            if torch.cuda.is_available() and torch.cuda.is_current_stream_capturing():
+                raise RuntimeError("detr_graph: spatial_shapes manquant en capture")
             entry = torch.tensor(list(key), dtype=torch.long, device=feats.device)
             if len(_spatial_cache) >= _SPATIAL_MAX:
                 _spatial_cache.pop(next(iter(_spatial_cache)))
             _spatial_cache[(key, str(feats.device))] = entry
+        # Table latérale ptr→H/W : `key` = int Python issus de `.shape`
+        # (zéro sync), relus par `_cached_coords` pendant la capture.
+        _record_spatial_dims(entry.untyped_storage().data_ptr(), entry.device, key)
         return feats, pos, entry
 
     def _cached_coords(self, height, width, dtype, device):
-        # Valeurs lues à chaque appel (sync ~µs, négligeable devant 52 ms de
-        # DETR) : la clé `data_ptr` seul resservait une grille périmée quand
-        # l'allocateur réutilisait le stockage pour d'autres H/W — corruption
-        # à effet différé, sans traceback (mort prod du 29/10). Les valeurs
-        # sont stables par graphe capturé, donc la lecture reste rejouable.
-        hlo, wlo = int(height), int(width)
-        key = _coords_key(height.untyped_storage().data_ptr(), hlo, wlo, dtype, device)
+        # Clé ptr+H/W SANS sync : les H/W viennent de la table latérale
+        # (remplie par `_cached_shapes` avec des int Python). La clé `data_ptr`
+        # seul resservait une grille périmée à la réutilisation du stockage
+        # (mort prod du 29/10) ; lire les valeurs ici synchroniserait pendant
+        # la capture CUDA → capture refusée, eager déguisé (8/8, 01/11).
+        # Stockage inconnu (tenseur hors `_cached_shapes`) : repli sync en
+        # eager (correct), erreur propre en capture (eager conservé).
+        sptr = height.untyped_storage().data_ptr()
+        hw = None
+        if width.untyped_storage().data_ptr() == sptr:
+            hw = _lookup_coords_dims(sptr, height.data_ptr(),
+                                     height.element_size(), height.device)
+        if hw is None:
+            if torch.cuda.is_available() and torch.cuda.is_current_stream_capturing():
+                raise RuntimeError("detr_graph: stockage spatial inconnu en capture")
+            hlo, wlo = _coords_hw_eager(height, width)
+        else:
+            hlo, wlo = hw
+        key = _coords_key(sptr, hlo, wlo, dtype, device)
         hit = _coords_cache.get(key)
         if hit is not None:
             return hit
