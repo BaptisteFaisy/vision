@@ -141,7 +141,7 @@ class ProbeHazardsTest {
     fun `reset oublie le compte dit`() {
         val dangers = dangers()
         assertEquals("5 marches.", dangers.count.onTick(true, 5, 1_000L))
-        assertNull(dangers.count.onTick(true, 5, 1_500L))
+        assertNull(dangers.count.onTick(true, 5, 1_499L))
 
         dangers.reset()
 
