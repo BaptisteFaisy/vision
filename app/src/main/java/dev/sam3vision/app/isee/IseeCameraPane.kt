@@ -99,6 +99,12 @@ class IseeCameraHost(private val context: Context) {
     /** Dernier encodage du direct : la cadence du direct, pas celle du capteur. */
     private var lastShareEncodeMs = 0L
 
+    /** Entrée précédente de l'analyseur (ns) : la cadence réellement obtenue, pas demandée. */
+    private var lastEntryNs = 0L
+
+    /** Intervalle de la dernière frame analysée (ms), publié dans `capsplit` (`int`). */
+    private var lastIntervalMs = 0L
+
     /** Chaîne NV21 directe : un encodeur par analyseur (ses tampons sont réutilisés). */
     private val encoder = Nv21JpegEncoder()
 
@@ -253,7 +259,22 @@ class IseeCameraHost(private val context: Context) {
      * latence affichée par la sonde, qui ne mesure que l'appel réseau. Or c'est du temps
      * mural entre ce que voit l'utilisateur et ce que SAM reçoit.
      */
+    /**
+     * Cadence **réellement obtenue** : intervalle depuis l'entrée précédente de
+     * l'analyseur, en ms (0 pour la première frame). C'est le chiffre qui sépare ce
+     * que le matériel impose de ce que l'application retarde — `age` seul ne le dit
+     * pas, puisque exposition et file d'attente s'y additionnent.
+     */
+    private fun noteCadence(entryNs: Long): Long {
+        val intervalMs = if (lastEntryNs == 0L) 0L else (entryNs - lastEntryNs) / NS_PER_MS
+        lastEntryNs = entryNs
+        return intervalMs
+    }
+
     private fun analyse(proxy: ImageProxy) {
+        // Cadence du pipeline, avant toute décision : une frame jetée par `wantsFrame`
+        // compte aussi, sinon on mesurerait la consommation de SAM.
+        lastIntervalMs = noteCadence(SystemClock.elapsedRealtimeNanos())
         if (wantsFrame?.invoke() == false) {
             // Même jetée, la frame nourrit le gouverneur : l'aperçu reste exposé
             // juste quand SAM ne consomme rien (échantillon Y, pas de pack NV21).
@@ -390,7 +411,7 @@ class IseeCameraHost(private val context: Context) {
         val direct = if (shareBytes >= 0) ", direct ${shareBytes / 1024} Ko" else ""
         android.util.Log.i("sam3vision",
             "conversion: ${ms} ms (capteur ${size.first}×${size.second}, jpeg ${bytes / 1024} Ko$direct, jetées $droppedFrames, veto nuit $lowLightVetoes, floues $blurryFrames)")
-        android.util.Log.i(LiveLatencyLog.TAG, TimingsText.capsplit(ageMs, encMs, b64Ms, cbMs, ms))
+        android.util.Log.i(LiveLatencyLog.TAG, TimingsText.capsplit(ageMs, encMs, b64Ms, cbMs, ms, lastIntervalMs))
     }
 
     /** Démarre l'enregistrement du MP4 dans [file] ; `false` si non prêt ou déjà lancé. */

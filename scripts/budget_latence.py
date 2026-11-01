@@ -107,9 +107,9 @@ CIBLES_MESURES = ((300, 500), (250, 500))   # (moyenne, max) : défauts du parse
 ETAGES_DOC = (
     ("CAPTURE", plage_str(CAPTURE), "capteur → callback de l'analyseur CameraX",
      "**mesuré** 81 ms le 01/11/2026 (`ISEE_LAT` capsplit `age`, téléphone ; N non archivé) "
-     "— l'essentiel est la file de l'analyseur, pas l'exposition",
-     "période caméra : 33,3 ms à 30 fps — 81 ms ≈ 2,5 périodes, donc un backlog "
-     "d'`ImageAnalysis` que la politique de flux peut réduire"),
+     "— la cause n'est pas établie : le poste `int` (cadence obtenue) la tranche",
+     "période caméra 33,3 ms à 30 fps, donc exposition <= 33 ms : au moins ~48 ms de "
+     "ces 81 ms ne sont ni l'exposition ni la cadence (readout, ISP, file — à départager)"),
     ("ENCODE", plage_str(ENCODE), "NV21 → JPEG q65 → base64 du corps de requête",
      "**mesuré** 27 ms le 01/11/2026 (`ISEE_LAT` capsplit `enc` 24 + `b64` 3, téléphone ; "
      "N non archivé)",
