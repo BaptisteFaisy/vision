@@ -26,9 +26,14 @@ poste `capt`, `TimingsText.capsplit` sous le même tag, loggée 1 frame sur 20) 
 `age` = capteur → entrée analyseur (expo, readout, livraison, attente fil),
 `enc` = NV21 → JPEG, `b64` = base64 + horodatage, `cb` = rappel `onFrame`
 (profondeur, mouvement, réserve/envoi), `total` = analyse complète (durée du
-callback). `age + enc + b64 + cb` retrouve le `capt` de la sonde à ~1 ms près —
-c'est cette somme, et non `age` seul, qui explique les dizaines de ms hors
-encode et hors base64. Le tableau finit par la comparaison avec le `capt` mesuré
+callback), `int` = intervalle depuis l'entrée précédente de l'analyseur, donc la
+**cadence réellement obtenue**. `age + enc + b64 + cb` retrouve le `capt` de la
+sonde à ~1 ms près — c'est cette somme, et non `age` seul, qui explique les
+dizaines de ms hors encode et hors base64. `int` ne s'additionne à rien : il sert
+à trancher, pas à totaliser. À 30 fps l'exposition ne peut pas dépasser 33 ms ;
+si `int` vaut 33 et `age` 81, alors l'écart entre les deux n'est ni l'exposition
+ni la cadence, et il faut chercher ailleurs (`int` ≫ 33 = cadence perdue ;
+`int` ≈ 33 = pipeline à l'heure, donc le délai est en amont de l'analyseur). Le tableau finit par la comparaison avec le `capt` mesuré
 du dump (`capt non mesuré dans ce dump` si la sonde n'a rien écrit). Code 0 si
 au moins une ligne `capsplit` est trouvée, 2 sinon. `--servers` et `--capsplit`
 sont exclusifs (usage, code 2).
@@ -57,7 +62,9 @@ POSTE = re.compile(r"(latency|capt|up|srv|rtt|mask|pixel)\s+(\d+|—)")
 ETAGES = ("preprocess", "vision", "detr", "depth", "masks", "total")
 LIGNE_SERVEUR = re.compile(r"ISEE_LAT:\s*server:\s*(.*)")
 ETAGE = re.compile(r"([A-Za-z_][A-Za-z0-9_]*)\s+(\d+|—)\s*ms")
-POSTES_CAPSPLIT = ("age", "enc", "b64", "cb", "total")
+# `total` et `int` ferment la ligne mais ne s'additionnent pas au `capt` :
+# seuls les quatre premiers postes le composent (`POSTES_CAPSPLIT[:4]`).
+POSTES_CAPSPLIT = ("age", "enc", "b64", "cb", "total", "int")
 LIGNE_CAPSPLIT = re.compile(r"ISEE_LAT:\s*capsplit\s+(.*)")
 # Postes capsplit sans suffixe `ms` ; `POSTES_CAPSPLIT[:4]` se somme en `capt`.
 POSTE_CAPSPLIT = re.compile(r"([a-z0-9]+)\s+(\d+|—)")
@@ -300,6 +307,17 @@ def selftest_capsplit():
         ["somme", "1", "110.0", "110", "110", "110"]]
     assert any("écart -1.0" in l for l in cap_table)
     assert tableau_capsplit([], [])[-1] == "capt non mesuré dans ce dump"
+    # L'intervalle : lu, affiché, jamais additionné au `capt`.
+    avec_int = "I ISEE_LAT: capsplit age 81 · enc 24 · b64 3 · cb 2 · total 30 · int 33"
+    assert parse_ligne_capsplit(avec_int) == {"age": 81, "enc": 24, "b64": 3, "cb": 2,
+                                              "total": 30, "int": 33}
+    table_int = tableau_capsplit(parse_texte_capsplit(avec_int + "\n", 0), [])
+    assert [l.split() for l in table_int if l.split()[0] == "int"] == [
+        ["int", "1", "33.0", "33", "33", "33"]]
+    assert [l.split() for l in table_int if l.split()[0] == "somme"] == [
+        ["somme", "1", "110.0", "110", "110", "110"]]   # sans `int`
+    # Un dump d'avant l'intervalle reste lisible : le poste est absent, pas faux.
+    assert "int" not in parse_ligne_capsplit(cap)
     import contextlib, io
     muet, parle = io.StringIO(), io.StringIO()
     with contextlib.redirect_stdout(muet), contextlib.redirect_stderr(muet):
@@ -314,7 +332,7 @@ def selftest():
     cas = selftest_frames()
     selftest_serveurs()
     selftest_capsplit()
-    print(f"OK   {cas + 32} assertions parse_isee_lat")  # 32 asserts + 4 cas
+    print(f"OK   {cas + 36} assertions parse_isee_lat")  # 36 asserts + 4 cas
     return 0
 
 

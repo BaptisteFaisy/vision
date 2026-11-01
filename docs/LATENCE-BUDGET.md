@@ -43,7 +43,7 @@ Chemin Direct, frame 512×206 JPEG q65 = 20,7 Ko (27 Ko en base64), 4 concepts, 
 <!-- table:étages -->
 | étage | ce qu'il couvre | valeur (ms) | provenance | plancher |
 |---|---|---:|---|---|
-| `CAPTURE` | capteur → callback de l'analyseur CameraX | 81 | **mesuré** 81 ms le 01/11/2026 (`ISEE_LAT` capsplit `age`, téléphone ; N non archivé) — l'essentiel est la file de l'analyseur, pas l'exposition | période caméra : 33,3 ms à 30 fps — 81 ms ≈ 2,5 périodes, donc un backlog d'`ImageAnalysis` que la politique de flux peut réduire |
+| `CAPTURE` | capteur → callback de l'analyseur CameraX | 81 | **mesuré** 81 ms le 01/11/2026 (`ISEE_LAT` capsplit `age`, téléphone ; N non archivé) — la cause n'est pas établie : le poste `int` (cadence obtenue) la tranche | période caméra 33,3 ms à 30 fps, donc exposition <= 33 ms : au moins ~48 ms de ces 81 ms ne sont ni l'exposition ni la cadence (readout, ISP, file — à départager) |
 | `ENCODE` | NV21 → JPEG q65 → base64 du corps de requête | 27 | **mesuré** 27 ms le 01/11/2026 (`ISEE_LAT` capsplit `enc` 24 + `b64` 3, téléphone ; N non archivé) | ≈ 2 ms pour un 512×206 (non mesuré ici) ; u02 donnait 5–8 ms, base64 exclu |
 | `QUEUE` | attente du créneau d'envoi (`intervalMsAdaptive`) | calculée | u01 + hypothèse de phase uniforme (attente ≈ intervalle ÷ 2) ; cadence prudente de cet arbre : 350 / 500 / 900 ms | 0 ms si la frame est traitée sans tick (chemin local) |
 | `HTTP` | requête émise → réponse complète lue par le client (**= A/R**) | 422 (médian mesuré) | **mesuré** (notes de campagne, 12 appels keep-alive, A100 eu-west, 512×206 ; date non consignée) | plancher 123,7 ms = réseau 93 + serveur 30,7 (meilleur cas mesuré des deux côtés) |
@@ -55,12 +55,15 @@ Chemin Direct, frame 512×206 JPEG q65 = 20,7 Ko (27 Ko en base64), 4 concepts, 
 Trois remarques qui commandent la suite :
 
 - `CAPTURE` **n'est plus une hypothèse** : 81 ms mesurés le 01/11/2026 (`age` de la décomposition
-  `capsplit`), contre 25 ms simulés. Le chiffre est brutal, mais il faut le lire correctement :
-  81 ms ≈ 2,5 périodes de frame à 30 fps, c'est donc de la **file d'attente** d'`ImageAnalysis`,
-  pas du temps d'exposition. Ce qui restait invisible — 81 ms répartis entre expo, readout,
+  `capsplit`), contre 25 ms simulés. Ce qui restait invisible — 81 ms répartis entre expo, readout,
   livraison et attente fil, qu'aucune sortie ne sommait — est désormais publié par
-  `scripts/parse_isee_lat.py --capsplit`. L'étage est *mesuré* et *réductible* : ce n'est pas la
-  même chose qu'être *acquis*.
+  `scripts/parse_isee_lat.py --capsplit`. En revanche **la cause de ces 81 ms n'est pas établie**,
+  et ce document ne la suppose plus : à 30 fps l'exposition ne peut pas dépasser 33 ms, donc au
+  moins ~48 ms viennent d'ailleurs (readout, ISP, file d'attente de l'analyseur) sans qu'on sache
+  dans quelles proportions. Le poste `int` — la cadence réellement obtenue — est là pour trancher :
+  `int` ≈ 33 ms avec `age` 81 ms disculpe l'exposition *et* la cadence et désigne l'amont ;
+  `int` ≫ 33 ms désigne une cadence perdue. Tant que la campagne n'a pas été relue avec `int`,
+  l'étage est *mesuré* mais **pas expliqué**.
 - `ENCODE` non plus : **27 ms mesurés** (`enc` 24 + `b64` 3), contre 5–8 ms estimés — l'estimation
   u02 avait été faite avant d'inclure le base64. Avec `CAPTURE`, cela déplace le budget client hors
   attente de 57,6–78,4 ms à 135,6–153,4 ms (§ 4).
@@ -159,7 +162,8 @@ Comment lire, et ce que le modèle ne prouve pas :
 - La dernière ligne compte plus que les autres : le chemin local ne tient les 100 ms que **si
   l'encode par frame disparaît**. S'il reste, 81 ms de capture et 17 ms d'affichage mangent la
   cible avant la moindre propagation (102,6–111,4 ms). L'architecture locale n'est donc pas
-  gratuite : elle suppose d'arrêter d'encoder du JPEG à chaque frame.
+  gratuite : elle suppose d'arrêter d'encoder du JPEG à chaque frame — ou que les 81 ms de
+  `CAPTURE` soient largement réductibles, ce que la campagne n'a pas encore établi (§ 2).
 - **Ce qui n'est pas dans le modèle** : la gigue (p95), les frames jetées, et le surcoût d'un
   décodage PNG à 12 objets. Le budget est donc optimiste par construction ; c'est voulu — un budget
   bâti sur les p50 doit laisser la marge pour les p95.
@@ -310,6 +314,21 @@ Lectures, dans l'ordre d'importance :
 - **rien de tout cela n'est un p50/p95** : l'effectif du dump n'a pas été archivé. C'est la dette
   ouverte de cette campagne, et `check-budget-provenance.py` l'affiche en avertissement à chaque
   passage.
+
+### Ce que cette campagne ne tranche pas
+
+Les 81 ms de `age` restent **inexpliqués** : la campagne mesure le total, pas sa répartition. Le
+poste `int` (intervalle depuis l'entrée précédente de l'analyseur) a été ajouté pour ça, et la
+campagne du 01/11 ne le contient pas — elle précède l'instrument. À la prochaine relecture :
+
+| `int` mesuré | ce que ça veut dire | levier |
+|---|---|---|
+| ≈ 33 ms (30 fps tenus) | ni l'exposition ni la cadence ne peuvent faire 81 ms : le délai est en amont de l'analyseur (readout, ISP, buffers du HAL) | rien côté app ; voir la configuration des flux |
+| ≫ 33 ms | l'application ne tient pas la cadence : l'analyseur est saturé (`total` proche de `int`) | réduire la section critique de l'analyseur |
+| ≈ `total` | l'analyseur est le goulot : les frames sont jetées, pas retardées | idem, par le débit |
+
+Tant que ce tableau n'a pas de réponse mesurée, `CAPTURE` est publié comme *mesuré mais pas
+expliqué* — et aucune optimisation du chemin caméra ne peut être présentée comme un gain.
 
 C'est aussi la leçon de fond : `CAPTURE` était publié à 25 ms avec l'étiquette *simulation* et
 rien ne reliait cette étiquette à une campagne. `scripts/check-budget-provenance.py` existe pour
