@@ -31,10 +31,11 @@ import dev.sam3vision.core.traverse.FrameMotion
  * « regardez à gauche/droite » est supprimé, ordre user du 31/10) — la
  * voix véhicules parle en premier, stop comme douce, devant l'évitement
  * (ordre user du 31/10), puis l'évitement, sinon le verdict
- * ([NoLightCrossWatch]) : « Traversez. » sans
- * danger, « Attendez. » sur danger (mouvement brut seul — une voiture
- * garée ne bloque jamais, même proche ou sous pan caméra, ordre user du
- * 31/10), tous les deux toutes les 2 s. [motion] (`null` = pas de signal
+ * ([NoLightCrossWatch]) : « Traversez. » après 3 s sans voiture en
+ * mouvement (ordre user du 01/11), « Attendez. » sur danger (mouvement
+ * brut seul — une voiture garée ne bloque jamais, même proche ou sous
+ * pan caméra, ordre user du 31/10), tous les deux toutes les 2 s.
+ * [motion] (`null` = pas de signal
  * fond) juge les pistes par le fond, avec feu comme sans feu.
  */
 internal fun crossingPhraseOf(

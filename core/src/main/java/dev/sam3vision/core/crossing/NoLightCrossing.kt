@@ -69,30 +69,35 @@ class NoLightGate(private val minFrames: Int = NO_LIGHT_MIN_FRAMES) {
 
 /**
  * Annonceur du verdict sans feu : « Traversez. » sans danger, « Attendez. »
- * sur danger ([danger] vrai : veto trafic ou véhicule brut en mouvement) —
- * redit toutes les [CROSS_REPEAT_MS] ms dans les deux cas (ordre user du
- * 31/10 : toutes les 2 s, on sait si on peut traverser). Un verdict se
- * confirme ([CROSS_MIN_FRAMES] frames stables), et « Attendez. » coupe le
- * délai après un « Traversez. » (miroir du rouge après vert : contredire
- * vite est sûr, attendre pour traverser aussi).
+ * sur danger ([danger] vrai : véhicule brut en mouvement — une garée ne
+ * bloque jamais) — redit toutes les [CROSS_REPEAT_MS] ms dans les deux cas
+ * (ordre user du 31/10 : toutes les 2 s, on sait si on peut traverser). Un
+ * verdict se confirme ([CROSS_MIN_FRAMES] frames stables), et le premier
+ * « Traversez. » exige en plus [CALM_MS] de calme continu (ordre user du
+ * 01/11 : 3 s sans voiture en mouvement — tout danger rouvre la fenêtre) ;
+ * « Attendez. » coupe le délai après un « Traversez. » (miroir du rouge
+ * après vert : contredire vite est sûr, attendre pour traverser aussi).
  *
  * Pur et testé en JVM : [atMs] est fourni, aucune horloge implicite.
  */
 class NoLightAnnouncer(
     private val minFrames: Int = CROSS_MIN_FRAMES,
     private val repeatMs: Long = CROSS_REPEAT_MS,
+    private val calmMs: Long = CALM_MS,
 ) {
 
     private var steady = 0
     private var lastDanger: Boolean? = null
     private var lastSpokenAtMs: Long? = null
     private var lastSpokenDanger: Boolean? = null
+    private var calmSinceMs: Long? = null
 
     /**
-     * Verdict à [atMs] (`null` = silence : confirmation en cours, répétition
-     * pas encore due, ou la voix véhicules a parlé). [vehicleSpoke] vrai
-     * quand la voix véhicules a parlé sur cette frame : le verdict se tait
-     * et recule son délai (pas de doublon avec la phrase prioritaire).
+     * Verdict à [atMs] (`null` = silence : confirmation en cours, fenêtre
+     * de calme pas encore remplie, répétition pas encore due, ou la voix
+     * véhicules a parlé). [vehicleSpoke] vrai quand la voix véhicules a
+     * parlé sur cette frame : le verdict se tait et recule son délai (pas
+     * de doublon avec la phrase prioritaire).
      */
     fun onFrame(
         atMs: Long,
@@ -105,6 +110,7 @@ class NoLightAnnouncer(
             lastSpokenDanger = danger
             lastDanger = danger
             steady = 0
+            noteCalm(atMs, danger)
             return null
         }
         if (lastDanger != danger) {
@@ -113,7 +119,9 @@ class NoLightAnnouncer(
         } else {
             steady += 1
         }
+        noteCalm(atMs, danger)
         if (steady < minFrames) return null
+        if (!danger && !calmEnough(atMs)) return null
         val last = lastSpokenAtMs
         val interrupt = danger && lastSpokenDanger == false
         if (!interrupt && last != null && atMs - last < repeatMs) return null
@@ -122,12 +130,24 @@ class NoLightAnnouncer(
         return if (danger) NoLightCrossingText.wait(language) else NoLightCrossingText.cross(language)
     }
 
-    /** Oublie confirmation, délai et dernier verdict (nouvelle traversée, nouvelle séance). */
+    /** Fenêtre de calme : ouverte à la première frame calme, fermée par tout danger. */
+    private fun noteCalm(atMs: Long, danger: Boolean) {
+        if (danger) calmSinceMs = null else if (calmSinceMs == null) calmSinceMs = atMs
+    }
+
+    /** Le calme dure-t-il depuis [calmMs] sans interruption ? */
+    private fun calmEnough(atMs: Long): Boolean {
+        val since = calmSinceMs ?: return false
+        return atMs - since >= calmMs
+    }
+
+    /** Oublie confirmation, délai, dernier verdict et fenêtre de calme (nouvelle traversée, nouvelle séance). */
     fun reset() {
         steady = 0
         lastDanger = null
         lastSpokenAtMs = null
         lastSpokenDanger = null
+        calmSinceMs = null
     }
 
     companion object {
@@ -136,5 +156,8 @@ class NoLightAnnouncer(
 
         /** Répétition du verdict déjà dit (« Traversez. » comme « Attendez. » : toutes les 2 s). */
         const val CROSS_REPEAT_MS = 2_000L
+
+        /** Calme continu exigé avant le premier « Traversez. » (3 s sans voiture en mouvement). */
+        const val CALM_MS = 3_000L
     }
 }

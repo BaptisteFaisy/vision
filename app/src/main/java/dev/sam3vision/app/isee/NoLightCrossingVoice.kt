@@ -5,9 +5,10 @@ import dev.sam3vision.core.speech.SpeechLanguage
 
 /**
  * Voix du verdict sans feu, une par processus (même garde des 500 lignes que
- * [CrossingLateralWatch]) : « Traversez. » sans danger, « Attendez. » sur
- * danger (veto trafic ou véhicule brut en mouvement) — tous les deux toutes
- * les 2 s (ordre user du 31/10 : on sait toujours si on peut traverser).
+ * [CrossingLateralWatch]) : « Traversez. » après 3 s sans voiture en
+ * mouvement (ordre user du 01/11), « Attendez. » sur danger (véhicule brut
+ * en mouvement) — tous les deux toutes les 2 s (ordre user du 31/10 : on
+ * sait toujours si on peut traverser).
  */
 internal object NoLightCrossWatch {
 
