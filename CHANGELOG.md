@@ -3,6 +3,31 @@
 Le journal part du 2026-10-26 après 19 h : le commit de départ, puis une entrée par fait
 livré et ses preuves (tâche, fichiers, chiffres) dans l'arbre.
 
+## 2026-11-01 — CI : un test rouge se trie tout seul, et la pollution ne revient plus (branche `fix/triage-rouge-tests`)
+
+- **Constat** : le 01/11, la PR #919 a été bloquée 34 min par `ProbeStairsPriorityTest`,
+  une classe **que la PR ne touchait pas** — la nouvelle classe de test publiant de
+  vraies frames laissait les globaux de séance sales (`ProbeTracks`), et la classe
+  suivante, même JVM, se taisait. L'agent de réparation a été saisi deux fois : deux
+  « budget de 150 s dépassé », aucune proposition. Rien dans la chaîne ne savait dire
+  « le test tombé n'est pas dans le diff ».
+- **Fait** : `tools/triage_test.py` (déterministe, stdlib) lit le journal du run, sort
+  la classe tombée, la rapproche du diff, **relance la classe seule** et désigne les
+  tests suspects (ceux qui appellent `probe.onFrame`/`probe.dispatch`). Nouveau
+  workflow `triage-rouge.yml` : un passage par tête, rapport commenté + label, puis
+  réparation par le pilote existant **avec le verdict en indice** (`--indice`). Le
+  balayeur lui laisse la main tant que `TRIAGE_TEST` ≠ 0 (sinon il consommait l'unique
+  tentative de la tête sans indice). Prévention : `LiveProbe.begin()` remet les globaux
+  de séance à zéro (`globalsNouvelleSeance`), et `tools/check-test-globals.py` (appelé
+  par `scripts/test_scripts.sh`) refuse un test `app/` qui publie sans `begin()` ni
+  `seanceVide()`.
+- **Preuve** : triage rejoué sur le journal réel du run 41336819252 → `pollution`,
+  `ProbeStairsPriorityTest` hors périmètre, suspect `LiveProbePublishConcurrencyTest`,
+  « relancée seule : verte » (exactement le diagnostic fait à la main). Tests :
+  `tools/test_triage_test.py` 16/16, `tools/test_check_test_globals.py` 12/12,
+  `scripts/test_scripts.sh` 193 ok, gardes Fireworks 88 ok, `check-kotlin-limits` 0
+  dépassement, `:app` 1 890 tests et `:core` 3 050 tests verts (0 échec).
+
 ## 2026-11-01 — Latence : verdicts R1/ENCODE/p95 consolidés, budget republié (branche `lat-coord-verdict`)
 
 - **Fait** : reprise du chantier latence (15 agents) consolidée en une mise à jour

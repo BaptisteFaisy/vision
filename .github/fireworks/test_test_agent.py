@@ -34,6 +34,19 @@ class PromptTest(unittest.TestCase):
         self.assertIn("python3 -m unittest", prompt)
         self.assertIn("gradlew", prompt)
 
+    def test_porte_le_triage_quand_il_existe(self):
+        """Le triage évite la recherche à l'aveugle (#919 : 2 abandons)."""
+        prompt = test_agent.prompt_fix(
+            "O/R", "12", "/tmp/clone", "FAILED x", "",
+            indice="- ProbeXTest hors périmètre\n- suspect : LiveProbePublish.kt")
+        self.assertIn("Triage automatique", prompt)
+        self.assertIn("ProbeXTest hors périmètre", prompt)
+        self.assertIn("suspect : LiveProbePublish.kt", prompt)
+
+    def test_sans_triage_aucun_bloc_vide(self):
+        prompt = test_agent.prompt_fix("O/R", "12", "/tmp/clone", "FAILED x")
+        self.assertNotIn("Triage automatique", prompt)
+
 
 class BinaireTest(unittest.TestCase):
     """Localisation du binaire : PATH, puis les emplacements des runners."""

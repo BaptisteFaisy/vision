@@ -87,6 +87,21 @@ PR restait bloquée sur « le modèle n'a rien rendu ». Si des fichiers manquen
 encore, une **relance ciblée** ne redemande qu'eux, avec leur diff ; la réponse
 du modèle est journalisée au moindre échec.
 
+## Indice de triage (`--indice`)
+
+Depuis le 01/11, l'agent ne part plus du seul journal. Le workflow
+`triage-rouge` relance la classe tombée seule et écrit son verdict dans
+`/tmp/triage.txt` (classe, périmètre, suspects) ; `test_agent.py fix --indice
+/tmp/triage.txt` l'ajoute au prompt, sous « Triage automatique (déjà fait, ne le
+refais pas) ».
+
+C'est ce qui manquait sur #919 : la classe tombée n'était pas dans le diff, le
+coupable était le nouveau test de la PR (globaux de séance sales), et l'agent —
+lancé sans indice — a rendu « budget de 150 s dépassé », deux fois.
+
+Sans `--indice`, le comportement est celui d'avant (journal seul). L'option est
+facultative et ne casse aucun appelant : le balayeur peut la passer aussi.
+
 ## Validation
 
 ```bash

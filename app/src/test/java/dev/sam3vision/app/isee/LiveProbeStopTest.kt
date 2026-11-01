@@ -39,6 +39,10 @@ class LiveProbeStopTest {
         releaseOnStop = savedRelease ?: releaseOnStop
     }
 
+    /** Ces tests lancent de vraies frames : les globaux de séance suivent. */
+    @After
+    fun remettreLaSeanceAZero() = seanceVide()
+
     @Test
     fun `stop ferme les sessions et coupe l_envoi`() = runTest {
         val (probe, fake) = probeHarness(this)

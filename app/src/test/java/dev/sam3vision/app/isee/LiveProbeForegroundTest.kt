@@ -5,6 +5,7 @@ import kotlinx.coroutines.test.advanceUntilIdle
 import kotlinx.coroutines.test.runTest
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
+import org.junit.After
 import org.junit.Assert.assertTrue
 import org.junit.Test
 
@@ -14,6 +15,10 @@ import org.junit.Test
  * (`onFrame`) — sinon l'enregistrement rallumerait la carte après son extinction.
  */
 class LiveProbeForegroundTest {
+
+    /** Ces tests lancent de vraies frames : les globaux de séance suivent. */
+    @After
+    fun remettreLaSeanceAZero() = seanceVide()
 
     @Test
     fun `en arriere-plan aucune frame ne part`() = runTest {

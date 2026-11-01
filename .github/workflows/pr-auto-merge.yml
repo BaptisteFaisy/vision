@@ -433,6 +433,9 @@ jobs:
           FIREWORKS_AGENT_SCOPE: ${{ vars.FIREWORKS_AGENT_SCOPE }}
           # v22 — agent de réparation des tests (zeroclaw `fw`) : `0` coupe.
           TEST_AGENT: ${{ vars.TEST_AGENT }}
+          # v28 — `0` rend la réparation d'un test rouge au balayeur (le
+          # workflow `triage-rouge` la prend sinon, avec l'indice du triage).
+          TRIAGE_TEST: ${{ vars.TRIAGE_TEST }}
           REPO: BaptisteFaisy/vision
           PR: ${{ matrix.pr }}
           SHA: ${{ matrix.sha }}
@@ -800,8 +803,17 @@ jobs:
             # touche un fichier de garde, dépasse 20 fichiers ou
             # 1 500 lignes, ou ne compile pas. Une seule tentative
             # par tête (marque) : jamais de boucle d'agent.
+            # v28 (01/11) — la réparation d'un test rouge appartient au
+            # workflow `triage-rouge` dès qu'il est armé (`TRIAGE_TEST` ≠ 0) :
+            # il relance la classe tombée SEULE, en déduit la dépendance
+            # d'ordre et désigne les tests suspects, puis appelle ce même
+            # pilote **avec cet indice**. Vécu sur #919 : sans indice, deux
+            # saisines à 150 s ont rendu « budget dépassé » et la PR a attendu
+            # une demi-heure pour une ligne à ajouter. `TRIAGE_TEST=0` rend la
+            # main au balayeur, sans rien changer d'autre.
             if [ "$(marques "$pr" "<!-- test-agent sha=$SHA -->")" -eq 0 ] \
-               && [ "${TEST_AGENT:-1}" != "0" ]; then
+               && [ "${TEST_AGENT:-1}" != "0" ] \
+               && [ "${TRIAGE_TEST:-1}" = "0" ]; then
               rc2=0
               git show origin/master:.github/fireworks/test_agent.py \
                 > /tmp/fw-test-agent.py 2>/dev/null \

@@ -87,12 +87,8 @@ class LiveProbePublishConcurrencyTest {
         } finally {
             scope.cancel()
             // Pas de pollution inter-tests : la publication écrit les globaux de la
-            // séance (pistes de personnes, plan de masque escaliers, pompe fond) que
-            // d'autres suites lisent — sans ça, `ProbeStairsPriorityTest` ne parle plus
-            // (la personne du test est prise pour une piste déjà prévenue).
-            ProbeTracks.reset()
-            StairCannyCount.clear()
-            ProbeBackgroundMotion.reset()
+            // séance, que d'autres suites lisent (voir `seanceVide`).
+            seanceVide()
         }
     }
 
