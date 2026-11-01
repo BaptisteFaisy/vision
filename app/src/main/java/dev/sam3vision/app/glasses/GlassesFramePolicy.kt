@@ -1,6 +1,7 @@
 package dev.sam3vision.app.glasses
 
 import dev.sam3vision.app.MAX_IMAGE_EDGE
+import java.util.Locale
 import kotlin.math.max
 import kotlin.math.roundToInt
 
@@ -107,6 +108,20 @@ internal fun throttleDelayMs(
     nowMs: Long,
     throttleMs: Long = FRAME_THROTTLE_MS,
 ): Long = (throttleMs - (nowMs - lastSentAtMs)).coerceAtLeast(0L)
+
+/**
+ * Cadence mesurée : [frames] images en [elapsedMs] millisecondes → images/s,
+ * `null` quand le calcul est impossible (compteur pas encore parti). Pur, testé en JVM.
+ */
+internal fun measuredFps(frames: Long, elapsedMs: Long): Float? =
+    if (frames <= 0L || elapsedMs <= 0L) null else frames * 1000f / elapsedMs
+
+/**
+ * Suffixe « (12.3 i/s) » pour le journal, vide quand la cadence est incalculable :
+ * un seul format pour la pompe et le décodeur (recette : `logcat -s GlassesVideo,GlassesChain`).
+ */
+internal fun fpsSuffix(frames: Long, elapsedMs: Long): String =
+    measuredFps(frames, elapsedMs)?.let { " (%.1f i/s)".format(Locale.US, it) } ?: ""
 
 /** Verdict sur une frame brute, avant toute copie ou conversion. */
 internal enum class FrameVerdict {

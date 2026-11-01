@@ -51,6 +51,7 @@ internal class GlassesCamera(
     private var collector: GlassesFrameCollector? = null
     private var framesJob: Job? = null
     private var pushed = 0L
+    private var firstPushMs = 0L
 
     /** Micro des lunettes, créé avec le flux : `null` tant que rien n'est attaché. */
     var audio: GlassesAudio? = null
@@ -149,9 +150,11 @@ internal class GlassesCamera(
         val arrivedAtNs = SystemClock.elapsedRealtimeNanos()
         val bytes = runCatching { frame.buffer.readRemainingBytes() }.getOrNull() ?: return
         pushed += 1
+        if (pushed == 1L) firstPushMs = SystemClock.elapsedRealtime()
         if (pushed == 1L || pushed % 150 == 0L) {
+            val elapsed = SystemClock.elapsedRealtime() - firstPushMs
             Log.i(TAG, "flux lunettes : $pushed frames (${frame.width}×${frame.height}, ${bytes.size} o," +
-                " ptsUs=${frame.presentationTimeUs}, rxMs=${arrivedAtNs / 1_000_000L})")
+                " ptsUs=${frame.presentationTimeUs}, rxMs=${arrivedAtNs / 1_000_000L})" + fpsSuffix(pushed, elapsed))
         }
         val copy = GlassesFrame(
             bytes = bytes,

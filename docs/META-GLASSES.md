@@ -21,13 +21,13 @@ s'il était mesuré.
 | `GlassesController.kt` (471 l.) | le seul point d'entrée : init SDK, enregistrement, session, permissions, routage des gestes, analyse des frames collectées, connexion mock de recette |
 | `GlassesPolicy.kt` (225 l.) | **logique pure** : gravité + textes des messages, phases joignables, libellés, raison de non-collecte — testée en JVM |
 | `GlassesStatus.kt` (44 l.) | les 4 lignes d'état, en texte pur (testées) ; l'écran ne fait que les afficher |
-| `GlassesCamera.kt` (203 l.) | flux 15 i/s `MEDIUM` `compressVideo = true`, photo à la demande, pompe vidéo vers l'accueil + collecteur derrière flag |
+| `GlassesCamera.kt` (225 l.) | flux 15 i/s `HIGH` `compressVideo = true`, photo à la demande, pompe vidéo vers l'accueil (cadence reçue au logcat) + collecteur derrière flag |
 | `GlassesFrameCollector.kt` (83 l.) | pompe de production : `videoStream` → `JpegFrame`, 1 frame / 1,5 s, testée sur JVM |
 | `GlassesVideoDecoder.kt` (253 l.) | bitstream H.265 → `ArgbImage` via `MediaCodec` (collecte), **jamais essayé** |
-| `GlassesLiveDecoder.kt` (321 l.) | rendu du direct sur la surface de l'accueil (bitmap, sinon H.265 `MediaCodec` Annex B + `csd-0`), prouvé sur téléphone |
+| `GlassesLiveDecoder.kt` (377 l.) | rendu du direct sur la surface de l'accueil (bitmap, sinon H.265 `MediaCodec` Annex B + `csd-0`), correction `TextureView` centrée (`textureViewCrop`), cadence rendue au logcat |
 | `GlassesVideoLink.kt` (169 l.) | passerelle frames + `streaming`/`live` + taille vidéo entre les lunettes et l'accueil iSee |
 | `GlassesFrameConvert.kt` (98 l.) | conversions partagées banc + production (YUV → ARGB → JPEG 85 → base64) |
-| `GlassesFramePolicy.kt` (144 l.) | politique de frame partagée (étranglement, verdict, recadrage, horodatage), pure, testée en JVM |
+| `GlassesFramePolicy.kt` (160 l.) | politique de frame partagée (étranglement, verdict, recadrage, horodatage, cadence mesurée), pure, testée en JVM |
 | `GlassesAnalysisStep.kt` (67 l.) | maillon partagé « frame → `AnalyzeUseCase` → voix », testé en JVM |
 | `FrameTypes.kt` (158 l.) | `JpegFrame`, `Yuv420Layout`, `YuvConverter` partagés, testés en JVM |
 | `GlassesInputs.kt` (95 l.) | bouton capture → `CaptureAction`, tick 80 ms |
@@ -180,10 +180,13 @@ lecture ratée.
 ## 5. Flux d'images : 15 i/s, photo à la demande
 
 - Configuration demandée au SDK : `StreamConfiguration(audioCodec = choice.toCodec(),
-  videoQuality = MEDIUM, frameRate = FRAME_RATE, compressVideo = true)`
-  (`GlassesCamera.kt:59-63`), `FRAME_RATE = 15` (`:129`). Le commentaire du code justifie la
-  limite (« au-delà, le lien Bluetooth Classic casse l'image ») : c'est un **constat matériel
-  repris tel quel, non remesuré ici**.
+  videoQuality = HIGH, frameRate = GLASSES_FRAME_RATE, compressVideo = true)`
+  (`glassesStreamConfiguration`, `GlassesStreamConfig.kt`), `GLASSES_FRAME_RATE = 15`.
+  La haute qualité (720×1280) est un choix de piqué, **non validé sur matériel** : si
+  la rue saccade, revenir à `MEDIUM` au même endroit. La cadence réellement reçue et
+  rendue se lit au logcat (`logcat -s GlassesVideo,GlassesChain` : « N images rendues
+  (X i/s) », « N frames (…o) (Y i/s) ») — X < Y = le téléphone perd des images, Y < 15
+  = c'est le lien qui ne suit pas.
 - L'audio n'est pas `null` : `grep -n "audioCodec = null" app/src/main` → 0. Le code monte un
   **palier** (`GlassesAudioPlan.ladder`, `GlassesAudioPlan.kt:28-29`) — 16 kHz mono préféré,
   48 kHz mono en repli, puis « sans micro » — et `GlassesCamera.start()` essaie les trois
@@ -401,7 +404,7 @@ isole dans des fichiers courts et on met la décision dans `GlassesPolicy.kt`.
 | L'attente du lien borne désormais `STARTING` à 30 s (`LINK_WAIT_MS`) puis revient en `IDLE` avec un message ; `createSession` lui-même n'a toujours **aucun délai** | moitié corrigée le 29/10, `createSession` ouvert |
 | Messages visibles seulement dans Réglages (§7) | ouvert, hors périmètre |
 | `DonState.UNKNOWN` est affiché « non portées » (`GlassesStatus.kt:22-27`) : l'état inconnu et l'état « retirées » se ressemblent | ouvert, sans risque |
-| Qualité d'image à 15 i/s, décodage HEIC, latences | **non mesuré** |
+| Qualité d'image à 15 i/s, décodage HEIC, latences | **non mesuré** (compteurs i/s reçues/rendues au logcat pour trancher lien vs téléphone) |
 | Aucun test d'instrumentation des lunettes | assumé : il n'y a pas de matériel |
 ## 13. Mesuré sur une paire réelle (27/10/2026)
 
@@ -441,5 +444,6 @@ déclencheur manuel. Micro indisponible : repli annoncé (photo → chat, comme 
 Recette sans matériel (debug) : Réglages → META GLASSES → « Simuler un appui long
 (parler) » et « Simuler ouvre iSee (voix) » ; ou `adb shell am start --es glasses_talk "..."`
 pour injecter une question comme si le micro l'avait entendue. À valider sur matériel :
-bips audibles dans les lunettes (sortie A2DP), rue nette en haute qualité sans freeze,
+bips audibles dans les lunettes (sortie A2DP), rue droite (ratio conservé, plus
+d'étirement) et nette en haute qualité sans freeze, cadences reçues/rendues au logcat,
 et question bout-en-bout avec photo jointe à la réponse.
