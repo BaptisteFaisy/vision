@@ -19,13 +19,13 @@ import org.junit.Test
 class DistanceTickerTest {
 
     @Test
-    fun `pas du ticker sous les 150 ms exiges`() {
-        assertEquals(120L, DistanceTicker.TICK_MS)
+    fun `pas du ticker a 10 Hz avec marge, sous les 150 ms exiges`() {
+        assertEquals(80L, DistanceTicker.TICK_MS)
         assertTrue(DistanceTicker.TICK_MS <= 150L)
     }
 
     @Test
-    fun `un tick toutes les 120 ms en temps virtuel`() = runTest {
+    fun `un tick toutes les 80 ms en temps virtuel`() = runTest {
         val dispatcher = StandardTestDispatcher(testScheduler)
         val ticks = mutableListOf<Long>()
         var now = 10_000L
@@ -33,15 +33,15 @@ class DistanceTickerTest {
             ticks.add(ticked)
         }
         ticker.start()
-        advanceTimeBy(119L)
+        advanceTimeBy(79L)
         runCurrent()
         assertTrue(ticks.isEmpty())
-        now += 120L
+        now += 80L
         advanceTimeBy(1L)
         runCurrent()
-        assertEquals(listOf(10_120L), ticks)
-        now += 120L
-        advanceTimeBy(120L)
+        assertEquals(listOf(10_080L), ticks)
+        now += 80L
+        advanceTimeBy(80L)
         runCurrent()
         assertEquals(2, ticks.size)
         ticker.stop()
@@ -58,7 +58,7 @@ class DistanceTickerTest {
         val ticker = DistanceTicker(TestScope(dispatcher), dispatcher) { count++ }
         ticker.start()
         ticker.start()
-        advanceTimeBy(120L)
+        advanceTimeBy(80L)
         runCurrent()
         assertEquals(1, count)
         ticker.stop()
@@ -94,7 +94,7 @@ class DistanceTickerTest {
             layers.add(predictedLayer(512, 384, meter.predictions(now), 67f))
         }
         ticker.start()
-        advanceTimeBy(120L)
+        advanceTimeBy(80L)
         runCurrent()
         assertEquals(1, layers.size)
         assertNull(layers.first())

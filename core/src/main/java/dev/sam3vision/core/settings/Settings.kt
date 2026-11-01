@@ -1,6 +1,7 @@
 package dev.sam3vision.core.settings
 
 import dev.sam3vision.core.depth.DepthBackend
+import dev.sam3vision.core.distance.LensSpec
 import dev.sam3vision.core.model.ObjectLimits
 import dev.sam3vision.core.speech.SpeechLanguage
 
@@ -137,6 +138,12 @@ data class Settings(
      * capteur. Sert quand le driver ne répond pas, ou pour affiner l'étalonnage.
      */
     val cameraFovDeg: Float = 0f,
+    /**
+     * Champ de vision horizontal imposé à la caméra des lunettes, en degrés :
+     * 0 = repli estimé ([LensSpec.Glasses]). Le SDK n'expose aucun calibrage :
+     * cette valeur affine en attendant la mire.
+     */
+    val glassesFovDeg: Float = 0f,
     /**
      * Rôle de ce téléphone : [CaregiverRole.Blind] (défaut, iSee) ou
      * [CaregiverRole.Caregiver] (page de suivi du proche). Persisté : l'app
@@ -365,7 +372,7 @@ data class Settings(
         "adaptiveUploadEnabled=$adaptiveUploadEnabled, keyframeSchedulerEnabled=$keyframeSchedulerEnabled, " +
         "navigationGuidanceEnabled=$navigationGuidanceEnabled, " +
         "outdoorMode=$outdoorMode, " +
-        "cameraFovDeg=$cameraFovDeg, caregiverRole=$caregiverRole, " +
+        "cameraFovDeg=$cameraFovDeg, glassesFovDeg=$glassesFovDeg, caregiverRole=$caregiverRole, " +
         "caregiverInvite=$caregiverInvite, maxObjects=$maxObjects, " +
         "routeBaseUrl=$routeBaseUrl)"
 }

@@ -60,6 +60,15 @@ internal fun DistanceSettings(draft: Settings, onChange: (Settings) -> Unit) {
             onChange(draft.copy(cameraFovDeg = parseFov(text)))
         }
         LabeledField(
+            label = "Glasses field of view (°, 0 = estimated fallback)",
+            value = fovText(draft.glassesFovDeg),
+            secret = false,
+        ) { text ->
+            // No calibration store here: the guided helper routine is phone-only,
+            // glasses wait for the mire (docs/LUNETTES-RECETTE-TEL.md § 6).
+            onChange(draft.copy(glassesFovDeg = parseFov(text)))
+        }
+        LabeledField(
             label = "Camera height in meters (shoulder ~1.5)",
             value = heightText(heightM),
             secret = false,

@@ -40,10 +40,11 @@ data class ChosenLens(val spec: LensSpec, val origin: LensOrigin) {
  * Le forcé garde l'aspect du capteur quand il est connu (le vertical suit la
  * vraie géométrie au lieu du 4:3 supposé) ; repli 4:3 sinon.
  *
- * [fromGlasses] = la frame mesurée vient des lunettes : le calibrage du téléphone ne
- * vaut plus, c'est [glasses] qui s'applique (`null` = pas encore calibré sur mire, le
- * repli grand-angle s'applique en attendant — voir le protocole mire de
- * `docs/LUNETTES-RECETTE-TEL.md`). Par défaut (téléphone), le routage est inchangé.
+ * [fromGlasses] = la frame mesurée vient des lunettes : le champ lunettes forcé
+ * prime (aspect 9:16 du flux), sinon [glasses] (mire, `null` = pas encore
+ * calibrée), sinon le repli estimé [LensSpec.Glasses] — jamais le capteur du
+ * téléphone (voir le protocole mire de `docs/LUNETTES-RECETTE-TEL.md`). Par
+ * défaut (téléphone), le routage est inchangé.
  */
 internal fun chooseLens(
     forcedFovDeg: Float,
@@ -51,6 +52,7 @@ internal fun chooseLens(
     glasses: LensSpec? = null,
     fromGlasses: Boolean = false,
 ): ChosenLens {
+    if (fromGlasses) return chooseGlassesLens(forcedFovDeg, glasses)
     val usableSensor = sensor?.takeIf { it.usable }
     if (forcedFovDeg.isFinite() && forcedFovDeg in LensSpec.FOV_MIN..LensSpec.FOV_MAX) {
         val aspect = usableSensor?.let(::sensorAspect) ?: DEFAULT_ASPECT
@@ -58,13 +60,24 @@ internal fun chooseLens(
             ?: LensSpec.fromHorizontalFov(forcedFovDeg)
         return ChosenLens(spec, LensOrigin.FORCED)
     }
-    if (fromGlasses) {
-        val usableGlasses = glasses?.takeIf { it.usable }
-        if (usableGlasses != null) return ChosenLens(usableGlasses, LensOrigin.SENSOR)
-        return ChosenLens(LensSpec.Default, LensOrigin.FALLBACK)
-    }
     if (usableSensor != null) return ChosenLens(usableSensor, LensOrigin.SENSOR)
     return ChosenLens(LensSpec.Default, LensOrigin.FALLBACK)
+}
+
+/**
+ * Voie lunettes : le forcé prime quand il donne un calibrage utilisable (un
+ * champ extrême sort le vertical 9:16 des bornes caméra), sinon la mire, sinon
+ * le repli estimé — jamais le capteur du téléphone.
+ */
+private fun chooseGlassesLens(forcedFovDeg: Float, glasses: LensSpec?): ChosenLens {
+    if (forcedFovDeg.isFinite() && forcedFovDeg in LensSpec.FOV_MIN..LensSpec.FOV_MAX) {
+        LensSpec.fromGlassesSettings(forcedFovDeg).takeIf { it.usable }?.let {
+            return ChosenLens(it, LensOrigin.FORCED)
+        }
+    }
+    val usableGlasses = glasses?.takeIf { it.usable }
+    if (usableGlasses != null) return ChosenLens(usableGlasses, LensOrigin.SENSOR)
+    return ChosenLens(LensSpec.Glasses, LensOrigin.FALLBACK)
 }
 
 /** Même choix, sans le drapeau (voir [chooseLens]). */

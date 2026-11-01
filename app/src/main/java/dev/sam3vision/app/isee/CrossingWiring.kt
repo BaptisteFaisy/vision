@@ -2,6 +2,7 @@ package dev.sam3vision.app.isee
 
 import android.graphics.RectF
 import dev.sam3vision.app.IseeHaptics
+import dev.sam3vision.app.glasses.GlassesVideoLink
 import dev.sam3vision.app.live.LensOrigin
 import dev.sam3vision.core.crossing.CrossingAnnouncer
 import dev.sam3vision.core.crossing.CrossingApproachWatcher
@@ -75,8 +76,9 @@ internal fun LiveProbe.setCrossingActive(
     active: Boolean,
     sensorLens: LensSpec? = null,
     onLens: ((LensOrigin) -> Unit)? = null,
+    fromGlasses: Boolean = GlassesVideoLink.live.value,
 ) {
-    configureFrom(settings, state.value.conceptsSent.ifEmpty { LivePrompts.default }, active, sensorLens, onLens)
+    configureFrom(settings, state.value.conceptsSent.ifEmpty { LivePrompts.default }, active, sensorLens, onLens, fromGlasses = fromGlasses)
 }
 
 /**

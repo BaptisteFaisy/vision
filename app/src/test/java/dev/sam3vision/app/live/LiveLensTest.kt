@@ -34,7 +34,38 @@ class LiveLensTest {
 
     @Test
     fun `côté lunettes sans calibrage le repli s'applique, pas le capteur`() {
-        assertEquals(LensSpec.Default, chosenLens(0f, sensor, glasses = null, fromGlasses = true))
+        assertEquals(LensSpec.Glasses, chosenLens(0f, sensor, glasses = null, fromGlasses = true))
+    }
+
+    @Test
+    fun `côté lunettes le forcé utilise l'aspect 9 16 du flux`() {
+        val forced = chosenLens(70f, sensor, fromGlasses = true)
+        assertEquals(70f, forced.horizontalFovDeg, 0.001f)
+        assertEquals(102.45f, forced.verticalFovDeg, 0.2f)
+        assertFalse(forced.sensorLandscape)
+    }
+
+    @Test
+    fun `côté lunettes le forcé prime sur la mire`() {
+        val mire = LensSpec(60f, 90f, sensorLandscape = false)
+        assertEquals(70f, chosenLens(70f, sensor, mire, fromGlasses = true).horizontalFovDeg, 0.001f)
+    }
+
+    @Test
+    fun `côté lunettes le forcé extrême retombe sur la mire puis le repli`() {
+        // 130° forcés : le vertical 9:16 sort à 150° des bornes caméra, inutilisable.
+        val mire = LensSpec(60f, 90f, sensorLandscape = false)
+        assertEquals(mire, chosenLens(130f, sensor, mire, fromGlasses = true))
+        assertEquals(LensSpec.Glasses, chosenLens(130f, sensor, glasses = null, fromGlasses = true))
+    }
+
+    @Test
+    fun `côté lunettes la provenance suit l'étage`() {
+        val mire = LensSpec(60f, 90f, sensorLandscape = false)
+        assertEquals(LensOrigin.FORCED, chooseLens(70f, sensor, mire, fromGlasses = true).origin)
+        assertEquals(LensOrigin.SENSOR, chooseLens(0f, sensor, mire, fromGlasses = true).origin)
+        assertEquals(LensOrigin.FALLBACK, chooseLens(0f, sensor, glasses = null, fromGlasses = true).origin)
+        assertTrue(chooseLens(0f, sensor, glasses = null, fromGlasses = true).isFallback)
     }
 
     @Test

@@ -137,6 +137,15 @@ class SettingsCodecTest {
     }
 
     @Test
+    fun `le fov lunettes survit a un aller-retour`() {
+        val custom = Settings.Default.copy(glassesFovDeg = 62.5f)
+        val roundTrip = SettingsCodec.decode(SettingsCodec.encode(custom))
+        assertEquals(62.5f, roundTrip.glassesFovDeg, 0.001f)
+        // Un fichier écrit avant cette clé reprend le repli estimé.
+        assertEquals(0f, SettingsCodec.decode("").glassesFovDeg, 0f)
+    }
+
+    @Test
     fun `la cle de narration survit a un aller-retour`() {
         val keyed = Settings.Default.copy(liveLlmApiKey = "cle-narration")
         assertEquals("cle-narration", SettingsCodec.decode(SettingsCodec.encode(keyed)).liveLlmApiKey)
