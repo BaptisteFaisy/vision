@@ -29,6 +29,12 @@ data class ApproachVerdict(
     val lateralMoving: Boolean = false,
     val lateralLabel: String? = null,
     val lateralTtcSeconds: Float? = null,
+    /** Tau porté par une piste nourrie à cette frame : le veto ([TraverseVeto])
+     * garde le maintien stale (fail-safe), la voix exige le frais (pas de
+     * « Stop » sur une piste morte que dément la frame présente). */
+    val tauFresh: Boolean = true,
+    /** Même partage pour le latéral (piste nourrie ou non). */
+    val lateralFresh: Boolean = true,
 )
 
 /**
@@ -150,7 +156,7 @@ class VehicleApproach {
         associate(vehiclesOf(detections), atMs, frameWidth, depthByBox)
         dropStale(atMs)
         evaluateMotion(motion, gyro, frameWidth, frameHeight)
-        return verdict(frameWidth, frameHeight, radialMpsByKey)
+        return verdict(frameWidth, frameHeight, radialMpsByKey, atMs)
     }
 
     /** Boîte tronquée par le cadre : sa croissance/vitesse est un artefact de (dé)clip, pas une mesure. Lue aussi par le suiveur (croissance). */
@@ -307,23 +313,28 @@ class VehicleApproach {
     }
 
     /** Le plus dangereux des rapprochements francs, silence sinon. */
-    private fun verdict(frameWidth: Int, frameHeight: Int, radialMpsByKey: Map<String, Float>?): ApproachVerdict {
-        val approach = approachOf(frameWidth, frameHeight, radialMpsByKey)
-        val lateral = lateralOf(frameWidth, frameHeight)
+    private fun verdict(frameWidth: Int, frameHeight: Int, radialMpsByKey: Map<String, Float>?, atMs: Long): ApproachVerdict {
+        val approach = approachOf(frameWidth, frameHeight, radialMpsByKey, atMs)
+        val lateral = lateralOf(frameWidth, frameHeight, atMs)
         return ApproachVerdict(
             approach.first, approach.second, approach.third,
             lateral.first, lateral.second, lateralTtcOf(frameWidth, frameHeight),
+            tauFresh = approach.fourth, lateralFresh = lateral.third,
         )
     }
+
+/** Quadruplet local (verdict + fraîcheur) : Kotlin n'a pas de Quadruple std. */
+private data class Quadruple<A, B, C, D>(val first: A, val second: B, val third: C, val fourth: D)
 
     /**
      * Rapprochement franc : plus petit tau sous [TTC_SECONDS], ou radiale
      * Kalman franche ([radialMpsByKey]) sans tau — la distance confirme,
      * jamais elle ne supprime.
      */
-    private fun approachOf(frameWidth: Int, frameHeight: Int, radialMpsByKey: Map<String, Float>?): Triple<Boolean, Float?, String?> {
+    private fun approachOf(frameWidth: Int, frameHeight: Int, radialMpsByKey: Map<String, Float>?, atMs: Long): Quadruple<Boolean, Float?, String?, Boolean> {
         var bestLabel: String? = null
         var bestTtc = Float.MAX_VALUE
+        var bestFresh = true
         var radialLabel: String? = null
         var radialBest = Float.MAX_VALUE
         for ((id, track) in tracks) {
@@ -346,11 +357,12 @@ class VehicleApproach {
             if (tau.isFinite() && tau < bestTtc) {
                 bestTtc = tau
                 bestLabel = track.label
+                bestFresh = track.lastSeenMs == atMs
             }
         }
-        if (bestLabel != null && bestTtc < TTC_SECONDS) return Triple(true, bestTtc, bestLabel)
-        if (radialLabel != null) return Triple(true, null, radialLabel)
-        return Triple(false, null, null)
+        if (bestLabel != null && bestTtc < TTC_SECONDS) return Quadruple(true, bestTtc, bestLabel, bestFresh)
+        if (radialLabel != null) return Quadruple(true, null, radialLabel, true)
+        return Quadruple(false, null, null, true)
     }
 
     /**
@@ -359,9 +371,10 @@ class VehicleApproach {
      * ([Verdict.CAMERA_MOVED]) ne conclut pas — un panoramique n'est pas
      * une voiture qui roule.
      */
-    private fun lateralOf(frameWidth: Int, frameHeight: Int): Pair<Boolean, String?> {
+    private fun lateralOf(frameWidth: Int, frameHeight: Int, atMs: Long): Triple<Boolean, String?, Boolean> {
         var bestLabel: String? = null
         var bestSpeed = 0f
+        var bestFresh = true
         for ((id, track) in tracks) {
             if (!track.motion.velocityReliable) continue
             if (lastVerdicts[id]?.verdict == Verdict.CAMERA_MOVED) continue
@@ -373,9 +386,10 @@ class VehicleApproach {
             if (speed > bestSpeed) {
                 bestSpeed = speed
                 bestLabel = track.label
+                bestFresh = track.lastSeenMs == atMs
             }
         }
-        return (bestLabel != null) to bestLabel
+        return Triple(bestLabel != null, bestLabel, bestFresh)
     }
 
     /** TTC latéral (largeur / vitesse latérale), `null` sans latéral franc ([MIN_LATERAL_RATIO]). */
@@ -467,25 +481,3 @@ class VehicleApproach {
         }
     }
 }
-
-/**
- * Seuils d'expansion des véhicules (PISTE2) : un véhicule est un danger
- * grave — seuil de grossissement abaissé (0,02), couloir élargi (0,30, un
- * véhicule large menace même excentré), TTC plafonné à 4 s. Priors à recaler
- * sur téléphone, comme [VehicleApproach.TTC_SECONDS].
- */
-val VEHICLE_APPROACH_THRESHOLDS = ApproachThresholds(
-    minGrowthPerSec = 0.02f,
-    centerMargin = 0.30f,
-    maxTtcSec = 4f,
-)
-
-/**
- * Seuils d'expansion par label (PISTE2) : [vehicle] pour les labels de
- * [VehicleConcepts], [person] pour tout le reste.
- */
-fun approachThresholdsFor(
-    label: String,
-    vehicle: ApproachThresholds = VEHICLE_APPROACH_THRESHOLDS,
-    person: ApproachThresholds = ApproachThresholds(),
-): ApproachThresholds = if (VehicleConcepts.isVehicle(label)) vehicle else person
