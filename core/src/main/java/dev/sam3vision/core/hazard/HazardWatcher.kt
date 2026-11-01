@@ -2,6 +2,7 @@ package dev.sam3vision.core.hazard
 
 import dev.sam3vision.core.distance.DistanceMeter
 import dev.sam3vision.core.distance.DistanceReading
+import dev.sam3vision.core.distance.DistanceText
 import dev.sam3vision.core.live.GuidanceWord
 import dev.sam3vision.core.live.PositionText
 import dev.sam3vision.core.live.SteeringCap
@@ -21,13 +22,13 @@ data class HazardAlt(
 /**
  * Signal danger d'une frame : [detected] quand une personne ou du mobilier
  * suivi est dans le couloir marché à [HazardWatcher.HAZARD_METERS] ou moins
- * ([HazardWatcher.PERSON_METERS] pour une personne, 15 m droit devant pour
- * la personne et le poteau — [HazardWatcher.PERSON_FAR_METERS] et
- * [HazardWatcher.POLE_FAR_METERS], ordre user du 01/11), [meters] sa
- * distance, [label] son libellé SAM brut (la phrase y lit le nom parlé),
- * [centerX] son centre normalisé (l'heure du cadran, `null` = inconnue).
- * La personne prime : présente, elle est retenue même si une barrière est
- * plus proche ([alt] la garde en repli) ; sinon le plus proche gagne.
+ * ([HazardWatcher.PERSON_METERS] pour une personne), [meters] sa distance,
+ * [label] son libellé SAM brut (la phrase y lit le nom parlé), [centerX]
+ * son centre normalisé (l'heure du cadran, `null` = inconnue). La personne
+ * prime : présente, elle est retenue même si une barrière est plus proche
+ * ([alt] la garde en repli) ; sinon le plus proche gagne. SPEC v4 : la
+ * personne parle à moins de 10 m, le mobilier à moins de 6 m, le poteau
+ * parle (niveau 7) ; la borne et le portail ne sont plus reconnus.
  */
 data class HazardSignal(
     val detected: Boolean,
@@ -113,7 +114,10 @@ data class HazardSignal(
  * [kind] sa sorte (l'arbitre voix y lit le rang : personne P3, barrière
  * P4, divers avec le reste), [safetyPhrase] l'alerte immédiate lue par
  * l'arbitre (`null` pour la personne : le mot imminent part en clip, la
- * fusion casserait le clipId — la barrière reste douce).
+ * fusion casserait le clipId — la barrière reste douce), [level] le niveau
+ * VoiceBus v4 (2 la personne, 4 les grillages/murs/barrières, 7 les
+ * poteaux et divers) et [antiRepeatKey] sa clé AntiRepeat v4
+ * (`human-soft`, `human-imminent`, `fence`, `pole`).
  */
 data class HazardCue(
     val phrase: String,
@@ -127,6 +131,10 @@ data class HazardCue(
      * **personne**, pas une par côté toutes les 20 s (audit foule du 01/11).
      */
     val trackId: Int? = null,
+    /** Niveau VoiceBus v4 (voir [HazardWatcher], 2/4/7 dehors). */
+    val level: Int = HazardWatcher.LEVEL_PERSON,
+    /** Clé AntiRepeat v4 de l'annonce (voir [HazardWatcher]). */
+    val antiRepeatKey: String = HazardWatcher.KEY_HUMAN_SOFT,
 )
 
 /**
@@ -176,11 +184,12 @@ object HazardText {
 }
 
 /**
- * Lissage temporel du [HazardSignal], miroir de `StairWatcher` : un positif
- * isolé ne parle pas, il faut [confirmFrames] positifs consécutifs **de la
- * même sorte** (personne ou non-personne : l'alternance ne confirme rien),
- * puis silence pendant [cooldownMs] (dit-une-fois, cooldown partagé :
- * pas de bavardage même si les humains bougent).
+ * Lissage temporel du [HazardSignal] (SPEC v4), miroir de `StairWatcher` :
+ * un positif isolé ne parle pas, il faut [confirmFrames] positifs
+ * consécutifs **de la même sorte** (personne ou non-personne :
+ * l'alternance ne confirme rien), puis silence par groupe (miroir de la
+ * table AntiRepeat v4 : personne douce 2 s, grillages/murs/barrières 4 s,
+ * poteaux et divers 2 s — un groupe ne fait plus taire les autres).
  *
  * Pur JVM et testé. Doux par défaut (`urgent = false`, attend le silence,
  * [HazardText.personPhrase] : le seul mot d'évitement) ; la personne imminente (à
@@ -202,8 +211,14 @@ class HazardWatcher(
     /** Non-personnes consécutives en cours (une personne remet à zéro). */
     private var otherHits: Int = 0
 
-    /** Instant de la dernière annonce douce, [NO_INSTANT] si aucune. */
-    private var lastCueAtMs: Long = NO_INSTANT
+    /** Instant de la dernière annonce douce personne, [NO_INSTANT] si aucune. */
+    private var lastPersonMs: Long = NO_INSTANT
+
+    /** Instant de la dernière annonce grillage/mur/barrière, [NO_INSTANT] si aucune. */
+    private var lastFenceMs: Long = NO_INSTANT
+
+    /** Instant de la dernière annonce poteau/divers, [NO_INSTANT] si aucune. */
+    private var lastPoleMs: Long = NO_INSTANT
 
     /** Personne déjà dite, en attente de ré-armement ([PERSON_REARM_FRAMES] sans personne). */
     private var personSpoken: Boolean = false
@@ -219,20 +234,22 @@ class HazardWatcher(
 
     /** Dernière annonce douce, `null` si aucune (le mot imminent ne compte pas). */
     val lastAlertMs: Long?
-        get() = lastCueAtMs.takeIf { it != NO_INSTANT }
+        get() = maxOf(lastPersonMs, lastFenceMs, lastPoleMs).takeIf { it != NO_INSTANT }
 
-    /** Candidat parlé de la frame : sorte, nom, distance et centre (principal ou repli). */
+    /** Candidat parlé de la frame : sorte, nom, distance, centre, niveau v4 (principal ou repli). */
     private data class Candidate(
         val kind: HazardKind,
         val name: HazardConcepts.HazardName,
         val meters: Float?,
         val centerX: Float?,
+        val level: Int,
         val trackId: Int? = null,
     )
 
     /**
      * Alimente le lissage avec le [signal] de la frame à [nowMs] : l'annonce
-     * quand le compte de confirmation est atteint hors cooldown, `null` sinon.
+     * quand le compte de confirmation est atteint hors silence du groupe,
+     * `null` sinon.
      */
     fun onSignal(signal: HazardSignal, nowMs: Long, language: SpeechLanguage = SpeechLanguage.DEFAULT): HazardCue? {
         trackPerson(signal)
@@ -262,7 +279,8 @@ class HazardWatcher(
      * Candidat de la frame : le signal retenu, sauf personne douce déjà
      * dite (le repli parle alors à sa place), `null` si rien à confirmer.
      * La personne imminente contourne le verrou dit-une-fois (doux puis
-     * approche = le mot parle, sinon silence critique).
+     * approche = le mot parle, sinon silence critique). Le principal comme
+     * le repli portent [HazardConcepts.isSpoken].
      */
     private fun candidateOf(signal: HazardSignal): Candidate? {
         if (!signal.detected) return null
@@ -275,16 +293,17 @@ class HazardWatcher(
             if (!HazardConcepts.isSpoken(altLabel)) return null
             val altName = HazardConcepts.nameOf(altLabel) ?: return null
             return Candidate(HazardConcepts.kindOf(altLabel), altName, alt.meters, alt.centerX,
-                trackId = signal.trackId)
+                HazardConcepts.levelOf(altLabel), trackId = signal.trackId)
         }
         return Candidate(HazardConcepts.kindOf(label), name, signal.meters, signal.centerX,
-            trackId = signal.trackId)
+            HazardConcepts.levelOf(label), trackId = signal.trackId)
     }
 
     /**
      * Personne : l'imminente dit le mot seul d'évitement dès la 1re frame
      * (clip `guide_*`, répété toutes les [IMMINENT_REPEAT_MS], immédiat au
-     * changement de mot) ; sinon douce confirmée, dite une fois.
+     * changement de mot) ; sinon douce confirmée, dite une fois par approche
+     * ([cooldownMs] entre deux approches, SPEC v4 : 2 s).
      */
     private fun onPerson(candidate: Candidate, nowMs: Long, language: SpeechLanguage): HazardCue? {
         otherHits = 0
@@ -297,40 +316,52 @@ class HazardWatcher(
             personSpoken = true
             personQuiet = 0
             personHits = 0
-            return HazardCue(word, meters, urgent = true, kind = HazardKind.PERSON, trackId = candidate.trackId)
+            return HazardCue(word, meters, urgent = true, kind = HazardKind.PERSON,
+                trackId = candidate.trackId, level = LEVEL_PERSON, antiRepeatKey = KEY_HUMAN_IMMINENT)
         }
         personHits++
         if (personHits < confirmFrames) return null
-        if (lastCueAtMs != NO_INSTANT && nowMs - lastCueAtMs < cooldownMs) return null
-        lastCueAtMs = nowMs
+        if (lastPersonMs != NO_INSTANT && nowMs - lastPersonMs < cooldownMs) return null
+        lastPersonMs = nowMs
         personHits = 0
         personSpoken = true
         personQuiet = 0
         return HazardCue(
             HazardText.personPhrase(language, candidate.centerX),
             meters, kind = HazardKind.PERSON, trackId = candidate.trackId,
+            level = LEVEL_PERSON, antiRepeatKey = KEY_HUMAN_SOFT,
         )
     }
 
-    /** Non-personne : doux confirmé, cooldown partagé avec la personne douce. */
+    /**
+     * Non-personne : doux confirmé, silence du groupe (grillages/murs/
+     * barrières [FENCE_COOLDOWN_MS], poteaux et divers [cooldownMs]).
+     */
     private fun onOther(candidate: Candidate, nowMs: Long, language: SpeechLanguage): HazardCue? {
         personHits = 0
         otherHits++
         if (otherHits < confirmFrames) return null
-        if (lastCueAtMs != NO_INSTANT && nowMs - lastCueAtMs < cooldownMs) return null
-        lastCueAtMs = nowMs
+        val fence = candidate.level == LEVEL_FENCE
+        val gap = if (fence) FENCE_COOLDOWN_MS else cooldownMs
+        val last = if (fence) lastFenceMs else lastPoleMs
+        if (last != NO_INSTANT && nowMs - last < gap) return null
+        if (fence) lastFenceMs = nowMs else lastPoleMs = nowMs
         otherHits = 0
         return HazardCue(
             HazardText.phrase(candidate.name, language, candidate.centerX),
             candidate.meters, kind = candidate.kind, trackId = candidate.trackId,
+            level = candidate.level,
+            antiRepeatKey = if (fence) KEY_FENCE else KEY_POLE,
         )
     }
 
-    /** Oublie les comptes, l'annonce et le mot imminent (nouvelle séance de direct). */
+    /** Oublie les comptes, les annonces et le mot imminent (nouvelle séance de direct). */
     fun reset() {
         personHits = 0
         otherHits = 0
-        lastCueAtMs = NO_INSTANT
+        lastPersonMs = NO_INSTANT
+        lastFenceMs = NO_INSTANT
+        lastPoleMs = NO_INSTANT
         personSpoken = false
         personQuiet = 0
         lastImminentWord = null
@@ -341,14 +372,17 @@ class HazardWatcher(
         /** Positifs consécutifs avant d'annoncer (un isolé = bruit). */
         const val DEFAULT_CONFIRM_FRAMES = 2
 
-        /** Silence entre deux annonces douces (dit-une-fois : pas de bavardage). */
-        const val DEFAULT_COOLDOWN_MS = 10_000L
+        /** Silence entre deux annonces douces personne, poteau ou divers (SPEC v4 : 2 s). */
+        const val DEFAULT_COOLDOWN_MS = 2_000L
 
-        /** Au-delà de cette distance (m), le mobilier ne fait pas parler. */
-        const val HAZARD_METERS = 3f
+        /** Silence entre deux annonces grillages/murs/barrières (SPEC v4 : 4 s). */
+        const val FENCE_COOLDOWN_MS = 4_000L
 
-        /** Au-delà de cette distance (m), une personne ne fait pas parler (ordre user : 4 m). */
-        const val PERSON_METERS = 4f
+        /** Au-delà de cette distance (m), le mobilier ne fait pas parler (SPEC v4 : 6 m). */
+        const val HAZARD_METERS = 6f
+
+        /** Au-delà de cette distance (m), une personne ne fait pas parler (SPEC v4 : 10 m). */
+        const val PERSON_METERS = 10f
 
         /** Personne à cette distance (m) ou moins : mot seul dès la 1re frame, urgent. */
         const val PERSON_FAST_METERS = 2f
@@ -368,6 +402,27 @@ class HazardWatcher(
 
         /** Frames sans personne avant de ré-armer l'annonce (un clignotement ne ré-arme pas). */
         const val PERSON_REARM_FRAMES = 3
+
+        /** Niveau VoiceBus v4 : humains (phrase + cadran + distance, imminent ≤ 2 m). */
+        const val LEVEL_PERSON = 2
+
+        /** Niveau VoiceBus v4 : grillages, murs et barrières (< 6 m). */
+        const val LEVEL_FENCE = 4
+
+        /** Niveau VoiceBus v4 : poteaux, mobilier vertical et divers (< 6 m). */
+        const val LEVEL_POLE = 7
+
+        /** Clé AntiRepeat v4 : personne douce (2 s). */
+        const val KEY_HUMAN_SOFT = "human-soft"
+
+        /** Clé AntiRepeat v4 : personne imminente (immédiat, répété à 300 ms). */
+        const val KEY_HUMAN_IMMINENT = "human-imminent"
+
+        /** Clé AntiRepeat v4 : grillages, murs et barrières (4 s). */
+        const val KEY_FENCE = "fence"
+
+        /** Clé AntiRepeat v4 : poteaux, mobilier vertical et divers (2 s). */
+        const val KEY_POLE = "pole"
 
         /** Aucune annonce émise encore. */
         private const val NO_INSTANT = Long.MIN_VALUE

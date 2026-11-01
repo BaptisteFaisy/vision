@@ -11,7 +11,8 @@ import dev.sam3vision.core.speech.SpeechLanguage
  *
  * En montée, [lineCount] est le compte **lissé** (médiane de la tendance, voir
  * [StairWatcher]) ; [meters] porte la profondeur quand elle est connue
- * (dernière marche à moins d'un mètre).
+ * (dernière marche à moins d'un mètre). [level] est le niveau VoiceBus v4
+ * (6, escaliers) et [antiRepeatKey] sa clé AntiRepeat v4 (`stairs`, 2 s).
  */
 data class StairCue(
     val phrase: String,
@@ -19,6 +20,10 @@ data class StairCue(
     val lineCount: Int,
     val direction: StairDirection = StairDirection.Unknown,
     val meters: Float? = null,
+    /** Niveau VoiceBus v4 : escaliers. */
+    val level: Int = StairWatcher.LEVEL,
+    /** Clé AntiRepeat v4 : `stairs` (2 s). */
+    val antiRepeatKey: String = StairWatcher.KEY_STAIRS,
 )
 
 /**
@@ -117,14 +122,14 @@ object StairText {
 }
 
 /**
- * Lissage temporel du [StairSignal] : un positif isolé ne parle pas, il faut
- * [confirmFrames] positifs consécutifs, puis silence pendant [cooldownMs]
- * (miroir du `VOICE_COOLDOWN` MIT, 3 s, monté à 10 s : un escalier ne bouge
- * pas, inutile de le répéter à chaque pas).
+ * Lissage temporel du [StairSignal] (SPEC v4 : escaliers niveau 6, jalons
+ * 4/2/1 m, nombre de marches dit, silence 2 s) : un positif isolé ne parle
+ * pas, il faut [confirmFrames] positifs consécutifs, puis silence pendant
+ * [cooldownMs].
  *
  * Mode montée : une fois l'escalier annoncé, le compteur Canny lissé pilote un
  * compte à rebours (« Plus que N marches. ») puis la dernière marche, au
- * cooldown court [climbCooldownMs] (2,5 s) au lieu de 10 s — pendant qu'on
+ * cooldown court [climbCooldownMs] (2 s) au lieu du standard — pendant qu'on
  * monte, le décor change à chaque pas. Le lissage est la médiane des
  * [trendFrames] derniers comptes (2-3 frames, pas le brut : un pic isolé ne
  * fait ni décrémenter ni conclure) ; la tendance traverse le seuil du
@@ -262,6 +267,7 @@ class StairWatcher(
         markApproach(nowMs)
         return StairCue(
             StairText.phrase(language, direction, centerX), signal.confidence, signal.lineCount, direction, meters,
+            level = LEVEL, antiRepeatKey = KEY_STAIRS,
         )
     }
 
@@ -302,6 +308,7 @@ class StairWatcher(
             return StairCue(
                 StairText.lastStep(language, direction), signal.confidence,
                 smoothed ?: signal.lineCount, direction, meters,
+                level = LEVEL, antiRepeatKey = KEY_STAIRS,
             )
         }
         val remaining = smoothed ?: return null
@@ -309,6 +316,7 @@ class StairWatcher(
         return StairCue(
             StairText.countdown(remaining, language, direction), signal.confidence,
             remaining, direction, meters,
+            level = LEVEL, antiRepeatKey = KEY_STAIRS,
         )
     }
 
@@ -353,6 +361,7 @@ class StairWatcher(
         return StairCue(
             StairText.distancePhrase(language, direction, target),
             signal.confidence, signal.lineCount, direction, meters,
+            level = LEVEL, antiRepeatKey = KEY_STAIRS,
         )
     }
 
@@ -417,11 +426,11 @@ class StairWatcher(
         /** Positifs consécutifs avant d'annoncer (un isolé = bruit). */
         const val DEFAULT_CONFIRM_FRAMES = 3
 
-        /** Silence entre deux annonces standard (l'escalier ne bouge pas). */
-        const val DEFAULT_COOLDOWN_MS = 10_000L
+        /** Silence entre deux annonces standard (SPEC v4 : 2 s, miroir de la table AntiRepeat). */
+        const val DEFAULT_COOLDOWN_MS = 2_000L
 
-        /** Silence entre deux annonces de montée (le décor change à chaque pas). */
-        const val CLIMB_COOLDOWN_MS = 2_500L
+        /** Silence entre deux annonces de montée (SPEC v4 : 2 s — le décor change à chaque pas). */
+        const val CLIMB_COOLDOWN_MS = 2_000L
 
         /** Fenêtre du lissage : 3 derniers comptes (tendance 2-3 frames, pas le brut). */
         const val TREND_FRAMES = 3
@@ -438,7 +447,7 @@ class StairWatcher(
         /** Profondeur du palier de la dernière marche (mètres). */
         const val LAST_STEP_METERS = 1f
 
-        /** Paliers du compte à rebours d'approche (m), du plus loin au plus proche. */
+        /** Paliers du compte à rebours d'approche (m), du plus loin au plus proche (SPEC v4 : 4/2/1). */
         val COUNTDOWN_METERS = listOf(4f, 2f, 1f)
 
         /**
@@ -446,6 +455,12 @@ class StairWatcher(
          * T + marge (prior, à valider rue comme le §24 bordure).
          */
         const val REARM_MARGIN_METERS = 0.2f
+
+        /** Niveau VoiceBus v4 : escaliers (jalons 4/2/1 + nombre de marches dit). */
+        const val LEVEL = 6
+
+        /** Clé AntiRepeat v4 : escaliers (2 s). */
+        const val KEY_STAIRS = "stairs"
 
         /** Aucune annonce émise encore. */
         private const val NO_INSTANT = Long.MIN_VALUE

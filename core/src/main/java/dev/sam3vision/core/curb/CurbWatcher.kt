@@ -22,7 +22,8 @@ enum class CurbEdge { Up, Down, Uncertain }
  * palier, [urgent] vrai pour les seuls paliers proches 0,7 / 0,5 m,
  * [safetyPhrase] l'alerte immédiate (« Bordure à 0,5 mètre. ») pour le seul
  * palier 0,5 m (`null` pour la détection, les paliers doux et le bateau —
- * info douce, pas d'alerte).
+ * info douce, pas d'alerte), [level] le niveau VoiceBus v4 (5, bordures) et
+ * [antiRepeatKey] sa clé AntiRepeat v4 (`curb`, 2 s).
  */
 data class CurbCue(
     val phrase: String,
@@ -30,6 +31,10 @@ data class CurbCue(
     val tier: CurbTier = CurbTier.FAR,
     val urgent: Boolean = false,
     val safetyPhrase: String? = null,
+    /** Niveau VoiceBus v4 : bordures. */
+    val level: Int = CurbWatcher.LEVEL,
+    /** Clé AntiRepeat v4 : `curb` (2 s). */
+    val antiRepeatKey: String = CurbWatcher.KEY_CURB,
 )
 
 /**
@@ -141,9 +146,10 @@ object CurbText {
 }
 
 /**
- * Lissage temporel du [CurbSignal], miroir de `StairWatcher` : un positif
+ * Lissage temporel du [CurbSignal] (SPEC v4 : bordures à moins de 6 m,
+ * niveau 5, silence 2 s), miroir de `StairWatcher` : un positif
  * isolé ne parle pas, il faut [confirmFrames] positifs consécutifs, puis
- * silence pendant [cooldownMs] (un trottoir ne bouge pas).
+ * silence pendant [cooldownMs].
  *
  * Détection dite aussitôt confirmée (« Bordure détectée. », une fois par
  * approche), puis compte à rebours [COUNTDOWN_METERS] (2 / 1,5 / 1 / 0,7 /
@@ -247,7 +253,8 @@ class CurbWatcher(
         flatSpoken = true
         lastCueAtMs = nowMs
         flatHits = 0
-        return CurbCue(CurbText.flatPhrase(language), signal.meters, CurbTier.NONE, urgent = false)
+        return CurbCue(CurbText.flatPhrase(language), signal.meters, CurbTier.NONE, urgent = false,
+            level = LEVEL, antiRepeatKey = KEY_CURB)
     }
 
     /**
@@ -288,6 +295,8 @@ class CurbWatcher(
             CurbTier.FAR,
             urgent = false,
             safetyPhrase = null,
+            level = LEVEL,
+            antiRepeatKey = KEY_CURB,
         )
     }
 
@@ -327,6 +336,8 @@ class CurbWatcher(
             if (near) CurbTier.NEAR else CurbTier.FAR,
             urgent = near,
             safetyPhrase = phrase.takeIf { target == SAFETY_PALIER_METERS },
+            level = LEVEL,
+            antiRepeatKey = KEY_CURB,
         )
     }
 
@@ -348,8 +359,8 @@ class CurbWatcher(
         /** Positifs consécutifs avant d'annoncer (un isolé = bruit). */
         const val DEFAULT_CONFIRM_FRAMES = 2
 
-        /** Silence entre deux annonces douces (4 s, audit 31/10 : re-parler vite rue). */
-        const val DEFAULT_COOLDOWN_MS = 4_000L
+        /** Silence entre deux annonces (SPEC v4 : 2 s, miroir de la table AntiRepeat). */
+        const val DEFAULT_COOLDOWN_MS = 2_000L
 
         /**
          * Tolérance au clignotement SAM : jusqu'à [GRACE_FRAMES] frames consécutives
@@ -357,12 +368,12 @@ class CurbWatcher(
          * (comptes, verrous et dernière annonce inchangés) et rendent `null` ; la 3e frame
          * consécutive sans détection ré-arme comme avant, puis le bateau se traite comme avant.
          * Sans cette grâce, un seul trou remettait la détection à zéro et la reprise retombait
-         * sur le cooldown 10 s : compte à rebours inaccessible pendant toute une approche.
+         * sur le cooldown : compte à rebours inaccessible pendant toute une approche.
          */
         const val GRACE_FRAMES = 2
 
-        /** Au-delà de cette distance (m), un bord n'est même plus suivi (détection dite dès confirmée). */
-        const val CURB_METERS = 3f
+        /** Au-delà de cette distance (m), un bord n'est même plus suivi (SPEC v4 : 6 m). */
+        const val CURB_METERS = 6f
 
         /**
          * Bas de boîte minimal (fraction de hauteur) : à 3 m le bord tombe en
@@ -397,6 +408,12 @@ class CurbWatcher(
 
         /** Après un palier proche dit, le bateau reste muet (traversée du bord). */
         const val FLAT_AFTER_STEP_SUPPRESS_MS = 10_000L
+
+        /** Niveau VoiceBus v4 : bordures (< 6 m). */
+        const val LEVEL = 5
+
+        /** Clé AntiRepeat v4 : bordures (2 s). */
+        const val KEY_CURB = "curb"
 
         /** Aucune annonce émise encore. */
         private const val NO_INSTANT = Long.MIN_VALUE

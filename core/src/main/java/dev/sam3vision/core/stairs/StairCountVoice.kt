@@ -3,18 +3,20 @@ package dev.sam3vision.core.stairs
 import dev.sam3vision.core.speech.SpeechLanguage
 
 /**
- * Voix du compteur de marches : quand un escalier est reconnu, dit combien de
- * marches sont vues (« 5 marches. »), au plus toutes les [COUNT_MS] à chaque
- * changement — et le même compte se répète toutes les [REPEAT_MS] tant que
- * l'escalier reste vu (dans l'escalier, le compte reste utile ; un passage
- * devant, plus bref, ne déclenche pas la répétition).
+ * Voix du compteur de marches (SPEC v4 : le nombre de marches est dit quand
+ * l'escalier est reconnu) : dit combien de marches sont vues (« 5 marches. »),
+ * au plus toutes les [COUNT_MS] à chaque changement — et le même compte se
+ * répète toutes les [REPEAT_MS] tant que l'escalier reste vu (dans
+ * l'escalier, le compte reste utile ; un passage devant, plus bref, ne
+ * déclenche pas la répétition).
  *
  * La voix synthétise en ~1 s : répéter à 300 ms l'étoufferait et bloquerait
- * les urgences — d'où le silence d'une seconde entre deux répétitions, et
- * deux comptes différents espacés d'au moins [COUNT_MS] (un pic isolé du
- * compteur Canny ne fait pas bégayer). Un compte à 0 sur un positif = compteur
- * indisponible (voie labels SAM, qui nomme sans compter) : silence, comme
- * [StairWatcher] — 0 n'est pas « zéro marche », c'est « non compté ».
+ * les urgences — d'où le silence de deux secondes entre deux répétitions
+ * (SPEC v4 : escaliers 2 s), et deux comptes différents espacés d'au moins
+ * [COUNT_MS] (un pic isolé du compteur Canny ne fait pas bégayer). Un compte
+ * à 0 sur un positif = compteur indisponible (voie labels SAM, qui nomme sans
+ * compter) : silence, comme [StairWatcher] — 0 n'est pas « zéro marche »,
+ * c'est « non compté ».
  *
  * Pur JVM et testé.
  */
@@ -63,10 +65,10 @@ class StairCountVoice {
         const val COUNT_MS = 300L
 
         /**
-         * Silence avant de redire le même compte : 1 s, le temps de la
-         * synthèse — dans l'escalier, le compte suit chaque pas sans bégayer.
+         * Silence avant de redire le même compte : 2 s (SPEC v4 : escaliers
+         * 2 s) — dans l'escalier, le compte suit chaque pas sans bégayer.
          */
-        const val REPEAT_MS = 1_000L
+        const val REPEAT_MS = 2_000L
 
         /** Aucun compte dit encore (ou escalier perdu de vue). */
         private const val NO_COUNT = -1
