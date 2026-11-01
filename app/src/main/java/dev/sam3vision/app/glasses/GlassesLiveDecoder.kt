@@ -176,6 +176,12 @@ class GlassesLiveDecoder(
     fun setSurface(next: Surface?) = synchronized(lock) { surface = next }
 
     /**
+     * L'accueil regarde-t-il ? Sans surface, `render` refuse sans rien tenter :
+     * ce n'est pas un échec de décodage, et la mesure B2 ne doit pas le compter.
+     */
+    val hasSurface: Boolean get() = synchronized(lock) { surface != null }
+
+    /**
      * Rend une frame copiée ; `true` = une image est affichée (l'accueil peut marquer le
      * direct vivant). Une frame de config codec rend `false` : elle prépare, sans image.
      */

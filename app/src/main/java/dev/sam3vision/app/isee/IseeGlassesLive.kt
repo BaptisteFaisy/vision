@@ -2,6 +2,7 @@ package dev.sam3vision.app.isee
 
 import android.graphics.Matrix
 import android.graphics.SurfaceTexture
+import android.os.SystemClock
 import android.view.Surface
 import android.view.TextureView
 import androidx.compose.runtime.Composable
@@ -17,6 +18,7 @@ import dev.sam3vision.app.glasses.GlassesVideoLink
 import dev.sam3vision.app.glasses.VideoSize
 import dev.sam3vision.app.glasses.textureViewCrop
 import dev.sam3vision.app.targetSize
+import dev.sam3vision.core.live.LinkDrop
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
 
@@ -38,9 +40,19 @@ internal fun GlassesLive(modifier: Modifier) {
             // Un essai par poussée, sans attendre : le flux bat à 15 i/s, la suivante
             // réessaie ~66 ms plus tard. Boucler ici affamerait le décodeur (constaté :
             // 200 entrées en 4 min au lieu de 15/s, première sortie à +4 min).
+            // Le rendu est daté à ses bornes (même horloge monotone que
+            // `arrivedAtNs`) : c'est l'étage `dec` de la mesure B2.
             GlassesVideoLink.frames.collect { box ->
                 val frame = box?.frame ?: return@collect
-                if (decoder.render(frame)) GlassesVideoLink.markRendered(box.seq)
+                val decodeStartNs = SystemClock.elapsedRealtimeNanos()
+                val rendered = decoder.render(frame)
+                val decodeEndNs = SystemClock.elapsedRealtimeNanos()
+                if (rendered) {
+                    GlassesVideoLink.noteRendered(box.seq, frame, decodeStartNs, decodeEndNs)
+                } else if (frame.compressed && !frame.codecConfig && decoder.hasSurface) {
+                    // H.265 nominal, accueil à l'écoute, rien de sorti : décodeur muet.
+                    GlassesVideoLink.markDrop(LinkDrop.DECODE_FAIL)
+                }
             }
         }
     }
@@ -127,7 +139,10 @@ private fun glassesListener(decoder: GlassesLiveDecoder, attached: AttachedSurfa
             return true
         }
 
-        override fun onSurfaceTextureUpdated(texture: SurfaceTexture) = Unit
+        // Chaque image affichée ferme la mesure B2 (`aff` = pixel − sortie décodeur).
+        override fun onSurfaceTextureUpdated(texture: SurfaceTexture) {
+            GlassesVideoLink.markPixel()
+        }
     }
 
 /** Recadre la vue sur la vidéo ; reporté après le layout si la vue n'a pas encore de taille. */

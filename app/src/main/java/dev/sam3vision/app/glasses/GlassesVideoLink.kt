@@ -1,6 +1,11 @@
 package dev.sam3vision.app.glasses
 
+import android.os.SystemClock
 import android.util.Log
+import dev.sam3vision.core.live.GlassesClockOffset
+import dev.sam3vision.core.live.GlassesLinkStats
+import dev.sam3vision.core.live.LinkDrop
+import dev.sam3vision.core.live.TimingsText
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
@@ -49,6 +54,9 @@ data class VideoSize(val width: Int, val height: Int)
 
 /** Journal du direct (recette : `logcat -s GlassesVideo`). */
 private const val TAG = "GlassesVideo"
+
+/** Journal de la mesure du lien (recette B1/B2 : `logcat -s GlassesLink`). */
+private const val LINK_TAG = "GlassesLink"
 
 /**
  * Une poussée de frame, numérotée : deux poussées identiques (le mock rejoue la même image)
@@ -141,6 +149,7 @@ object GlassesVideoLink {
     fun push(frame: GlassesFrame) {
         seq += 1
         _frames.value = GlassesFrameBox(seq, frame)
+        synchronized(timingLock) { noteArrivalLocked(frame, seq) }
     }
 
     /**
@@ -159,6 +168,131 @@ object GlassesVideoLink {
         if (seq >= 0L) _renderedSeq.value = seq
     }
 
+    // ---- Mesure du lien (B1/B2) -------------------------------------------------
+    // Trois threads s'y croisent (pompe SDK → push, rendu → noteRendered, UI →
+    // markPixel) : tout ce bloc vit sous [timingLock]. Horloge unique
+    // `elapsedRealtimeNanos`, la même que `arrivedAtNs` (jamais `nanoTime` ni
+    // `currentTimeMillis` : deux bases différentes fausseraient les étages).
+
+    /** Rendu daté en attente de son pixel : le chaînon entre décodeur et affichage. */
+    private data class PendingLink(
+        val seq: Long,
+        val linkUs: Long,
+        val decodeUs: Long,
+        val decodeEndNs: Long,
+    )
+
+    private val timingLock = Any()
+
+    /** Nanosecondes par microseconde (tous les étages du lien sont en µs). */
+    private const val NS_PER_US = 1_000L
+
+    /** Cadence du résumé [LINK_TAG] : 1 Hz au plus, comme la recette l'exige. */
+    private const val SUMMARY_NS = 1_000_000_000L
+    private val clockOffset = GlassesClockOffset()
+    private val linkStats = GlassesLinkStats()
+    private var awaitingNote = false
+    private var lastLinkSeq = -1L
+    private var lastLinkUs = -1L
+    private var pending: PendingLink? = null
+    private var lastSummaryNs = 0L
+
+    /**
+     * Arrivée d'une poussée : alimente le décalage pts ↔ téléphone (B1) et compte
+     * les abandons d'amont. Une poussée décodable qui en écrase une autre jamais
+     * rendue est une conflation, pas une mesure manquante.
+     */
+    private fun noteArrivalLocked(frame: GlassesFrame, pushedSeq: Long) {
+        if (frame.codecConfig) {
+            linkStats.drop(LinkDrop.CODEC_CONFIG)
+            return
+        }
+        if (frame.width <= 0 || frame.height <= 0 || frame.bytes.isEmpty()) {
+            linkStats.drop(LinkDrop.DIMENSIONS)
+            return
+        }
+        if (awaitingNote) linkStats.drop(LinkDrop.CONFLATED)
+        awaitingNote = true
+        lastLinkSeq = pushedSeq
+        lastLinkUs = observeLinkUs(frame)
+    }
+
+    /** Retard variable radio (µs) d'une frame datée, `-1` si elle ne l'est pas (mock, banc). */
+    private fun observeLinkUs(frame: GlassesFrame): Long {
+        if (frame.arrivedAtNs <= 0L) return -1L
+        val jitterNs = clockOffset.observe(frame.arrivedAtNs, frame.presentationTimeUs) ?: return -1L
+        return (jitterNs + NS_PER_US / 2L) / NS_PER_US
+    }
+
+    /**
+     * Une frame vient d'être rendue, bornes du rendu à l'appui ([decodeStartNs],
+     * [decodeEndNs] monotones) : allume le direct comme [markRendered], puis arme
+     * le pixel. Un rendu précédent jamais affiché est conflé (l'afficheur ne
+     * montre que la dernière image). Une frame non datée (mock, banc) allume le
+     * direct sans mesure : jamais de chiffre inventé.
+     */
+    fun noteRendered(seq: Long, frame: GlassesFrame, decodeStartNs: Long, decodeEndNs: Long) {
+        markRendered(seq)
+        synchronized(timingLock) {
+            awaitingNote = false
+            pending?.let { linkStats.drop(LinkDrop.CONFLATED) }
+            pending = null
+            val linkUs = if (seq == lastLinkSeq) lastLinkUs else observeLinkUs(frame)
+            if (linkUs < 0L || decodeEndNs < decodeStartNs) return
+            val decodeUs = (decodeEndNs - decodeStartNs + NS_PER_US / 2L) / NS_PER_US
+            pending = PendingLink(seq, linkUs, decodeUs, decodeEndNs)
+        }
+    }
+
+    /**
+     * Pixel affiché (`onSurfaceTextureUpdated`) : ferme la frame en attente —
+     * `aff` = pixel − sortie décodeur — et journalise sous [LINK_TAG] la ligne
+     * per-frame ([TimingsText.link]) plus le résumé à 1 Hz au plus
+     * ([GlassesLinkStats.line]). [atNs] = 0 = maintenant (même idiome que
+     * `ScreenTimings.beginFrame`) ; sans rendu en attente, ne fait rien.
+     */
+    fun markPixel(atNs: Long = 0L) {
+        val nowNs = if (atNs > 0L) atNs else SystemClock.elapsedRealtimeNanos()
+        synchronized(timingLock) {
+            val done = pending ?: return
+            pending = null
+            if (nowNs < done.decodeEndNs) return
+            val displayUs = (nowNs - done.decodeEndNs + NS_PER_US / 2L) / NS_PER_US
+            linkStats.record(done.linkUs, done.decodeUs, displayUs)
+            val perceivedUs = done.linkUs + done.decodeUs + displayUs
+            Log.i(LINK_TAG, TimingsText.link(done.seq, done.linkUs, done.decodeUs, displayUs, perceivedUs))
+            if (nowNs - lastSummaryNs >= SUMMARY_NS) {
+                lastSummaryNs = nowNs
+                Log.i(LINK_TAG, linkStats.line())
+            }
+        }
+    }
+
+    /** Compte une frame perdue en aval (décodeur muet sur une frame décodable). */
+    fun markDrop(cause: LinkDrop) {
+        synchronized(timingLock) { linkStats.drop(cause) }
+    }
+
+    /** Résumé du lien (`GlassesLink e2e p50/p95/p99 …`), pour l'UI et les tests. */
+    fun linkLine(): String = synchronized(timingLock) { linkStats.line() }
+
+    /** Abandons par cause, dans l'ordre de [LinkDrop]. */
+    fun linkDrops(): List<Long> = synchronized(timingLock) { linkStats.dropCounts() }
+
+    /** Frames mesurées jusqu'au pixel (les abandons ne comptent pas). */
+    val linkSamples: Long get() = synchronized(timingLock) { linkStats.samples }
+
+    /** Oublie la mesure du lien : nouvelle session, nouvelles horloges des deux côtés. */
+    private fun resetLinkLocked() {
+        clockOffset.reset()
+        linkStats.reset()
+        awaitingNote = false
+        lastLinkSeq = -1L
+        lastLinkUs = -1L
+        pending = null
+        lastSummaryNs = 0L
+    }
+
     /**
      * Le flux démarre ou s'arrête. Le démarrage n'allume que `streaming` (la surface se
      * prépare) : `live` ne vient qu'à la première image rendue. L'arrêt oublie tout.
@@ -170,6 +304,7 @@ object GlassesVideoLink {
             _frames.value = null
             _videoSize.value = null
             _renderedSeq.value = null
+            synchronized(timingLock) { resetLinkLocked() }
         }
     }
 
