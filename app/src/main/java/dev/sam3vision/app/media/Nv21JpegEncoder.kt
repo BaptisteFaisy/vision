@@ -166,6 +166,28 @@ private fun sourceCol(turn: Int, x: Int, y: Int, width: Int, height: Int): Int =
 }
 
 /**
+ * Luminance moyenne 0-255 du plan Y, échantillonnée ([SAMPLE_BUDGET] lectures au
+ * plus, pas régulier sur toute l'image) : le gouverneur d'exposition la lit à
+ * chaque frame analysée sans payer la copie NV21 complète. Pure : testée en JVM.
+ */
+fun sampledMeanLuma(y: YuvPlane, width: Int, height: Int): Int {
+    if (width <= 0 || height <= 0) return 0
+    val step = maxOf(1, width * height / SAMPLE_BUDGET)
+    var sum = 0L
+    var count = 0
+    var index = 0
+    while (index < width * height) {
+        sum += y.at(index / width, index % width).toInt() and 0xFF
+        count++
+        index += step
+    }
+    return if (count == 0) 0 else (sum / count).toInt()
+}
+
+/** Lectures Y au plus par frame pour [sampledMeanLuma] : négligeable à 30 im/s. */
+private const val SAMPLE_BUDGET = 1024
+
+/**
  * Chaîne **NV21 directe** : la frame du capteur (YUV 4:2:0) est recopiée en NV21 —
  * rotation et réduction dans la même passe — puis compressée en JPEG par [YuvImage].
  *
@@ -230,6 +252,17 @@ class Nv21JpegEncoder {
         val size = pack(proxy, edge) ?: return null
         val bytes = compress(nv21, size.width, size.height, quality) ?: return null
         return JpegLuma(bytes, lumaPlan(size))
+    }
+
+    /**
+     * Luminance moyenne 0-255 de la frame, lue sur le plan Y sans copie NV21 :
+     * le gouverneur d'exposition l'appelle à chaque frame analysée, même celles
+     * que SAM ne veut pas. `null` si le buffer n'est pas en YUV 4:2:0.
+     */
+    fun sampleMeanLuma(proxy: ImageProxy): Int? {
+        if (proxy.format != ImageFormat.YUV_420_888) return null
+        val planes = planesOf(proxy) ?: return null
+        return sampledMeanLuma(planes.y, planes.width, planes.height)
     }
 
     /** Recopie NV21 des plans caméra (rotation et réduction) ; `null` si la forme manque. */
