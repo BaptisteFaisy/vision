@@ -15,6 +15,7 @@ from __future__ import annotations
 
 import asyncio
 import json
+import struct
 import sys
 from pathlib import Path
 
@@ -64,6 +65,24 @@ def frame(ident: int, png: str, **extra) -> str:
     return json.dumps(payload)
 
 
+def _raw_header(header: bytes) -> bytes:
+    """Préfixe uint32 big-endian + ``header`` brut (pour les en-têtes malformés)."""
+    return struct.pack(">I", len(header)) + header
+
+
+def binary_frame(ident: int, jpeg: bytes, **extra) -> bytes:
+    """Une trame WS binaire M1 : uint32 BE + en-tête JSON (sans image) + JPEG brut."""
+    return _raw_header(json.dumps({"id": ident, **extra}).encode()) + jpeg
+
+
+def _binary_error_is(live_ws, raw: bytes, ident: int) -> bool:
+    """La trame ``raw`` est-elle refusée en 400 borné avec l'``id`` attendu ?"""
+    parsed = live_ws.parse_frame_bytes(raw)
+    detail = (parsed["error"] or {}).get("detail", "")
+    return (parsed["error"] is not None and parsed["error"]["status"] == 400
+            and parsed["id"] == ident and isinstance(detail, str) and len(detail) <= 300)
+
+
 def fake_pipeline(captured: dict | None = None):
     """Pipeline factice : renvoie la forme de ``POST /live`` et note ses arguments."""
     def run(image_b64, prompts, max_objects, work_edge, batch_prompts=None, edge=None):
@@ -107,6 +126,50 @@ def test_parse_frame(live_ws) -> None:
     not_object = live_ws.parse_frame(json.dumps(["x" * 300]))
     check("parse_frame: corps non-objet → -1 + 400",
           not_object["id"] == -1 and not_object["error"]["status"] == 400)
+
+
+def test_parse_frame_bytes(live_ws) -> None:
+    """``parse_frame_bytes`` : trame valide servie, trames limites en 400 borné."""
+    jpeg = b"\xff\xd8" + bytes(64)
+    ok = live_ws.parse_frame_bytes(binary_frame(9, jpeg, prompts=["person"], work_edge=640,
+                                                 max_objects=4, mask_encoding="bits"))
+    check("binaire: trame valide (id + JPEG brut)",
+          ok["error"] is None and ok["id"] == 9 and ok["jpeg"] == jpeg, str(ok)[:160])
+    check("binaire: knobs validés comme le texte",
+          ok["request"].prompts == ["person"] and ok["request"].work_edge == 640
+          and ok["request"].max_objects == 4 and ok["request"].mask_encoding == "bits")
+    check("binaire: champs inconnus ignorés, jamais 400",
+          live_ws.parse_frame_bytes(binary_frame(3, jpeg, roi=[1, 2, 3]))["error"] is None)
+    check("binaire: image_b64 dans l'en-tête ignoré (le brut gouverne)",
+          live_ws.parse_frame_bytes(binary_frame(4, jpeg, image_b64="z" * 300))["jpeg"] == jpeg)
+    check("binaire: JPEG indécodable accepté au parse (400 au décodage)",
+          live_ws.parse_frame_bytes(binary_frame(5, b"pas une image"))["error"] is None)
+    check("binaire: N=0 → id -1 + 400",
+          _binary_error_is(live_ws, struct.pack(">I", 0) + jpeg, -1))
+    check("binaire: N>taille → id -1 + 400",
+          _binary_error_is(live_ws, struct.pack(">I", 100) + b'{"id": 1}', -1))
+    check("binaire: N>4 Ko → id -1 + 400",
+          _binary_error_is(live_ws, struct.pack(">I", 9999) + jpeg, -1))
+    check("binaire: moins de 4 octets → id -1 + 400",
+          _binary_error_is(live_ws, b"\x00\x01", -1))
+    check("binaire: JSON malformé → id -1 + 400",
+          _binary_error_is(live_ws, _raw_header(b"{pas du json") + jpeg, -1))
+    check("binaire: en-tête non-objet → id -1 + 400",
+          _binary_error_is(live_ws, _raw_header(b"[1, 2]") + jpeg, -1))
+    check("binaire: id absent → -1 + 400",
+          _binary_error_is(live_ws, _raw_header(json.dumps({"prompts": None}).encode()) + jpeg, -1))
+    check("binaire: JPEG vide → id conservé + 400",
+          _binary_error_is(live_ws, binary_frame(12, b""), 12))
+
+
+def test_stuck_id(live_ws) -> None:
+    """``stuck_id`` : l'``id`` d'une frame lente, texte ou binaire, ``-1`` si illisible."""
+    check("stuck_id: texte valide", live_ws.stuck_id('{"id": 7}') == 7)
+    check("stuck_id: texte cassé → -1", live_ws.stuck_id("{cassé") == -1)
+    check("stuck_id: binaire valide",
+          live_ws.stuck_id(binary_frame(8, b"\xff\xd8")) == 8)
+    check("stuck_id: binaire cassé → -1", live_ws.stuck_id(b"\x00\x01") == -1)
+    check("stuck_id: None → -1", live_ws.stuck_id(None) == -1)
 
 
 def test_ws_contract(live_app) -> None:
@@ -319,6 +382,8 @@ def test_ws_depth(live_app) -> None:
 RUNNERS = (
     ("schéma LiveWsRequest", "schemas", test_schema),
     ("protocole WS (parse_frame)", "live_ws", test_parse_frame),
+    ("protocole WS binaire (parse_frame_bytes)", "live_ws", test_parse_frame_bytes),
+    ("protocole WS binaire (stuck_id)", "live_ws", test_stuck_id),
     ("WS: contrat de réponse", "live_app_fast", test_ws_contract),
     ("WS: erreurs sans fermeture", "live_app_fast", test_ws_errors),
     ("WS: message binaire", "live_app_fast", test_ws_binary),

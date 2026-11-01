@@ -1,5 +1,6 @@
 package dev.sam3vision.core.net
 
+import dev.sam3vision.core.mask.base64Bytes
 import dev.sam3vision.core.model.LiveFrame
 import dev.sam3vision.core.model.LiveHealth
 import kotlinx.coroutines.CompletableDeferred
@@ -47,14 +48,34 @@ class WsLiveClient(
     private val withDepth: Boolean = false,
     /** Masques demandés (`mask_encoding`) ; `false` = boîtes et scores seuls (`none`). */
     private val masks: Boolean = true,
+    /**
+     * Envoi binaire M1 : JPEG brut (longueur + en-tête + JPEG) au lieu du JSON base64
+     * (−33 % à la montée). `false` par défaut : exige un serveur qui sait lire le
+     * binaire — à activer après son déploiement, jamais avant. Quand le serveur répond
+     * `{"id":-1,"error":…}` (signature d'un serveur sans binaire), la frame repart une
+     * fois en JSON et les suivantes partent directement en texte.
+     */
+    private val binaryWs: Boolean = false,
 ) : LiveClient {
 
     private val lock = Any()
 
     /** Réponses attendues, indexées par `id` de requête. */
-    private val pending = mutableMapOf<Int, CompletableDeferred<String>>()
+    private val pending = mutableMapOf<Int, PendingFrame>()
     private var nextId = 0
     private var connected = false
+
+    /**
+     * Le serveur a déjà répondu `id: -1` : sans WS binaire, les frames suivantes partent
+     * directement en JSON (repli collant, un seul aller-retour perdu par session).
+     */
+    private var binaryRefused = false
+
+    /** Une frame en vol : son réveil, et si elle est partie en binaire (repli JSON). */
+    private class PendingFrame(val reply: CompletableDeferred<String>, val binary: Boolean)
+
+    /** Signal interne : `id: -1` reçu — la frame binaire en vol repart en JSON. */
+    private object FallbackToJson : Exception("WS binaire refusé (id -1) : repli JSON")
 
     override suspend fun live(
         jpegB64: String,
@@ -63,13 +84,38 @@ class WsLiveClient(
         maxObjects: Int,
     ): Result<LiveFrame> {
         val id = synchronized(lock) { ++nextId }
-        val reply = CompletableDeferred<String>()
+        val binary = synchronized(lock) { binaryWs && !binaryRefused }
         // Message (~28 Ko) assemblé hors verrou : `onText` (même lock) ne doit pas attendre.
-        val message = frameMessage(id, jpegB64, prompts, workEdge, maxObjects)
+        val sender: () -> Boolean
+        if (binary) {
+            val jpeg = base64Bytes(jpegB64)
+                ?: return Result.failure(ApiError.BadResponse(WS_BAD_IMAGE))
+            val bytes = frameMessageBinary(id, jpeg, prompts, workEdge, maxObjects, maskFormat, maskEdge, withDepth, masks)
+            sender = { transport.sendBytes(bytes) }
+        } else {
+            val message = frameMessage(id, jpegB64, prompts, workEdge, maxObjects)
+            sender = { transport.send(message) }
+        }
+        return try {
+            exchange(id, binary, sender).then { text -> parseReply(text) }
+        } catch (e: FallbackToJson) {
+            exchange(id, binary = false) {
+                transport.send(frameMessage(id, jpegB64, prompts, workEdge, maxObjects))
+            }.then { text -> parseReply(text) }
+        }
+    }
+
+    /**
+     * Un aller-retour sur le socket (ouvert ou à ouvrir) : [sender] porte l'encodage
+     * (texte ou binaire M1), `binary` dit si la frame peut être rappelée en JSON. Lève
+     * [FallbackToJson] quand le serveur répond `id: -1` (l'appelant renvoie en texte).
+     */
+    private suspend fun exchange(id: Int, binary: Boolean, sender: () -> Boolean): Result<String> {
+        val reply = CompletableDeferred<String>()
         val opened = synchronized(lock) {
             // L'attente est enregistrée **avant** l'ouverture : un échec de socket
             // (connexion refusée) peut survenir immédiatement, il doit réveiller la frame.
-            pending[id] = reply
+            pending[id] = PendingFrame(reply, binary)
             if (!openLocked()) {
                 pending.remove(id)
                 false
@@ -78,19 +124,20 @@ class WsLiveClient(
             }
         }
         if (!opened) return Result.failure(ApiError.Network(WS_UNREACHABLE))
-        // Envoi **hors verrou** : pendant que ~28 Ko partent sur le socket, le thread
+        // Envoi **hors verrou** : pendant que la frame part sur le socket, le thread
         // lecteur (`onText`, même verrou) continue de réveiller les frames en vol —
         // sinon un envoi lent figeait toutes les réceptions. Si le socket meurt entre
         // l'ouverture et l'envoi, `send` refuse (ou `onClosed` a déjà réveillé la
         // frame en échec) : les deux chemins rendent un échec réseau, jamais un succès.
-        val sent = transport.send(message)
-        if (!sent) {
+        if (!sender()) {
             synchronized(lock) { pending.remove(id) }
             return Result.failure(ApiError.Network("WebSocket /live/ws: send refused"))
         }
-        val raw = awaitReply(reply)
-        synchronized(lock) { pending.remove(id) }
-        return raw.then { text -> parseReply(text) }
+        return try {
+            awaitReply(reply)
+        } finally {
+            synchronized(lock) { pending.remove(id) }
+        }
     }
 
     /** Vrai tant que le socket est ouvert — l'UI s'en sert pour dire « WebSocket » ou « KO ». */
@@ -149,11 +196,29 @@ class WsLiveClient(
      * la trame (jusqu'à ~5 Ko de masques) ne coûte ici que quelques caractères parcourus.
      */
     private fun onText(text: String) {
-        val reply = synchronized(lock) { pending[readId(text)] } ?: return
+        val id = readId(text)
+        val reply = synchronized(lock) {
+            pending[id]?.reply ?: run {
+                noteBinaryRefused(id, text)
+                null
+            }
+        } ?: return
         // Corps (message) complet, avant le parsing de la réponse par l'appelant : c'est le
         // poste « corps » de la chronologie. Un message orphelin ne date rien.
         marks?.onBody()
         reply.complete(text)
+    }
+
+    /**
+     * Orphelin `{"id":-1,"error":…}` : signature d'un serveur sans WS binaire (il ne lit
+     * que du texte). La plus ancienne frame binaire en vol est réveillée en repli JSON,
+     * les suivantes partent directement en texte. Sans construction de JSON : le marqueur
+     * `"error"` suffit, une trame orpheline ne coûte toujours rien (appel sous [lock]).
+     */
+    private fun noteBinaryRefused(id: Int, text: String) {
+        if (!binaryWs || id != UNKNOWN_WS_ID || ERROR_MARK !in text) return
+        binaryRefused = true
+        pending.values.firstOrNull { it.binary }?.reply?.completeExceptionally(FallbackToJson)
     }
 
     /** Socket fermé ou en panne : les frames en vol échouent tout de suite. */
@@ -164,7 +229,7 @@ class WsLiveClient(
 
     private fun failPending(failure: Throwable) {
         val waiting = synchronized(lock) { pending.values.toList().also { pending.clear() } }
-        waiting.forEach { reply -> reply.completeExceptionally(failure) }
+        waiting.forEach { frame -> frame.reply.completeExceptionally(failure) }
     }
 
     private suspend fun awaitReply(reply: CompletableDeferred<String>): Result<String> = try {
@@ -199,5 +264,8 @@ class WsLiveClient(
         const val WS_UNREACHABLE = "WebSocket /live/ws unreachable"
         const val WS_CLOSED = "WebSocket /live/ws closed"
         const val WS_UNREADABLE = "WebSocket: unreadable message"
+        const val WS_BAD_IMAGE = "WebSocket /live/ws : image_b64 illisible"
+        const val UNKNOWN_WS_ID = -1
+        const val ERROR_MARK = "\"error\""
     }
 }

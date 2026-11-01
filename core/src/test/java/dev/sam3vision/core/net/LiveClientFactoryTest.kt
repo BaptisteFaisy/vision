@@ -55,6 +55,23 @@ class LiveClientFactoryTest {
     }
 
     @Test
+    fun `la fabrique transmet binaryWs au message envoye`() = runBlocking {
+        val transport = ContractWsTransport()
+            .apply { answerBytesWith { listOf(NetContract.frameReply(1)) } }
+        val client = liveClientWith(
+            baseUrl = "https://exemple.invalid",
+            timeoutSeconds = 10L,
+            binaryWs = true,
+            transportFor = { transport },
+        )
+
+        client.live("SUVLFw==", null, 640, 4)
+
+        assertEquals("la frame part en binaire", 1, transport.sentBytes.size)
+        assertTrue("aucun texte", transport.sent.isEmpty())
+    }
+
+    @Test
     fun `la fabrique transmet masks false en none sans knobs`() = runBlocking {
         val transport = ContractWsTransport { json ->
             listOf(NetContract.frameReply(json.getInt("id")))
