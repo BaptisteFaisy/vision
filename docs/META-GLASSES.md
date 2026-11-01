@@ -387,9 +387,12 @@ chiffres, les formats et les conclusions de l'un ne se transposent pas à l'autr
 | `GlassesPhaseMappingTest.kt` | `DeviceSessionState` → phase affichée, dont `PAUSED` |
 | `GlassesFrameCollectorTest.kt` | étranglement par rejet, routage compressé/brut/config, silences journalisés, libération |
 | `GlassesVideoDecoderTest.kt` | pas de chroma et disposition de sortie du décodeur (partie pure) |
+| `GlassesLensTest.kt` (D1) | modèle → champ (66/66/70/95/68°), resserrement au flux, repli sans modèle |
+| `GlassesSelectTest.kt` (D5) | sélection lunettes vs téléphone (étages, focales, réglages indépendants) |
 
 Reste dans `:core`, déjà testé là-bas : `CaptureGestureBuffer` (appui court retenu 350 ms,
-double appui prioritaire, `reset`).
+double appui prioritaire, `reset`). Calibration optique aussi en `:core` : `CropGeometryTest` (D2),
+`CropFovLimitsTest` et `PhoneLensDefaultsTest` (D5) — voir `docs/DISTANCES.md` « Où c'est testé ».
 
 **Ne peut pas être testé en JVM** (et n'est donc pas couvert) : tout ce qui touche au SDK ou à
 Android — `Wearables.*`, `DeviceSession`, `Stream`, `MockDeviceKit`, `Bitmap`, Compose. Aucun
@@ -447,3 +450,33 @@ pour injecter une question comme si le micro l'avait entendue. À valider sur ma
 bips audibles dans les lunettes (sortie A2DP), rue droite (ratio conservé, plus
 d'étirement) et nette en haute qualité sans freeze, cadences reçues/rendues au logcat,
 et question bout-en-bout avec photo jointe à la réponse.
+
+## 15. Calibration optique pour les distances (2026-11-01)
+
+Le SDK DAT 1.0.0 **n'expose aucune optique** (ni focale, ni FOV, ni distorsion)
+et **aucune orientation tête** (ni IMU, ni quaternion — `DonState`/`HingeState`
+seuls, R3). Le calibrage lunettes vient donc d'une table par modèle, lue via
+`Device.deviceType` (`GlassesLens.kt`, D1) :
+
+| Paire (`DeviceType`) | H retenu | Source |
+|---|---|---|
+| `RAYBAN_META` (gen1 + gen2, même capteur 12 MP 3024×4032) | 66° | DXOMARK labo (V 83° / D 96°) |
+| `RAYBAN_META_OPTICS` | 66° (même optique présumée) | — |
+| `OAKLEY_META_HSTN` | 70° | DXOMARK labo (V 87° / D 100°) |
+| `OAKLEY_META_VANGUARD` | 95° (dérivation validée, confirmation mire non bloquante) | marketing 122° DFOV projeté sur capteur 3:4 — voir `LUNETTES-VANGUARD.md` |
+| Autres / `UNKNOWN` / sans modèle | 68° (repli R4, milieu de [66, 70]) | — |
+
+Capteur portrait natif 3:4 (le vertical dérive à focale constante : 66° → V 81,7°
+vs 83° labo), centre supposé centré, distorsion nulle (aucune donnée publique).
+Sélection (voie lunettes de `chooseLens`, D1) : Réglages `glassesFovDeg` > mire >
+profil modèle > repli 53,7° (fenêtre 9:16 du capteur), sinon chemin téléphone
+inchangé. Recadrage → FOV effectif (`CropGeometry.afterCrop`, D2 : la spec
+post-crop porte l'orientation du crop, sinon le sténopé prend le mauvais axe,
+−44 % prouvé ; le pont E5 recadre la focale flux par photo envoyée).
+Tangage : le téléphone ne vise pas où vise la tête → branche sol coupée
+explicitement en lunettes-live (`groundPlaneEnabled`, `setGlassesLive`, D3),
+sténopé seul. Profondeur DA2 : aucun changement (D4 — embarqué et serveur sont
+aspect-safe, calibration par frame sur ancres sténopé).
+Tests : `GlassesLensTest` + `GlassesSelectTest` (ici, §11), `CropGeometryTest` +
+`CropFovLimitsTest` + `PhoneLensDefaultsTest` + 3 `DistanceMeterTest` + 3
+`ProbeFrameTest` (voir `docs/DISTANCES.md` « Où c'est testé »).
