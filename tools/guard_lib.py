@@ -61,15 +61,20 @@ class Control:
 
 # --- outils communs -------------------------------------------------------
 
-def load_checker(root):
-    """Charge `tools/check-kotlin-limits.py` au lieu d'en recopier la logique."""
-    path = os.path.join(root, "tools", "check-kotlin-limits.py")
+def load_py_module(name, path):
+    """Charge un outil `tools/*.py` à tirets (importlib : un seul chargeur)."""
     if not os.path.isfile(path):
-        raise FileNotFoundError(f"garde de limites introuvable : {path}")
-    spec = importlib.util.spec_from_file_location("_guard_limits", path)
+        raise FileNotFoundError(f"outil introuvable : {path}")
+    spec = importlib.util.spec_from_file_location(name, path)
     module = importlib.util.module_from_spec(spec)
     spec.loader.exec_module(module)
     return module
+
+
+def load_checker(root):
+    """Charge `tools/check-kotlin-limits.py` au lieu d'en recopier la logique."""
+    return load_py_module("_guard_limits",
+                         os.path.join(root, "tools", "check-kotlin-limits.py"))
 
 
 def count_sources(root, checker):

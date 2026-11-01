@@ -190,8 +190,8 @@ Aucun trou de blocage trouvé : chaque concept bloque, mesuré ou par prudence.
   (`KnownSizes.kt:52-71`) — à 2 m, lus ≈ 2,0 m et bloquants (`:144`).
   Escaliers et marches (`stairs`, `escalier`, `step`, `steps`, `marche`) : sans
   hauteur sténopé (volontaire, `KnownSizes.kt:15-22`), lus sans distance,
-  bloquants par prudence (`:161`). « marche » est hors reconnaissance
-  (`traverse/StairConcepts.kt:37-38`, `CurbConcepts.kt:15-16`) mais le couloir
+  bloquants par prudence (`:161`). « marche » est reconnu
+  (`stairs/StairConcepts.kt`, `CurbConcepts.kt:18-21`) mais le couloir
   bloque tout label : la reco ne conditionne pas le blocage.
 - **Trou** : aucun concept, aucune taille inventée (`heightMeters("trou")` et
   `("hole")` = `null`) — la prudence bloque (`:179`). Une vraie distance
@@ -199,7 +199,7 @@ Aucun trou de blocage trouvé : chaque concept bloque, mesuré ou par prudence.
 - **Suivis notés, non faits** : `StairDetector` (Canny) branché à la voix
   escaliers (`StairCannyCount`, 30/10), seuils recalibrés téléphone 256×103
   (30/10, validation live recommandée) ;
-  `stairs.StairConcepts` reconnaît « marche » quand `traverse.StairConcepts` le
-  refuse (voix, autre agent) ; boîte coupée en haut seul : la ligne des pieds
+  doublon `traverse.StairConcepts` supprimé le 01/11 (un seul concept `stairs`,
+  qui reconnaît « marche ») ; boîte coupée en haut seul : la ligne des pieds
   reste valide mais `DistanceMeter.readOne` (`DistanceEstimator.kt:156`)
   écarte toute la lecture — assouplir serait deviner, la prudence suffit.

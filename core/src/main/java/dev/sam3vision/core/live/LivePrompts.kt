@@ -80,7 +80,7 @@ object LivePrompts {
     )
 
     /**
-     * Preset extérieur : **15** concepts de cheminement urbain — la personne et
+     * Preset extérieur : **18** concepts de cheminement urbain — la personne et
      * le mobilier qui borde le trottoir (poteaux, lampadaires, bornes, clôtures,
      * barrières, portails, panneaux, arbres), plus le trottoir lui-même et le
      * passage piéton, les encombrants (poubelles), les animaux et le feu piéton
@@ -120,11 +120,11 @@ object LivePrompts {
     )
 
     /**
-     * Liste du monde sensoriel : dehors = [default] (les 18 concepts
+     * Liste du monde sensoriel : dehors = [default] (les 21 concepts
      * extérieurs, foule incluse), dedans = [indoor] (les 9 objets
      * d'intérieur). V1 : seuls les prompts basculent, la portée reste 4 m
      * dans les deux mondes. À ne pas confondre avec le preset [outdoor]
-     * (13 concepts de cheminement, pastille « Extérieur » du direct) : la
+     * (18 concepts de cheminement, pastille « Extérieur » du direct) : la
      * bascule monde s'applique à la sonde iSee, pas aux pastilles.
      */
     fun forMode(outdoor: Boolean): List<String> = if (outdoor) default else indoor
@@ -146,7 +146,7 @@ object LivePrompts {
      * `PROMPT_LIMIT = 22` côté tracker ; le client ne doit pas en envoyer
      * davantage — sinon l'app affiche des concepts jamais détectés.
      *
-     * La liste par défaut n'occupe que 17 de ces 22 places : la marge sert à
+     * La liste par défaut occupe 21 de ces 22 places : la marge sert à
      * « Find the X » ([withConcept]), pas à allonger le suivi au repos.
      *
      * **Couplage de déploiement** : un serveur resté à 18 **refuse** la frame

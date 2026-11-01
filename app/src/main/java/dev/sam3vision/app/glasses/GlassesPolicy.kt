@@ -36,10 +36,6 @@ enum class MessageKind {
 data class GlassesMessage(val kind: MessageKind, val text: String)
 
 /**
- * Tous les textes des lunettes, écrits une seule fois, avec leur gravité. Aucun d'eux ne
- * contient de clé ni de token : les erreurs du SDK sont résumées par leur description.
- */
-/**
  * Où se donne une permission des lunettes : **par paquet**, et la question se pose dans Meta AI.
  * Le SDK sait l'ouvrir lui-même (`Wearables.RequestPermissionContract`, bouton « Autoriser … »),
  * le chemin manuel n'est que le repli — en Developer Mode la fiche de l'app n'expose que
@@ -50,7 +46,6 @@ internal fun permissionPath(refusal: String): String =
         "Otherwise Meta AI → ☰ → Glasses → the pair → Settings → Apps → " +
         "developer mode apps → this app."
 
-/** Nom lisible d'une capacité, pour composer les messages sans jargon du SDK. */
 /**
  * Les huit refus de flux du SDK, chacun avec sa cause réelle : « erreur du flux » n'aide pas,
  * « branches refermées » ou « lunettes chaudes » si.
@@ -110,6 +105,7 @@ fun registrationRequestErrorMessage(error: RegistrationRequestError): GlassesMes
     )
 }
 
+/** Nom lisible d'une capacité, pour composer les messages sans jargon du SDK. */
 fun permissionLabel(permission: Permission): String = when (permission) {
     Permission.CAMERA -> "glasses camera"
     Permission.MICROPHONE -> "glasses microphone"
@@ -198,16 +194,16 @@ fun sessionErrorNeedsGlassesAppUpdate(error: DeviceSessionError): Boolean =
     error == DeviceSessionError.DAT_APP_ON_THE_GLASSES_UPDATE_REQUIRED ||
         error == DeviceSessionError.INSUFFICIENT_SDK_VERSION
 
+/**
+ * Tous les textes des lunettes, écrits une seule fois, avec leur gravité. Aucun d'eux ne
+ * contient de clé ni de token : les erreurs du SDK sont résumées par leur description.
+ */
 object GlassesMessages {
 
     fun sdkUnavailable(reason: String) = GlassesMessage(MessageKind.ERROR, "Glasses SDK unavailable: $reason")
 
     fun registrationFailed(reason: String) =
         GlassesMessage(MessageKind.ERROR, "Registration refused: $reason")
-
-    fun sessionRefused(reason: String) = GlassesMessage(MessageKind.ERROR, "Session refused: $reason")
-
-    fun sessionInterrupted(reason: String) = GlassesMessage(MessageKind.ERROR, "Session interrupted: $reason")
 
     fun sessionAlreadyRunning() =
         GlassesMessage(MessageKind.WARNING, "A glasses session is already running: stop it first.")
@@ -249,14 +245,8 @@ object GlassesMessages {
             "dictation keeps the phone mic.",
     )
 
-    fun streamRefused(reason: String) = GlassesMessage(MessageKind.ERROR, "Stream refused: $reason")
-
-    fun streamError(reason: String) = GlassesMessage(MessageKind.WARNING, "Glasses stream: $reason")
-
     fun streamStopped() =
         GlassesMessage(MessageKind.WARNING, "Camera stream stopped: restart the session to take a photo again.")
-
-    fun photoRefused(reason: String) = GlassesMessage(MessageKind.ERROR, "Photo refused: $reason")
 
     fun photoUndecodable() = GlassesMessage(
         MessageKind.ERROR,

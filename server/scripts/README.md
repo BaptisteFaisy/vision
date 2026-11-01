@@ -30,7 +30,7 @@ Modal** : ni secret, ni déploiement). `MODAL_BIN`, `MODAL_PROFILE`, `SECRET_NAM
 | `deploy-live-fast.sh` | **seule** commande de déploiement du direct (app `sam3-eu-a100`, leviers `FAST_*`, attente de la nouvelle version, vérification `/health`) ; `--no-deploy` vérifie sans déployer | `bash scripts/deploy-live-fast.sh` |
 | `modal-one-gpu.sh` | garde-fou « une seule GPU » (enveloppe de `sam3-gpu guard`) | `bash scripts/modal-one-gpu.sh --status` |
 | `bench_live.py` / `bench_live_ws.py` / `bench_track.py` / `phone_bench.py` | bancs de mesure HTTP / WebSocket / tracker / téléphone (réveillent un GPU : jamais en routine) | `python3 scripts/bench_live_ws.py --url wss://… --image … --runs 6` |
-| `test_live_ws.py` | contrat WS sans GPU ni réseau (24 vérifications) | `python3 scripts/test_live_ws.py` |
+| `test_live_ws.py` | contrat WS sans GPU ni réseau (55 vérifications) | `python3 scripts/test_live_ws.py` |
 | `test_units.py` + `tests_units/` | tests unitaires sans GPU (latence, fusion, poids, plomberie) | `python3 scripts/test_units.py` |
 | `probe_*.py`, `local_segment.py`, `baseten_sync.py` | sondes de mesure, segmentation locale, synchro Baseten | — |
 

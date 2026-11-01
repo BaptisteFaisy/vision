@@ -26,11 +26,13 @@ Usage : python3 tools/check-budget-derive.py [--root .] [--strict] [--list]
 Sortie : 0 si conforme, 1 si un chiffre diverge, 2 si la racine n'existe pas.
 """
 import argparse
-import importlib.util
 import os
 import re
 import sys
 from collections import namedtuple
+
+sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
+import guard_lib
 
 DOC_DEFAUT = "docs/LATENCE-BUDGET.md"
 GARDE = "check-kotlin-limits.py"
@@ -96,10 +98,7 @@ RENVOI = re.compile(
 def charge_garde():
     """Charge `tools/check-kotlin-limits.py` (neutralisation Kotlin réutilisée)."""
     chemin = os.path.join(os.path.dirname(os.path.abspath(__file__)), GARDE)
-    spec = importlib.util.spec_from_file_location("check_kotlin_limits", chemin)
-    module = importlib.util.module_from_spec(spec)
-    spec.loader.exec_module(module)
-    return module
+    return guard_lib.load_py_module("check_kotlin_limits", chemin)
 
 
 def lis_texte(chemin):

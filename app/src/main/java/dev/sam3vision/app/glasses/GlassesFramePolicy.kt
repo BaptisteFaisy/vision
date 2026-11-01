@@ -38,9 +38,9 @@ internal fun frameTimestampMs(presentationTimeUs: Long, fallbackMs: Long): Long 
  *   dimensions d'entrée sont inexploitables ; sinon des dimensions ≥ 1 (une
  *   image très allongée garde au moins un pixel sur son petit côté).
  *
- * Arrondi volontaire (`roundToInt`) + `null` si inutile : ne pas factoriser avec
- * `FramePolicy.requestedSize` (troncature, jamais `null`) — les deux politiques
- * diffèrent par contrat, pas par oubli.
+ * Arrondi volontaire (`roundToInt`) + `null` si inutile : contrat propre aux
+ * lunettes (l'ancienne politique page caméra, troncature sans `null`, a été
+ * supprimée le 01/11/2026 avec ses appelants).
  */
 internal fun scaledDimensions(
     width: Int,

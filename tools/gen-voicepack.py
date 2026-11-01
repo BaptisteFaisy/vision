@@ -27,14 +27,19 @@ def repo_root() -> str:
     return os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 
 
-def default_voice(root: str) -> str:
-    """Voix par défaut de l'app (Settings.kt) — le pack parle comme elle."""
+def default_voice(root: str, strict: bool = True) -> str:
+    """Voix par défaut de l'app (Settings.kt) — le pack parle comme elle.
+
+    `strict=False` (garde) : chaîne vide au lieu de sortir, pour un rapport.
+    """
     path = os.path.join(
         root, "core/src/main/java/dev/sam3vision/core/settings/Settings.kt")
     with open(path, encoding="utf-8") as fh:
         src = fh.read()
     mat = re.search(r'LAURE_VOICE_ID\s*=\s*"([^"]+)"', src)
     if not mat:
+        if not strict:
+            return ""
         sys.exit("gen-voicepack: LAURE_VOICE_ID introuvable dans Settings.kt")
     return mat.group(1)
 

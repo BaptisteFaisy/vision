@@ -1,6 +1,6 @@
 # Mode tap court — vidéo → SAM 3.1, annonces ElevenLabs
 
-Conçu pour un usage sans regard. Ce mode est l'**écran `Route.Tap`** (`AppNav.kt:37`, `:68`),
+Conçu pour un usage sans regard. Ce mode est l'**écran `Route.Tap`** (`AppNav.kt:111`),
 atteint depuis les Réglages (« Other screens » → « Classic home (photo + analysis) »,
 `SettingsScreen.kt:407-416`). ⚠️ L'accueil par défaut de l'app est **iSee**, qui a son
 propre geste de tap (voir la dernière section) : ce ne sont pas les mêmes chemins de code.
@@ -68,7 +68,7 @@ l'envoi (`TapSession.kt:157`), donc la dictée peut reprendre pendant que la vid
 (`LAUNCHED`/`SENT`/`FAILED`, `TapConfig.kt:13-21`) et `announcementAllowed()` refuse tout autre
 texte (`TapMachine.kt:53-54`, revérifié dans `AnnouncementPlayer.kt:57`) : le TTS système n'est
 jamais utilisé ici, et le lecteur du chat est coupé à l'entrée de l'écran
-(`AppNav.kt:111-113`, `viewModel.stopSpeaking()`).
+(`AppNav.kt:321`, `viewModel.stopSpeaking()`).
 
 Latence : `prewarm()` génère les trois clips à l'ouverture de l'écran dans
 `filesDir/announcements/{launched,sent,failed}.mp3` (`TapConfig.kt:86`,
@@ -180,7 +180,7 @@ file d'annonces et le nettoyage restent identiques.
   que si `isee.active` est vrai (`MainActivity.kt:95`, `IseeHome.kt:26-29`), c'est-à-dire
   quand l'accueil iSee est à l'écran. Sur l'écran `Route.Tap`, l'appui long **ne fait rien** :
   `TapCaptureScreen` accepte un `longPressAction` (`TapCaptureScreen.kt:54`, `:64`) mais la
-  navigation ne lui en passe pas (`AppNav.kt:72` : `TapCaptureScreen(state.settings, pop,
+  navigation ne lui en passe pas (`AppNav.kt:268` : `TapCaptureScreen(state.settings, pop,
   route.autoStart)`), donc le paramètre reste `null`. `LongPressRootLayout.kt` existe encore mais
   n'est **instancié nulle part** (mesuré : seule occurrence = sa déclaration, ligne 27).
 

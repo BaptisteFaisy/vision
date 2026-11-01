@@ -28,10 +28,10 @@ guidance. A **companion** can follow along remotely, live, from their browser.
 
 > This repository (`BaptisteFaisy/vision`) carries the whole product: the Android
 > app, the segmenting GPU backend, and the companion page. This page describes
-> what the tree **actually ships**, re-checked on **31/10/2026** against
-> `origin/master` (`57a550af`). The tree counts in [Figures](#figures) are the
-> output of `python3 tools/count-tree.py`; measured figures elsewhere are dated
-> and marked as measurements, not as code guarantees.
+> what the tree **actually ships**, re-checked on **01/11/2026** against
+> `origin/master` (`2387cd4f`) with the dead-code cleanup applied. The tree counts
+> in [Figures](#figures) are the output of `python3 tools/count-tree.py`; measured
+> figures elsewhere are dated and marked as measurements, not as code guarantees.
 
 ## Meta AI stack
 
@@ -113,8 +113,8 @@ An ordinary phone, a remote GPU card, and voice as the only interface:
   `docs/ISEE-DESIGN-PORTRAIT.md`).
 - **Live** — **21 tracked concepts** by default (`person`, `car`, `bus`,
   `bicycle`, `motorcycle`, `pedestrian traffic light`, `pedestrian signal head`,
-  `curb`, `sidewalk`, `crosswalk`, `pole`, `stairs`, `keys`, `gate`, `wall`,
-  `souvenir shop`, `beanie`, `socks`, `stroller`, `child`, `dog`), **22 at most**
+  `curb`, `sidewalk`, `crosswalk`, `pole`, `stairs`, `keys`, `gate`,
+  `souvenir shop`, `beanie`, `socks`, `wall`, `stroller`, `child`, `dog`), **22 at most**
   (`LivePrompts.MAX`, `MAX_PROMPTS` server-side), one frame in flight (WebSocket `/live/ws`, or tracker sessions
   when the *Tracker* chip is on), pills, distances, and voice announcements
   (`docs/LIVE-SPEC.md`). The Direct tries the tracker first and falls back to `/live`
@@ -161,8 +161,8 @@ An ordinary phone, a remote GPU card, and voice as the only interface:
 |---|---|
 | `:core` | Android library (`dev.sam3vision.core`, minSdk 26): network clients (LLM, SAM, live WebSocket, tracker, video, Valhalla), pacing and frame gate, masks, distances, pure depth, gestures, crossing/traverse, navigation, voice, encrypted settings, design tokens (`iseedesign`) |
 | `:app` | The APK (`dev.sam3vision.app`, minSdk 29): Compose + CameraX, iSee home, legacy screens, tap mode, glasses + bench, depth (ONNX), in-app map (MapLibre), voice navigation, companion share, capture purge |
-| `server/` | Deployed backend: live/photo (`backend/live_fast/`, app `sam3-eu-a100`), Valhalla CPU routing (`backend/valhalla_cpu.py`, app `valhalla-idf-cpu`), tracker (`backend/track_app.py`, manual deploy), the photo-era app (`backend/modal_app.py`, not called by the current app), Baseten host config (`backend/baseten/` — sources synced by `scripts/baseten_sync.py`, not versioned), GPU probes, and `scripts/` (deploy, benches, probes, unit tests) |
-| `suivi-parent/` | Companion page (static, zero npm dependencies) embedded in every APK (`caregiverAssets`, `app/build.gradle.kts:179`); its Vercel deployment is abandoned, but `api/` still serves the local preview tests |
+| `server/` | Deployed backend: live/photo (`backend/live_fast/`, app `sam3-eu-a100`), Valhalla CPU routing (`backend/valhalla_cpu.py`, app `valhalla-idf-cpu`), tracker (`backend/track_app.py`, manual deploy), the photo-era app (`backend/modal_app.py`, not called by the current app), Baseten host config (`backend/baseten/` — `config.yaml` + `src/server.py` versioned, `data/` synced at push time by `server/scripts/baseten_sync.py`), GPU probes, and `scripts/` (deploy, benches, probes, unit tests) |
+| `suivi-parent/` | Companion page (static, zero npm dependencies) embedded in every APK (`caregiverAssets`, `app/build.gradle.kts:197`); its Vercel deployment is abandoned, but `api/` still serves the local preview tests |
 | `suivi-relais/` | The relay actually used (Cloudflare Worker + D1 + one Durable Object per stream): `POST /api/share`, `GET /api/state`, `GET /ws` (live camera frames) |
 | `tools/` | CI guards (Kotlin sizes, Portrait design, latency budget, voice navigation, APK keys), the pedestrian-light crop/training pipeline, voice pack generator, caregiver orb export, fake LLM/SAM for tests, the tree census (`count-tree.py`) |
 | `scripts/` | Build, phone/emulator recipes, checks, latency budget, golden masks |
@@ -237,38 +237,38 @@ Prerequisites: JDK 17 + Android SDK (`JAVA_HOME`, `ANDROID_HOME`), Python 3 (gua
 Node (companion page, no `npm install`).
 
 ```bash
-./gradlew :core:testDebugUnitTest :app:testDebugUnitTest   # JVM tests (3,860 @Test)
+./gradlew :core:testDebugUnitTest :app:testDebugUnitTest   # JVM tests (4,795 @Test: 2,957 + 1,838)
 ./gradlew :app:assembleDebug                               # debug APK
 python3 tools/check-kotlin-limits.py                       # file < 500 lines, function < 50
 python3 tools/check-isee-design.py                         # mandatory Portrait design
 python3 tools/check-budget-derive.py                       # doc ↔ code latency figures
 python3 tools/check-voice-nav-doc.py                       # doc ↔ code voice navigation
-python3 tools/check-voicepack.py                           # voice pack catalog ↔ clips
-bash scripts/test_scripts.sh                               # 145 shell assertions
-node --test suivi-parent/test/*.test.mjs suivi-relais/test/relais.test.mjs  # 47 tests
-python3 server/scripts/test_units.py                       # backend unit tests (venv)
+python3 tools/check-voicepack.py                           # voice pack catalog ↔ clips (CI gate)
+bash scripts/test_scripts.sh                               # 177 shell tests
+node --test suivi-parent/test/*.test.mjs suivi-relais/test/*.test.mjs  # 67 tests
+python3 server/scripts/test_units.py                       # backend unit tests (639, stdlib stubs, no GPU)
 bash scripts/build.sh                                      # assembleDebug --offline + APK check
 python3 tools/count-tree.py                                # the Figure table below
 ```
 
 ## Figures
 
-Measured on `origin/master` (`57a550af`) with this cleanup applied, 31/10/2026 — `python3 tools/count-tree.py`
+Measured on `origin/master` (`2387cd4f`) with this cleanup applied, 01/11/2026 — `python3 tools/count-tree.py`
 prints exactly this table (`--json` for scripts). The census is a script, not a habit:
 recopied numbers had drifted three times in one day.
 
 | Mesure | Valeur | Commande |
 |---|---|---|
-| Fichiers `.kt` | **1112** | `find . -name '*.kt' -not -path './.git/*' -not -path '*/build/*' \| wc -l` |
-| Lignes Kotlin | **129,044** | idem, `-exec cat {} + \| wc -l` |
-| Lignes de prod (`*/src/main`) | **69,918** — `:core` 251 f. / 30,276 l. · `:app` 342 f. / 39,642 l. | idem sous `core/src/main`, `app/src/main` |
-| `@Test` JVM | **3,880** — `:core` 2,489 · `:app` 1,391 | `grep -rho '@Test' core/src/test app/src/test --include='*.kt' \| wc -l` |
-| Tests instrumentés | **10** (appareil requis) | idem sous `app/src/androidTest*` |
+| Fichiers `.kt` | **1224** | `find . -name '*.kt' -not -path './.git/*' -not -path '*/build/*' \| wc -l` |
+| Lignes Kotlin | **153,303** | idem, `-exec cat {} + \| wc -l` |
+| Lignes de prod (`*/src/main`) | **79,608** — `:core` 258 f. / 34,344 l. · `:app` 376 f. / 45,264 l. | idem sous `core/src/main`, `app/src/main` |
+| `@Test` JVM | **4,795** — `:core` 2,957 · `:app` 1,838 | `grep -rho '@Test' core/src/test app/src/test --include='*.kt' \| wc -l` |
+| Tests instrumentés | **9** (appareil requis) | idem sous `app/src/androidTest*` |
 | `@Preview` Compose | **11** | idem, `@Preview` |
-| Backend Python (`server/backend`) | **40** fichiers, **7,912** lignes | `find server/backend -name '*.py' \| wc -l` |
-| Docs | **59** fichiers dans `docs/` | `ls docs/*.md \| wc -l` |
-| Workflows CI | **6** | `ls .github/workflows/*.yml \| wc -l` |
-| Plus gros fichier de prod | `app/src/main/java/dev/sam3vision/app/LiveViewModel.kt` — **498** lignes (plafond 500) | `find core app -path '*/src/main/*' -name '*.kt' \| xargs wc -l \| sort -rn \| head` |
+| Backend Python (`server/backend`) | **43** fichiers, **9,043** lignes | `find server/backend -name '*.py' \| wc -l` |
+| Docs | **61** fichiers dans `docs/` | `ls docs/*.md \| wc -l` |
+| Workflows CI | **7** | `ls .github/workflows/*.yml \| wc -l` |
+| Plus gros fichier de prod | `app/src/main/java/dev/sam3vision/app/glasses/GlassesController.kt` — **499** lignes (plafond 500) | `find core app -path '*/src/main/*' -name '*.kt' \| xargs wc -l \| sort -rn \| head` |
 
 Details (constants, budgets, thresholds) are in `docs/PERF.md`; recipes in
 `docs/TESTING.md`. The guards are green on this tree; Gradle tests are the only ones not
@@ -334,7 +334,8 @@ in `docs/CALIBRAGE-FEU.md`, so nobody walks that road twice.
 - **Merge queue**: **Mergify** (`.mergify.yml`, batches of 3, rebase). GitHub's native
   queue is unavailable — it needs an organisation-owned repository, and the API answers
   `422 Invalid rule 'merge_queue'` on a user repository. `pr-auto-merge.yml` survives as
-  the sweeper (conflicts, failed-run retries). `master` is protected (PR mandatory).
+  the sweeper (conflicts, failed-run retries) and `auto-approve.yml` approves the runs
+  parked in `action_required` by bot pushes. `master` is protected (PR mandatory).
 - On `master`: `ci-native` (debug + release APK + lint, 10 min), Modal redeploys
   (`deploy-live-fast`, `deploy-valhalla-cpu`).
 - **Self-hosted** runners `[self-hosted, linux, x64, vision]` with a warm Gradle cache for

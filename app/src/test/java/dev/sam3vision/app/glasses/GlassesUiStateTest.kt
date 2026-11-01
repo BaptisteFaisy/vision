@@ -37,9 +37,9 @@ class GlassesUiStateTest {
 
     @Test
     fun `la gravite du message suit le message jusqu a l ecran`() {
-        val state = GlassesUiState(message = GlassesMessages.photoRefused("occupée"))
+        val state = GlassesUiState(message = GlassesMessages.photoUndecodable())
         assertEquals(MessageKind.ERROR, state.message?.kind)
-        assertTrue(state.message?.text.orEmpty().startsWith("Photo refused"))
+        assertTrue(state.message?.text.orEmpty().startsWith("Glasses photo unreadable"))
     }
 
     @Test

@@ -15,9 +15,9 @@ plus l'arbre — bandeau ajouté).
 | `docs/ARCHITECTURE.md` | **recompté** (29/10, §1) | Tableau §1 et bloc de commandes alignés sur `tools/count-tree.py` (216/249/283/159 fichiers, 913 `.kt`, 98 370 lignes) ; les deux valeurs contradictoires du même §1 (204 vs 211, 268 vs 277) sont parties ; §2-7 : valeurs vraies, lignes non recalées |
 | `docs/PERF.md` | **recompté** (29/10, §1.1-1.2) | §1.1 refait (913 / 98 370 / 2 884 / 9, garde 1 008 fichiers, **6** workflows et non 8), §1.2 : `:core` 1 835 + `:app` 1 049 exécutés, 0 échec ; §2 et §4 inchangés |
 | `docs/DOC-ETAT.md` | **nouveau** (26/10) | Ce tableau |
-| `docs/TESTING.md` | **recompté** (29/10) | §1 (1 835 + 1 049 = 2 884, 408 fichiers, 8 + 1 instrumentés), §6 régénéré depuis les rapports JUnit (une entrée par classe, 1 835 + 1 049) ; §2 : 101 assertions, 6 workflows |
+| `docs/TESTING.md` | **recompté** (01/11, post-nettoyage) | §1 (2 957 + 1 838 = 4 795, 577 fichiers, 8 + 1 instrumentés), §6 régénéré mécaniquement (une entrée par classe, 2 957 + 1 838) ; §2 : 177 tests scripts, 7 workflows, 639 backend |
 | `docs/MASQUES-DEBUG.md` | **inexacte → corrigée** | Cadence iSee : « 2 requêtes en vol, budget 200 ms » alors que `Cadence.Fast` est à **1 créneau / 150 ms** ; « cadre 448 px » alors que `ISEE_FRAME_EDGE = 320` |
-| `docs/CI-QUEUE.md` | **recorrigée** (30/10, découpe v10) | `ci.yml` pour la PR avec **quatre** jobs (`ci-core`, `ci-app`, `ci`, `ci-budget`) + natif (`apk`, `lint`) dans `ci-native.yml` hors PR et hors doc, runners **auto-hébergés** `[self-hosted, linux, x64, vision]` ; `couche0` (scope + forbidden, juge pris sur `master`, refus accompagné du bloc `## Scope` à coller) ; `stale-base-guard` supprimé (toujours vert) ; 6 workflows ; budget 5 min par job, `master` protégé (PR obligatoire, 3 checks requis, file de merge native, débit v12/v13 : merge direct des PR `BEHIND` vertes quand le dépôt l'autorise, sinon une seule PR préparée à la fois — plafond levé par la file de merge **Mergify** (`.mergify.yml`, lots de 3, contournement `exempt` du ruleset) — la file native de GitHub est indisponible sur un dépôt d'utilisateur) |
+| `docs/CI-QUEUE.md` | **recorrigée** (30/10, découpe v10) | `ci.yml` pour la PR avec **quatre** jobs (`ci-core`, `ci-app`, `ci`, `ci-budget`) + natif (`apk`, `lint`) dans `ci-native.yml` hors PR et hors doc, runners **auto-hébergés** `[self-hosted, linux, x64, vision]` ; `couche0` (scope + forbidden, juge pris sur `master`, refus accompagné du bloc `## Scope` à coller) ; `stale-base-guard` supprimé (toujours vert) ; 7 workflows ; budget 5 min par job, `master` protégé (PR obligatoire, 3 checks requis, file de merge native, débit v12/v13 : merge direct des PR `BEHIND` vertes quand le dépôt l'autorise, sinon une seule PR préparée à la fois — plafond levé par la file de merge **Mergify** (`.mergify.yml`, lots de 3, contournement `exempt` du ruleset) — la file native de GitHub est indisponible sur un dépôt d'utilisateur) |
 | `docs/NETTOYAGE.md` | **corrigé** (29/10) | Purge horaire (`PERIOD_HOURS = 1`), Room + WorkManager ; la publication dans la galerie (`MediaStoreGallery`) n'avait aucun appelant et a été retirée : le § des traces MediaStore dit maintenant que **rien n'écrit** dans `traced_captures` |
 | `docs/DISTANCES.md` | **à jour**, une correction | Formule et constantes justes (lissage 0,35 / 0,85 ; `KnownSizes` ; `LensSpec` 67° borné 15–130°). Concepts par défaut du direct : **6** depuis le 28/10 (le doc reste générique, sans chiffre en dur) |
 | `docs/ELEVENLABS-TTS.md` | **à jour** | En-tête `xi-api-key`, base `https://api.elevenlabs.io/v1`, modèle `eleven_v4_turbo`, voix premade vs bibliothèque (402) |
@@ -85,9 +85,9 @@ plus l'arbre — bandeau ajouté).
   `app/…/isee/IseeDissolve.kt`, `app/…/isee/IseeScenePane.kt`), et l'accueil est
   désormais `IseeHome` → `IseeScenePane` : `IseeChatPane` et `IseeCameraWindow` sont
   supprimés. Reste à confirmer visuellement sur appareil (jamais regardé sur écran).
-- **« 8 objets par défaut »** — **vrai pour les objets affichés** (`ObjectLimits.DEFAULT_ON_SCREEN = 8`,
-  borné 1–32), **faux pour les concepts suivis** : `LivePrompts.default` en contient **16**
-  (max 16, `LivePrompts.MAX`), et c'est aussi le plafond du champ « Follow ».
+- **« 8 objets par défaut »** — **faux deux fois** : `ObjectLimits.DEFAULT_ON_SCREEN = 16`
+  (borné 1–32) et `LivePrompts.default` en contient **21** (max 22, `LivePrompts.MAX`),
+  qui est aussi le plafond du champ « Follow ».
 
 ## Hors périmètre de cette passe (à reprendre)
 

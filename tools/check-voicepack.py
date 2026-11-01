@@ -6,40 +6,47 @@ Vérifie, sans clé ni réseau (runnable en CI) :
    morceaux `parts` pour les phrases composées) ;
 2. chaque MP3 attendu existe et n'est pas vide (sauf mention --allow-missing,
    pour les branches qui codent le pack avant sa génération) ;
-3. assets/vp_voice.txt désigne la voix par défaut de l'app (LAURE_VOICE_ID).
+3. aucun MP3 `vp_*` en surplus sur le disque (clip supprimé du catalogue
+   mais fichier oublié — les 99 FR morts du 01/11/2026) ;
+4. assets/vp_voice.txt désigne la voix par défaut de l'app (LAURE_VOICE_ID).
+
+Racine et voix par défaut : une seule implémentation, celle de
+`tools/gen-voicepack.py` (chargée par `guard_lib`, tirets oblige).
 
 Usage : python3 tools/check-voicepack.py [--allow-missing]
 """
 import json
 import os
-import re
 import subprocess
 import sys
 
+sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
+import guard_lib
+
 PHONE_SOURCES = ("app/src/main/java", "core/src/main/java")
+LANGS = ("fr", "en")
 
 
-def repo_root() -> str:
-    return os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+def _gen():
+    here = os.path.dirname(os.path.abspath(__file__))
+    return guard_lib.load_py_module(
+        "gen_voicepack", os.path.join(here, "gen-voicepack.py"))
 
 
 def failures(root: str, allow_missing: bool) -> list:
     problems = []
+    gen = _gen()
     with open(os.path.join(root, "tools/voicepack-catalog.json"),
               encoding="utf-8") as fh:
         catalog = json.load(fh)["clips"]
-    with open(os.path.join(root, "core/src/main/java/dev/sam3vision"
-                           "/core/settings/Settings.kt"),
-              encoding="utf-8") as fh:
-        settings = fh.read()
-    laure = re.search(r'LAURE_VOICE_ID\s*=\s*"([^"]+)"', settings)
-    laure = laure.group(1) if laure else ""
+    laure = gen.default_voice(root, strict=False)
+    expected = set()
     for clip in catalog:
         cid = clip["id"]
         if clip.get("parts"):
             needles = list(clip["parts"])  # composée en code : morceaux only
         else:
-            needles = [clip[lang] for lang in ("fr", "en") if clip.get(lang)]
+            needles = [clip[lang] for lang in LANGS if clip.get(lang)]
         for needle in needles:
             found = subprocess.run(
                 ["grep", "-r", "--fixed-strings", "--quiet", needle]
@@ -47,14 +54,20 @@ def failures(root: str, allow_missing: bool) -> list:
                 cwd=root).returncode == 0
             if not found:
                 problems.append(f"{cid}: « {needle} » introuvable dans le Kotlin")
-        for lang in ("fr", "en"):
+        for lang in LANGS:
             if not clip.get(lang):
                 continue
-            mp3 = os.path.join(root, "app/src/main/res/raw",
-                               f"vp_{cid}_{lang}.mp3")
+            name = f"vp_{cid}_{lang}.mp3"
+            expected.add(name)
+            mp3 = os.path.join(root, "app/src/main/res/raw", name)
             if not (os.path.isfile(mp3) and os.path.getsize(mp3)):
                 if not allow_missing:
-                    problems.append(f"{cid}: {os.path.basename(mp3)} manquant/vide")
+                    problems.append(f"{cid}: {name} manquant/vide")
+    raw_dir = os.path.join(root, "app/src/main/res/raw")
+    if os.path.isdir(raw_dir):
+        for name in sorted(os.listdir(raw_dir)):
+            if name.startswith("vp_") and name not in expected:
+                problems.append(f"{name} en surplus (hors catalogue : supprimer)")
     stamp = os.path.join(root, "app/src/main/assets/vp_voice.txt")
     if os.path.isfile(stamp):
         with open(stamp, encoding="utf-8") as fh:
@@ -72,7 +85,7 @@ def main(argv: list) -> int:
     if unknown:
         print(f"check-voicepack: option inconnue {unknown[0]}", file=sys.stderr)
         return 2
-    problems = failures(repo_root(), allow_missing)
+    problems = failures(_gen().repo_root(), allow_missing)
     for problem in problems:
         print(f"check-voicepack: {problem}", file=sys.stderr)
     if problems:
