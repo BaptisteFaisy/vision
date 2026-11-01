@@ -3,6 +3,21 @@
 Le journal part du 2026-10-26 après 19 h : le commit de départ, puis une entrée par fait
 livré et ses preuves (tâche, fichiers, chiffres) dans l'arbre.
 
+## 2026-11-01 — iSee : fin du crash `IndexOutOfBounds` des trackers concurrents (branche `persontracker-race`)
+
+- **Fait** : `LiveProbe.dispatch` lance un `runFrame` par frame sans garde
+  anti-recouvrement, et les trois processeurs d'état (`PersonTracker`,
+  `VehicleStateWatcher`, `TraverseVeto`, instances uniques par séance)
+  mutaient leurs listes sans synchronisation — deux frames entrelacées
+  tuaient l'app (`IndexOutOfBounds` dans `PersonTracker.sweep`,
+  `NoSuchElementException` côté véhicules/veto ; crash 2 runs sur 4 sur
+  isee-sim le 01/11). `update`/`onFrame`/`reset` sont désormais
+  `@Synchronized` (6 lignes, aucun changement logique).
+- **Preuve** : 3 tests de concurrence JVM (8 threads × 300 frames) rouges
+  avant le fix (signatures exactes du crash), verts après ;
+  `:core:testDebugUnitTest` + `:app:testDebugUnitTest` verts sur le r630
+  (BUILD SUCCESSFUL, 0 échec).
+
 ## 2026-11-01 — iSee : la personne douce dit le seul mot « Droite. »/« Gauche. » (branche `fix-personne-mot-seul`)
 
 - **Fait** : ordre user « iSee me dit encore attention personne à x
