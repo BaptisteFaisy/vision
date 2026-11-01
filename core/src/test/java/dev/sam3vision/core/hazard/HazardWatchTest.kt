@@ -376,6 +376,7 @@ class HazardWatchTest {
         assertFalse(cue.urgent)
         assertEquals(HazardKind.OTHER, cue.kind)
         assertNull(cue.safetyPhrase)
+        assertEquals(7, cue.level)
     }
 
     @Test
@@ -428,7 +429,7 @@ class HazardWatchTest {
         assertEquals("Gauche.", cue!!.phrase)
         assertFalse(cue.urgent)
         assertEquals(HazardKind.PERSON, cue.kind)
-        assertEquals(7, cue.level)
+        assertEquals(2, cue.level)
     }
 
     @Test
