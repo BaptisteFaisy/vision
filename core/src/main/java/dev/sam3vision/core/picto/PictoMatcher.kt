@@ -7,6 +7,15 @@ import kotlin.math.sqrt
 /** Score minimal pour afficher le pictogramme (corrélation normalisée 0..1). */
 const val MATCH_THRESHOLD = 0.72f
 
+/**
+ * Marge minimale entre le meilleur score et son second non chevauchant : un
+ * gabarit arête (sombre|clair, comme le gabarit clés du téléphone) matche
+ * tout contour au-dessus du seuil — seule une position qui se détache prouve
+ * l'objet (test de Lowe). Calibrée le 01/11 sur gabarits réels : faux positif
+ * sur halo 0,074, vrais positifs ~0,88.
+ */
+const val MATCH_MARGIN = 0.10f
+
 /** Échelles cherchées : l'objet peut être plus près ou plus loin que sur la photo. */
 private val SCALES = floatArrayOf(0.7f, 1.0f, 1.4f)
 
@@ -30,9 +39,10 @@ fun buildTemplate(photo: GrayImage): PictoTemplate {
 
 /**
  * Meilleure occurrence du gabarit dans la frame, `null` si rien ne dépasse le
- * seuil. Corrélation croisée normalisée multi-échelle, moyennes et variances de
- * fenêtre en O(1) par images intégrales — ~1 M d'opérations à 80 px, 2 Hz sur
- * le téléphone sans dépendance native.
+ * seuil avec une marge distinctive. Corrélation croisée normalisée
+ * multi-échelle, moyennes et variances de fenêtre en O(1) par images
+ * intégrales — ~2 M d'opérations à 80 px (second passage hors meilleur
+ * rectangle), 2 Hz sur le téléphone sans dépendance native.
  */
 fun matchTemplate(
     frame: GrayImage,
@@ -44,14 +54,48 @@ fun matchTemplate(
     if (isFlat(template.gray)) return null
     val sums = Integrals(frame)
     var best: PictoHit? = null
+    var runnerUp: Float? = null
     for (scale in SCALES) {
         val edge = max(6, (template.edge * scale).toInt())
         if (edge >= frame.width || edge >= frame.height) continue
         val scaled = resizeGray(template.gray, template.edge, edge)
         val hit = scanScale(frame, sums, scaled, edge, pictoId, label)
-        if (hit != null && (best == null || hit.score > best.score)) best = hit
+        if (hit != null && (best == null || hit.score > best.score)) {
+            best = hit
+            runnerUp = secondBest(frame, sums, scaled, edge, hit)
+        }
     }
-    return best?.takeIf { it.score >= threshold }
+    return best?.takeIf { hit -> hit.score >= threshold && (runnerUp == null || hit.score - runnerUp >= MATCH_MARGIN) }
+}
+
+/**
+ * Meilleur score hors du meilleur rectangle ([best]) : `null` si aucune autre
+ * fenêtre ne convient (le match est seul, donc distinctif). La marge
+ * best − second prouve que la position se détache ; un gabarit arête, qui
+ * matche tout contour, y échoue toujours.
+ */
+private fun secondBest(
+    frame: GrayImage,
+    sums: Integrals,
+    scaled: IntArray,
+    edge: Int,
+    best: PictoHit,
+): Float? {
+    val templateStd = stdOf(scaled)
+    if (templateStd < FLAT_STD) return null
+    val centered = centerFloats(scaled, scaled.average().toFloat())
+    val bx = (best.x * frame.width).toInt()
+    val by = (best.y * frame.height).toInt()
+    var second = -1f
+    for (y in 0..frame.height - edge step STRIDE) {
+        for (x in 0..frame.width - edge step STRIDE) {
+            if (x - bx < edge && bx - x < edge && y - by < edge && by - y < edge) continue
+            val (mean, variance) = sums.window(x, y, edge, edge) ?: continue
+            val score = normalizedScore(frame, x, y, edge, centered, mean, templateStd, variance)
+            if (score > second) second = score
+        }
+    }
+    return second.takeIf { it >= 0f }
 }
 
 /** Vrai si le gabarit est uni : aucun motif à chercher, que des faux positifs. */

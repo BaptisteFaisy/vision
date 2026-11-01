@@ -44,6 +44,10 @@ private fun noise(size: Int, seed: Long): GrayImage {
     )
 }
 
+/** Arête verticale : sombre à gauche, clair à droite — montant, halo de lampe. */
+private fun edgeScene(size: Int, at: Int, dark: Int = 60, light: Int = 210): GrayImage =
+    GrayImage(IntArray(size * size) { i -> if (i % size < at) dark else light }, size, size)
+
 /** Découpe 24×24 à (20,20) : gabarit à l'échelle exacte de la frame. */
 private fun directTemplate(frame: GrayImage): PictoTemplate {
     val crop = IntArray(24 * 24) { i -> frame.gray[(20 + i / 24) * frame.width + 20 + i % 24] }
@@ -105,6 +109,31 @@ class PictoMatcherTest {
         assertEquals(TEMPLATE_EDGE, template.edge)
         // Carré 16×16 à (16,8) : le premier pixel vaut x = 16.
         assertEquals(16, template.gray[0])
+    }
+
+    @Test
+    fun `arete seule sans objet - pas de match malgre un score haut`() {
+        // Gabarit arête (sombre|clair, comme le gabarit clés du téléphone) sur
+        // une scène arête ailleurs : le seuil seul rendait un HIT à ~1.0 — le
+        // picto clés sur la lampe du 01/11. La marge l'interdit : l'arête
+        // matche partout, aucune position ne se détache.
+        val template = PictoTemplate(IntArray(24 * 24) { i -> if (i % 24 < 8) 40 else 200 }, 24)
+        assertNull(matchTemplate(edgeScene(96, 50), template, "p1", "keys"))
+    }
+
+    @Test
+    fun `vrai positif texture garde sa marge`() {
+        // Incrustation exacte dans du bruit : pic unique à 1.0, second loin
+        // derrière — le rappel ne doit pas souffrir de la marge.
+        val frame = noise(96, 999L)
+        val patch = IntArray(24 * 24) { (it * 37 + 11) % 256 }
+        for (dy in 0 until 24) {
+            for (dx in 0 until 24) frame.gray[(40 + dy) * 96 + 30 + dx] = patch[dy * 24 + dx]
+        }
+        val hit = matchTemplate(frame, PictoTemplate(patch, 24), "p1", "objet")
+        assertTrue(hit != null)
+        assertEquals(30f / 96f, hit!!.x, 0.001f)
+        assertEquals(40f / 96f, hit.y, 0.001f)
     }
 }
 

@@ -3,6 +3,22 @@
 Le journal part du 2026-10-26 après 19 h : le commit de départ, puis une entrée par fait
 livré et ses preuves (tâche, fichiers, chiffres) dans l'arbre.
 
+## 2026-11-01 — iSee : le picto clés ne s'affiche plus sans les clés (branche `isee-picto-cles`)
+
+- **Constat** : sur le Samsung, le pictogramme des clés restait affiché sur une
+  lampe alors que SAM rapportait 0 objet (capture + gabarits lus sur l'appareil,
+  5 pictos armés dont 3 « keys »). Le gabarit clés est une arête sombre|clair qui
+  corrèle à 0,786 un halo de lampe (seuil 0,72) : le matcher local, sans exigence
+  de distinctivité, affichait le picto.
+- **Fait** : `core/picto/PictoMatcher.kt` exige une marge de Lowe
+  (`MATCH_MARGIN = 0,10`, calibrée sur gabarits réels : faux positif 0,074, vrais
+  positifs ~0,88) entre le meilleur score et son second non chevauchant — iSee
+  comme le Direct en profitent, sans changement de signature.
+- **Preuve** : `PictoMatcherTest` 8/8 sur r630 (dont `arete seule sans objet`,
+  rouge avant le correctif, et `vrai positif texture`, rappel intact),
+  `IseePictoTest` 22/22, `LiveAskSessionTest` 24/24, `PictoStoreTest` 9/9,
+  `PictoOverlayTest` 2/2, `check-kotlin-limits` 0 dépassement.
+
 ## 2026-11-01 — CI : un test rouge se trie tout seul, et la pollution ne revient plus (branche `fix/triage-rouge-tests`)
 
 - **Constat** : le 01/11, la PR #919 a été bloquée 34 min par `ProbeStairsPriorityTest`,
