@@ -2,8 +2,10 @@
 """Rejoue un trajet GPS sur un émulateur Android, à cadence fixe (défaut 1 Hz).
 
 Lit un CSV (`lat,lon`, en-tête toléré, `;` ou espaces acceptés) ou un GPX
-(`<trkpt lat="…" lon="…">`) et pousse chaque point par `adb emu geo fix`,
-l'ordre GPS de la console émulateur étant (longitude, latitude).
+(`<trkpt lat="…" lon="…">`) et pousse chaque point par le **receiver de
+simulation de l'app debug** (précision annoncée, donc le guidage iSee accepte
+le fix) ; `--mode geofix` retombe sur `adb emu geo fix`, dont la position
+n'annonce aucune précision — iSee jette alors ces fixes sans rien dire.
 
 Réutilisable seul, sans le harnais :
 
@@ -25,6 +27,11 @@ import time
 
 PKG_OK = 0
 PKG_USAGE = 2
+
+# Contrat de `SimLocationDebugReceiver` (app/src/debug, build debug seulement).
+SIM_ACTION = "dev.sam3vision.app.sim.LOCATION"
+SIM_CLEAR = "dev.sam3vision.app.sim.LOCATION_CLEAR"
+SIM_ACCURACY_M = "8"
 
 # Un `<trkpt …>` GPX : attributs dans n'importe quel ordre, flottants signés.
 GPX_POINT = re.compile(r"<trk(?:pt|e|kseg)\b", re.IGNORECASE)
@@ -117,22 +124,77 @@ def resolve_adb(given):
     die("adb introuvable : passez --adb, $ADB ou installez les platform-tools")
 
 
-def send(adb, serial, point, timeout_s):
-    """Pousse un point ; la console veut (lon, lat). Renvoie True si accepté."""
-    lat, lon = point
-    argv = [adb, "-s", serial, "emu", "geo", "fix", "%.6f" % lon, "%.6f" % lat]
+def adb_run(adb, serial, argv, timeout_s):
+    """Lance `adb -s <série> …` ; renvoie (code, sortie combinée). `None` si timeout."""
     try:
-        done = subprocess.run(argv, capture_output=True, timeout=timeout_s, check=False)
+        done = subprocess.run([adb, "-s", serial] + argv, capture_output=True,
+                              timeout=timeout_s, check=False)
     except subprocess.TimeoutExpired:
-        print("ATTENTION : geo fix sans réponse en %ss" % timeout_s, file=sys.stderr)
-        return False
+        return None, "aucune réponse en %ss" % timeout_s
     except OSError as error:
         die("adb n'a pas pu être lancé : %s" % error.strerror)
-    if done.returncode != 0:
-        detail = done.stderr.decode("utf-8", "replace").strip() or "code %d" % done.returncode
-        print("ATTENTION : geo fix refusé (%s)" % detail, file=sys.stderr)
+    return done.returncode, (done.stdout + done.stderr).decode("utf-8", "replace").strip()
+
+
+def has_sim_receiver(adb, serial, pkg, timeout_s):
+    """Vrai si l'APK installé porte le receiver de position simulée (build debug)."""
+    code, out = adb_run(adb, serial, ["shell", "dumpsys", "package", pkg], timeout_s)
+    return code == 0 and SIM_ACTION in out
+
+
+def send_broadcast(adb, serial, pkg, point, timeout_s):
+    """Pousse un point par le receiver debug (précision annoncée). True si accepté."""
+    lat, lon = point
+    argv = ["shell", "am", "broadcast", "-a", SIM_ACTION, "-p", pkg,
+            "--ef", "lat", "%.6f" % lat, "--ef", "lon", "%.6f" % lon,
+            "--ef", "acc", SIM_ACCURACY_M]
+    code, out = adb_run(adb, serial, argv, timeout_s)
+    if code != 0 or "Broadcast completed" not in out:
+        print("ATTENTION : broadcast de position refusé (%s)"
+              % (out or "code %s" % code), file=sys.stderr)
         return False
     return True
+
+
+def send_geofix(adb, serial, point, timeout_s):
+    """Pousse un point par `adb emu geo fix` (lon, lat). True si accepté."""
+    lat, lon = point
+    argv = ["emu", "geo", "fix", "%.6f" % lon, "%.6f" % lat]
+    code, out = adb_run(adb, serial, argv, timeout_s)
+    if code != 0:
+        print("ATTENTION : geo fix refusé (%s)" % (out or "code %s" % code), file=sys.stderr)
+        return False
+    return True
+
+
+def choose_mode(wanted, adb, serial, pkg, timeout_s):
+    """Mode effectif : `auto` prend le receiver s'il est là, sinon geo fix (averti)."""
+    if wanted != "auto":
+        return wanted
+    if has_sim_receiver(adb, serial, pkg, timeout_s):
+        print("position : receiver de simulation (précision %s m)" % SIM_ACCURACY_M)
+        return "broadcast"
+    print("ATTENTION : APK sans receiver de simulation (build release ?) → 'adb emu geo "
+          "fix', dont la position n'annonce pas de précision : iSee rejette ces fixes",
+          file=sys.stderr)
+    return "geofix"
+
+
+def make_sender(mode, pkg):
+    """Rend l'envoi d'un point, selon le mode retenu."""
+    if mode == "broadcast":
+        return lambda adb, serial, point, timeout_s: send_broadcast(
+            adb, serial, pkg, point, timeout_s)
+    return send_geofix
+
+
+def clear(adb, args, mode):
+    """Retire le test provider à la fin (les fixes réels reprennent). Silencieux."""
+    if mode != "broadcast":
+        return
+    adb_run(adb, args.serial,
+            ["shell", "am", "broadcast", "-a", SIM_CLEAR, "-p", args.pkg],
+            args.adb_timeout)
 
 
 def build_parser():
@@ -144,6 +206,11 @@ def build_parser():
     parser.add_argument("--adb", metavar="BIN", default="", help="binaire adb")
     parser.add_argument("--serial", metavar="SÉRIE", default="",
                         help="série adb (obligatoire hors --dry-run)")
+    parser.add_argument("--pkg", metavar="PAQUET", default="dev.sam3vision.app",
+                        help="paquet Android à alimenter (défaut : dev.sam3vision.app)")
+    parser.add_argument("--mode", metavar="M", default="auto",
+                        choices=("auto", "broadcast", "geofix"),
+                        help="canal de position : auto (défaut), broadcast, geofix")
     parser.add_argument("--hz", metavar="N", type=float, default=1.0,
                         help="cadence d'envoi en Hz (défaut 1)")
     parser.add_argument("--max-seconds", metavar="N", type=float, default=0.0,
@@ -156,6 +223,34 @@ def build_parser():
                         help="afficher les points sans contacter l'émulateur")
     parser.add_argument("-h", "--help", action="store_true", help="cette aide")
     return parser
+
+
+def replay(args, adb, points, send, mode):
+    """Envoie les points à la cadence, en boucle si demandé. Code de sortie."""
+    period = 1.0 / args.hz
+    started = time.monotonic()
+    failures = 0
+    sent = 0
+    while True:
+        for point in points:
+            if args.max_seconds and time.monotonic() - started >= args.max_seconds:
+                print("rejeu : %d points envoyés (durée atteinte)" % sent)
+                clear(adb, args, mode)
+                return PKG_OK
+            if send(adb, args.serial, point, args.adb_timeout):
+                failures = 0
+                sent += 1
+            else:
+                failures += 1
+                if failures >= 2:
+                    die("deux envois consécutifs ont échoué — série '%s' en ligne ?"
+                        % args.serial)
+            time.sleep(period)
+        if not args.loop:
+            break
+    print("rejeu : %d points envoyés en %.1fs" % (sent, time.monotonic() - started))
+    clear(adb, args, mode)
+    return PKG_OK
 
 
 def main(argv):
@@ -180,7 +275,6 @@ def main(argv):
         die("--hz doit être positif", PKG_USAGE)
     points = read_route(args.route)
     print("trajet : %d points (%s)" % (len(points), args.route))
-
     if args.dry_run:
         for index, (lat, lon) in enumerate(points, 1):
             print("  %3d  %.6f, %.6f" % (index, lat, lon))
@@ -188,30 +282,10 @@ def main(argv):
     if not args.serial:
         die("--serial est requis pour rejouer (comparez 'adb devices' avant/après le boot)",
             PKG_USAGE)
-
     adb = resolve_adb(args.adb)
-    period = 1.0 / args.hz
-    started = time.monotonic()
-    failures = 0
-    sent = 0
-    while True:
-        for point in points:
-            if args.max_seconds and time.monotonic() - started >= args.max_seconds:
-                print("rejeu : %d points envoyés (durée atteinte)" % sent)
-                return PKG_OK
-            if send(adb, args.serial, point, args.adb_timeout):
-                failures = 0
-                sent += 1
-            else:
-                failures += 1
-                if failures >= 2:
-                    die("deux geo fix consécutifs ont échoué — série '%s' en ligne ?"
-                        % args.serial)
-            time.sleep(period)
-        if not args.loop:
-            break
-    print("rejeu : %d points envoyés en %.1fs" % (sent, time.monotonic() - started))
-    return PKG_OK
+    mode = choose_mode(args.mode, adb, args.serial, args.pkg, args.adb_timeout)
+    sender = make_sender(mode, args.pkg)
+    return replay(args, adb, points, sender, mode)
 
 
 if __name__ == "__main__":

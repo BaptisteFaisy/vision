@@ -5,7 +5,7 @@ puis le **01/11/2026** (`grep`, aucun `gradlew` lancé pour ces passes). Les
 comptages de tests sont **statiques** (annotations `@Test`).
 Les chemins cités sont vérifiés un par un. **Aucun résultat d'exécution sur un appareil
 (téléphone ou émulateur) n'existe dans cet arbre** : tout ce qui est décrit comme recette est
-une *procédure*, pas une preuve. La liste de ce qui n'a pas été rejoué est au §4.
+une *procédure*, pas une preuve — sauf le §3 (harnais émulateur), exécuté et mesuré le 01/11/2026. La liste de ce qui n'a pas été rejoué est au §4.
 
 ## 1. Compter les tests (cet arbre, 01/11)
 
@@ -88,45 +88,79 @@ renvoie à `JAVA_HOME`. Ce qui est obligatoire, c'est un JDK **qui fournit `java
 seul ne suffit pas. Bytecode et `-jvm-target` sont fixés à **17** (`app/build.gradle.kts`,
 `core/build.gradle.kts`).
 
-## 3. Recette émulateur (flotte arrêtée — ne plus utiliser)
+## 3. Rejouer une balade enregistrée sur l'émulateur (`isee-sim.sh`)
 
-> **La flotte d'émulateurs est arrêtée et désactivée** (relevé antérieur, hors de
-> cet arbre) : on ne teste que sur le **téléphone réel** (section « Téléphone réel »
-> ci-dessous).
-> La recette émulateur ci-dessous est conservée pour mémoire — ses commandes
-> ne passent plus sur aucune machine du projet.
-
-Le script `scripts/install-emulator.sh` faisait la chaîne complète — reconstruisait l'APK
-s'il manquait, l'installait, accordait `CAMERA`, lançait l'app, prenait une capture
-d'écran et en affichait le chemin :
+**Exécuté le 01/11/2026** sur cette machine (Debian, KVM, émulateur 37.2.12) : la balade
+filmée au téléphone devient le flux de la caméra arrière, à sa vitesse réelle, et l'écran
+est filmé. Aucun téléphone n'est nécessaire.
 
 ```bash
-EMULATOR_SERIAL=emulator-5554 bash scripts/install-emulator.sh   # tout ci-dessous
+bash scripts/isee-sim.sh --video ~/Vidéos/balade.mp4 --route ~/Vidéos/balade.csv --seconds 30
 ```
 
-Variables lues par le script (`scripts/install-emulator.sh`, en-tête) : `EMULATOR_SERIAL`
-(**défaut `emulator-5554`**), `SKIP_BUILD=1` (ne pas rebâtir l'APK), `APK`, `ADB`, `TMPDIR`.
-Il ne lit ni n'affiche aucune valeur secrète.
+Le harnais enchaîne, et s'arrête au premier échec en nommant le coupable :
 
-À la main, si besoin :
+1. **transcodage** de la vidéo en profil caméra stable (H.264 `yuv420p` 640x480, 30 fps,
+   rotation appliquée, audio retiré), **mis en cache** par empreinte du fichier source
+   (`$XDG_CACHE_HOME/isee-sim`) : une même balade n'est transcodée qu'une fois ;
+2. **AVD** `isee-sim` créée si absente (image `android-35 google_apis x86_64`, 4 Go de RAM) ;
+3. **boot** headless avec `-camera-back videofile:<vidéo>` — c'est toute l'astuce : la
+   caméra de l'émulateur *est* le fichier, il n'y a rien à modifier dans l'app ;
+4. `adb install -r` de l'APK debug, puis `pm grant` (`CAMERA`, `RECORD_AUDIO`, position) et
+   `appops … mock_location allow` ;
+5. `am start --es route isee` : l'écran iSee s'ouvre sans qu'on touche à l'écran ;
+6. **rejeu du trajet** (`--route`, CSV `lat,lon` ou GPX) à 1 Hz, en tâche de fond ;
+7. **screenrecord** de `--seconds` secondes, puis rapatriement ;
+8. `logcat` filtré (`sam3vision`, `iSeeLive`, `iSeeMotion`, `Traverse`) + tampon `crash`,
+   puis extinction de l'émulateur **que le script a démarré** (jamais celui d'un autre).
+
+Options : `--video` (obligatoire), `--route`, `--seconds`, `--record`, `--avd`, `--no-build`,
+`--keep`, `--help`. Variables : `APK`, `ADB`, `EMULATOR`, `FFMPEG`, `ISEESIM_SIZE`
+(`640x480` par défaut ou `1280x720`), `ISEESIM_CACHE`, `BOOT_TIMEOUT`.
+
+### Ce qui a été mesuré sur la caméra vidéo
+
+| Mesure | Valeur | Comment |
+|---|---|---|
+| cadence livrée | **30 images/s** (temps réel) | vidéo de test avec compteur incrusté : 2 captures d'écran à 6,33 s d'écart montrent 3,990 s → 10,330 s de vidéo (192 images) |
+| bouclage | **oui, indéfini** | après la fin des 60 s, le compteur reprend à 0 sans intervention |
+| résolution | 640x480 par défaut (`1280x720` possible via `ISEESIM_SIZE`) | `listQemuCameras` dans le logcat de l'émulateur |
+| boot à froid | ~25 s | jusqu'à `sys.boot_completed=1` |
+
+Conséquence : une modif qui touche la caméra, la détection, l'UI ou le guidage se teste
+**sans téléphone**, et l'enregistrement d'écran est la preuve à joindre.
+
+### Position simulée : pourquoi pas `adb emu geo fix`
+
+`geo fix` livre une position **sans précision**, et iSee jette en silence tout fix dont
+`accM` dépasse `NavTuning.maxAccM` (25 m) — `NavFix.isUsable()` exige même `accM > 0`
+(`core/.../nav/NavRoute.kt`). Un trajet rejoué par `geo fix` donne donc un guidage muet.
+
+Le build **debug** embarque pour cela un receiver de simulation
+(`app/src/debug/.../sim/SimLocationDebugReceiver.kt`, actions
+`dev.sam3vision.app.sim.LOCATION` et `…LOCATION_CLEAR`) : il installe un test provider
+`gps` **et** `network` avec une précision de 8 m. `route-replay.py` le détecte tout seul et
+l'utilise ; sans lui il retombe sur `geo fix` en le disant.
 
 ```bash
-adb -s emulator-5554 install -r app/build/outputs/apk/debug/app-debug.apk
-adb -s emulator-5554 shell pm grant dev.sam3vision.app android.permission.CAMERA
-adb -s emulator-5554 shell pm grant dev.sam3vision.app android.permission.RECORD_AUDIO   # non posée par le script
-adb -s emulator-5554 shell am start -n dev.sam3vision.app/.MainActivity
-adb -s emulator-5554 shell screencap /sdcard/s.png && adb -s emulator-5554 pull /sdcard/s.png /tmp/samvision.png
+# à la main, un point :
+adb -s emulator-5556 shell am broadcast -a dev.sam3vision.app.sim.LOCATION -p dev.sam3vision.app \
+  --ef lat 48.8566 --ef lon 2.3522 --ef acc 8 --ef bearing 90 --ef speed 1.4
 ```
 
-- Le script accorde **`CAMERA` seulement** : les recettes de dictée et de voix exigent
-  `RECORD_AUDIO`, à accorder à la main.
-- Coordonnées de recette : propres à **1080×2400 @ 420 dpi** ; re-mesurer avec
-  `uiautomator dump` si l'UI bouge. `KEYCODE_BACK` peut sortir de l'app (préférer le bouton
-  « Retour » de l'écran).
-- L'app reprend l'écran où elle était après `am start` : pour rejouer depuis l'accueil,
-  `adb -s <serial> shell am force-stop dev.sam3vision.app` avant.
-- `install -r` échoue si un build antérieur a changé de signature : `uninstall` d'abord.
-- Les champs de clés sont masqués à l'écran (`•••`) : aucune clé lisible dans une capture.
+### Ce que le harnais ne prouve pas
+
+- **Ni latence ni performances réelles** : le rendu est logiciel (SwiftShader), les chiffres
+  de `docs/LATENCE-BUDGET.md` restent mesurés sur téléphone.
+- **Pas de réseau de services** : sans `local.properties`, `SAM_BASE_URL`/`SAM31_ENDPOINT`/
+  `LLM_BASE_URL` sont vides → panneaux d'erreur de la sonde et des questions. Pour une
+  recette hors ligne de la chaîne vision, pointer `sam31.endpoint=http://10.0.2.2:8099` sur
+  `tools/mock-sam.py` (le manifeste debug autorise le cleartext, 10.0.2.2 = l'hôte).
+- **Pas de caméra avant**, pas de photo/enregistrement réels : la caméra de l'émulateur est
+  le fichier vidéo.
+
+`scripts/install-emulator.sh` (ci-dessous) reste l'ancienne recette, gardée pour mémoire :
+elle installe l'APK sur un émulateur **déjà en ligne**, sans caméra vidéo ni trajet.
 
 ### Téléphone réel
 
