@@ -10,9 +10,10 @@
 ## 1. Cibles
 
 - **(A) Cadrage** : la rue des lunettes est nette, non déformée, sans freeze, au
-  bon ratio (HIGH = 720×1280 portrait natif, 15 i/s, H.265).
+  bon ratio (HIGH = 720×1280 portrait natif, jusqu'à 60 i/s demandés, H.265 ;
+  repli 30/24/15 annoncé si le lien refuse).
 - **(B) Latence lunettes → téléphone** : frame affichée en **< 100 ms** (p95,
-  60 s à 15 i/s), mesurée comme ci-dessous.
+  60 s à la cadence tenue), mesurée comme ci-dessous.
 - **(C) Latence vers le GPU Modal** : voir § 5 — l'aller-retour cloud a un
   plancher mesuré qui dépasse 50 ms ; on minimise l'aller et on prouve chaque ms.
 
