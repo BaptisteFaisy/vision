@@ -263,6 +263,7 @@ class IseeViewModel(app: Application) : AndroidViewModel(app) {
         observeCrossingVoice(viewModelScope, proximity, ::canAnnounce, { settings.speechLanguage })
         probe.observeCrossing(viewModelScope, haptics)
         probe.observeGlassesLive(viewModelScope, { settings }, { camera?.lensSpec }, { pitch.stop() }, { pitch.start() }, lensFeeds::mire)
+        probe.observeHeadPose(viewModelScope)
         probe.observeDetour(viewModelScope, voiceNav::onProbeDetour)
         hazards = probe.observeHazards(
             viewModelScope, proximity, { canAnnounce() }, { settings.speechLanguage }, safety,

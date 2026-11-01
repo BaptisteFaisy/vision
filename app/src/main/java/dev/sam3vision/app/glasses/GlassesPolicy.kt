@@ -232,6 +232,11 @@ object GlassesMessages {
 
     fun cameraUnavailable(reason: String) = GlassesMessage(MessageKind.ERROR, "Camera unavailable: $reason")
 
+    fun headPoseUnavailable() = GlassesMessage(
+        MessageKind.WARNING,
+        "Head pose unavailable: glasses distances run pinhole-only.",
+    )
+
     fun micPermissionMissing() = GlassesMessage(MessageKind.ERROR, permissionPath("Microphone not allowed"))
 
     fun audioRefused(hertz: Int, reason: String) = GlassesMessage(
