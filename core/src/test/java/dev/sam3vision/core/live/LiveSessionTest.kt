@@ -217,21 +217,67 @@ class LiveSessionTest {
     }
 
     @Test
-    fun `le regulateur ne rouvre que sous la moitie du budget`() {
+    fun `le regulateur rouvre apres cinq moyennes sous le budget, pas avant`() {
         val session = LiveSession(FakeLiveClient(), cadence = twoSlots())
         (1..3).forEach { _ -> session.stats.record(344L) }
         session.regulate()
         assertEquals(1, session.slots)
-        // 120 ms : sous le budget (150) mais pas sous sa moitié -> on reste à un créneau
+        // 120 ms : sous le budget (150) mais la réouverture veut de la durée,
+        // pas un creux — l'ancien seuil (moitié du budget) passait sous le plancher
+        // du signal (rtt ~176 ms) et ne rouvrait jamais (dump 01/11, lat-queue).
+        session.stats.reset()
+        (1..3).forEach { _ -> session.stats.record(120L) }
+        (1 until LiveSession.REOPEN_AFTER).forEach { _ -> session.regulate() }
+        assertEquals(1, session.slots)
+        session.regulate()
+        assertEquals(2, session.slots)
+    }
+
+    @Test
+    fun `le regulateur rouvre apres une congestion passagere (dump 01-11)`() {
+        val session = LiveSession(FakeLiveClient(), cadence = Cadence.Fast)
+        // Passage lent réseau (trames 182-200 du dump : rtt 200-424 ms) : on referme.
+        (1..3).forEach { _ -> session.stats.record(320L) }
+        session.regulate()
+        assertEquals(1, session.slots)
+        // Retour au nominal (rtt ~186 ms < budget 210) : on rouvre, pas on reste collé.
+        session.stats.reset()
+        (1..3).forEach { _ -> session.stats.record(186L) }
+        (1..LiveSession.REOPEN_AFTER).forEach { _ -> session.regulate() }
+        assertEquals(2, session.slots)
+    }
+
+    @Test
+    fun `un depassement remet a zero le compte de reouverture`() {
+        val session = LiveSession(FakeLiveClient(), cadence = twoSlots())
+        (1..3).forEach { _ -> session.stats.record(344L) }
+        session.regulate()
+        session.stats.reset()
+        (1..3).forEach { _ -> session.stats.record(120L) }
+        (1 until LiveSession.REOPEN_AFTER).forEach { _ -> session.regulate() }
+        assertEquals(1, session.slots)
+        // Un dépassement au milieu du compte : tout est à refaire.
+        session.stats.reset()
+        (1..3).forEach { _ -> session.stats.record(344L) }
+        session.regulate()
         session.stats.reset()
         (1..3).forEach { _ -> session.stats.record(120L) }
         session.regulate()
-        assertEquals(1, session.slots)
-        // 60 ms : le backend respire, on rouvre
-        session.stats.reset()
-        (1..3).forEach { _ -> session.stats.record(60L) }
+        assertEquals("un seul sous-budget après le dépassement : pas de réouverture", 1, session.slots)
+    }
+
+    @Test
+    fun `reset oublie le compte de reouverture`() {
+        val session = LiveSession(FakeLiveClient(), cadence = twoSlots())
+        (1..3).forEach { _ -> session.stats.record(344L) }
         session.regulate()
-        assertEquals(2, session.slots)
+        session.stats.reset()
+        (1..3).forEach { _ -> session.stats.record(120L) }
+        (1 until LiveSession.REOPEN_AFTER).forEach { _ -> session.regulate() }
+        session.reset()
+        (1..3).forEach { _ -> session.stats.record(120L) }
+        session.regulate()
+        assertEquals("compte remis à zéro : une seule moyenne ne rouvre pas", 1, session.slots)
     }
 
     /** Cadence à deux créneaux explicite : le même profil que [Cadence.Fast], écrit en dur. */
