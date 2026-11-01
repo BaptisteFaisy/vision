@@ -54,6 +54,8 @@ ANCHORS = {
     "feuxfr3/tel_g05.ppm": "Green",
     "feuxfr3/tel_g06.ppm": "Green",
     "feuxfr3/tel_g07.ppm": "Green",
+    "feuxfr3/tel_g08.ppm": "Green",
+    "feuxfr3/tel_g09.ppm": "Green",
     "feuxfr3/tel_r01.ppm": "Red",
     "feuxfr3/tel_r02.ppm": "Red",
     "feuxfr3/tel_r03.ppm": "Red",
@@ -110,8 +112,8 @@ class FeaturesTest(unittest.TestCase):
 
 
 class ParityTest(unittest.TestCase):
-    def test_trente_et_une_ancres(self):
-        self.assertEqual(len(ANCHORS), 31)
+    def test_trente_trois_ancres(self):
+        self.assertEqual(len(ANCHORS), 33)
         for name, want in sorted(ANCHORS.items()):
             px, w, h = lf.load_ppm(RES / name)
             with self.subTest(name=name):
