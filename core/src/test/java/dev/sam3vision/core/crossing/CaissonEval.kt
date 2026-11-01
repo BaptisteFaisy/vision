@@ -16,7 +16,7 @@ import org.json.JSONObject
  * n'est pas rejoué : les caissons contiennent leur lentille, verdicts
  * inchangés, voir `CrossingRecenterTest` côté `:app`) →
  * [PedLightGate.verdict] (vrai code). Les verdicts attendus sont pinés dans
- * `feuxevel/RECALL-v3.json` (pré-calculés par le miroir Python
+ * `feuxevel/RECALL-v4.json` (pré-calculés par le miroir Python
  * `tools/light_features.py`, parité verrouillée en CI sur 31 ancres).
  */
 
@@ -166,10 +166,10 @@ internal data class EvalGolden(
     val recall: Map<String, String>,
 )
 
-/** Lecture du doré `feuxevel/RECALL-v3.json` (échoue fort si absent). */
+/** Lecture du doré `feuxevel/RECALL-v4.json` (échoue fort si absent). */
 internal fun loadGolden(loader: ClassLoader?): EvalGolden {
-    val text = loader?.getResourceAsStream("feuxevel/RECALL-v3.json")?.bufferedReader()?.readText()
-        ?: error("ressource manquante : feuxevel/RECALL-v3.json")
+    val text = loader?.getResourceAsStream("feuxevel/RECALL-v4.json")?.bufferedReader()?.readText()
+        ?: error("ressource manquante : feuxevel/RECALL-v4.json")
     val json = JSONObject(text)
     val cases = json.getJSONArray("cases")
     val verdicts = mutableMapOf<String, String>()

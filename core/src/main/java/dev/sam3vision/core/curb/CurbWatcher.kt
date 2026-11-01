@@ -269,7 +269,7 @@ class CurbWatcher(
         return onCountdown(signal, nowMs, language)
     }
 
-    /** Détection : parle vite, une fois par approche (le clignotement attend le cooldown). */
+    /** Détection : parle vite, une fois par approche (le clignotement attend le cooldown). Sens incertain (chemin/route) : consigne prudente, pas la détection franche. */
     private fun onDetection(signal: CurbSignal, nowMs: Long, language: SpeechLanguage): CurbCue? {
         palierHits = 0
         palierTarget = null
@@ -279,8 +279,11 @@ class CurbWatcher(
         detectedSpoken = true
         lastCueAtMs = nowMs
         hits = 0
+        val edge = signal.edge ?: CurbEdge.Up
+        val phrase = if (edge == CurbEdge.Uncertain) CurbText.phrase(edge, language, signal.centerX)
+        else CurbText.detectedPhrase(language, signal.centerX)
         return CurbCue(
-            CurbText.detectedPhrase(language, signal.centerX),
+            phrase,
             signal.meters,
             CurbTier.FAR,
             urgent = false,
@@ -315,7 +318,9 @@ class CurbWatcher(
         lastCueAtMs = nowMs
         val near = target <= STEP_NEAR_METERS
         if (near) lastNearAtMs = nowMs
-        val phrase = CurbText.distancePhrase(target, language)
+        val edge = signal.edge ?: CurbEdge.Up
+        val phrase = if (edge == CurbEdge.Uncertain) CurbText.stepPhrase(edge, language)
+        else CurbText.distancePhrase(target, language)
         return CurbCue(
             phrase,
             signal.meters,
@@ -343,8 +348,8 @@ class CurbWatcher(
         /** Positifs consécutifs avant d'annoncer (un isolé = bruit). */
         const val DEFAULT_CONFIRM_FRAMES = 2
 
-        /** Silence entre deux annonces douces (4 s, audit 31/10 : re-parler vite rue). */
-        const val DEFAULT_COOLDOWN_MS = 4_000L
+        /** Silence entre deux annonces douces (le trottoir ne bouge pas). */
+        const val DEFAULT_COOLDOWN_MS = 10_000L
 
         /**
          * Tolérance au clignotement SAM : jusqu'à [GRACE_FRAMES] frames consécutives

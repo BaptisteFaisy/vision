@@ -264,8 +264,11 @@ class CurbWatcherTest {
 
         val watcher = CurbWatcher()
         val near = CurbSignal(detected = true, meters = 0.3f, centerX = 0.5f, edge = CurbEdge.Uncertain)
-        watcher.onSignal(near, 1000L, SpeechLanguage.Fr)
-        val cue = watcher.onSignal(near, 2000L, SpeechLanguage.Fr)
+        assertNull(watcher.onSignal(near, 1000L, SpeechLanguage.Fr))
+        val detected = watcher.onSignal(near, 2000L, SpeechLanguage.Fr)
+        assertEquals("Attention bordure, à midi.", detected!!.phrase)
+        assertNull(watcher.onSignal(near, 3000L, SpeechLanguage.Fr))
+        val cue = watcher.onSignal(near, 4000L, SpeechLanguage.Fr)
 
         assertEquals("Attention bordure.", cue!!.phrase)
         assertTrue(cue.urgent)
@@ -273,7 +276,7 @@ class CurbWatcherTest {
     }
 
     @Test
-    fun `cooldown bordures quatre secondes`() {
+    fun `cooldown bordures dix secondes`() {
         val watcher = CurbWatcher()
         val positive = CurbSignal(detected = true, meters = 0.8f)
 
@@ -282,7 +285,8 @@ class CurbWatcherTest {
         watcher.onSignal(CurbSignal.none(), 3000L)
         assertNull(watcher.onSignal(positive, 4000L))
         assertNull(watcher.onSignal(positive, 5000L))
-        assertNotNull("cooldown 4 s écoulé", watcher.onSignal(positive, 6000L))
+        assertNull(watcher.onSignal(positive, 6000L))
+        assertNotNull("cooldown 10 s écoulé", watcher.onSignal(positive, 13000L))
     }
 
     @Test
