@@ -77,6 +77,7 @@ class PersonTracker(
      * Les pistes trop vieilles (`atMs - dernière vue > maxGapMs`) sont
      * enterrées d'abord ; les autres survivent à une frame vide.
      */
+    @Synchronized
     fun onFrame(atMs: Long, labels: List<PlacedLabel>): List<TrackedLabel> {
         frameIndex++
         sweep(atMs)
@@ -99,6 +100,7 @@ class PersonTracker(
      * Nouvelle séance : toutes les pistes sont oubliées, et les ids continuent
      * d'avancer — un id d'avant [reset] ne désigne jamais quelqu'un d'après.
      */
+    @Synchronized
     fun reset() {
         tracks.clear()
         frameIndex = 0L

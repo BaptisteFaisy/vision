@@ -130,6 +130,7 @@ class VehicleStateWatcher(
      * fond : une piste qui suit la caméra ne conclut plus le mouvement.
      * [movingMeters] borne la portée du mouvement (sans-feu : infini — toute voiture qui bouge se dit).
      */
+    @Synchronized
     fun update(
         detections: List<Detection>,
         readings: List<DistanceReading>,
@@ -195,6 +196,7 @@ class VehicleStateWatcher(
     }
 
     /** Oublie pistes, mémoire et annonces (nouvelle traversée, nouveau direct). */
+    @Synchronized
     fun reset() {
         approach.reset()
         previous = emptyMap()
