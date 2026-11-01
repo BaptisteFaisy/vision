@@ -23,8 +23,8 @@
   restants restent blanc laiteux. Shader AGSL sur API 33+,
   repli en dégradés en dessous. **Aucun pixel sur la boule, aucun satellite.**
 - **Caméra = la rue en haut**, sans cadre ni carte (`IseePortraitCamera`) :
-  elle occupe 64 % du haut au repos (`PICTURE_IDLE_H`) et 50 % pendant la
-  parole (`PICTURE_SPEAKING_H`), avec une transition douce, et **se fond dans le blanc** sur
+  elle occupe toujours 50 % du haut quand elle est affichée (la taille
+  parole, `PICTURE_SPEAKING_H`), et **se fond dans le blanc** sur
   ses 34 % du bas (`FADE`, courbe `pictureAlpha`). À l'ouverture elle arrive
   **floue et agrandie** (×1,05, flou max 24) puis devient nette (`focusPull`).
   Elle reste visible **tant qu'une capture est vivante** (`captureLive`),
