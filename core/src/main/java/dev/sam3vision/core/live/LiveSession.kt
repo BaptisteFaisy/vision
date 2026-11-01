@@ -50,6 +50,23 @@ data class Cadence(
             concurrency = 2,
             latencyBudgetMs = 210L,
         )
+
+        /**
+         * Foule (audit foule du 01/11, P0 point 1) : mêmes deux vols que [Fast], mais
+         * budget de **600 ms** au lieu de 150 — en foule c'est ce budget qui refermait
+         * les créneaux au moment précis où le second vol sert. 1,43 s pour un piéton
+         * frontal à 2,7 m/s, **2 frames à 1,4 ips** ⇒ on garde le double vol en foule :
+         * une frame de 400 ms **projetée par son âge** ([Timing.projectDistance]) vaut
+         * mieux que deux fois moins de décisions, et une frame perdue à l'instant du
+         * contact ne se rattrape pas.
+         */
+        val Crowd = Cadence(
+            fastMs = 0L,
+            targetMs = 0L,
+            slowMs = 900L,
+            concurrency = 2,
+            latencyBudgetMs = 600L,
+        )
     }
 }
 
@@ -64,6 +81,10 @@ data class Cadence(
  *
  * C'est l'implémentation **par défaut** de [FramePipeline] ; le tracker
  * ([TrackRunner], `/session` + `/frame`) est l'autre.
+ *
+ * La sonde iSee bascule [Cadence.Fast] → [Cadence.Crowd] dès qu'un corps est dans sa
+ * dernière réponse (état `LiveProbe.crowd`) : en foule, le second vol reste ouvert
+ * jusqu'à 600 ms de latence moyenne au lieu de 150.
  */
 class LiveSession(
     private val client: LiveClient,
@@ -73,7 +94,7 @@ class LiveSession(
     val prompts: List<String> = LivePrompts.default,
     private val workEdge: Int = DEFAULT_WORK_EDGE,
     private val maxObjects: Int = DEFAULT_MAX_OBJECTS,
-    private val cadence: Cadence = Cadence.Direct,
+    private var cadence: Cadence = Cadence.Direct,
     private val clock: () -> Long = System::currentTimeMillis,
 ) : FramePipeline {
     /** Créneaux d'envoi : 1 par défaut, [Cadence.concurrency] pour la cadence rapide. */
@@ -94,6 +115,18 @@ class LiveSession(
 
     /** Nombre de requêtes acceptées en même temps, à cet instant. */
     val slots: Int get() = gate.capacity
+
+    /**
+     * Bascule de cadence à chaud ([Cadence.Fast] ↔ [Cadence.Crowd]) : la foule rouvre le
+     * second vol que le budget de 150 ms avait refermé, et le rend en sortant de foule.
+     * Les créneaux suivent [Cadence.concurrency] ; les mesures de la séance sont gardées
+     * (c'est le budget qui change, pas l'historique de latence). Rien d'autre ne bouge.
+     */
+    fun useCadence(next: Cadence) {
+        if (next == cadence) return
+        cadence = next
+        gate.capacity = next.concurrency
+    }
 
     /** Le socket du direct est-il ouvert ? `false` pour un client sans transport socket. */
     val socketOpen: Boolean get() = (client as? WsLiveClient)?.isConnected ?: false

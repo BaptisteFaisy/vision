@@ -276,18 +276,19 @@ class DistanceMeterTest {
     }
 
     @Test
-    fun `bordure collee au bas avec pose est mesuree par le sol`() {
+    fun `bordure collee au bas avec pose n'a plus de distance`() {
+        // P0 point 7 : le bas coupé ne rend plus la distance du bord bas. La pose
+        // seule ne fait pas un plan de sol : sans ligne de pieds dans l'image, il
+        // n'y a rien à lire (la constante de pose existait, elle n'est plus rendue).
         val meter = DistanceMeter()
         meter.pose = CameraPose(1.5f)
         val box = listOf(100f, 300f, 400f, 384f)
         assertTrue(Pinhole.isVerticallyCut(box, 384))
-        val reading = meter.measure(512, 384, listOf(detection("curb", box))).firstOrNull()
-        assertNotNull(reading)
-        // voie sol pure : curb n'a pas de hauteur stenope, la mesure vient des pieds
+        assertTrue(meter.measure(512, 384, listOf(detection("curb", box))).isEmpty())
         val focal = LensSpec.Default.focalPx(512, 384)
         val (_, principalY) = LensSpec.Default.principalPx(512, 384)
-        val expected = GroundPlane.forwardMeters(384f, CameraPose(1.5f), focal, principalY, 384)!!
-        assertEquals(expected, reading!!.rawMeters, 0.001f)
+        val constant = GroundPlane.forwardMeters(384f, CameraPose(1.5f), focal, principalY, 384)!!
+        assertEquals(3.01f, constant, 0.01f)
     }
 
     @Test
@@ -300,19 +301,26 @@ class DistanceMeterTest {
     }
 
     @Test
-    fun `boite coupee avec pose mesure le sol, stenope ecarte`() {
+    fun `boite coupee avec pose ne rend plus de distance`() {
+        // P0 point 7 : une personne dont le bas de boîte est coupé n'est plus
+        // annoncée à la distance du bord bas (2,27 m à tangage 0 sur l'objectif de
+        // l'audit, 3,01 m avec la focale par défaut). Le sténopé voit une hauteur
+        // tronquée et le plan de sol n'a pas de pieds : rien, plutôt qu'un chiffre.
         val meter = DistanceMeter()
         meter.pose = CameraPose(1.5f)
         val box = listOf(100f, 200f, 200f, 384f)
         assertTrue(Pinhole.isVerticallyCut(box, 384))
-        val reading = meter.measure(512, 384, listOf(detection("personne", box))).firstOrNull()
-        assertNotNull(reading)
+        assertTrue(meter.measure(512, 384, listOf(detection("personne", box))).isEmpty())
+        // la valeur refusée, pour mémoire : constante de pose, pas une mesure
         val focal = LensSpec.Default.focalPx(512, 384)
         val (_, principalY) = LensSpec.Default.principalPx(512, 384)
-        val ground = GroundPlane.forwardMeters(384f, CameraPose(1.5f), focal, principalY, 384)!!
-        val pinhole = Pinhole.distanceMeters(box, 1.70f, focal)!!
-        // le stenope verrait un autre chiffre (hauteur faussee) : la lecture suit le sol seul
-        assertTrue(kotlin.math.abs(pinhole - ground) > 0.1f)
-        assertEquals(ground, reading!!.rawMeters, 0.001f)
+        val constant = GroundPlane.forwardMeters(384f, CameraPose(1.5f), focal, principalY, 384)!!
+        assertEquals(3.01f, constant, 0.01f)
+        // le sténopé sur la hauteur tronquée, lui, annonçait une autre erreur
+        assertEquals(
+            1.70f * focal / (box[3] - box[1]),
+            Pinhole.distanceMeters(box, 1.70f, focal)!!,
+            0.01f,
+        )
     }
 }

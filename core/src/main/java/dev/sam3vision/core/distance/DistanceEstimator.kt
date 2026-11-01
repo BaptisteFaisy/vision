@@ -11,9 +11,11 @@ import kotlin.jvm.Volatile
  * l'image analysée pour retrouver l'objet à l'écran, [confidence] la confiance
  * de la mesure brute (voir [ReadingConfidence]).
  *
- * [cutFallback] : repli bas-au-contact (boîte coupée par le bord bas, pieds
- * sous le cadre) — valeur sol ou dernière piste, confiance plafonnée, à
- * exclure des ancres profondeur (`DepthReadings`, biais loin).
+ * [cutFallback] : repli bas-au-contact **historique** — plus produit depuis le
+ * P0 point 7 (une boîte coupée par le bas n'a plus de distance, voir
+ * [DistanceMeter.measure]). Le champ reste : la calibration profondeur le filtre
+ * (`DepthReadings` : un repli ne fait jamais une ancre) et une lecture venue
+ * d'ailleurs peut encore le porter.
  */
 data class DistanceReading(
     val trackId: Int,
@@ -59,7 +61,7 @@ object Pinhole {
 
     /**
      * Bord haut coupé : la hauteur ne mesure plus l'objet (tête hors cadre).
-     * Toujours refusé, même avec une pose — seul le bas-au-contact a un repli.
+     * Refusé, comme le bord bas — aucune des deux coupes n'a de mesure.
      */
     fun isCutTop(box: List<Float>, tolerancePx: Float = EDGE_TOLERANCE_PX): Boolean {
         if (box.size < 4) return false
@@ -67,8 +69,10 @@ object Pinhole {
     }
 
     /**
-     * Bord bas coupé (« au contact ») : les pieds sont sous le cadre, l'objet
-     * est proche — repli sol ou dernière piste ([DistanceMeter]), pas refus sec.
+     * Bord bas coupé : les pieds sont sous le cadre, donc la hauteur de la boîte
+     * ne mesure plus l'objet **et** la ligne des pieds n'est plus dans l'image —
+     * les deux branches de la lane sont muettes, la mesure est refusée (voir
+     * [DistanceMeter.measure]).
      */
     fun isCutBottom(box: List<Float>, imageHeight: Int, tolerancePx: Float = EDGE_TOLERANCE_PX): Boolean {
         if (box.size < 4 || imageHeight <= 0) return false
@@ -221,9 +225,9 @@ class DistanceMeter(
      * la mesure n'est alors pas lissée, mais elle est quand même rendue).
      * Les boîtes masquées par une meilleure détection ([Occlusion]) sont écartées :
      * leur hauteur ne mesure plus l'objet.
-     * Une boîte coupée par le bord bas seul donne un repli signalé
-     * ([DistanceReading.cutFallback]) quand la pose ou la piste le permet ;
-     * coupée en haut, elle est écartée.
+     * Une boîte coupée par le bord haut **ou bas** est écartée : sa hauteur ne
+     * mesure plus l'objet et, coupée en bas, sa ligne de pieds n'est plus dans
+     * l'image — aucune des deux branches de la lane ne peut conclure (voir [readOne]).
      */
     fun measure(
         width: Int,
@@ -258,9 +262,19 @@ class DistanceMeter(
         // détecteur (overlay, appariement profondeur).
         val box = detection.maskBox?.takeIf { it.size >= 4 } ?: detection.box
         if (Pinhole.isCutTop(box)) return null
-        if (Pinhole.isCutBottom(box, height)) {
-            return readCutBottom(width, height, detection, trackId, focalPx, principalX, principalY, box)
-        }
+        // Bas coupé (pieds sous le cadre) : aucune mesure, `null`. Le sténopé ne
+        // peut pas parler (hauteur tronquée) et le plan de sol non plus — sa
+        // formule demande la ligne des pieds, qui est précisément sous le cadre.
+        // La rabattre sur le bord bas (ce que faisait cette branche jusqu'au P0
+        // point 7) rendait une **constante de pose** (2,27 m à tangage 0, 6,29 m à
+        // −20° pour un téléphone à 1,5 m) : un piéton à 1 m était annoncé à 2,27 m
+        // et le seuil de contact de 0,6 m devenait inatteignable. Il n'existe pas
+        // de plan de sol par objet côté direct pour remplacer ce chiffre
+        // (`GroundPipeline` n'est pas branché à la boucle live, pas de
+        // `GroundReadings` par boîte) — c'est là qu'il se branchera. Une distance
+        // inconnue se traite comme proche par les appelants conservateurs
+        // (`Guidance` bloque sans distance) ; un chiffre faux est pire.
+        if (Pinhole.isCutBottom(box, height)) return null
         // Boîte redressée (identité sans distorsion mesurée) : les deux branches
         // — sténopé via [rawMeters], plan de sol via [groundMeters] — lisent des
         // bords haut/bas sur leurs rayons idéaux.
@@ -359,59 +373,9 @@ class DistanceMeter(
         return GroundPlane.forwardMeters(box[3], current, focalPx, principalY, imageHeight)
     }
 
-    /**
-     * Repli bas-au-contact : la boîte touche le bord bas (pieds sous le cadre),
-     * le sténopé est impraticable (hauteur tronquée) mais l'objet est proche et
-     * demande une valeur. Le sol au bord du cadre d'abord ([pose] réglée), la
-     * dernière piste sinon — brut, jamais lissé : nourrir la piste d'un biais au
-     * contact la corromprait. `null` sans pose ni piste (pas de valeur déguisée).
-     */
-    private fun readCutBottom(
-        width: Int,
-        height: Int,
-        detection: Detection,
-        trackId: Int?,
-        focalPx: Float,
-        principalX: Float,
-        principalY: Float,
-        box: List<Float>,
-    ): DistanceReading? {
-        val measured = undistortedBox(box, width, height, principalX, principalY)
-        val feet = measured.toMutableList()
-        feet[3] = minOf(feet[3], height.toFloat())
-        val ground = groundMeters(feet, focalPx, principalY, height)
-        val predicted = lastFor(trackId)
-        val meters = ground ?: predicted?.meters ?: lastSmoothed(trackId) ?: return null
-        val confidence = minOf(
-            ReadingConfidence.of(feet, null, ground),
-            predicted?.confidence ?: 1f,
-            CUT_FALLBACK_MAX_CONFIDENCE,
-        )
-        val id = trackId ?: UNTRACKED_ID
-        return DistanceReading(id, detection.label, meters, meters, detection.box, confidence, true)
-    }
-
-    /** Prédiction Kalman de la piste, `null` sans piste, sans Kalman ou périmée. */
-    private fun lastFor(trackId: Int?): KalmanPrediction? {
-        if (trackId == null || !kalmanEnabled) return null
-        return kalman.predict(trackId)
-    }
-
-    /** Dernier lissage EMA de la piste, `null` sans piste, en Kalman ou périmé. */
-    private fun lastSmoothed(trackId: Int?): Float? {
-        if (trackId == null || kalmanEnabled) return null
-        return smoother.last(trackId)
-    }
-
     companion object {
         /** Identité des objets que le journal n'a pas encore identifiés. */
         const val UNTRACKED_ID = -1
-
-        /**
-         * Confiance plafond d'un repli bas-au-contact : sol au bord du cadre ou
-         * dernière piste — une rustine qui dépanne, jamais une mesure à 1.
-         */
-        const val CUT_FALLBACK_MAX_CONFIDENCE = 0.5f
     }
 
     /** Mesure brute d'une frame : mètres fusionnés + confiance de la mesure. */

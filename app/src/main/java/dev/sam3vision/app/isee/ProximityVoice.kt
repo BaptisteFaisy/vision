@@ -14,66 +14,50 @@ import kotlin.coroutines.coroutineContext
 /**
  * Voix de proximité de la fenêtre caméra : directions douces dites en continu
  * ([speakWord]), positions et obstacles doux redits après [REPEAT_TTL_MS]
- * tant qu'ils durent ([onPhrase] : un danger présent ne se tait pas, le
- * retour d'une scène parle) — en voix Laure (ElevenLabs).
+ * tant qu'ils durent ([onPhrase] : un danger présent ne se tait pas, le retour
+ * d'une scène parle) — en voix Laure (ElevenLabs).
  *
- * L'urgence ([urgent] : stop, danger qui s'approche, sortie de trace) ne
- * parle jamais Laure : elle part par [safety] (voix de sécurité, système
- * grave, hors-ligne — ordre user : une urgence ne sonne jamais comme une
- * phrase normale), coupe tout (chat compris, dictée ou pas) et reste orale
- * seule (aucun sous-titre, aucun fanion parlant — le TTS système ne rend
- * pas de fin). Les clips stop (`guide_stop`, `tl_stop`) sont l'héritage
- * d'avant : l'urgent ne les joue plus.
+ * L'urgence ([urgent] : stop, danger qui s'approche, sortie de trace) ne parle
+ * jamais Laure : elle part par [safety] (voix de sécurité, système grave,
+ * hors-ligne — une urgence ne sonne jamais comme une phrase normale), coupe
+ * tout (chat compris, dictée ou pas) et reste orale seule (aucun sous-titre ni
+ * fanion parlant : le TTS système ne rend pas de fin). Les clips stop
+ * (`guide_stop`, `tl_stop`) sont l'héritage d'avant : l'urgent ne les joue plus.
  *
  * Garde-fous du doux : rien par-dessus la réponse du chat (une seule source
- * sonore à la fois — c'est l'appelant qui dit si le lecteur est libre),
- * rien par-dessus la voix route (le doux attend la fin du virage), rien
- * par-dessus le TTS système ([systemBusy] : une alerte de sécurité ne se
- * chevauche pas), et une synthèse annulée (phrase plus fraîche arrivée
- * entre-temps, `collectLatest` côté sonde) n'est jamais jouée. Le stop seul
- * ne se répète jamais ; les directions douces reparlent à chaque émission
- * (ordre user du 31/10).
- *
- * Sans clé ElevenLabs (ou voix réseau en panne : 401/402/429), pas de
- * silence : la phrase douce part au TTS système ([system], en file),
- * précédée une fois par session du signal [VoiceOfflineFallback]. Le repli est
- * oral seul (ni sous-titre, ni fanion — miroir `SafetyVoice` : sans fin de
- * lecture, un fanion bloquerait la voix douce pour toujours), mais mémorisé
- * (pas de répétition).
+ * sonore à la fois — l'appelant dit si le lecteur est libre), rien par-dessus la
+ * voix route, rien par-dessus le TTS système ([systemBusy] : une alerte de
+ * sécurité ne se chevauche pas), et une synthèse annulée (`collectLatest` côté
+ * sonde) n'est jamais jouée. Le stop seul ne se répète jamais ; les directions
+ * douces reparlent à chaque émission (ordre user du 31/10). Sans clé ElevenLabs
+ * (ou voix réseau en panne : 401/402/429), pas de silence : la phrase douce
+ * part au TTS système ([system], en file), précédée une fois par session du
+ * signal [VoiceOfflineFallback].
  *
  * [synthesize] injecte le moteur doux (ElevenLabs en prod, faux en test —
- * miroir `IseePlayback`). [clips] est le pack voix des mots doux : clip
- * local quand il existe (< 100 ms, zéro réseau), synthèse + mise en cache
- * sinon (`null` = synthèse seule, comme avant). [routeSpeaking] dit si la
- * voix route parle : le doux se tait tant qu'elle parle. [flushPending]
- * redit la phrase douce gardée ([onPhrase] avec file) dès le silence, dans
- * [PENDING_TTL_MS]. L'arrivée sur le passage ([onArrivalPhrase]) passe en
- * dernier, derrière la route et les doux — la plus basse priorité de
- * toutes les annonces.
+ * miroir `IseePlayback`), [clips] le pack voix des mots doux (clip local
+ * < 100 ms, synthèse + cache sinon), [routeSpeaking] dit si la voix route
+ * parle. [flushPending] redit la phrase gardée dès le silence, dans
+ * [PENDING_TTL_MS] ; l'arrivée sur le passage ([onArrivalPhrase]) passe en
+ * dernier — la plus basse priorité de toutes les annonces.
  *
- * Deux ordres user du 1/11 passent par ici : les annonces « Attention … »
- * sont cadencées par [cadence] (même annonce jamais deux fois dans la
- * fenêtre, silence entre deux annonces — le direct ne mitraille plus), et la
- * parole du user ([userSpeaking] : tenue du micro, transcription en cours)
- * passe devant tout ce que dit cette voix — rien ne parle par-dessus lui, les
- * phrases attendent en file ([flushPending]) et se redisent au silence.
- * Seule exception : le stop de Traversée ([GuidanceWord.isStopPhrase]), qui
- * n'attend jamais. La voix de sécurité ([safety]) garde ses propres règles.
- * Le mouvement ([VoicePreempt], § 31) coupe la parole douce en cours au
- * lieu d'attendre le silence, sécurité et parole du user exceptées.
+ * Point 4 du patch P0 (« la phrase bloquée doit attendre son tour, pas
+ * disparaître ») : la cadence reçoit le `trackId` de la personne suivie
+ * ([onPhrase], [speakWord] : `null` par défaut, aucun appelant cassé — une
+ * personne = un tour), donc deux passants à 1 s d'intervalle parlent tous les
+ * deux ; et l'annonce bloquée par la redite n'est pas jetée : elle sort au
+ * silence ([flushPending]), une seule par silence, avec la voix du doux.
+ *
+ * Ordres user du 1/11 : les annonces « Attention … » sont cadencées par
+ * [cadence] (jamais deux fois dans la fenêtre, silence entre deux annonces), et
+ * la parole du user ([userSpeaking] : micro tenu, transcription en cours) passe
+ * devant tout ce que dit cette voix — les phrases attendent en file
+ * ([flushPending]) et se redisent au silence, sauf le stop de Traversée
+ * ([GuidanceWord.isStopPhrase]). Le mouvement ([VoicePreempt], § 31) coupe la
+ * parole douce en cours au lieu d'attendre, sécurité et user exceptés. Les
+ * files ([queues], [VoicePendingQueue]) ne disent rien : elles gardent,
+ * [onPhrase] et [flushPending] décident.
  */
-/**
- * Préemption d'une phrase douce par le mouvement : la phrase coupe la
- * parole douce en cours (chat, route, autre annonce — le lecteur partagé
- * est coupé par `play()`) au lieu d'attendre le silence, mais jamais la
- * sécurité (fenêtre P1/P2 ou TTS système en cours : la phrase part en
- * file comme le doux). Dans la file, le rang tient l'ordre (l'ordinal
- * compare, à rang égal la plus fraîche gagne) : une voiture ([VEHICLE])
- * ne se fait pas remplacer par une personne ([PERSON]), qui ne se fait
- * pas remplacer par un doux ([NONE]). Ordre user du 01/11, § 31.
- */
-enum class VoicePreempt { NONE, PERSON, VEHICLE }
-
 class ProximityVoice(
     private val player: SpeechPlayer,
     private val settings: () -> Settings,
@@ -98,14 +82,12 @@ class ProximityVoice(
     /** Instant de la dernière phrase dite ([nowMs]) : la déduplication est bornée ([REPEAT_TTL_MS]). */
     private var lastPhraseAtMs: Long = 0L
 
-    /** Phrase douce gardée ([onPhrase] avec file), `null` si aucune. */
-    private var pending: Pending? = null
-
-    /** Consigne route gardée ([onRoutePhrase] douce), `null` si aucune. */
-    private var pendingRoute: Pending? = null
-
-    /** Arrivée sur le passage gardée ([onArrivalPhrase]), `null` si aucune. */
-    private var pendingArrival: Pending? = null
+    /**
+     * Phrases gardées pour le silence : file douce, consigne route, arrivée
+     * sur le passage, annonces que la redite avait bloquées ([flushRedite]) —
+     * mécanique et rangs dans [VoicePendingQueue].
+     */
+    internal val queues = VoicePendingQueue()
 
     /** Lecture déjà coupée pour la parole du user (une fois par prise de parole). */
     private var cutForUserDone = false
@@ -122,9 +104,7 @@ class ProximityVoice(
     fun reset() {
         lastPhrase = null
         lastPhraseAtMs = 0L
-        pending = null
-        pendingRoute = null
-        pendingArrival = null
+        queues.clearAll()
         offline.reset()
         cutForUserDone = false
         cadence.reset()
@@ -175,8 +155,14 @@ class ProximityVoice(
      * route, annonce — `speak` coupe le lecteur partagé) au lieu
      * d'attendre le silence ; la sécurité et la parole du user gardent
      * le dessus (fenêtre [busy], TTS système ou micro en cours : file
-     * comme le doux, rang tenu par [queuePending]). L'urgent garde la
+     * comme le doux, rang tenu par [queues]). L'urgent garde la
      * main (traité avant).
+     * [trackId] : la personne suivie que [phrase] concerne (pisteur de
+     * foule) — la cadence s'en sert comme clé (une personne = un tour),
+     * donc deux passants à 1 s d'intervalle parlent tous les deux. `null`
+     * (défaut) = comportement d'avant le patch P0 point 4. Une annonce
+     * bloquée par la redite n'est pas perdue : elle attend son tour et
+     * sort au silence ([flushPending], une seule par silence).
      */
     suspend fun onPhrase(
         phrase: String,
@@ -186,32 +172,33 @@ class ProximityVoice(
         busy: () -> Boolean = { false },
         dedupMs: Long = REPEAT_TTL_MS,
         preempt: VoicePreempt = VoicePreempt.NONE,
+        trackId: Int? = null,
     ) {
         if (saidRecently(phrase, dedupMs)) return
-        if (cadence.blocked(phrase, nowMs(), urgent)) return
+        if (cadence.blocked(phrase, nowMs(), urgent, trackId)) return
         if (yieldsToUser(phrase)) {
             cutForUser()
-            if (queue) queuePending(phrase, preempt)
+            if (queue) queues.queueSoft(phrase, preempt, trackId, nowMs())
             return
         }
         if (urgent) {
-            speakUrgent(phrase)
+            speakUrgent(phrase, trackId)
             return
         }
         val current = settings()
         if (preempt != VoicePreempt.NONE) {
             if (busy() || systemBusy()) {
-                if (queue) queuePending(phrase, preempt)
+                if (queue) queues.queueSoft(phrase, preempt, trackId, nowMs())
                 return
             }
-            speak(phrase, current)
+            speak(phrase, current, trackId)
             return
         }
         if (!playerIdle || routeSpeaking() || busy() || systemBusy()) {
-            if (queue) queuePending(phrase, VoicePreempt.NONE)
+            if (queue) queues.queueSoft(phrase, VoicePreempt.NONE, trackId, nowMs())
             return
         }
-        speak(phrase, current)
+        speak(phrase, current, trackId)
     }
 
     /**
@@ -233,7 +220,7 @@ class ProximityVoice(
         if (cadence.blocked(phrase, nowMs(), urgent)) return
         if (yieldsToUser(phrase)) {
             cutForUser()
-            pendingRoute = Pending(phrase, nowMs() + PENDING_TTL_MS)
+            queues.queueRoute(phrase, nowMs())
             return
         }
         if (urgent) {
@@ -242,7 +229,7 @@ class ProximityVoice(
         }
         val current = settings()
         if (!playerIdle || systemBusy()) {
-            pendingRoute = Pending(phrase, nowMs() + PENDING_TTL_MS)
+            queues.queueRoute(phrase, nowMs())
             return
         }
         speak(phrase, current)
@@ -261,11 +248,11 @@ class ProximityVoice(
         val current = settings()
         if (yieldsToUser(phrase)) {
             cutForUser()
-            pendingArrival = Pending(phrase, nowMs() + PENDING_TTL_MS)
+            queues.queueArrival(phrase, nowMs())
             return
         }
         if (!playerIdle || routeSpeaking() || systemBusy()) {
-            pendingArrival = Pending(phrase, nowMs() + PENDING_TTL_MS)
+            queues.queueArrival(phrase, nowMs())
             return
         }
         speak(phrase, current)
@@ -275,19 +262,34 @@ class ProximityVoice(
      * Redit les phrases gardées dès que plus rien ne parle : chat silencieux
      * ([playerIdle]), route tue, système tu ([systemBusy]) et [busy] faux
      * (P1/P2 en cours, vu par l'appelant) — la consigne route d'abord, puis
-     * la douce d'obstacle, puis l'arrivée sur le passage (une seule par appel,
-     * jamais de rafale). Périmée ([PENDING_TTL_MS]) ou déjà dite : jetée. En
-     * échec (synthèse, porte) : gardée pour le prochain silence — la file ne
-     * perd pas. À appeler à chaque frame par le guetteur en file, Traversée
-     * comprise.
+     * la douce d'obstacle, puis l'annonce que la redite avait bloquée
+     * ([flushRedite], une seule par silence), puis l'arrivée sur le passage
+     * (une seule phrase par appel, jamais de rafale). Périmée
+     * ([PENDING_TTL_MS]) ou déjà dite : jetée. En échec (synthèse, porte) :
+     * gardée pour le prochain silence — la file ne perd pas. À appeler à
+     * chaque frame par le guetteur en file, Traversée comprise.
      */
     suspend fun flushPending(playerIdle: Boolean, busy: () -> Boolean = { false }) {
         if (!playerIdle || routeSpeaking() || busy() || systemBusy() || userSpeaking()) return
         val current = settings()
-        if (flushOne(pendingRoute, current) { pendingRoute = null }) return
-        if (flushOne(pending, current) { pending = null }) return
-        flushOne(pendingArrival, current) { pendingArrival = null }
+        if (flushOne(queues.routeDue(), current) { queues.dropRoute() }) return
+        if (flushOne(queues.softDue(), current) { queues.dropSoft() }) return
+        if (flushRedite(current)) return
+        flushOne(queues.arrivalDue(), current) { queues.dropArrival() }
     }
+
+    /**
+     * Redit au silence l'annonce que la redite avait bloquée (« la phrase
+     * bloquée doit attendre son tour, pas disparaître », patch P0 point 4) :
+     * [VoicePendingQueue.drainCadence] sort les phrases dues
+     * ([AttentionCadence.pending]), une seule fois chacune, et le doux les dit
+     * de la même voix que [speak] (Laure, repli TTS système) — **une seule par
+     * silence**, le reste tenant dans la file d'un silence à l'autre. Une
+     * phrase redite entre-temps est sautée ; un échec de synthèse la remet en
+     * tête (la file ne perd pas). `true` si une phrase est sortie.
+     */
+    private suspend fun flushRedite(current: Settings): Boolean =
+        queues.drainCadence({ cadence.pending(nowMs()) }, { saidRecently(it) }) { speak(it, current) }
 
     /**
      * Redit l'arrivée gardée seule, au silence (chat tu, route tue) et sans
@@ -298,13 +300,13 @@ class ProximityVoice(
     suspend fun flushArrival(playerIdle: Boolean) {
         if (!playerIdle || routeSpeaking() || systemBusy() || userSpeaking()) return
         val current = settings()
-        if (hasFresh(pendingRoute) || hasFresh(pending)) return
-        flushOne(pendingArrival, current) { pendingArrival = null }
+        if (hasFresh(queues.routeDue()) || hasFresh(queues.softDue())) return
+        flushOne(queues.arrivalDue(), current) { queues.dropArrival() }
     }
 
-    /** Vrai si [due] attend encore d'être dite (fraîche et jamais parlée). */
-    private fun hasFresh(due: Pending?): Boolean =
-        due != null && due.phrase != lastPhrase && nowMs() < due.expiresAtMs
+    /** Vrai si [due] attend encore d'être dite : la règle de fraîcheur vit dans [VoicePendingQueue]. */
+    private fun hasFresh(due: VoicePendingQueue.Pending?): Boolean =
+        queues.hasFresh(due, lastPhrase, nowMs())
 
     /**
      * Vrai si [phrase] vient d'être dite (moins de [ttlMs]) : la
@@ -318,9 +320,10 @@ class ProximityVoice(
     /**
      * Redit [due] si elle est encore fraîche et jamais dite ; `true` si parlée.
      * Marquée dite après parole moteur : en échec, la phrase reste en file
-     * (l'appelant garde son `Pending`) au lieu d'être perdue.
+     * (l'appelant garde son `Pending`) au lieu d'être perdue. La personne
+     * suivie ([VoicePendingQueue.Pending.trackId]) garde sa clé de cadence.
      */
-    private suspend fun flushOne(due: Pending?, current: Settings, clear: () -> Unit): Boolean {
+    private suspend fun flushOne(due: VoicePendingQueue.Pending?, current: Settings, clear: () -> Unit): Boolean {
         if (due == null) return false
         if (due.phrase == lastPhrase || nowMs() >= due.expiresAtMs) {
             clear()
@@ -328,8 +331,8 @@ class ProximityVoice(
         }
         // Annonce « Attention … » encore dans sa fenêtre : gardée (sa cadence
         // la libérera) — pas dite, pas perdue avant [PENDING_TTL_MS].
-        if (cadence.blocked(due.phrase, nowMs())) return false
-        if (!speak(due.phrase, current)) return false
+        if (cadence.blocked(due.phrase, nowMs(), trackId = due.trackId)) return false
+        if (!speak(due.phrase, current, due.trackId)) return false
         clear()
         return true
     }
@@ -341,16 +344,18 @@ class ProximityVoice(
      * Orale seule : aucun sous-titre ni fanion (le TTS système ne rend pas
      * de fin, un fanion sans fin muterait la voix douce — voir `cutSpeaking`).
      * Sans sécurité câblée (tests) : synthèse immédiate, sans garde — une
-     * urgence ne se perd jamais.
+     * urgence ne se perd jamais. L'urgent échappe à la redite ([cadence] :
+     * `urgent = true` court-circuite la fenêtre de 20 s, seul son propre
+     * silence de 2 s est tenu) ; [trackId] garde la clé de la personne.
      */
-    private suspend fun speakUrgent(phrase: String) {
+    private suspend fun speakUrgent(phrase: String, trackId: Int? = null) {
         if (phrase.isBlank()) return
         val cut = safety
         if (cut != null) {
             cut.speak(phrase)
             lastPhrase = phrase
             lastPhraseAtMs = nowMs()
-            cadence.record(phrase, nowMs(), urgent = true)
+            cadence.record(phrase, nowMs(), urgent = true, trackId = trackId)
             return
         }
         player.stop()
@@ -361,7 +366,7 @@ class ProximityVoice(
         if (bytes.isEmpty()) return
         lastPhrase = phrase
         lastPhraseAtMs = nowMs()
-        cadence.record(phrase, nowMs(), urgent = true)
+        cadence.record(phrase, nowMs(), urgent = true, trackId = trackId)
         cutForUserDone = false
         onSpeaking(phrase)
         player.play(bytes).onFailure { onSpeaking("") }
@@ -371,9 +376,10 @@ class ProximityVoice(
      * Synthèse + lecture d'une phrase douce admise ; `true` si parlée (ou
      * confiée au TTS système). Sans clé, ou voix réseau en panne (401/402/429) :
      * repli système ([VoiceOfflineFallback]), jamais de silence quand un moteur est
-     * câblé. Mémorisée au moment de parler seulement.
+     * câblé. Mémorisée au moment de parler seulement. [trackId] : la personne
+     * que la phrase concerne, pour la clé de [cadence].
      */
-    private suspend fun speak(phrase: String, current: Settings): Boolean {
+    private suspend fun speak(phrase: String, current: Settings, trackId: Int? = null): Boolean {
         coroutineContext.ensureActive()
         if (!current.ttsConfigured) return offline.speak(phrase, current)
         val bytes = synthesize(current.ttsApiKey, current.ttsVoiceId, phrase)
@@ -386,7 +392,7 @@ class ProximityVoice(
         // (chat, route, système, porte, synthèse) ne tait pas les réémissions.
         lastPhrase = phrase
         lastPhraseAtMs = nowMs()
-        cadence.record(phrase, nowMs())
+        cadence.record(phrase, nowMs(), trackId = trackId)
         cutForUserDone = false
         onSpeaking(phrase)
         player.play(bytes).onFailure { onSpeaking("") }
@@ -405,6 +411,9 @@ class ProximityVoice(
      * avalé par un garde transitoire ne tait pas ses réémissions. [queue] :
      * le mot doux tué part en file et se redit par [flushPending] (en
      * synthèse, pas en clip : parlé lentement vaut mieux que perdu).
+     * [trackId] : la personne suivie que [text] concerne (même clé de
+     * cadence que [onPhrase], une personne = un tour) ; `null` par défaut,
+     * aucun appelant cassé.
      */
     suspend fun speakWord(
         clipId: String,
@@ -413,22 +422,34 @@ class ProximityVoice(
         playerIdle: Boolean,
         urgent: Boolean = false,
         queue: Boolean = false,
+        trackId: Int? = null,
     ) {
         if (text == lastPhrase && GuidanceWord.isStopPhrase(text)) return
         if (yieldsToUser(text)) {
             cutForUser()
-            if (queue) queuePending(text, VoicePreempt.NONE)
+            if (queue) queues.queueSoft(text, VoicePreempt.NONE, trackId, nowMs())
             return
         }
         if (urgent) {
-            speakUrgent(text)
+            speakUrgent(text, trackId)
             return
         }
         val current = settings()
         if (!playerIdle || systemBusy()) {
-            if (queue) queuePending(text, VoicePreempt.NONE)
+            if (queue) queues.queueSoft(text, VoicePreempt.NONE, trackId, nowMs())
             return
         }
+        playWord(clipId, text, language, current)
+    }
+
+    /**
+     * Rend [text] en clip local quand le pack l'a (le plus rapide), sinon en
+     * synthèse réseau mise en cache pour la suite — repli système sans clé ou
+     * sur 401/402/429. Corps historique de [speakWord] : seul ce qui a
+     * vraiment parlé est mémorisé (un mot avalé par un garde transitoire ne
+     * tait pas ses réémissions).
+     */
+    private suspend fun playWord(clipId: String, text: String, language: SpeechLanguage, current: Settings) {
         val file = clips?.clipFor(clipId, language, current.ttsVoiceId)?.takeIf { it.isFile }
         if (file != null) {
             lastPhrase = text
@@ -455,25 +476,16 @@ class ProximityVoice(
         player.play(bytes).onFailure { onSpeaking("") }
     }
 
-    /** Phrase douce en attente de silence : [phrase] à redire avant [expiresAtMs], [preempt] son rang (la file tient l'ordre du mouvement). */
-    private data class Pending(val phrase: String, val expiresAtMs: Long, val preempt: VoicePreempt = VoicePreempt.NONE)
-
-    /**
-     * Garde [phrase] de rang [preempt] en file douce : une voiture en
-     * mouvement ne se fait pas remplacer par une personne, ni une
-     * personne par un doux (l'ordinal compare, à rang égal la plus
-     * fraîche gagne comme avant).
-     */
-    private fun queuePending(phrase: String, preempt: VoicePreempt) {
-        val old = pending
-        if (old == null || preempt.ordinal >= old.preempt.ordinal) {
-            pending = Pending(phrase, nowMs() + PENDING_TTL_MS, preempt)
-        }
-    }
-
     companion object {
         /** Rattrapage borné : au-delà, la scène a changé, la phrase est périmée. */
         const val PENDING_TTL_MS = 5_000L
+
+        /**
+         * Annonces dues gardées d'un silence à l'autre ([flushRedite]) : au-delà,
+         * la plus ancienne est lâchée — une file de rattrapage ne bloque jamais
+         * la parole fraîche.
+         */
+        const val CADENCE_QUEUE_MAX = 4
 
         /**
          * Redite d'une phrase identique : 4 s, le temps de dire une phrase

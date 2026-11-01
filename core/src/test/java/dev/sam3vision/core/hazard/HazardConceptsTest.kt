@@ -2,6 +2,7 @@ package dev.sam3vision.core.hazard
 
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
+import org.junit.Assert.assertNull
 import org.junit.Assert.assertTrue
 import org.junit.Test
 
@@ -133,5 +134,48 @@ class HazardConceptsTest {
         assertFalse(HazardConcepts.isHazard("sidewalk"))
         assertFalse(HazardConcepts.isHazard("marche"))
         assertFalse(HazardConcepts.isHazard("  "))
+        // Un label inconnu reste muet : ni nom, ni sorte, ni voix.
+        assertNull(HazardConcepts.nameOf("trampoline"))
+        assertNull(HazardConcepts.nameOf(""))
+        assertFalse(HazardConcepts.isSpoken("trampoline"))
+    }
+
+    @Test
+    fun `foule nommee FR EN, poussette fauteuil trottinette chien enfant`() {
+        // Audit foule du 01/11 : ce qui barre le passage même sans piéton debout.
+        assertEquals("à la poussette", HazardConcepts.nameOf("stroller")!!.fr)
+        assertEquals("stroller", HazardConcepts.nameOf("poussette")!!.en)
+        assertEquals("à la poussette", HazardConcepts.nameOf("Poussettes")!!.fr)
+        assertEquals("au fauteuil roulant", HazardConcepts.nameOf("wheelchair")!!.fr)
+        assertEquals("wheelchair", HazardConcepts.nameOf("fauteuil roulant")!!.en)
+        assertEquals("au fauteuil roulant", HazardConcepts.nameOf("fauteuils roulants")!!.fr)
+        assertEquals("à la trottinette", HazardConcepts.nameOf("electric scooter")!!.fr)
+        assertEquals("scooter", HazardConcepts.nameOf("Trottinettes")!!.en)
+        assertEquals("au chien", HazardConcepts.nameOf("dog")!!.fr)
+        assertEquals("dog", HazardConcepts.nameOf("Chiens")!!.en)
+        assertEquals("à l'enfant", HazardConcepts.nameOf("child")!!.fr)
+        assertEquals("child", HazardConcepts.nameOf("Enfants")!!.en)
+    }
+
+    @Test
+    fun `foule parlee et sorte - les corps se contournent, la trottinette non`() {
+        assertTrue(HazardConcepts.isSpoken("dog"))
+        assertTrue(HazardConcepts.isSpoken("stroller"))
+        assertTrue(HazardConcepts.isSpoken("wheelchair"))
+        assertTrue(HazardConcepts.isSpoken("electric scooter"))
+        assertTrue(HazardConcepts.isSpoken("child"))
+        assertEquals(HazardKind.PERSON, HazardConcepts.kindOf("wheelchair"))
+        assertEquals(HazardKind.PERSON, HazardConcepts.kindOf("stroller"))
+        assertEquals(HazardKind.PERSON, HazardConcepts.kindOf("poussette"))
+        assertEquals(HazardKind.PERSON, HazardConcepts.kindOf("dog"))
+        assertEquals(HazardKind.PERSON, HazardConcepts.kindOf("enfant"))
+        assertEquals(HazardKind.OTHER, HazardConcepts.kindOf("electric scooter"))
+        assertEquals(HazardKind.OTHER, HazardConcepts.kindOf("trottinette"))
+        // L'enfant reste une personne (l'ancien contrat ne bouge pas) ; la
+        // poussette se contourne sans être quelqu'un à qui l'on parle.
+        assertTrue(HazardConcepts.isPerson("child"))
+        assertTrue(HazardConcepts.isPerson("enfant"))
+        assertFalse(HazardConcepts.isPerson("stroller"))
+        assertFalse(HazardConcepts.isPerson("dog"))
     }
 }

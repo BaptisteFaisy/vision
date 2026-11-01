@@ -89,13 +89,13 @@ class DistanceFusionTest {
     }
 
     @Test
-    fun `objet coupe mesure par le sol seul avec la pose`() {
+    fun `objet coupe par le bas ne rend plus de distance`() {
         val posed = meter(CameraPose(1.5f, 0.2f))
-        // bas collé au bord = pieds exacts : le sol mesure (1,94 m), le sténopé
-        // (3,57 m sur une hauteur faussée) est écarté, pas fusionné
-        val feet = posed.measure(WIDTH, HEIGHT, listOf(detection("personne", listOf(100f, 200f, 200f, 384f)))).firstOrNull()!!
-        assertEquals(GroundPlane.forwardMeters(384f, CameraPose(1.5f, 0.2f), FOCAL_PX, 191.5f, HEIGHT)!!, feet.meters, 0.001f)
-        // tête coupée : pas de lecture (haut tronqué, sténopé impraticable — audit 31/10)
+        // bas collé au bord : les pieds sont hors cadre, la hauteur est tronquée —
+        // plus de constante du bord bas (P0 point 7), ni sténopé ni sol
+        val feet = posed.measure(WIDTH, HEIGHT, listOf(detection("personne", listOf(100f, 200f, 200f, 384f))))
+        assertTrue("bas coupé encore mesuré : $feet", feet.isEmpty())
+        // tête coupée : pas de lecture non plus (haut tronqué, sténopé impraticable — audit 31/10)
         assertTrue(posed.measure(WIDTH, HEIGHT, listOf(detection("licorne", listOf(100f, 0f, 200f, 200f)))).isEmpty())
     }
 

@@ -16,22 +16,22 @@ class LivePromptsTest {
             listOf(
                 "person", "car", "bus", "bicycle", "pedestrian traffic light",
                 "pedestrian signal head", "curb", "sidewalk", "crosswalk", "pole",
-                "stairs", "keys", "fence", "gate", "wall", "souvenir shop",
-                "beanie", "socks",
+                "stairs", "fence", "gate", "wall", "stroller", "child",
+                "electric scooter", "dog",
             ),
             LivePrompts.default,
         )
         assertEquals(18, LivePrompts.MAX)
         assertEquals(LivePrompts.default, LivePrompts.normalize(LivePrompts.default))
+        assertEquals("person", LivePrompts.default.first())
     }
 
     @Test
-    fun `murs clotures et portails suivis en exterieur, barrier cede son slot a keys`() {
-        // Ordre user du 31/10 : les clés entrent dans les 17, « fence » garde
-        // son slot, « barrier » sort (reconnu encore par le preset extérieur).
-        // Ordre user du 31/10 (soir) : iSee détecte les murs — « wall » entre
-        // en 18e (plafond 17 → 18, rien ne sort).
-        assertTrue("keys" in LivePrompts.default)
+    fun `murs clotures et portails suivis en exterieur, barrier et keys hors defaut`() {
+        // Ordre user du 31/10 : « fence » garde son slot, « barrier » sort
+        // (reconnu encore par le preset extérieur), « wall » entre en 18e.
+        // Audit foule du 01/11 : « keys » cède le sien à la poussette.
+        assertFalse("keys" in LivePrompts.default)
         assertFalse("barrier" in LivePrompts.default)
         assertTrue("fence" in LivePrompts.default)
         assertTrue("gate" in LivePrompts.default)
@@ -43,16 +43,20 @@ class LivePromptsTest {
     }
 
     @Test
-    fun `souvenirs suivis par defaut, camion moto et trottinette sortis`() {
-        // Ordre user du 31/10 (boutique du square) : les trois slots
-        // camion/moto/trottinette passent aux souvenirs, des deux côtés
-        // (direct et véhicules traversée).
-        assertTrue("souvenir shop" in LivePrompts.default)
-        assertTrue("beanie" in LivePrompts.default)
-        assertTrue("socks" in LivePrompts.default)
+    fun `foule suivie par defaut, souvenirs et cles sortis`() {
+        // Audit foule du 01/11 : poussette, enfant, trottinette et chien
+        // entrent dans les 18 — les souvenirs de la boutique du square
+        // (31/10) et les clés cèdent leurs quatre slots.
+        assertTrue("stroller" in LivePrompts.default)
+        assertTrue("child" in LivePrompts.default)
+        assertTrue("electric scooter" in LivePrompts.default)
+        assertTrue("dog" in LivePrompts.default)
+        assertFalse("souvenir shop" in LivePrompts.default)
+        assertFalse("beanie" in LivePrompts.default)
+        assertFalse("socks" in LivePrompts.default)
+        assertFalse("keys" in LivePrompts.default)
         assertFalse("truck" in LivePrompts.default)
         assertFalse("motorcycle" in LivePrompts.default)
-        assertFalse("electric scooter" in LivePrompts.default)
         assertFalse("scooter" in LivePrompts.default)
     }
 
@@ -97,12 +101,16 @@ class LivePromptsTest {
     }
 
     @Test
-    fun `huit objets d interieur dedans, douze dangers dehors`() {
+    fun `neuf objets d interieur dedans, poussette incluse, dix huit dangers dehors`() {
         assertEquals(
-            listOf("person", "door", "chair", "table", "stairs", "wall", "window", "crosswalk"),
+            listOf(
+                "person", "stroller", "door", "chair", "table", "stairs", "wall",
+                "window", "crosswalk",
+            ),
             LivePrompts.indoor,
         )
-        assertEquals(8, LivePrompts.indoor.size)
+        assertEquals(9, LivePrompts.indoor.size)
+        assertTrue("stroller" in LivePrompts.indoor)
         assertEquals(LivePrompts.default, LivePrompts.forMode(true))
         assertEquals(LivePrompts.indoor, LivePrompts.forMode(false))
     }
@@ -201,11 +209,11 @@ class LivePromptsTest {
     @Test
     fun `find the x au plafond, le dernier concept cede son slot`() {
         // « Find the X » au plafond ne reste plus muet — démontré avec « wallet »
-        // (« keys » est déjà dans les défauts) : « socks », 18e, sort, 18 suivis.
+        // : « dog », 18e depuis l'audit foule du 01/11, sort, 18 suivis.
         val next = LivePrompts.withConcept(LivePrompts.default, "wallet")
         assertEquals(LivePrompts.MAX, next.size)
         assertTrue("wallet" in next)
-        assertFalse("socks" in next)
+        assertFalse("dog" in next)
         assertEquals(LivePrompts.default.dropLast(1) + "wallet", next)
     }
 

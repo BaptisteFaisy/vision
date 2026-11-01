@@ -1,5 +1,6 @@
 package dev.sam3vision.core.live
 
+import dev.sam3vision.core.model.ObjectLimits
 import dev.sam3vision.core.net.liveBinaryUrl
 import dev.sam3vision.core.net.liveFrameJson
 import java.util.Base64
@@ -114,6 +115,20 @@ class LiveWireGuardTest {
         assertTrue(boxesOnly, boxesOnly.contains("mask_encoding=none"))
         assertFalse("pas de mask_format sans masque", boxesOnly.contains("mask_format"))
         assertFalse("pas de mask_edge sans masque", boxesOnly.contains("mask_edge"))
+    }
+
+    /**
+     * Plafond client dans la trame réelle : c'est bien [ObjectLimits.DEFAULT_ON_SCREEN] (16,
+     * patch P0 foule 01/11) qui part en `max_objects`, sans qu'aucune couche réseau ne le
+     * réécrive — le serveur, lui, ne clampe qu'à 1..32 et garde donc les 16.
+     */
+    @Test
+    fun `le plafond par defaut part a seize objets dans le JSON`() {
+        val body = org.json.JSONObject(
+            liveFrameJson(jpegB64, PROMPTS, workEdge = 640, maxObjects = ObjectLimits.DEFAULT_ON_SCREEN),
+        )
+        assertEquals(16, ObjectLimits.DEFAULT_ON_SCREEN)
+        assertEquals(16, body.getInt("max_objects"))
     }
 
     private companion object {
