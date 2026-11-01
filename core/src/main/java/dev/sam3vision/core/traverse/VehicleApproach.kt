@@ -142,8 +142,12 @@ class VehicleApproach {
         associate(vehiclesOf(detections), atMs, frameWidth, depthByBox)
         dropStale(atMs)
         evaluateMotion(motion, frameWidth, frameHeight)
-        return verdict(frameWidth, radialMpsByKey)
+        return verdict(frameWidth, frameHeight, radialMpsByKey)
     }
+
+    /** Boîte tronquée par le cadre : sa croissance/vitesse est un artefact de (dé)clip, pas une mesure. */
+    private fun onEdge(box: Box, frameWidth: Int, frameHeight: Int): Boolean =
+        box.x1 <= EDGE_PX || box.x2 >= frameWidth - EDGE_PX || box.y1 <= EDGE_PX || box.y2 >= frameHeight - EDGE_PX
 
     /**
      * Verdicts fond des pistes à vitesse établie : la vitesse lissée de la
@@ -279,12 +283,12 @@ class VehicleApproach {
     }
 
     /** Le plus dangereux des rapprochements francs, silence sinon. */
-    private fun verdict(frameWidth: Int, radialMpsByKey: Map<String, Float>?): ApproachVerdict {
-        val approach = approachOf(frameWidth, radialMpsByKey)
-        val lateral = lateralOf(frameWidth)
+    private fun verdict(frameWidth: Int, frameHeight: Int, radialMpsByKey: Map<String, Float>?): ApproachVerdict {
+        val approach = approachOf(frameWidth, frameHeight, radialMpsByKey)
+        val lateral = lateralOf(frameWidth, frameHeight)
         return ApproachVerdict(
             approach.first, approach.second, approach.third,
-            lateral.first, lateral.second, lateralTtcOf(frameWidth),
+            lateral.first, lateral.second, lateralTtcOf(frameWidth, frameHeight),
         )
     }
 
@@ -293,7 +297,7 @@ class VehicleApproach {
      * Kalman franche ([radialMpsByKey]) sans tau — la distance confirme,
      * jamais elle ne supprime.
      */
-    private fun approachOf(frameWidth: Int, radialMpsByKey: Map<String, Float>?): Triple<Boolean, Float?, String?> {
+    private fun approachOf(frameWidth: Int, frameHeight: Int, radialMpsByKey: Map<String, Float>?): Triple<Boolean, Float?, String?> {
         var bestLabel: String? = null
         var bestTtc = Float.MAX_VALUE
         var radialLabel: String? = null
@@ -302,6 +306,7 @@ class VehicleApproach {
             if (!track.motion.velocityReliable) continue
             if (lastVerdicts[id]?.verdict == Verdict.CAMERA_MOVED) continue
             if (!verdictAllows(id)) continue
+            if (fondFranc && onEdge(track.motion.anchorBox, frameWidth, frameHeight)) continue
             // PISTE2 : expansion à profondeur constante = pan/zoom caméra, pas une approche.
             if (DepthConfirm.contradicts(track.firstCloseness, track.lastCloseness)) continue
             val width = track.motion.anchorBox.width
@@ -332,13 +337,14 @@ class VehicleApproach {
      * ([Verdict.CAMERA_MOVED]) ne conclut pas — un panoramique n'est pas
      * une voiture qui roule.
      */
-    private fun lateralOf(frameWidth: Int): Pair<Boolean, String?> {
+    private fun lateralOf(frameWidth: Int, frameHeight: Int): Pair<Boolean, String?> {
         var bestLabel: String? = null
         var bestSpeed = 0f
         for ((id, track) in tracks) {
             if (!track.motion.velocityReliable) continue
             if (lastVerdicts[id]?.verdict == Verdict.CAMERA_MOVED) continue
             if (!verdictAllows(id)) continue
+            if (fondFranc && onEdge(track.motion.anchorBox, frameWidth, frameHeight)) continue
             if (track.motion.anchorBox.width < frameWidth * MIN_WIDTH_FRACTION) continue
             val speed = abs(track.motion.velocity.x)
             if (speed <= frameWidth * LATERAL_RATIO) continue
@@ -351,12 +357,13 @@ class VehicleApproach {
     }
 
     /** TTC latéral (largeur / vitesse latérale), `null` sans latéral franc ([MIN_LATERAL_RATIO]). */
-    private fun lateralTtcOf(frameWidth: Int): Float? {
+    private fun lateralTtcOf(frameWidth: Int, frameHeight: Int): Float? {
         var lateralTtc: Float? = null
         for ((id, track) in tracks) {
             if (!track.motion.velocityReliable) continue
             if (lastVerdicts[id]?.verdict == Verdict.CAMERA_MOVED) continue
             if (!verdictAllows(id)) continue
+            if (fondFranc && onEdge(track.motion.anchorBox, frameWidth, frameHeight)) continue
             val width = track.motion.anchorBox.width
             if (width < frameWidth * MIN_WIDTH_FRACTION) continue
             lateralTtcOf(track, width, frameWidth)?.let { ttc ->
@@ -417,6 +424,9 @@ class VehicleApproach {
 
         /** Vitesse latérale minimale (fraction d'image/s) pour un TTC latéral. */
         const val MIN_LATERAL_RATIO = 0.01f
+
+        /** Marge de détection du cadre (px) : à l'intérieur, la boîte est tronquée. */
+        private const val EDGE_PX = 1f
 
         /**
          * Clé d'instance d'un véhicule : label canonique + seau de position
