@@ -32,8 +32,9 @@ class ObstacleArbiterTest {
     private fun curb(
         phrase: String = "Step up in 1 meter.",
         tier: CurbTier = CurbTier.FAR,
+        urgent: Boolean = false,
         safety: String? = null,
-    ) = CurbCue(phrase = phrase, meters = 1f, tier = tier, safetyPhrase = safety)
+    ) = CurbCue(phrase = phrase, meters = 1f, tier = tier, urgent = urgent, safetyPhrase = safety)
 
     private fun hazard(
         phrase: String = "Attention à la barrière.",
@@ -113,6 +114,19 @@ class ObstacleArbiterTest {
 
         assertNull(decision.safety)
         assertEquals("Car moving, 12 meters away. Attention à la barrière.", decision.soft)
+        assertTrue(decision.urgent)
+    }
+
+    @Test
+    fun `bordure imminente seule = doux urgent, coupe comme le vehicule`() {
+        val decision = decideObstacles(
+            null,
+            curb(phrase = "Bordure à 0,7 mètre.", tier = CurbTier.NEAR, urgent = true),
+            null,
+        )
+
+        assertNull(decision.safety)
+        assertEquals("Bordure à 0,7 mètre.", decision.soft)
         assertTrue(decision.urgent)
     }
 

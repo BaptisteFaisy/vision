@@ -5,6 +5,7 @@ import dev.sam3vision.app.BuildConfig
 import dev.sam3vision.app.debugModelsLine
 import dev.sam3vision.app.live.chosenLens
 import dev.sam3vision.app.speech.VoicePack
+import dev.sam3vision.core.curb.CurbConcepts
 import dev.sam3vision.core.curb.CurbCue
 import dev.sam3vision.core.curb.CurbSignal
 import dev.sam3vision.core.curb.CurbTier
@@ -275,6 +276,9 @@ internal fun obstacleFrame(
     val hazardCue = if (st.crossingActive) null
     else watchers.hazard.onSignal(HazardSignal.of(readings, st.width, st.height), nowMs, lang)
     val decision = decideObstacles(vehicleCue, curbCue, hazardCue)
+    if (BuildConfig.DEBUG) {
+        android.util.Log.d("CurbVoice", curbVoiceLine(readings, curbSignal, curbCue?.phrase, st.crossingActive))
+    }
     decision.safety?.let {
         safety.speak(it)
         watchers.lastSafetyMs = nowMs
@@ -286,6 +290,35 @@ internal fun obstacleFrame(
     } else if (!st.crossingActive) {
         scope.launch { softSpeech.withLock { voice.flushPending(playerIdle(), busy) } }
     }
+}
+
+/**
+ * Ligne diagnostique bordure d'une frame (DEBUG seul, tag `CurbVoice`) : nombre de
+ * lectures, lectures à label bordure (`label/mètres/bas-de-boîte`), signal lissé
+ * (détecté/mètres/palier/bateau), phrase du cue (`null` = muet) et Traversée.
+ * Construite au [StringBuilder], appelée sous `BuildConfig.DEBUG` : aucun log ni
+ * allocation en release. Pure, testée en JVM.
+ */
+internal fun curbVoiceLine(
+    readings: List<DistanceReading>,
+    signal: CurbSignal,
+    phrase: String?,
+    crossingActive: Boolean,
+): String {
+    val line = StringBuilder(160)
+    line.append("lectures=").append(readings.size).append(" bordures=[")
+    var first = true
+    for (reading in readings) {
+        if (!CurbConcepts.isCurb(reading.label)) continue
+        if (!first) line.append(';')
+        first = false
+        line.append(reading.label).append('/').append(reading.meters).append("m/bas=")
+            .append(reading.box.getOrNull(3))
+    }
+    return line.append("] signal=").append(signal.detected).append('/').append(signal.meters)
+        .append("m/").append(signal.tier).append("/flat=").append(signal.flatPass)
+        .append(" phrase=").append(phrase).append(" traversee=").append(crossingActive)
+        .toString()
 }
 
 /**
