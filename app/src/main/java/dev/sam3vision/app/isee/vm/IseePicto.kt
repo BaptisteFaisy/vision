@@ -57,8 +57,10 @@ data class PictoUiState(
  * (~10 s facturées ~0,01 $), et une seconde demande ne double pas la facture.
  * La chasse (« où sont mes clés ») est pilotée par la détection : l'ordre
  * arme le label, le pictogramme se génère à sa première détection SAM,
- * puis l'overlay s'ancre sur la boîte détectée — il disparaît avec les
- * clés et réapparaît avec elles, sans jamais régénérer.
+ * puis l'overlay s'ancre sur la boîte détectée : l'ancrage live est seul
+ * juge tant que dure la chasse — objet hors champ (passage gabarit muet)
+ * ou SAM muet, le picto tombe aussitôt et revient avec l'objet, sans
+ * jamais régénérer.
  * Dehors, tout est muet (bouton, ordres, reconnaissance sur frames) : seul
  * dedans suit des pictos. Une génération lancée dedans mais livrée dehors
  * est jetée sans bruit ([dropLate]).
@@ -183,6 +185,7 @@ class IseePicto(
     /**
      * Frame filmée (JPEG base64) : les repères armés y sont cherchés au plus
      * toutes les [MATCH_EVERY_MS] — 2 Hz, l'overlay garde le dernier passage.
+     * Chasse : un passage muet sur le picto chassé périme son ancrage live.
      */
     fun onFrame(jpegB64: String) {
         if (!placeMode().pictoEnabled) return
@@ -195,6 +198,16 @@ class IseePicto(
             val frame = frameGray(jpegB64) ?: return@launch
             val hits = known.mapNotNull { matchTemplate(frame, it.template, it.id, it.label) }
             templateHits = hits
+            // Chasse : la frame fraîche ne voit plus l'objet — l'ancrage live
+            // précédent est périmé, le picto tombe sans attendre SAM (qui le
+            // ré-ancre à sa prochaine publication si l'objet est toujours là).
+            huntLabel?.let { hunt ->
+                armedFor(hunt)?.let { armed ->
+                    if (hits.none { it.pictoId == armed.id }) {
+                        liveHits = liveHits.filter { it.pictoId != armed.id }
+                    }
+                }
+            }
             publishHits()
         }
     }
@@ -312,10 +325,14 @@ class IseePicto(
         KnownSizes.canonical(hunt) == KnownSizes.canonical(label) ||
             PictoVoiceOrder.matches(label, hunt) || PictoVoiceOrder.matches(hunt, label)
 
-    /** Les deux sources fusionnées : l'ancrage live gagne sur le gabarit. */
+    /** Les deux sources fusionnées : l'ancrage live gagne sur le gabarit, et le picto chassé n'est jamais montré par le gabarit seul. */
     private fun publishHits() {
         val live = liveHits
-        val merged = live + templateHits.filter { hit -> live.none { it.pictoId == hit.pictoId } }
+        // Chasse : l'ancrage live est seul juge pour le picto chassé — le
+        // passage gabarit précédent ne le ressuscite pas quand SAM dit parti.
+        val huntedId = huntLabel?.let { armedFor(it)?.id }
+        val templates = templateHits.filter { hit -> live.none { it.pictoId == hit.pictoId } && hit.pictoId != huntedId }
+        val merged = live + templates
         update { it.copy(picto = it.picto.copy(hits = merged)) }
     }
 
