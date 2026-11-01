@@ -116,6 +116,14 @@ object TimingsText {
             " · percu ${us(perceivedUs)}"
 
     /**
+     * Jambe du A/B binaire-vs-base64 : « leg binary » ou « leg text », loggée à la
+     * première frame puis au repli texte. Invisible à `parse_isee_lat.py` (ni
+     * `latency`, ni `server:`) : la ligne vit dans le même dump `ISEE_LAT` et
+     * `scripts/latence-ab-compare.py` s'en sert pour attribuer chaque frame.
+     */
+    fun leg(binary: Boolean): String = if (binary) "leg binary" else "leg text"
+
+    /**
      * Étages serveur reçus : « server: preprocess 12 ms · vision 47 ms · detr 38 ms ».
      * « server: — » quand `FAST_TIMING` est éteint au déploiement.
      */

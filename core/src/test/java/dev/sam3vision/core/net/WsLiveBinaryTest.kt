@@ -163,4 +163,41 @@ class WsLiveBinaryTest {
         assertEquals(1, transport.sentBytes.size)
         assertTrue("pas de repli quand le socket refuse", transport.sent.isEmpty())
     }
+
+    @Test
+    fun `la premiere frame annonce le transport binaire, une seule fois`() = runBlocking {
+        val transport = ContractWsTransport()
+            .apply { answerBytesWith { bytes -> listOf(NetContract.frameReply(binaryIdOf(bytes))) } }
+        val legs = mutableListOf<Boolean>()
+        val client = WsLiveClient(base, transport, 1_000, RecordingLiveClient(), onBinaryChange = legs::add)
+
+        client.live("SUVLFw==", null, 640, 4).getOrThrow()
+        client.live("SUVLFw==", null, 640, 4).getOrThrow()
+
+        assertEquals(listOf(true), legs)
+    }
+
+    @Test
+    fun `la premiere frame annonce le transport texte en opt-out`() = runBlocking {
+        val transport = ContractWsTransport { json -> listOf(NetContract.frameReply(json.getInt("id"))) }
+        val legs = mutableListOf<Boolean>()
+        val client = WsLiveClient(base, transport, 1_000, RecordingLiveClient(), binaryWs = false, onBinaryChange = legs::add)
+
+        client.live("SUVLFw==", null, 640, 4).getOrThrow()
+
+        assertEquals(listOf(false), legs)
+    }
+
+    @Test
+    fun `un refus -1 annonce le repli texte apres le binaire initial`() = runBlocking {
+        val transport = ContractWsTransport { json -> listOf(NetContract.frameReply(json.getInt("id"))) }
+            .apply { answerBytesWith { listOf(NetContract.errorReply(-1)) } }
+        val legs = mutableListOf<Boolean>()
+        val client = WsLiveClient(base, transport, 1_000, RecordingLiveClient(), onBinaryChange = legs::add)
+
+        client.live("SUVLFw==", null, 640, 4).getOrThrow()
+        client.live("SUVLFw==", null, 640, 4).getOrThrow()
+
+        assertEquals("binaire puis repli, sans répétition", listOf(true, false), legs)
+    }
 }

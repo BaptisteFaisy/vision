@@ -30,16 +30,23 @@ import kotlinx.coroutines.flow.StateFlow
  */
 
 /**
- * Drapeau de build `live.local.overlay` : renseigné, il **prime** sur le réglage
- * utilisateur (même règle que les clés injectées au build) ; vide, c'est le réglage qui
- * décide. Valeur inconnue ⇒ réglage, jamais un silence.
+ * Drapeau de build tri-état (`local.properties`, jamais commité) : renseigné, il
+ * **prime** (même règle que les clés injectées au build) ; vide ou inconnu, c'est
+ * [default] qui décide, jamais un silence.
  */
-fun localOverlayFlag(buildFlag: String, settingEnabled: Boolean): Boolean =
+fun buildFlagOn(buildFlag: String, default: Boolean): Boolean =
     when (buildFlag.trim().lowercase(Locale.ROOT)) {
         "true", "1", "on", "oui" -> true
         "false", "0", "off", "non" -> false
-        else -> settingEnabled
+        else -> default
     }
+
+/**
+ * Drapeau de build `live.local.overlay` : renseigné, il **prime** sur le réglage
+ * utilisateur ; vide, c'est le réglage qui décide ([buildFlagOn]).
+ */
+fun localOverlayFlag(buildFlag: String, settingEnabled: Boolean): Boolean =
+    buildFlagOn(buildFlag, settingEnabled)
 
 /**
  * Part du calque local dans la ligne d'état : rien quand il est éteint (la pastille

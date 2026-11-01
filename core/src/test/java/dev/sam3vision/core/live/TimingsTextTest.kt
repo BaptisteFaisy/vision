@@ -62,4 +62,20 @@ class TimingsTextTest {
         assertFalse(line.contains("server:"))
         assertFalse(line.contains("latency "))
     }
+
+    @Test
+    fun `leg nomme la jambe du A/B en un mot`() {
+        assertEquals("leg binary", TimingsText.leg(true))
+        assertEquals("leg text", TimingsText.leg(false))
+    }
+
+    @Test
+    fun `leg reste invisible au parseur de verdict`() {
+        listOf(TimingsText.leg(true), TimingsText.leg(false)).forEach { line ->
+            assertFalse(line.startsWith("latency "))
+            assertFalse(line.startsWith("server:"))
+            assertFalse(line.contains("server:"))
+            assertFalse(line.contains("latency "))
+        }
+    }
 }

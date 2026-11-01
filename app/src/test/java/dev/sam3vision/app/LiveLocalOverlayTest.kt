@@ -40,6 +40,23 @@ class LiveLocalOverlayTest {
     }
 
     @Test
+    fun `le parseur tri-etat couvre les synonymes`() {
+        assertTrue(buildFlagOn("1", false))
+        assertTrue(buildFlagOn("oui", false))
+        assertEquals(false, buildFlagOn("off", true))
+        assertEquals(false, buildFlagOn("non", true))
+    }
+
+    @Test
+    fun `la jambe texte du A/B ne s allume que sur vrai`() {
+        // `LiveMaskTransport.clientFor` : binaryWs = !buildFlagOn(WS_TEXT, false).
+        assertEquals(false, !buildFlagOn("true", false))
+        assertTrue(!buildFlagOn("", false))
+        assertTrue(!buildFlagOn("false", false))
+        assertTrue(!buildFlagOn("peut-etre", false))
+    }
+
+    @Test
     fun `sans image locale la surface garde les masques du serveur`() {
         val serveur = listOf("masque-a", "masque-b")
 

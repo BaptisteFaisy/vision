@@ -57,6 +57,12 @@ class WsLiveClient(
      * partent directement en texte.
      */
     private val binaryWs: Boolean = true,
+    /**
+     * Annonce du transport (`true` = binaire) : une fois à la première frame, puis au
+     * repli texte. `null` = silencieuse. Comme [WireMarks], non bloquante et sans état
+     * lourd (appelée sous [lock], sur le thread d'envoi ou le lecteur).
+     */
+    private val onBinaryChange: ((Boolean) -> Unit)? = null,
 ) : LiveClient {
 
     private val lock = Any()
@@ -72,6 +78,9 @@ class WsLiveClient(
      */
     private var binaryRefused = false
 
+    /** Le transport initial a déjà été annoncé à [onBinaryChange] (une fois par session). */
+    private var legNoted = false
+
     /** Une frame en vol : son réveil, et si elle est partie en binaire (repli JSON). */
     private class PendingFrame(val reply: CompletableDeferred<String>, val binary: Boolean)
 
@@ -85,7 +94,7 @@ class WsLiveClient(
         maxObjects: Int,
     ): Result<LiveFrame> {
         val id = synchronized(lock) { ++nextId }
-        val binary = synchronized(lock) { binaryWs && !binaryRefused }
+        val binary = synchronized(lock) { sendLegLocked() }
         // Message (~28 Ko) assemblé hors verrou : `onText` (même lock) ne doit pas attendre.
         val sender: () -> Boolean
         if (binary) {
@@ -116,7 +125,7 @@ class WsLiveClient(
     ): Result<LiveFrame> {
         if (jpeg.isEmpty()) return Result.failure(ApiError.BadResponse(WS_BAD_IMAGE))
         val id = synchronized(lock) { ++nextId }
-        val binary = synchronized(lock) { binaryWs && !binaryRefused }
+        val binary = synchronized(lock) { sendLegLocked() }
         val sender: () -> Boolean
         if (binary) {
             val bytes = binaryFrame(id, jpeg, prompts, workEdge, maxObjects)
@@ -269,6 +278,20 @@ class WsLiveClient(
     }
 
     /**
+     * Transport de la frame qui part, avec l'annonce initiale à [onBinaryChange] (appel
+     * sous [lock], depuis `live`/`liveBytes` : un seul passage annonce, les deux chemins
+     * partagent le choix).
+     */
+    private fun sendLegLocked(): Boolean {
+        val binary = binaryWs && !binaryRefused
+        if (!legNoted) {
+            legNoted = true
+            onBinaryChange?.invoke(binary)
+        }
+        return binary
+    }
+
+    /**
      * Orphelin `{"id":-1,"error":…}` : signature d'un serveur sans WS binaire (il ne lit
      * que du texte). La plus ancienne frame binaire en vol est réveillée en repli JSON,
      * les suivantes partent directement en texte. Sans construction de JSON : le marqueur
@@ -276,7 +299,10 @@ class WsLiveClient(
      */
     private fun noteBinaryRefused(id: Int, text: String) {
         if (!binaryWs || id != UNKNOWN_WS_ID || ERROR_MARK !in text) return
-        binaryRefused = true
+        if (!binaryRefused) {
+            binaryRefused = true
+            onBinaryChange?.invoke(false)
+        }
         pending.values.firstOrNull { it.binary }?.reply?.completeExceptionally(FallbackToJson)
     }
 
