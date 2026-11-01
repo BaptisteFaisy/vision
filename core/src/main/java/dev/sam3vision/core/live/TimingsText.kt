@@ -100,6 +100,22 @@ object TimingsText {
             " · int $intervalMs"
 
     /**
+     * Frame lunettes rendue puis affichée, en **microsecondes** : « link seq 12 ·
+     * lien 30123 · dec 8421 · aff 7110 · percu 45654 ». `lien` = retard variable
+     * radio ([GlassesClockOffset]), `dec` = entrée-sortie du rendu, `aff` =
+     * sortie → pixel, `percu` = les trois additionnés. `—` = non mesuré.
+     *
+     * La microseconde (et non la milliseconde du Direct) : le verdict B2
+     * (`LUNETTES-RECETTE-TEL`, p95 < 100 ms) se joue à quelques ms, l'arrondi
+     * ms mangerait l'étage d'affichage (~8 ms). Invisible à
+     * `parse_isee_lat.py` (ni `latency`, ni `server:`) : la ligne vit dans le
+     * dump `GlassesLink`, sans fausser le verdict du Direct.
+     */
+    fun link(seq: Long, linkUs: Long, decodeUs: Long, displayUs: Long, perceivedUs: Long): String =
+        "link seq $seq · lien ${us(linkUs)} · dec ${us(decodeUs)} · aff ${us(displayUs)}" +
+            " · percu ${us(perceivedUs)}"
+
+    /**
      * Étages serveur reçus : « server: preprocess 12 ms · vision 47 ms · detr 38 ms ».
      * « server: — » quand `FAST_TIMING` est éteint au déploiement.
      */
@@ -127,6 +143,9 @@ object TimingsText {
 
     /** Millisecondes affichables : le nombre, ou [MISSING] si le poste manque. */
     private fun ms(value: Long): String = if (value >= 0) value.toString() else MISSING
+
+    /** Microsecondes affichables : même contrat que [ms], pour la ligne [link]. */
+    private fun us(value: Long): String = if (value >= 0) value.toString() else MISSING
 
     /** Aller-retour : son chiffre serveur a sa propre ligne dans le détail. */
     private const val SRV = "srv"

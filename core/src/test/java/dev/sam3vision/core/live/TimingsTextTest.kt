@@ -37,4 +37,29 @@ class TimingsTextTest {
         assertFalse(line.startsWith("server:"))
         assertFalse(line.contains("server:"))
     }
+
+    @Test
+    fun `link ecrit seq et quatre postes en microsecondes`() {
+        assertEquals(
+            "link seq 12 · lien 30123 · dec 8421 · aff 7110 · percu 45654",
+            TimingsText.link(12L, 30123L, 8421L, 7110L, 45654L),
+        )
+    }
+
+    @Test
+    fun `link marque les postes absents sans inventer de zero`() {
+        assertEquals(
+            "link seq 3 · lien — · dec 8421 · aff 7110 · percu —",
+            TimingsText.link(3L, -1L, 8421L, 7110L, -1L),
+        )
+    }
+
+    @Test
+    fun `link reste invisible au parseur de verdict`() {
+        val line = TimingsText.link(12L, 30123L, 8421L, 7110L, 45654L)
+        assertFalse(line.startsWith("latency "))
+        assertFalse(line.startsWith("server:"))
+        assertFalse(line.contains("server:"))
+        assertFalse(line.contains("latency "))
+    }
 }
