@@ -14,7 +14,7 @@ C. **contradiction** — si une campagne archivée mesure un étage, le budget n
    publier cet étage en `simulation`/`hypothèse`/`estimé`, ni publier un `mesuré` qui
    s'écarte de plus de `TOLERANCE` de la mesure. C'est le contrôle qui manquait le
    01/11/2026 : `CAPTURE` était publié à 25 ms (**simulation**, « jamais lu sur un
-   appareil ») alors que l'appareil mesurait 81 ms, et `ENCODE` à 5–8 ms (**estimé**)
+   appareil ») alors que l'appareil mesurait 86 ms, et `ENCODE` à 5–8 ms (**estimé**)
    alors que l'appareil mesurait 27 ms. Rien ne reliait l'étiquette à une campagne.
 
 L'archive est le seul endroit où une mesure entre dans ce dépôt : elle porte la date, la
@@ -53,9 +53,10 @@ NETTOYAGE = re.compile(r"[*`]")
 # (nom, date, {étage: ms mesurée}, source, N)  — N None : dump non archivé.
 CAMPAGNES = (
     ("ISEE_LAT capsplit", "01/11/2026",
-     {"CAPTURE": 81, "ENCODE": 27},
-     "`ISEE_LAT: capsplit` (`TimingsText.capsplit`, 1 frame sur 20), téléphone, écran iSee",
-     None),
+     {"CAPTURE": 86, "ENCODE": 27},
+     "`ISEE_LAT: capsplit` (`TimingsText.capsplit`, 1 frame sur 20), téléphone SM-G780G, build "
+     "`1.0.1139-da6531a`, écran iSee",
+     38),
 )
 
 
@@ -232,7 +233,7 @@ def selftest():
 
     entete = "| étage | couvre | valeur (ms) | provenance | plancher |\n|---|---|---:|---|---|"
     cas = [
-        ("mesuré daté", "| `CAPTURE` | c | 81 | **mesuré** 81 le 01/11/2026 (ISEE_LAT) | p |", 0, 0),
+        ("mesuré daté", "| `CAPTURE` | c | 86 | **mesuré** 86 le 01/11/2026 (ISEE_LAT) | p |", 0, 0),
         ("mesuré sans date", "| `X` | c | 81 | **mesuré** sur un banc | p |", 1, 0),
         ("mesuré, date non consignée",
          "| `X2` | c | 81 | **mesuré** (banc, date non consignée) | p |", 0, 0),
