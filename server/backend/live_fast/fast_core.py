@@ -34,6 +34,10 @@ import os
 from contextlib import contextmanager
 from types import SimpleNamespace
 
+# Knobs d'environnement et nom du GPU : extraits dans ``fast_env`` (garde taille
+# < 500 lignes/fichier, zéro duplication). Ré-exportés ici : ``service.py``,
+# ``live_app_fast.py`` et les bancs gardent ``from fast_core import clamp_int, …``.
+from fast_env import clamp_int, env_bool, env_int, gpu_name
 from timing import Stage, add_ms, elapsed_ms, now
 # Poids + chargements ré-exportés pour service.py et les bancs (limite 500 lignes).
 from token_cache import tokenize_cached
@@ -41,22 +45,6 @@ from weights import (ATTN_IMPL, DTYPE_NAME, MODEL_DIR, MODEL_ID, MODEL_SOURCE, l
                      load_cpu, local_only, round_edge, torch_dtype)
 
 DTYPES = ("bf16", "fp16", "fp32")
-_TRUTHY = ("1", "true", "yes", "on")
-
-
-def env_bool(raw, default: bool = False) -> bool:
-    """Knob d'environnement ou de requête : absent/"" -> default, sinon 1|true|yes|on."""
-    if raw is None or str(raw).strip() == "":
-        return default
-    return str(raw).strip().lower() in _TRUTHY
-
-
-def env_int(raw, default=None):
-    """Entier d'environnement optionnel ; None si absent ou non numérique."""
-    try:
-        return int(str(raw).strip()) if raw not in (None, "") else default
-    except ValueError:
-        return default
 
 
 # --- leviers du conteneur (lus à l'import, surchargeables par requête) -------------
@@ -91,38 +79,6 @@ def levers() -> dict:
             "dtype": DTYPE_NAME, "snapshot": SNAPSHOT, "attn": ATTN_IMPL or "eager",
             "warmups": WARMUPS, "timing": TIMING, "depth_every": DEPTH_EVERY,
             "preprocess": PREPROCESS}
-
-
-def clamp_int(value, default: int, low: int, high: int) -> int:
-    """Ramener un knob optionnel dans [low, high] ; absent ou non numérique -> default."""
-    if value is None:
-        return default
-    try:
-        number = int(value)
-    except (TypeError, ValueError):
-        return default
-    return max(low, min(high, number))
-
-
-def gpu_name() -> str:
-    """Nom du GPU réellement alloué, relevé une fois (nvidia-smi, secours torch)."""
-    import subprocess
-
-    try:
-        result = subprocess.run(["nvidia-smi", "--query-gpu=name", "--format=csv,noheader"],
-                                capture_output=True, text=True, timeout=15)
-        if result.returncode == 0 and result.stdout.strip():
-            return result.stdout.strip().splitlines()[0].strip()
-    except (OSError, subprocess.SubprocessError):
-        pass
-    try:
-        import torch
-
-        if torch.cuda.is_available():
-            return torch.cuda.get_device_name(0)
-    except Exception:  # noqa: BLE001 — /health ne doit jamais tomber pour un nom de GPU
-        pass
-    return "unknown"
 
 
 def _torch():
