@@ -5,6 +5,7 @@ import dev.sam3vision.app.isee.IseeCameraActions
 import dev.sam3vision.app.isee.IseeUiState
 import dev.sam3vision.app.isee.PictoStore
 import dev.sam3vision.app.media.MediaCacheStore
+import dev.sam3vision.core.model.Detection
 import dev.sam3vision.core.net.ApiError
 import dev.sam3vision.core.net.PictoImageClient
 import dev.sam3vision.core.picto.GrayImage
@@ -38,6 +39,10 @@ private fun geometricFrame(size: Int, squareAt: Int, square: Int, hole: Int): Gr
     }
     return GrayImage(gray, size, size)
 }
+
+/** Détection SAM « keys » sur une frame 100×100, boîte normalisée (x1, y1, x2, y2). */
+private fun keysAt(x1: Float, y1: Float, x2: Float, y2: Float): Detection =
+    Detection(label = "keys", score = 0.9f, box = listOf(x1 * 100, y1 * 100, x2 * 100, y2 * 100), width = 100, height = 100)
 
 /**
  * Les repères : bouton → photo → génération → relecture → stockage → overlay.
@@ -120,22 +125,30 @@ class IseePictoTest {
     }
 
     @Test
-    fun `find arme le repere sans relecture`() = runTest {
+    fun `find arme la chasse, la detection genere sans relecture`() = runTest {
         val coordinator = picto()(this)
         coordinator.findObject("keys")
+        advanceUntilIdle()
+        assertEquals(PictoPhase.Idle, state.value.picto.phase)
+        assertEquals(0, state.value.picto.armed)
+        assertEquals(0, client.calls)
+        coordinator.onDetections(listOf(keysAt(0.2f, 0.3f, 0.5f, 0.6f)))
         advanceUntilIdle()
         assertEquals(PictoPhase.Idle, state.value.picto.phase)
         assertEquals(1, state.value.picto.armed)
         assertEquals(IseeStatusText.PICTO_SAVED, state.value.status)
         assertEquals(listOf("keys"), coordinator.labels())
         assertEquals("keys", client.lastHint)
+        assertEquals(1, client.calls)
         assertTrue(coordinator.armed())
     }
 
     @Test
     fun `find en echec reseau affiche le motif`() = runTest {
         client.failure = ApiError.PaymentRequired()
-        picto()(this).findObject("keys")
+        val coordinator = picto()(this)
+        coordinator.findObject("keys")
+        coordinator.onDetections(listOf(keysAt(0.2f, 0.3f, 0.5f, 0.6f)))
         advanceUntilIdle()
         assertEquals(PictoPhase.Idle, state.value.picto.phase)
         assertEquals(0, state.value.picto.armed)
@@ -149,6 +162,76 @@ class IseePictoTest {
         assertEquals(PictoPhase.Idle, state.value.picto.phase)
         assertEquals(0, state.value.picto.armed)
         assertNull(state.value.status)
+    }
+
+    @Test
+    fun `sans chasse les detections ne generent rien`() = runTest {
+        picto()(this).onDetections(listOf(keysAt(0.2f, 0.3f, 0.5f, 0.6f)))
+        advanceUntilIdle()
+        assertEquals(0, client.calls)
+        assertEquals(0, state.value.picto.armed)
+        assertTrue(state.value.picto.hits.isEmpty())
+    }
+
+    @Test
+    fun `le picto se pose sur les cles, part et revient avec elles`() = runTest {
+        val coordinator = picto()(this)
+        coordinator.findObject("keys")
+        coordinator.onDetections(emptyList())
+        advanceUntilIdle()
+        assertEquals(0, client.calls)
+        coordinator.onDetections(listOf(keysAt(0.2f, 0.3f, 0.5f, 0.6f)))
+        advanceUntilIdle()
+        assertEquals(1, client.calls)
+        coordinator.onDetections(listOf(keysAt(0.2f, 0.3f, 0.5f, 0.6f)))
+        advanceUntilIdle()
+        val placed = state.value.picto.hits.single()
+        assertEquals("keys", placed.label)
+        assertEquals(0.2f, placed.x, 1e-6f)
+        assertEquals(0.3f, placed.y, 1e-6f)
+        assertEquals(0.3f, placed.w, 1e-6f)
+        assertEquals(0.3f, placed.h, 1e-6f)
+        coordinator.onDetections(emptyList())
+        advanceUntilIdle()
+        assertTrue(state.value.picto.hits.isEmpty())
+        coordinator.onDetections(listOf(keysAt(0.6f, 0.1f, 0.8f, 0.3f)))
+        advanceUntilIdle()
+        val back = state.value.picto.hits.single()
+        assertEquals(0.6f, back.x, 1e-6f)
+        assertEquals(0.2f, back.w, 1e-6f)
+        assertEquals(1, client.calls)
+    }
+
+    @Test
+    fun `find sur label deja arme reprend la chasse sans regenerer`() = runTest {
+        val coordinator = picto()(this)
+        coordinator.findObject("keys")
+        coordinator.onDetections(listOf(keysAt(0.2f, 0.3f, 0.5f, 0.6f)))
+        advanceUntilIdle()
+        assertEquals(1, client.calls)
+        coordinator.findObject("keys")
+        coordinator.onDetections(listOf(keysAt(0.2f, 0.3f, 0.5f, 0.6f)))
+        advanceUntilIdle()
+        assertEquals(1, client.calls)
+        assertEquals(1, state.value.picto.armed)
+        assertEquals("keys", state.value.picto.hits.single().label)
+    }
+
+    @Test
+    fun `dehors les detections restent muettes`() = runTest {
+        var mode = PictoPlaceMode.DEDANS
+        val coordinator = picto(placeMode = { mode })(this)
+        coordinator.findObject("keys")
+        coordinator.onDetections(listOf(keysAt(0.2f, 0.3f, 0.5f, 0.6f)))
+        advanceUntilIdle()
+        coordinator.onDetections(listOf(keysAt(0.2f, 0.3f, 0.5f, 0.6f)))
+        advanceUntilIdle()
+        assertEquals(1, state.value.picto.hits.size)
+        mode = PictoPlaceMode.DEHORS
+        coordinator.onDetections(emptyList())
+        advanceUntilIdle()
+        assertEquals(1, state.value.picto.hits.size)
+        assertEquals(1, client.calls)
     }
 
     @Test
@@ -203,6 +286,7 @@ class IseePictoTest {
         val calls = mutableListOf<String>()
         val coordinator = picto(calls, now = { 10_000L }, placeMode = { mode })(this)
         coordinator.findObject("keys")
+        coordinator.onDetections(listOf(keysAt(0.2f, 0.3f, 0.5f, 0.6f)))
         advanceUntilIdle()
         assertEquals(1, state.value.picto.armed)
         mode = PictoPlaceMode.DEHORS
@@ -236,6 +320,7 @@ class IseePictoTest {
         client.gate = CompletableDeferred()
         val coordinator = picto(placeMode = { mode })(this)
         coordinator.findObject("keys")
+        coordinator.onDetections(listOf(keysAt(0.2f, 0.3f, 0.5f, 0.6f)))
         assertEquals(PictoPhase.Generating, state.value.picto.phase)
         mode = PictoPlaceMode.DEHORS
         client.gate?.complete(Result.success(PNG))
@@ -287,11 +372,12 @@ class IseePictoTest {
         camera.throwOnTake = true
         val coordinator = picto()(this)
         coordinator.findObject("keys")
+        coordinator.onDetections(listOf(keysAt(0.2f, 0.3f, 0.5f, 0.6f)))
         advanceUntilIdle()
         assertEquals(PictoPhase.Idle, state.value.picto.phase)
         assertTrue(state.value.status.orEmpty().startsWith("Picto:"))
         camera.throwOnTake = false
-        coordinator.findObject("keys")
+        coordinator.onDetections(listOf(keysAt(0.2f, 0.3f, 0.5f, 0.6f)))
         advanceUntilIdle()
         assertEquals(1, state.value.picto.armed)
         assertEquals(IseeStatusText.PICTO_SAVED, state.value.status)
@@ -300,7 +386,9 @@ class IseePictoTest {
     @Test
     fun `sauvegarde impossible affiche le motif sans armer`() = runTest {
         val fileRoot = Files.createTempFile("isee-picto-file", null).toFile().apply { deleteOnExit() }
-        picto(storeRoot = fileRoot)(this).findObject("keys")
+        val coordinator = picto(storeRoot = fileRoot)(this)
+        coordinator.findObject("keys")
+        coordinator.onDetections(listOf(keysAt(0.2f, 0.3f, 0.5f, 0.6f)))
         advanceUntilIdle()
         assertEquals(PictoPhase.Idle, state.value.picto.phase)
         assertEquals(0, state.value.picto.armed)
@@ -312,6 +400,7 @@ class IseePictoTest {
         val root = tempDir("isee-picto-reopen")
         val first = picto(storeRoot = root)(this)
         first.findObject("keys")
+        first.onDetections(listOf(keysAt(0.2f, 0.3f, 0.5f, 0.6f)))
         advanceUntilIdle()
         assertTrue(first.armed())
         val second = picto(storeRoot = root)(this)
@@ -346,10 +435,12 @@ class IseePictoTest {
         var gate: CompletableDeferred<Result<ByteArray>>? = null
         var lastPhoto: ByteArray = ByteArray(0)
         var lastHint: String = ""
+        var calls: Int = 0
 
         override suspend fun editToPictogram(photoJpeg: ByteArray, hint: String): Result<ByteArray> {
             lastPhoto = photoJpeg
             lastHint = hint
+            calls += 1
             gate?.let { return it.await() }
             return failure?.let { Result.failure(it) } ?: Result.success(PNG)
         }
