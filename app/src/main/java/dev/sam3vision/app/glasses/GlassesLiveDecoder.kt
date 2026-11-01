@@ -8,6 +8,7 @@ import android.media.MediaFormat
 import android.os.SystemClock
 import android.util.Log
 import android.view.Surface
+import dev.sam3vision.core.distance.CropGeometry
 import java.io.ByteArrayOutputStream
 import java.nio.ByteBuffer
 
@@ -46,17 +47,8 @@ fun textureViewCrop(srcW: Int, srcH: Int, dstW: Int, dstH: Int): TextureCrop {
  * (`GlassesBitmapCropTest`) ; dégénéré → bitmap entier, jamais de crash.
  */
 internal fun bitmapSourceCrop(srcW: Int, srcH: Int, dstW: Int, dstH: Int): CropRect {
-    if (srcW <= 0 || srcH <= 0 || dstW <= 0 || dstH <= 0) return CropRect(0, 0, srcW, srcH)
-    // Comparaison sans flottant : source plus large que le canvas ?
-    val wide = srcW.toLong() * dstH
-    val tall = dstW.toLong() * srcH
-    if (wide == tall) return CropRect(0, 0, srcW, srcH)
-    if (wide > tall) {
-        val w = (srcH.toLong() * dstW / dstH).toInt().coerceIn(1, srcW)
-        return CropRect((srcW - w) / 2, 0, w, srcH)
-    }
-    val h = (srcW.toLong() * dstH / dstW).toInt().coerceIn(1, srcH)
-    return CropRect(0, (srcH - h) / 2, srcW, h)
+    val crop = CropGeometry.fillViewCrop(srcW, srcH, dstW, dstH)
+    return CropRect(crop.x, crop.y, crop.width, crop.height)
 }
 
 /** Start code Annex B : sépare les unités NAL dans le flux que le décodeur attend. */
