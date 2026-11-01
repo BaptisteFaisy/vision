@@ -5,6 +5,17 @@
 <manifest xmlns:android="http://schemas.android.com/apk/res/android"
     xmlns:tools="http://schemas.android.com/tools">
 
+    <!-- Debug uniquement : test provider de position (simulation GPS d'une balade).
+         Sans effet par elle-même : le droit effectif est l'appop, posée depuis l'hôte par
+         `adb shell appops set dev.sam3vision.app android:mock_location allow`.
+         Le build release ne la déclare pas.
+         `MockLocation` est éteint ici parce que la règle demande justement de déplacer la
+         permission dans un manifeste debug — c'est déjà ce fichier : sans suppression, le
+         contrôle la refuse même une fois la consigne appliquée. -->
+    <uses-permission
+        android:name="android.permission.ACCESS_MOCK_LOCATION"
+        tools:ignore="MockLocation,ProtectedPermissions" />
+
     <application
         android:usesCleartextTraffic="true"
         tools:replace="android:usesCleartextTraffic">
@@ -16,6 +27,18 @@
             android:exported="true">
             <intent-filter>
                 <action android:name="dev.sam3vision.app.locked.DEBUG_TOGGLE" />
+            </intent-filter>
+        </receiver>
+
+        <!-- Debug uniquement : position GPS simulée depuis l'hôte (`am broadcast`), pour
+             tester le guidage sur émulateur (`adb emu geo fix` ne donne aucune précision,
+             donc iSee jette le fix sans rien dire). Absent du build release. -->
+        <receiver
+            android:name=".sim.SimLocationDebugReceiver"
+            android:exported="true">
+            <intent-filter>
+                <action android:name="dev.sam3vision.app.sim.LOCATION" />
+                <action android:name="dev.sam3vision.app.sim.LOCATION_CLEAR" />
             </intent-filter>
         </receiver>
     </application>
