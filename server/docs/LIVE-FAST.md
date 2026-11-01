@@ -13,6 +13,7 @@ Source réellement déployée : `backend/live_fast/` (app Modal `sam3-eu-a100`, 
 | `FAST_SCALEDOWN=60` | fuite max ~0,04 $ si `/release` raté (60 s au lieu de 300) |
 | `FAST_BATCH_PROMPTS=1` | les N concepts dans un seul forward |
 | `FAST_EDGE=512` | grille 518 côté serveur |
+| `FAST_POST_KEPT_ONLY=1` | post DETR : sigmoid après seuillage (bit-identique au HF, `fast_post.py`) |
 
 Trois déploiements manuels d'autres agents ont effacé ces leviers dans la soirée (le
 `cuda_graph` Repassait à `false`, `vision_accel` à `none`) parce que la seule copie du
