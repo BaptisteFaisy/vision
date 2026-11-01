@@ -24,6 +24,9 @@ internal class ProbeTestClient(private val journal: MutableList<String>) : LiveC
     var sent = 0
         private set
 
+    /** Concepts envoyés par `live`, dans l'ordre : la preuve de la rotation. */
+    val sentPrompts = mutableListOf<List<String>?>()
+
     /** Sessions fermées (`stop`, `configure`) : le socket rendu, la carte peut s'éteindre. */
     var closed = 0
         private set
@@ -39,6 +42,7 @@ internal class ProbeTestClient(private val journal: MutableList<String>) : LiveC
         val slot = CompletableDeferred<Result<LiveFrame>>()
         waiting[jpegB64] = slot
         sent += 1
+        sentPrompts += prompts
         journal += "envoi $jpegB64 (frames=${publishedFrames()})"
         return slot.await()
     }
