@@ -20,7 +20,7 @@ livré et ses preuves (tâche, fichiers, chiffres) dans l'arbre.
   seul imminent ≤ 2 m parlé en clip même quand une voiture gagne) ;
   la file douce tient l'ordre (voiture > personne > doux, à rang
   égal la plus fraîche gagne).
-- **Preuve** : `:app:testDebugUnitTest` verts (0 échec, 0 sauté,
+- **Preuve** : `:app:testDebugUnitTest` 1 741 verts (0 échec, 0 sauté,
   dont 4 nouveaux `ObstacleArbiterTest` — voiture écrase, personne
   écrase, personne écrase l'arrêt, sécu gardée — et 8 nouveaux
   `ProximityVoicePreemptTest`) ; `:core` non rejoué (aucun fichier
