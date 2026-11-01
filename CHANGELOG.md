@@ -91,6 +91,21 @@ livré et ses preuves (tâche, fichiers, chiffres) dans l'arbre.
   dont « poteau = silence » nouveau) ; `check-kotlin-limits.py` OK ;
   `check-voicepack.py` OK ; UBS : 0 finding (scanner Kotlin
   indisponible, comme avant).
+## 2026-11-01 — iSee : picto des clés posé sur les clés détectées (branche `feat/isee-picto-cles-detectees`)
+
+- **Ordre user** : en mode picto, « où sont mes clés » génère le pictogramme
+  des clés quand elles sont détectées sur l'image, puis le pose sur les clés
+  affichées ; il disparaît quand elles sortent du champ et réapparaît avec
+  elles.
+- **Fait** : `findObject` arme la chasse au lieu de photographier à
+  l'aveugle ; `onDetections` (détections SAM de la sonde) génère à la
+  première détection puis ancre l'overlay sur la boîte détectée
+  (apparition/disparition/réapparition sans régénérer) ; déjà armé, la chasse
+  reprend sans refacturer ; muet dehors ; fusion ancrage live + gabarits
+  (le live gagne).
+- **Preuve** : `IseePictoTest` 20/20 (4 nouveaux),
+  `IseePictoVoiceTest` 19/19, `ProbeEnsureConceptTest` 7/7 verts ;
+  `check-kotlin-limits.py` OK (aucun dépassement).
 
 ## 2026-10-31 — iSee : escaliers jalonnés à 4 / 2 / 1 m (branche `feat/escaliers-jalons`)
 

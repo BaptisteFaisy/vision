@@ -17,7 +17,8 @@ import dev.sam3vision.core.settings.Settings
  * création restent sur place, démo et mot maison seul partent au direct.
  * « Find the X », « Where are my keys » et « où sont mes clés » sans repère
  * armé restent sur place
- * ([onFind] : X rejoint les masques SAM et son pictogramme se crée) ; armé,
+ * ([onFind] : X rejoint les masques SAM, son pictogramme se crée à sa
+ * première détection) ; armé,
  * le repère est chassé sur place (l'overlay le montre, la voix dit où il est),
  * jamais régénéré. Création (« fais un pictogramme de X », « create a picto
  * for X ») : [onCreate] photographie et arme sur place, sans relecture —

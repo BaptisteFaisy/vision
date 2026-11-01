@@ -97,7 +97,7 @@ class IseeViewModel(app: Application) : AndroidViewModel(app) {
         camera = { camera },
         settings = { settings },
         store = PictoStore(pictosDir(app.filesDir)),
-        clientOf = { s -> MetaImageClient(s.asrBaseUrl, s.asrApiKey) }, placeMode = { _state.value.placeMode },
+        clientOf = { s -> MetaImageClient(s.asrBaseUrl, s.asrApiKey) }, placeMode = { _state.value.placeMode }, probeState = probe.state,
         update = ::update,
         scope = viewModelScope,
     )
@@ -393,7 +393,7 @@ class IseeViewModel(app: Application) : AndroidViewModel(app) {
     /** La navigation a consommé la demande : ne pas rouvrir les réglages. */
     fun settingsOpened() = update { it.copy(openSettings = false) }
 
-    /** Ordres « Find the X » / « Where are my keys » : X rejoint les masques SAM, son picto se crée et s'arme. */
+    /** Ordres « Find the X » / « Where are my keys » / « où sont mes clés » : X rejoint les masques SAM, son picto se crée à sa première détection puis s'ancre sur lui. */
     private fun runFindOrder(label: String) {
         probe.ensureConcept(settings, label, camera?.lensSpec, lensQuality::note)
         picto.findObject(label)

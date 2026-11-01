@@ -8,12 +8,16 @@ import dev.sam3vision.app.isee.decodeFrameGray
 import dev.sam3vision.app.isee.photoToJpeg
 import dev.sam3vision.app.isee.templateFromPhoto
 import dev.sam3vision.app.isee.IseeCameraActions
+import dev.sam3vision.app.isee.LiveProbeState
 import dev.sam3vision.app.media.MediaCacheStore
+import dev.sam3vision.core.distance.KnownSizes
+import dev.sam3vision.core.model.Detection
 import dev.sam3vision.core.net.PictoImageClient
 import dev.sam3vision.core.picto.GrayImage
 import dev.sam3vision.core.picto.PictoHit
 import dev.sam3vision.core.picto.PictoPlaceMode
 import dev.sam3vision.core.picto.PictoTemplate
+import dev.sam3vision.core.picto.PictoVoiceOrder
 import dev.sam3vision.core.picto.matchTemplate
 import dev.sam3vision.core.settings.Settings
 import java.io.File
@@ -22,6 +26,9 @@ import kotlinx.coroutines.CompletableDeferred
 import kotlinx.coroutines.CoroutineDispatcher
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.flow.StateFlow
+import kotlinx.coroutines.flow.distinctUntilChanged
+import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withTimeoutOrNull
 
@@ -48,6 +55,10 @@ data class PictoUiState(
  *
  * Un seul vol à la fois (`busy`) : le bouton est muet pendant la génération
  * (~10 s facturées ~0,01 $), et une seconde demande ne double pas la facture.
+ * La chasse (« où sont mes clés ») est pilotée par la détection : l'ordre
+ * arme le label, le pictogramme se génère à sa première détection SAM,
+ * puis l'overlay s'ancre sur la boîte détectée — il disparaît avec les
+ * clés et réapparaît avec elles, sans jamais régénérer.
  * Dehors, tout est muet (bouton, ordres, relecture, reconnaissance sur
  * frames) : seul dedans suit des pictos. Une génération lancée dedans mais
  * livrée dehors est jetée sans bruit ([dropLate]).
@@ -66,7 +77,21 @@ class IseePicto(
     private val io: CoroutineDispatcher = Dispatchers.IO,
     private val clock: () -> Long = SystemClock::elapsedRealtime,
     private val placeMode: () -> PictoPlaceMode = { PictoPlaceMode.DEDANS },
+    probeState: StateFlow<LiveProbeState>? = null,
 ) {
+
+    /**
+     * Chasse branchée à la sonde : chaque publication de détections SAM y est
+     * guettée ([onDetections]) — `null` (tests) = pas d'abonnement.
+     */
+    init {
+        probeState?.let { flow ->
+            scope.launch(io) {
+                flow.map { it.samDetections }.distinctUntilChanged().collect { onDetections(it) }
+            }
+        }
+    }
+
 
     /** Brouillon en relecture : photo d'origine (régénération), gabarit, PNG. */
     private class Draft(val photo: ByteArray, val template: PictoTemplate, var png: ByteArray)
@@ -85,6 +110,22 @@ class IseePicto(
 
     @Volatile
     private var chipBounds: RectF? = null
+
+    /**
+     * Label chassé en direct (« keys ») : armé par [findObject], la
+     * génération part à sa première détection SAM ([onDetections]), puis
+     * l'overlay s'ancre sur sa boîte. `null` = pas de chasse en cours.
+     */
+    @Volatile
+    private var huntLabel: String? = null
+
+    /** Derniers matches locaux (gabarits), fusionnés avec [liveHits]. */
+    @Volatile
+    private var templateHits: List<PictoHit> = emptyList()
+
+    /** Ancrage live (boîte SAM du label chassé), prioritaire à l'affichage. */
+    @Volatile
+    private var liveHits: List<PictoHit> = emptyList()
 
     /** Charge les repères validés (ouverture de l'écran) et arme la détection. */
     fun refresh() {
@@ -129,25 +170,19 @@ class IseePicto(
     }
 
     /**
-     * Ordre « Find the X » : photo de l'objet filmé, pictogramme Muse, puis
-     * stockage direct — sans relecture, l'utilisateur est seul devant la
-     * caméra. Le repère est cherché dès la frame suivante et l'overlay le
-     * montre à son emplacement. Muet dehors ou si une génération est en vol.
+     * Ordre « Find the X » / « Where are my keys » / « où sont mes clés » :
+     * arme la chasse de [label] — le pictogramme se génère à sa première
+     * détection sur l'image ([onDetections]), pas sur une photo à
+     * l'aveugle, puis s'ancre sur les détections. Déjà armé : la chasse
+     * reprend sans régénérer, une seconde demande ne double pas la
+     * facture. Muet dehors ou si une génération est en vol.
      */
     fun findObject(label: String) {
         if (!placeMode().pictoEnabled) return
         if (busy || label.isBlank()) return
-        busy = true
-        update { it.copy(picto = PictoUiState(phase = PictoPhase.Shooting, armed = pictos.size), status = null) }
-        launchGuarded {
-            val shot = shoot()
-            if (shot == null) {
-                fail(IseeStatusText.PICTO_PHOTO_FAILED)
-            } else {
-                update { it.copy(picto = it.picto.copy(phase = PictoPhase.Generating)) }
-                generateAndArm(shot.first, shot.second, label)
-            }
-        }
+        huntLabel = label.trim()
+        liveHits = emptyList()
+        update { it.copy(picto = it.picto.copy(hits = templateHits, armed = pictos.size), status = null) }
     }
 
     /** L'aidant valide : le repère est stocké et la détection l'arme aussitôt. */
@@ -197,8 +232,48 @@ class IseePicto(
         scope.launch(io) {
             val frame = frameGray(jpegB64) ?: return@launch
             val hits = known.mapNotNull { matchTemplate(frame, it.template, it.id, it.label) }
-            update { it.copy(picto = it.picto.copy(hits = hits)) }
+            templateHits = hits
+            publishHits()
         }
+    }
+
+    /**
+     * Détections SAM confirmées de la dernière frame : le label chassé
+     * ([findObject]) y est guetté. Première détection sans repère armé :
+     * photo des clés cadrées, puis génération et armement direct — sans
+     * relecture, l'utilisateur est seul devant la caméra. Repère armé :
+     * l'overlay s'ancre sur la boîte détectée ; les clés sorties du
+     * champ, le picto disparaît, et il réapparaît avec elles, sans
+     * régénérer. Muet dehors et sans chasse en cours.
+     */
+    fun onDetections(dets: List<Detection>) {
+        if (!placeMode().pictoEnabled) return
+        val hunt = huntLabel ?: return
+        val armed = armedFor(hunt)
+        val seen = dets.firstOrNull { matchesHunt(hunt, it.label) }
+        if (seen != null && armed == null) {
+            if (busy) return
+            busy = true
+            update { it.copy(picto = PictoUiState(phase = PictoPhase.Shooting, armed = pictos.size), status = null) }
+            launchGuarded {
+                val shot = shoot()
+                if (shot == null) {
+                    fail(IseeStatusText.PICTO_PHOTO_FAILED)
+                } else {
+                    update { it.copy(picto = it.picto.copy(phase = PictoPhase.Generating)) }
+                    generateAndArm(shot.first, shot.second, hunt)
+                }
+            }
+            return
+        }
+        if (armed == null) return
+        val box = seen?.normalizedBox()
+        liveHits = if (seen != null && box != null && box.size >= 4) {
+            listOf(PictoHit(armed.id, armed.label, box[0], box[1], box[2] - box[0], box[3] - box[1], seen.score))
+        } else {
+            emptyList()
+        }
+        publishHits()
     }
 
     /** Relit le magasin et publie le nombre de repères armés. */
@@ -280,6 +355,26 @@ class IseePicto(
         draft = null
         busy = false
         update { it.copy(picto = PictoUiState(armed = pictos.size)) }
+    }
+
+    /** Repère armé visant [label], `null` = rien à ancrer, tout reste à générer. */
+    private fun armedFor(label: String): StoredPicto? =
+        pictos.firstOrNull { matchesHunt(label, it.label) }
+
+    /**
+     * Le label détecté vise-t-il la chasse, dans un sens ou dans l'autre
+     * (« keys » ↔ « keys », « remote » ↔ « tv remote ») ? Égalité
+     * canonique ou règle vocale (singulier/pluriel, abrégé oral).
+     */
+    private fun matchesHunt(hunt: String, label: String): Boolean =
+        KnownSizes.canonical(hunt) == KnownSizes.canonical(label) ||
+            PictoVoiceOrder.matches(label, hunt) || PictoVoiceOrder.matches(hunt, label)
+
+    /** Les deux sources fusionnées : l'ancrage live gagne sur le gabarit. */
+    private fun publishHits() {
+        val live = liveHits
+        val merged = live + templateHits.filter { hit -> live.none { it.pictoId == hit.pictoId } }
+        update { it.copy(picto = it.picto.copy(hits = merged)) }
     }
 
     /** Échec : repos, brouillon jeté, motif affiché. */
