@@ -12,7 +12,7 @@ import kotlin.coroutines.coroutineContext
 /**
  * Voix de proximité SPEC v4 : parle ou se tait — **aucune file** (ni douce,
  * ni route, ni arrivée, ni rattrapage : l'écrasé n'est jamais redit, le bus
- * ([VoiceBus]) arbitre l'instant et l'antirépétition ([AntiRepeat]) la
+ * ([VoiceBus]) arbitre l'instant et l'antirépétition ([dev.sam3vision.core.live.AntiRepeat]) la
  * fréquence, en amont).
  *
  * [speak] dit une phrase (clip enregistré d'abord — [clips], zéro réseau —,

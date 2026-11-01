@@ -31,7 +31,7 @@ interface VoiceBusSpeaker {
  * La parole du user (niveau 1, [userSpeaking]) tait tout sauf le niveau 0
  * (seul 0 la coupe) ; la lecture du chat ([chatSpeaking]) tient le niveau 9
  * (un niveau 12 ne coupe jamais une réponse en cours). L'antirépétition vit
- * en amont ([AntiRepeat], côté producteurs) : le bus n'arbitre que l'instant.
+ * en amont ([dev.sam3vision.core.live.AntiRepeat], côté producteurs) : le bus n'arbitre que l'instant.
  */
 object VoiceBus {
     /** Aucune parole en cours : tout niveau parle. */
