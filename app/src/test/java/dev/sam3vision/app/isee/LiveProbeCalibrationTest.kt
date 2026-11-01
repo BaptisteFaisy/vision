@@ -3,6 +3,7 @@ package dev.sam3vision.app.isee
 import dev.sam3vision.app.glasses.GlassesVideoLink
 import dev.sam3vision.app.live.GlassesMireStore
 import dev.sam3vision.core.distance.CameraPose
+import dev.sam3vision.core.distance.CropGeometry
 import dev.sam3vision.core.distance.LensSpec
 import dev.sam3vision.core.model.Detection
 import dev.sam3vision.core.settings.Settings
@@ -118,6 +119,7 @@ class LiveProbeCalibrationTest {
         probe.configureFrom(Settings.Default, glassesLens = mire, fromGlasses = true)
 
         assertEquals(mire, probe.distances.lensSpec)
+        assertEquals(mire, GlassesVideoLink.glassesStreamLens)
     }
 
     @Test
@@ -239,5 +241,43 @@ class LiveProbeCalibrationTest {
         } finally {
             observer.cancel()
         }
+    }
+
+    @Test
+    fun `E5 pose la focale recadree par photo vue`() = runTest {
+        val (probe, _) = probeHarness(this)
+        val stream = LensSpec(68f, 100.4f, sensorLandscape = false)
+        GlassesVideoLink.glassesStreamLens = stream
+        GlassesVideoLink.noteSnapshotGeometry(720, 1280, 320, 180)
+
+        applyGlassesLens(probe, fromView = true)
+
+        val expected = CropGeometry.afterCrop(stream, 720, 1280, CropGeometry.fillViewCrop(720, 1280, 320, 180))!!
+        assertEquals(expected, probe.distances.lensSpec)
+        GlassesVideoLink.detachSnapshot()
+    }
+
+    @Test
+    fun `E5 hors vue repose le flux, sans focale ne touche rien`() = runTest {
+        val (probe, _) = probeHarness(this)
+        val stream = LensSpec(68f, 100.4f, sensorLandscape = false)
+        GlassesVideoLink.glassesStreamLens = stream
+
+        applyGlassesLens(probe, fromView = false)
+        assertEquals(stream, probe.distances.lensSpec)
+
+        GlassesVideoLink.glassesStreamLens = null
+        applyGlassesLens(probe, fromView = true)
+        assertEquals(stream, probe.distances.lensSpec)
+    }
+
+    @Test
+    fun `groundDegraded reflete la bascule sol`() = runTest {
+        val (probe, _) = probeHarness(this)
+        assertTrue(!probe.groundDegraded)
+        probe.setGlassesLive(true)
+        assertTrue(probe.groundDegraded)
+        probe.setGlassesLive(false)
+        assertTrue(!probe.groundDegraded)
     }
 }

@@ -80,8 +80,11 @@ private fun bitmapToProbeJpeg(bitmap: Bitmap): String? {
  * Hors vue (poussée décodée fond = plein flux sans crop), la focale flux
  * D1 s'applique telle quelle. Silencieux sans focale ni géométrie : le
  * pont ne tombe jamais pour ça.
+ *
+ * `internal` pour les tests (`LiveProbeCalibrationTest`) : la politique par
+ * photo (vue = crop, fond = flux) est pinnée en JVM.
  */
-private fun applyGlassesLens(probe: LiveProbe, fromView: Boolean) {
+internal fun applyGlassesLens(probe: LiveProbe, fromView: Boolean) {
     val stream = GlassesVideoLink.glassesStreamLens ?: return
     if (!fromView) {
         probe.distances.setLens(stream)
