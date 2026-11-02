@@ -55,6 +55,20 @@ class PositionTextTest {
     }
 
     @Test
+    fun `cycles jamais nommes, moto intacte`() {
+        assertNull(PositionText.phrase(listOf(placed("bicycle", 0.5f))))
+        assertNull(PositionText.phrase(listOf(placed("trottinette", 0.5f))))
+        assertEquals(
+            "Personne at 9 o'clock.",
+            PositionText.phrase(listOf(placed("electric scooter", 0.5f), placed("personne", 0.1f))),
+        )
+        assertEquals(
+            "Motorcycle at 12 o'clock.",
+            PositionText.phrase(listOf(placed("motorcycle", 0.5f))),
+        )
+    }
+
+    @Test
     fun `sans distance, le plus en face se dit d'abord`() {
         val phrase = PositionText.phrase(
             listOf(placed("chien", 0.9f), placed("personne", 0.1f), placed("livre", 0.5f)),
