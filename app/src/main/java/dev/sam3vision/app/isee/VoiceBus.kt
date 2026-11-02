@@ -1,6 +1,7 @@
 package dev.sam3vision.app.isee
 
 import dev.sam3vision.app.BuildConfig
+import dev.sam3vision.core.live.AntiRepeat
 
 /** Étiquette des diagnostics du mutisme spontané (`logcat -s VoiceMute:*`). */
 private const val TAG_MUTE = "VoiceMute"
@@ -100,26 +101,35 @@ object VoiceBus {
      * écrase la parole en cours, jeté sinon (jamais redit, jamais mis en
      * file). La décision lit [activeLevel], pas le lecteur (sinon une parole
      * décidée mais pas encore jouée laisserait passer un niveau plus bas).
+     * [antiRepeatKey] rend son tour quand l'annonce est jetée (SPEC v4 § 5 :
+     * une annonce avalée ne consomme pas son tour — le producteur l'avait
+     * consommé par son pré-contrôle) ; `null` = sans clé (comportement
+     * inchangé : GPS, chat, repli).
      */
     @Synchronized
-    fun post(level: Int, text: String, clipId: String? = null, clips: List<String> = emptyList()) {
+    fun post(level: Int, text: String, clipId: String? = null, clips: List<String> = emptyList(),
+        antiRepeatKey: String? = null) {
         if (text.isBlank()) {
             android.util.Log.w(TAG_MUTE, "bus-jet motif=vide level=$level")
+            refundTurn(antiRepeatKey)
             return
         }
         val target = speaker
         if (target == null) {
             android.util.Log.w(TAG_MUTE, "bus-jet motif=sans-porte-parole level=$level texte=[$text]")
+            refundTurn(antiRepeatKey)
             return
         }
         if (userHoldsMic && level != OutdoorLevel.CAR_MOVING) {
             android.util.Log.w(TAG_MUTE, "bus-jet motif=micro-user level=$level texte=[$text]")
+            refundTurn(antiRepeatKey)
             return
         }
         val nowMs = System.currentTimeMillis()
         if (stairsBusStuck(activeLevel, nowMs, lastSayMs)) activeLevel = IDLE_LEVEL
         if (guidanceSpeaking() && level != OutdoorLevel.USER_SPEECH) {
             android.util.Log.w(TAG_MUTE, "bus-jet motif=mot-guidage-en-cours level=$level texte=[$text]")
+            refundTurn(antiRepeatKey)
             return
         }
         if (level == OutdoorLevel.STAIRS) {
@@ -131,15 +141,28 @@ object VoiceBus {
         }
         if (activeLevel == OutdoorLevel.STAIRS) {
             android.util.Log.w(TAG_MUTE, "bus-jet motif=escaliers-en-cours level=$level texte=[$text]")
+            refundTurn(antiRepeatKey)
             return
         }
         if (activeLevel != IDLE_LEVEL && level > activeLevel) {
             android.util.Log.w(TAG_MUTE, "bus-jet motif=ecrase level=$level actif=$activeLevel chat=$chatReads texte=[$text]")
+            refundTurn(antiRepeatKey)
             return
         }
         activeLevel = level
         lastSayMs = nowMs
         target.say(level, text, clipId, clips)
+    }
+
+    /**
+     * Rend le tour d'antirépétition d'une annonce jetée (SPEC v4 § 5 :
+     * pas vraiment parlée = pas de tour consommé) ; `null` = sans clé,
+     * rien à rendre. Privé : seul [post] jette.
+     */
+    private fun refundTurn(key: String?) {
+        if (key == null) return
+        if (BuildConfig.DEBUG) android.util.Log.d(TAG_MUTE, "bus-tour-rendu cle=$key")
+        AntiRepeat.forget(key)
     }
 
     /**
