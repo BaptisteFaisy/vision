@@ -3,10 +3,11 @@
 Règle produit (résidu = boîte − fond, en fractions d'image/s) :
 
 - **Le résidu est franc** ⇒ **la voiture bouge vraiment**.
-- **Le résidu est nul mais le fond défile** ⇒ **la caméra bouge**
-  (la boîte suit le porteur, la voiture est à l'arrêt).
-- **Les deux sont faibles** ⇒ **arrêt** ; doute (fond plat, basse
-  confiance) ⇒ silence, jamais d'arrêt inventé.
+- **Le résidu est nul** ⇒ la voiture est à l'arrêt, et le fond dit si
+  **la caméra bouge** (fond franc, la boîte suit le porteur) ou non.
+- **Glissement de suivi sous pan franc** ⇒ **la caméra bouge**
+  (tolérance au suivi imparfait) ; sans fond franc ⇒ doute.
+- Doute (fond plat, basse confiance) ⇒ silence, jamais d'arrêt inventé.
 
 ## V1 : boîte compensée du mouvement global
 
