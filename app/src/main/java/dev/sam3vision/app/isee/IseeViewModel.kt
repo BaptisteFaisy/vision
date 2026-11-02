@@ -41,7 +41,6 @@ import dev.sam3vision.core.glasses.CaptureAction
 import dev.sam3vision.core.live.AntiRepeat
 import dev.sam3vision.core.nav.NavFix
 import dev.sam3vision.core.nav.NavRoute
-import dev.sam3vision.core.picto.PictoPlaceMode
 import dev.sam3vision.core.net.MetaImageClient
 import dev.sam3vision.core.settings.Settings
 import dev.sam3vision.core.speech.SettingsVoiceCommand
@@ -107,10 +106,6 @@ class IseeViewModel(app: Application) : AndroidViewModel(app) {
         scope = viewModelScope, photoTemplateBox = { file, box -> templateFromPhoto(file, box) },
         onFound = ::postFoundClip,
     )
-    /** Zone tactile publiée par la puce Traversée (exemption d'interception racine). */
-    val crossingChip = CrossingChipZone()
-    /** Zone tactile publiée par la puce lieu (exemption d'interception racine). */
-    val placeModeChip = PlaceModeChipZone()
     /** Zones tactiles des boutons navigation sur l'accueil (exemption racine). */
     val navButtons = NavButtonZones()
     // Arbitrage voix : obstacle → TwinLite, sinon SAM (ordre user), sonde + guetteurs + traversée.
@@ -298,20 +293,8 @@ class IseeViewModel(app: Application) : AndroidViewModel(app) {
         )
     }
 
-    /** Bascule du mode Traversée (puce de la carte caméra) : mêmes masques, voix traversée ou retour. */
-    fun toggleCrossing() {
-        steering.toggleCrossing()
-        spine.onCrossingChanged()
-    }
-
-
-    /** Bascule dedans/dehors (puce lieu) : rejoue la phrase canonique de l'ordre vocal — même état, même synchro sonde, même confirmation. */
-    fun togglePlaceMode() {
-        viewModelScope.launch {
-            val target = if (_state.value.placeMode == PictoPlaceMode.DEDANS) "mode dehors" else "mode dedans"
-            modes.run(target)
-        }
-    }
+    /** Témoins tactiles Traversée + lieu, extraits du ViewModel (limite 500 lignes). */
+    val modeChips = IseeModeChips(viewModelScope, { _state.value.placeMode }, modes::run, { steering.toggleCrossing(); spine.onCrossingChanged() })
 
     override fun onCleared() {
         liveDictation.stop()

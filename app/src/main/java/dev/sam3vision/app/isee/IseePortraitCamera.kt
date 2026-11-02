@@ -97,14 +97,14 @@ private fun BoxScope.ModeToggles(probe: LiveProbe, viewModel: IseeViewModel, mod
     CrossingChip(
         probe.collectRest(),
         Modifier.align(Alignment.TopCenter).padding(top = 12.dp),
-        onToggle = { viewModel.toggleCrossing() },
-        onBounds = viewModel.crossingChip::setBounds,
+        onToggle = { viewModel.modeChips.toggleCrossing() },
+        onBounds = viewModel.modeChips.crossing::setBounds,
     )
     PlaceModeChip(
         mode,
         Modifier.align(Alignment.TopCenter).padding(top = 52.dp),
-        onToggle = { viewModel.togglePlaceMode() },
-        onBounds = viewModel.placeModeChip::setBounds,
+        onToggle = { viewModel.modeChips.togglePlace() },
+        onBounds = viewModel.modeChips.place::setBounds,
     )
 }
 
