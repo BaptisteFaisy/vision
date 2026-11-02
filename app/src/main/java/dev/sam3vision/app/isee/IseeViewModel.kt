@@ -292,6 +292,7 @@ class IseeViewModel(app: Application) : AndroidViewModel(app) {
         probe.observeHeadPose(viewModelScope)
         probe.observeDetour(viewModelScope, voiceNav::onProbeDetour)
         hazards = probe.observeHazards(viewModelScope, { settings.speechLanguage }, placeMode = { _state.value.placeMode })
+        probe.link.guidanceActive = { voiceNavState.value is VoiceNavUiState.Guiding }
         probe.observeIndoorDoors(
             viewModelScope,
             { level, text, clip -> VoiceBus.post(level, text, clip) },

@@ -1,5 +1,6 @@
 package dev.sam3vision.app.voicenav
 
+import android.app.Activity
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.runtime.Composable
@@ -42,6 +43,7 @@ fun VoiceNavRoute(isee: IseeViewModel, settings: Settings) {
     val hold = remember { VoiceNavHold(engine = ::speechClient) }
     val state by nav.state.collectAsState()
     val context = LocalContext.current
+    val activity = context as? Activity
     val lifecycle = LocalLifecycleOwner.current.lifecycle
     DisposableEffect(nav) {
         // Sortie d'écran : la confirmation s'annule, l'arrivée se referme.
@@ -60,7 +62,12 @@ fun VoiceNavRoute(isee: IseeViewModel, settings: Settings) {
         val observer = LifecycleEventObserver { _, event ->
             when (event) {
                 Lifecycle.Event.ON_PAUSE -> {
-                    if (GuidanceLifecycle.wantsBackground(nav.state.value)) {
+                    // Rotation : l'activité se recrée dans la même passe, le ViewModel
+                    // survit — ce n'est pas une sortie d'écran. Sans cette garde, chaque
+                    // rotation redémarre le service au pire moment (obligation de 5 s
+                    // expirée pendant que le thread principal reconstruit l'UI).
+                    val rotating = activity?.isChangingConfigurations == true
+                    if (GuidanceLifecycle.shouldStartBackground(nav.state.value, rotating)) {
                         GuidanceLifecycle.startBackground(context)
                     }
                 }

@@ -3,6 +3,8 @@ package dev.sam3vision.app.isee
 import dev.sam3vision.app.BuildConfig
 import dev.sam3vision.app.SpeechPlayer
 import dev.sam3vision.app.VOICE_SLICE_MS
+import dev.sam3vision.app.safety.CrashGuard
+import dev.sam3vision.app.safety.redactSecrets
 import dev.sam3vision.core.crossing.CrossingLevels
 import dev.sam3vision.core.speech.IseeClipsEn
 import kotlinx.coroutines.CancellationException
@@ -183,7 +185,7 @@ internal class BusSpeaker(
             }
         }
         lastWish = wish
-        scope.launch {
+        launchGuarded(heldLevel, heldToken, level, text) {
             // Hors chemin : la coupe libère la parole qui le tient — sauf
             // chemin prouvé coincé (marteler un lecteur figé n'a jamais
             // rien libéré).
@@ -204,6 +206,48 @@ internal class BusSpeaker(
                 if (current == generation) VoiceBus.onSpeechIdle()
             }
         }
+    }
+
+    /**
+     * Filet de la coroutine de parole ([say] ne suspend jamais : tout le travail part d'ici).
+     *
+     * Le scope vient du ViewModel (`viewModelScope`, sans `CoroutineExceptionHandler`) : une
+     * exception qui s'en échappait allait au handler non capturé du fil principal, donc à la
+     * mort du process — une simple faute de réglages, de pack de clips ou d'I/O suffisait.
+     * Ici, l'annulation se propage (coopération intacte) et **toute** autre faute est tracée
+     * ([CrashGuard]) puis rend le bus : plus de crash depuis la parole, plus de niveau tenu
+     * à vie par une parole morte ([yieldBus]).
+     */
+    private fun launchGuarded(
+        heldLevel: Int,
+        heldToken: Long,
+        level: Int,
+        text: String,
+        body: suspend () -> Unit,
+    ) {
+        scope.launch {
+            try {
+                body()
+            } catch (cancel: CancellationException) {
+                yieldBus(heldLevel, heldToken)
+                throw cancel
+            } catch (error: Throwable) {
+                android.util.Log.w(
+                    TAG_MUTE,
+                    "bus-parole-ko level=$level texte=[$text] ${error.javaClass.simpleName}: ${redactSecrets(error.message)}",
+                )
+                CrashGuard.note("bus-speech", error)
+                yieldBus(heldLevel, heldToken)
+            }
+        }
+    }
+
+    /**
+     * Rend le bus si c'est encore **notre** parole (niveau et jeton : une parole plus récente
+     * ne se fait jamais voler son tour). Gardé : le rappel de repos peut lui-même lever.
+     */
+    private fun yieldBus(heldLevel: Int, heldToken: Long) {
+        runCatching { if (VoiceBus.holds(heldLevel, heldToken)) VoiceBus.onSpeechIdle() }
     }
 
     /**
@@ -280,11 +324,18 @@ internal class BusSpeaker(
      */
     private fun watchRelease(heldLevel: Int, heldToken: Long, level: Int, text: String) {
         scope.launch {
-            delay(RELEASE_TIMEOUT_MS)
-            if (VoiceBus.holds(heldLevel, heldToken)) {
-                android.util.Log.w(TAG_MUTE, "bus-sans-retour level=$level texte=[$text] ms=$RELEASE_TIMEOUT_MS")
-                abandonStuckSpeech("superviseur")
-                VoiceBus.onSpeechIdle()
+            try {
+                delay(RELEASE_TIMEOUT_MS)
+                if (VoiceBus.holds(heldLevel, heldToken)) {
+                    android.util.Log.w(TAG_MUTE, "bus-sans-retour level=$level texte=[$text] ms=$RELEASE_TIMEOUT_MS")
+                    abandonStuckSpeech("superviseur")
+                    VoiceBus.onSpeechIdle()
+                }
+            } catch (cancel: CancellationException) {
+                throw cancel
+            } catch (error: Throwable) {
+                // Même filet que la parole : ce frère ne doit jamais tuer le process.
+                CrashGuard.note("bus-watchdog", error)
             }
         }
     }

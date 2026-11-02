@@ -6,11 +6,17 @@ import android.content.pm.PackageManager
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.platform.LocalContext
 import androidx.core.content.ContextCompat
+import androidx.lifecycle.Lifecycle
+import androidx.lifecycle.LifecycleEventObserver
+import androidx.lifecycle.compose.LocalLifecycleOwner
 
 /**
  * Les quatre permissions runtime d'iSee, demandées ensemble au premier lancement :
@@ -37,6 +43,30 @@ fun missingPermissions(context: Context): List<String> =
 /** État partagé du passage des permissions de premier lancement. */
 object IseePermissionFlow {    /** La demande groupée de permissions s'est jouée au moins une fois. */
 val handled = mutableStateOf(false)
+}
+
+/**
+ * Compteur incrémenté à **chaque retour au premier plan**.
+ *
+ * Android ne prévient aucune application qu'une permission vient d'être accordée
+ * ou révoquée depuis les Réglages système : un `granted` figé dans un `remember`
+ * ne voyait donc jamais ni l'octroi (écran noir muet au premier lancement) ni la
+ * révocation (Android 11+ retire les permissions des apps inutilisées) — la
+ * liaison levait alors une `SecurityException` avalée en silence. Les appelants
+ * s'en servent comme clé de `remember` pour relire l'état réel.
+ */
+@Composable
+fun permissionResumeTick(): Int {
+    val lifecycle = LocalLifecycleOwner.current.lifecycle
+    var tick by remember { mutableStateOf(0) }
+    DisposableEffect(lifecycle) {
+        val watcher = LifecycleEventObserver { _, event ->
+            if (event == Lifecycle.Event.ON_RESUME) tick++
+        }
+        lifecycle.addObserver(watcher)
+        onDispose { lifecycle.removeObserver(watcher) }
+    }
+    return tick
 }/**
  * Au premier lancement, les quatre dialogues système s'enchaînent seuls — Android ne
  * permet pas d'octroyer une permission autrement, aucune question de l'app ne s'ajoute.

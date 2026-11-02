@@ -89,9 +89,16 @@ class LiveProbe(
 
     internal var session: LiveSession? = null
 
-    /** Alias de [session] (session unique, FIX-18) : le délai froid vit sur la session,
-     * pas sur un second objet — les sites `if (warmed)` restent inchangés. */
-    internal var coldSession: LiveSession? = null
+    /**
+     * Alias de **lecture** de [session] (session unique, FIX-18) : le délai froid vit
+     * sur la session, pas sur un second objet. Depuis FIX-19 il n'est plus affectable,
+     * donc aucune session froide ne peut survivre à [goWarm] : plus de socket oisif à
+     * 60 s qui se réarme à chaque `configure()` (voir [ProbeLink.coldDue]).
+     */
+    internal val coldSession: LiveSession? get() = session
+
+    /** Lien de la sonde : âge de la dernière réponse, compteurs, budget froid payé. */
+    internal val link = ProbeLink()
 
     /**
      * État foule (audit foule du 01/11) : vrai dès qu'un **corps** figure dans la dernière
@@ -105,7 +112,7 @@ class LiveProbe(
     private var bodyAtMs = 0L
 
     /** Une frame a-t-elle abouti depuis l'activation de la caméra ? */
-    private var warmed = false
+    internal var warmed = false
 
     /** Cadence affichée : moyenne sur les 8 dernières frames, pas l'écart deux frames. */
     internal val rate = FrameRate()
@@ -155,7 +162,7 @@ class LiveProbe(
     internal var speechLanguage: SpeechLanguage = SpeechLanguage.DEFAULT
 
     /** Un réveil `/health` est en cours (un seul à la fois). */
-    private var warming = false
+    internal var warming = false
 
     /** Refus essuyé : la frame suivante part sans attendre l'échéance (voir [wantsFrame]). */
     private var priorityArmed = false
@@ -181,7 +188,11 @@ class LiveProbe(
         followed: List<String> = emptyList(),
     ) {
         val clean = baseUrl.trim()
-        openSessions(clean, prompts, maxObjects)
+        // Budget froid : dû **une seule fois par réveil** (FIX-19). Un réglage, une
+        // bascule de mode Traversée ou une rentrée d'écran sur un GPU déjà chaud ne
+        // reposent plus 60 s de latence tolérée sur le direct.
+        val cold = link.coldDue(clean)
+        openSessions(clean, prompts, maxObjects, cold)
         rotation.usePrompts(prompts)
         voice.guide = guide
         voice.language = language
@@ -191,6 +202,7 @@ class LiveProbe(
         // Un fichier par configuration : recouper l'interrupteur change de fichier.
         cropLogger = if (collectCrops) appContext?.let { LightCropLogger(java.io.File(it.filesDir, "lightcrops"), dev.sam3vision.app.BuildConfig.VERSION_NAME) } else null
         resetPipeline()
+        warmed = clean.isNotBlank() && !cold
         _state.update {
             LiveProbeState(
                 endpoint = clean,
@@ -199,16 +211,26 @@ class LiveProbe(
                 conceptsSent = LivePrompts.normalize(prompts),
                 followed = followed,
                 transport = TRANSPORT_WS,
-                timeoutSec = if (clean.isBlank()) 0L else COLD_TIMEOUT_SECONDS,
+                timeoutSec = when {
+                    clean.isBlank() -> 0L
+                    cold -> COLD_TIMEOUT_SECONDS
+                    else -> DEFAULT_TIMEOUT_SECONDS
+                },
                 error = if (clean.isBlank()) "no endpoint (Settings)" else null,
                 crossingActive = crossingActive,
             )
         }
-        if (clean.isNotBlank()) {
-            markWarming()
-            fireWake(clean)
-            pulse.start()
-        }
+        if (clean.isNotBlank()) armWake(clean, cold)
+    }
+
+    /**
+     * Démarre le réveil d'un endpoint : notice d'armement si le budget froid est dû (et
+     * remise à l'état du lien sinon), `/health` en tâche de fond, battement de guidage.
+     */
+    private fun armWake(clean: String, cold: Boolean) {
+        if (cold) markWarming() else publishLink(force = true)
+        fireWake(clean)
+        pulse.start()
     }
 
     /** Réveil explicite via la fabrique injectée (faux client en test, patient en prod) ; `/health` OK = carte chaude, on bascule sans attendre la frame (la jambe suit le bit `ws_binary`, le délai froid retombe). */
@@ -217,15 +239,15 @@ class LiveProbe(
     }
 
     /**
-     * Session unique sur [clean], au délai froid (60 s, réveil du conteneur) : [goWarm]
-     * la fait retomber au délai normal dès le 1er succès, sans second handshake (FIX-18).
-     * `coldSession` désigne la même session — les sites `if (warmed)` sont inchangés.
+     * Session unique sur [clean] (FIX-18), au délai froid **seulement si [cold]** :
+     * premier appel d'un endpoint (réveil du conteneur), sinon délai normal — un
+     * réglage en séance ne repaie plus 60 s (FIX-19).
      */
-    private fun openSessions(clean: String, prompts: List<String>, maxObjects: Int) {
+    private fun openSessions(clean: String, prompts: List<String>, maxObjects: Int, cold: Boolean) {
         closeSessions()
-        val single = openSession(clean, prompts, maxObjects, COLD_TIMEOUT_SECONDS)
+        val timeout = if (cold) COLD_TIMEOUT_SECONDS else DEFAULT_TIMEOUT_SECONDS
+        val single = openSession(clean, prompts, maxObjects, timeout)
         session = single
-        coldSession = single
         // Handshake unique, pendant la liaison caméra : la 1re frame part sans attendre.
         single?.preconnect()
     }
@@ -250,13 +272,15 @@ class LiveProbe(
     fun begin() {
         session?.stats?.reset()
         session?.serverStats?.reset()
-        coldSession?.stats?.reset()
-        coldSession?.serverStats?.reset()
         distances.reset()
-resetPipeline()
+        resetPipeline()
         globalsNouvelleSeance()
         _state.update { it.cleared() }
-        markWarming()
+        // Budget froid déjà payé lors de ce réveil : un `begin()` en séance ne redit
+        // plus « up to a minute » sur un GPU chaud (FIX-19).
+        val cold = link.coldDue(_state.value.endpoint)
+        warmed = !cold && _state.value.endpoint.isNotBlank()
+        if (cold) markWarming() else publishLink(force = true)
         pulse.start()
     }
 
@@ -331,7 +355,8 @@ _state.update { it.cleared() }
      */
     fun wantsFrame(): Boolean {
         if (!foregroundGate.foreground) return false
-        val active = (if (warmed) session else coldSession) ?: return false
+        publishLink() // silence : l'état dit « pas de réponse depuis N s », pas « GPU »
+        val active = session ?: return false
         // Réserve pleine et fraîche : convertir serait du CPU jeté — refus
         // compté (jamais silencieux), la suivante est prioritaire. Périmée
         // (> 1 période caméra) : la réalimenter, la suivante part au drain.
@@ -353,7 +378,7 @@ _state.update { it.cleared() }
         val exposedAtMs = if (captureAtNs > 0L) captureAtNs / 1_000_000L else System.currentTimeMillis()
         ProbeBackgroundMotion.offer(jpegB64, exposedAtMs) // fond V1 pour les veilleurs.
         val encodedAtNs = clock()
-        val active = (if (warmed) session else coldSession) ?: run {
+        val active = session ?: run {
             android.util.Log.w("sam3vision", "frame ignorée : aucune session SAM (endpoint vide ?)")
             return
         }
@@ -397,7 +422,7 @@ _state.update { it.cleared() }
     /** Une réponse vient d'arriver : une frame en réserve part maintenant, au lieu
      * d'attendre le prochain cycle (la requête **plus** l'encodage). */
     private fun drain() {
-        val active = (if (warmed) session else coldSession) ?: return
+        val active = session ?: return
         // Créneau encore pris : la réserve attend son tour, elle n'est pas dupliquée.
         if (active.saturated) return
         if (!reserve.take(reserved)) return
@@ -408,15 +433,13 @@ _state.update { it.cleared() }
         dispatch(active, reserved.jpegB64, reserved.captureAtNs, reserved.encodedAtNs, now, reserved.seq)
     }
 
-    /** Corps de la dernière réponse → [crowd] (hystérésis de [crowdOf]), puis cadence des
-     * deux sessions : en foule [Cadence.Crowd] garde le double vol jusqu'à 600 ms. */
+    /** Corps de la dernière réponse → [crowd] (hystérésis de [crowdOf]), puis cadence
+     * des deux sessions : en foule [Cadence.Crowd] garde le double vol jusqu'à 600 ms. */
     private fun noteCrowd(bodies: Int) {
         val now = clock() / 1_000_000L
         if (bodies > 0) bodyAtMs = now
         crowd = crowdOf(crowd, bodies, bodyAtMs, now)
-        val cadence = if (crowd) Cadence.Crowd else Cadence.Fast
-        session?.useCadence(cadence)
-        coldSession?.useCadence(cadence)
+        session?.useCadence(if (crowd) Cadence.Crowd else Cadence.Fast)
     }
 
     private suspend fun runFrame(active: LiveSession, jpegB64: String, at: Long, prompts: List<String>, rotated: Boolean) {
@@ -429,7 +452,7 @@ _state.update { it.cleared() }
             chronology.markReceived()
             // Frame détachée : elle garde ses marques de rendu quand la suivante démarre.
             val shown = chronology.publishing()
-            if (result.isSuccess && !warmed) goWarm()
+            if (result.isSuccess) if (!warmed) goWarm() else noteAnswer()
             // La suivante part **avant** la publication : le créneau est déjà rendu, et les
             // masques (~15 ms) ne doivent pas laisser le GPU inactif.
             drain()
@@ -437,12 +460,11 @@ _state.update { it.cleared() }
             val frame = accumulated(result.getOrNull(), prompts, rotated)
             if (frame == null) {
                 // Échec : le compte d'objets n'est pas remis à zéro — les masques affichés
-                // restent les derniers connus, seul le message d'erreur change.
+                // restent les derniers connus, seul le message d'erreur change. Le lien
+                // date ses échecs et n'écrit qu'une ligne de log par seconde.
                 val error = result.exceptionOrNull() ?: ApiError.BadResponse("SAM call failed")
                 if (error is ApiError.Timeout) { if (!warmed) sayColdTimeout(); LiveLatencyLog.drop(DropCause.TIMEOUT) }
-                val cause = error.cause?.let { " + ${it::class.simpleName} ${it.message}" } ?: ""
-                android.util.Log.w("sam3vision", "live KO: ${error::class.simpleName} ${error.message}$cause")
-                _state.update { it.copy(error = probeFailureText(error), timings = shown.snapshot()) }
+                noteFailure(error, shown.snapshot())
                 return@withLock
             }
             if (_state.value.frames == 0) {
@@ -450,21 +472,6 @@ _state.update { it.cleared() }
             }
             noteCrowd(frame.objects.count { PersonLabels.isBody(it.label) })
             publish(active, frame, jpegB64, at, shown)
-        }
-    }
-
-    /** 1re frame aboutie : le conteneur est chaud, le délai froid retombe au délai normal. */
-    private fun goWarm() {
-        // La première frame paie le démarrage du conteneur (mesuré : 17 s en WebSocket, 40 s
-        // en HTTP) : la garder dans la moyenne afficherait « 17 192 ms » pour un lien chaud
-        // à ~180 ms, et fausserait aussi le régulateur de créneaux.
-        (if (warmed) session else coldSession)?.let { it.stats.reset(); it.serverStats.reset() }
-        warmed = true
-        // Session unique (FIX-18) : le budget froid retombe, sans rouvrir le socket.
-        session?.useTimeoutMs(DEFAULT_TIMEOUT_SECONDS * 1000)
-        if (warming) {
-            warming = false
-            _state.update { it.copy(warming = false, timeoutSec = DEFAULT_TIMEOUT_SECONDS) }
         }
     }
 
@@ -477,14 +484,6 @@ _state.update { it.cleared() }
         if (!chronology.noteDrawn()) return
         val snap = chronology.snapshot(_state.value.timings)
         _state.update { current -> current.copy(timings = snap) }.also { LiveLatencyLog.frame(snap) }
-    }
-
-    /** Marqueur d'attente du premier retour : posé dès que l'endpoint est connu, effacé
-     * aux premières frames. Aucun appel réseau : la frame réveille le conteneur. */
-    private fun markWarming() {
-        if (_state.value.endpoint.isBlank() || warming) return
-        warming = true
-        _state.update { it.copy(warming = true, timeoutSec = COLD_TIMEOUT_SECONDS, spoken = WARM_SPOKEN, spokenSeq = it.spokenSeq + 1) }
     }
 
 }

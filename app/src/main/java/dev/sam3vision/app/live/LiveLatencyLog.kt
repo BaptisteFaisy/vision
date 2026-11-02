@@ -17,10 +17,24 @@ import dev.sam3vision.core.live.TimingsText
  * le diagnostic — le parseur l'ignore (pas de `latency N`). Les frames
  * incomplètes (pas de poste capteur, écran sorti) ne sont jamais loggées : une
  * latence inventée vaudrait moins que rien.
+ *
+ * Les **échecs** de frame passent par [failure] : une ligne par seconde au plus
+ * (compteur d'échecs consécutifs joint), là où le `Log.w` nu en écrivait une par
+ * frame et noyait logcat (audit C4).
  */
 object LiveLatencyLog {
 
     const val TAG = "ISEE_LAT"
+
+    /** Tag des lignes d'échec du direct : celui que `scripts/lat_stats.py` filtre déjà. */
+    const val FAIL_TAG = "sam3vision"
+
+    /** Fenêtre du throttle d'échec : une ligne par seconde, pas une par frame. */
+    const val FAILURE_EVERY_MS = 1_000L
+
+    /** Dernière ligne d'échec écrite (ms) et nombre de lignes écrasées depuis. */
+    private var lastFailureMs: Long? = null
+    private var suppressedFailures = 0
 
     /**
      * Ligne brute d'une frame dessinée, `null` si elle est incomplète. Pure (aucun
@@ -57,6 +71,58 @@ object LiveLatencyLog {
     /** Écrit la frame jetée en logcat (comptée par le parseur, hors série) ; ne lève jamais. */
     fun drop(cause: DropCause) {
         Log.i(TAG, dropLine(cause))
+    }
+
+    /**
+     * Une ligne d'échec est-elle due à [nowMs] ? Vraie la première fois, puis au plus
+     * une par [everyMs]. Pure (aucun Android), testée en JVM — [failure] n'ajoute que
+     * l'écriture logcat.
+     */
+    fun failureDue(nowMs: Long, lastAtMs: Long?, everyMs: Long = FAILURE_EVERY_MS): Boolean =
+        lastAtMs == null || nowMs - lastAtMs >= everyMs || nowMs < lastAtMs
+
+    /**
+     * Ligne brute d'un échec de frame : cause lisible (classe, message, cause imbriquée)
+     * et compte d'échecs consécutifs. Pure, testée en JVM.
+     */
+    fun failureLine(error: Throwable, failures: Int): String {
+        val cause = buildString {
+            append(error::class.simpleName)
+            error.message?.let { append(' ').append(it) }
+            error.cause?.let { nested ->
+                append(" + ").append(nested::class.simpleName).append(' ').append(nested.message)
+            }
+        }
+        return "live KO: $cause" + if (failures > 1) " (x$failures)" else ""
+    }
+
+    /**
+     * Écrit un échec de frame, **au plus une ligne par seconde** : sans ce throttle un
+     * lien coupé écrivait un `Log.w` par frame (~2/s, non borné) et noyait logcat.
+     * Rend `true` si la ligne est passée ; les écrasées sont comptées et rappelées
+     * dans la suivante. Ne lève jamais.
+     */
+    fun failure(error: Throwable, failures: Int, nowMs: Long = System.currentTimeMillis()): Boolean {
+        synchronized(this) {
+            if (!failureDue(nowMs, lastFailureMs)) {
+                suppressedFailures += 1
+                return false
+            }
+            lastFailureMs = nowMs
+            val merged = suppressedFailures
+            suppressedFailures = 0
+            val suffix = if (merged > 0) " (+$merged écrasés)" else ""
+            Log.w(FAIL_TAG, failureLine(error, failures) + suffix)
+            return true
+        }
+    }
+
+    /** Oublie l'état du throttle et les compteurs d'échec (nouvelle séance, tests). */
+    fun resetFailures() {
+        synchronized(this) {
+            lastFailureMs = null
+            suppressedFailures = 0
+        }
     }
 }
 

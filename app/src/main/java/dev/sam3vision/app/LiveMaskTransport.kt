@@ -63,5 +63,8 @@ object LiveMaskTransport {
         masks,
         binaryWs,
         onBinaryChange = LiveLatencyLog::leg,
+        // Réseau poussé par la plateforme : hors ligne, la frame échoue localement ; un
+        // changement d'interface jette le socket de l'ancienne au lieu d'attendre son délai.
+        net = dev.sam3vision.app.net.NetMonitor.state(),
     )
 }

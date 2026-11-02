@@ -26,9 +26,9 @@ private const val THINKING_LINE = "Thinking…"
  * iSee ne répondait pas.
  */
 @Composable
-internal fun SceneBottomBar(state: IseeUiState, modifier: Modifier = Modifier) {
+internal fun SceneBottomBar(state: IseeUiState, outage: String? = null, modifier: Modifier = Modifier) {
     Column(modifier.padding(horizontal = 18.dp), horizontalAlignment = Alignment.CenterHorizontally) {
-        statusLineOf(state)?.let { StatusLine(it) }
+        statusLineOf(state, outage)?.let { StatusLine(it) }
     }
 }
 
@@ -37,7 +37,10 @@ internal fun SceneBottomBar(state: IseeUiState, modifier: Modifier = Modifier) {
  * quelque chose, sinon l'attente pendant la réflexion, sinon rien du tout.
  * Pure : même état, même ligne, testable sur JVM.
  */
-internal fun statusLineOf(state: IseeUiState): String? {
+internal fun statusLineOf(state: IseeUiState, outage: String? = null): String? {
+    // La panne passe avant tout le reste : c'est la seule information qui dit que ce
+    // qu'on voit à l'écran n'est plus vivant. Le reste (statut, attente) est du confort.
+    outage?.takeIf { it.isNotBlank() }?.let { return it }
     val status = state.status?.takeIf { it.isNotBlank() }
     return status ?: THINKING_LINE.takeIf { state.thinking }
 }

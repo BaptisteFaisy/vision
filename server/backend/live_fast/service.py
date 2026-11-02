@@ -16,6 +16,7 @@ import detr_graph
 from fast_core import (BATCH_PROMPTS, DEPTH_EVERY, DTYPE_NAME, EDGE, RUNTIME_EDGE, TIMING,
                        clamp_int, gpu_name, levers, load, load_cpu, prepare, run_frame,
                        segment_frame, vision_grid)
+from gpu_guard import Slots, wedged
 from http_errors import validation_detail as _validation_detail
 from live_app_utils import accepts_param, call
 from passage import suggest_passage
@@ -23,8 +24,9 @@ from pipe_compat import accepts_param, call
 from timing import (Stage, build_breakdown, container_age_seconds, elapsed_ms,
                       format_server_timing, now)
 # Pompe WS extraite (garde < 500 l) : seuils ré-exportés (bancs, live_app).
-from ws_pump import (WS_FRAME_SECONDS, WS_IDLE_SECONDS, WS_MAX_REPLY_BYTES, ws_answer,
-                     ws_frame, ws_loop)
+from ws_pump import (WS_CLIENT_PING_SECONDS, WS_FRAME_SECONDS, WS_IDLE_SECONDS,
+                     WS_MAX_REPLY_BYTES, ws_answer, ws_frame, ws_loop)
+from ws_session import new_ws_metrics, ws_snapshot
 
 MODEL_LABEL = "sam3.1-fast"
 # Laisse le temps de répondre au client avant d'arrêter le processus (POST /release).
@@ -65,6 +67,19 @@ class Sam3LiveService:
     ``@modal.enter`` (après restauration du snapshot), Baseten depuis le lifespan
     ASGI de l'app (les deux chemins se rejoignent).
     """
+
+    def __init__(self) -> None:
+        """État de disponibilité par conteneur : créneaux, compteurs, chien de garde.
+
+        Créé ici (et pas au chargement du modèle) pour que ``/health`` et les
+        garde-fous répondent même avant ``load_container`` — un conteneur en boot
+        n'est pas une panne, mais il n'est pas prêt non plus.
+        """
+        self._gpu_lock = threading.Lock()
+        self.slots = Slots()
+        self.ws = new_ws_metrics()
+        self.frame_timeouts = 0
+        self.warm = False
 
     def load_cpu_weights(self) -> None:
         """Phase snapshottée (Modal ``enter(snap=True)``) : poids sur CPU, aucun état CUDA."""
@@ -193,6 +208,9 @@ class Sam3LiveService:
                                         "_attn_implementation", "?"), "dtype": DTYPE_NAME,
                           "timings": TIMING}
         result["passage"] = suggest_passage(result.get("objects"), result["width"], result["height"])
+        # Une frame servie = la carte est chaude pour de vrai (P1-4) : /health publie
+        # `warm`, un client peut donc arrêter de se croire chaud sur un simple /health.
+        self.warm = True
         return result
 
     async def _run_live(self, request) -> dict:
@@ -207,7 +225,7 @@ class Sam3LiveService:
             extra["mask_edge"] = getattr(request, "mask_edge", None) or 0
         if accepts_param(self._live_sync, "with_depth"):
             extra["with_depth"] = bool(getattr(request, "with_depth", False))
-        return await call(self._live_sync, *args, **extra)
+        return await call(self._live_sync, *args, slots=self.slots, **extra)
 
     async def _run_live_binary(self, request) -> dict:
         """``POST /live`` binaire : JPEG brut + knobs en query, même réponse que le JSON."""
@@ -235,7 +253,7 @@ class Sam3LiveService:
                 params.get("mask_format"), _int("mask_edge") or 0, timers, started,
                 _int("with_depth") == 1)
 
-        return await call(run)
+        return await call(run, slots=self.slots)
 
     async def _run_live_binary_ws(self, request, jpeg: bytes) -> dict:
         """``WS /live/ws`` binaire : JPEG brut + knobs de l'en-tête, même réponse que le texte."""
@@ -253,7 +271,7 @@ class Sam3LiveService:
                 getattr(request, "mask_edge", None) or 0, timers, started,
                 bool(getattr(request, "with_depth", False)))
 
-        return await call(run)
+        return await call(run, slots=self.slots)
 
     def _segment_sync(self, image_b64, prompts) -> dict:
         """Route historique /segment : concepts choisis par le serveur (docs/SPEC.md)."""
@@ -287,14 +305,25 @@ class Sam3LiveService:
         await ws_loop(self, websocket, idle_seconds, frame_seconds, DEPTH_EVERY)
 
     def health(self) -> dict:
-        """État du conteneur : modèle, carte, région, boot, leviers appliqués.
+        """État du conteneur : modèle, carte, région, boot, leviers, **état du direct**.
 
         Région/cloud lus sur les deux hôtes (``MODAL_*`` / ``BASETEN_*``) vers un champ
         stable ; ``load_seconds`` = phase GPU seule, ``restored``/``load_breakdown`` le boot.
+
+        ``ok`` cesse d'être un littéral : il vaut « la carte peut servir une frame
+        maintenant » (modèle chargé, verrou non perdu). Deux champs **additifs** pour
+        les clients (contrat inchangé par ailleurs) : ``ws_ready`` (même vérité que
+        ``ok``, nom explicite de sonde de vie) et ``warm`` (au moins une frame servie
+        depuis le boot — un ``/health`` réussi ne prouve pas la carte chaude, P1-4).
+        ``ws`` publie les compteurs de session (une ligne par ouverture/fermeture) :
+        sans eux le taux de reconnexion n'est pas mesurable (P1-3).
         """
         sha = deploy_sha()
-        return {"ok": True, "model": MODEL_LABEL, "version": MODEL_LABEL,
+        ready = getattr(self, "ctx", None) is not None and not wedged(self)
+        return {"ok": ready, "model": MODEL_LABEL, "version": MODEL_LABEL,
                 "sha": sha, "commit": sha, "ws_binary": True,
+                "ws_ready": ready,
+                "warm": bool(getattr(self, "warm", False)),
                 "device": self.ctx.get("device_label", "cpu"),
                 "depth": self.ctx.get("depth_model_id"),
                 "gpu": getattr(self, "gpu_name", "unknown"),
@@ -309,6 +338,7 @@ class Sam3LiveService:
                 # exposent levers(), seul celui de live_fast porte le flag snapshot.
                 "memory_snapshot": levers().get("snapshot", False),
                 "restored": getattr(self, "restored", None),
+                "ws": ws_snapshot(self),
                 "levers": levers(), "applied": {
                     "edge_applied": self.ctx.get("edge_applied"),
                     "vision_grid": self.ctx.get("vision_grid"),

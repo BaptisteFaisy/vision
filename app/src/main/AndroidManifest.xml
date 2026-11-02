@@ -2,6 +2,7 @@
 <manifest xmlns:android="http://schemas.android.com/apk/res/android">
 
     <uses-permission android:name="android.permission.INTERNET" />
+    <uses-permission android:name="android.permission.ACCESS_NETWORK_STATE" />
     <uses-permission android:name="android.permission.CAMERA" />
     <uses-permission android:name="android.permission.RECORD_AUDIO" />
     <uses-permission android:name="android.permission.VIBRATE" />
@@ -100,22 +101,29 @@
             </intent-filter>
         </service>
 
+        <!-- Les trois services longs portent `stopWithTask="false"` : un balayage de l'app
+             dans les récents ne doit pas couper une session en cours (suivi, guidage,
+             lunettes) sans le dire — elle s'arrête par son propre bouton. -->
+
         <!-- Suivi permanent : notification + position GPS, écran éteint ou non. -->
         <service
             android:name=".ShareTrackingService"
             android:exported="false"
+            android:stopWithTask="false"
             android:foregroundServiceType="location" />
 
         <!-- Guidage vocal : maintien en fond (GPS + annonces), bouton d'arrêt. -->
         <service
             android:name=".voicenav.GuidanceTrackingService"
             android:exported="false"
+            android:stopWithTask="false"
             android:foregroundServiceType="location" />
 
         <!-- Session lunettes-iSee : maintien en veille (lien + flux + voix), bouton d'arrêt. -->
         <service
             android:name=".glasses.GlassesSessionService"
             android:exported="false"
+            android:stopWithTask="false"
             android:foregroundServiceType="connectedDevice" />
 
     </application>

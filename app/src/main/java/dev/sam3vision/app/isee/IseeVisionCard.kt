@@ -4,8 +4,6 @@ import android.Manifest
 import android.content.Context
 import android.content.pm.PackageManager
 import android.graphics.RectF
-import androidx.activity.compose.rememberLauncherForActivityResult
-import androidx.activity.result.contract.ActivityResultContracts
 import androidx.camera.view.PreviewView
 import androidx.compose.animation.core.Animatable
 import androidx.compose.animation.core.AnimationVector1D
@@ -30,16 +28,13 @@ import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
-import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
-import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.layout.onGloballyPositioned
-import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.Dp
@@ -47,14 +42,10 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.compose.ui.viewinterop.AndroidView
 import androidx.core.content.ContextCompat
-import androidx.lifecycle.compose.LocalLifecycleOwner
 import dev.sam3vision.app.CameraSurface
 import dev.sam3vision.app.FirstPixelWatcher
 import dev.sam3vision.app.glasses.GlassesVideoLink
-import dev.sam3vision.app.IseePermissionFlow
 import dev.sam3vision.app.LiveDistanceLayer
-import dev.sam3vision.app.missingPermissions
-import kotlinx.coroutines.delay
 import java.io.File
 
 /**
@@ -181,6 +172,32 @@ internal fun CameraLive(glue: CameraGlue, probe: LiveProbe, viewModel: IseeViewM
         modifier = modifier,
     )
     ProbeVideoRest(probe)
+    CameraFailureLayer(glue, modifier)
+}
+
+/**
+ * L'échec de liaison caméra, dit **sur la carte**.
+ *
+ * `CameraGlue.failure` était écrit à la liaison et lu par personne : une caméra
+ * morte ne montrait qu'un aperçu noir et un « waiting for the first analysis… »,
+ * c'est-à-dire exactement le visage d'une perte de connexion. La carte dit
+ * maintenant que le capteur manque, et qu'iSee réessaie.
+ */
+@Composable
+private fun CameraFailureLayer(glue: CameraGlue, modifier: Modifier) {
+    val reason = glue.failure ?: return
+    Box(modifier, contentAlignment = Alignment.Center) {
+        Text(
+            cameraFailureText(reason),
+            color = Color.White,
+            fontSize = 11.sp,
+            textAlign = TextAlign.Center,
+            modifier = Modifier
+                .padding(6.dp)
+                .background(Color(0xCC1A1F26), RoundedCornerShape(10.dp))
+                .padding(horizontal = 10.dp, vertical = 6.dp),
+        )
+    }
 }
 
 /**
@@ -287,62 +304,6 @@ internal fun BoxScope.CrossingChip(
 
 
 /* ————————————————— Liaison caméra et câblage SAM ————————————————— */
-
-/** Permission + liaison caméra : un seul bloc, rappelé par le visuel. Composée en
- * permanence par le pane (caméra prête au premier geste), la vue ne vit que dans
- * la carte de la scène VISION. */
-internal data class CameraGlue(
-    val host: IseeCameraHost,
-    val granted: Boolean,
-    val failure: String?,
-    /** Aperçu créé dès la liaison : la carte se contente de le montrer. */
-    val preview: PreviewView,
-)
-
-/** La liaison caméra de l'écran : permission, aperçu permanent et actions du host. */
-@Composable
-internal fun rememberCameraGlue(viewModel: IseeViewModel): CameraGlue {
-    val context = LocalContext.current
-    var granted by remember { mutableStateOf(cameraGranted(context)) }
-    var failure by remember { mutableStateOf<String?>(null) }
-    val askCamera = rememberLauncherForActivityResult(ActivityResultContracts.RequestPermission()) {
-        granted = it
-    }
-    // Premier lancement : la demande groupée centrale gère les trois permissions, la
-    // carte ne demande rien elle-même ; une fois « handled », elle relit l'état réel.
-    val firstRun = remember { missingPermissions(context).isNotEmpty() }
-    val firstRunHandled = IseePermissionFlow.handled.value
-    val host = remember { IseeCameraHost(context) }
-    // L'aperçu est créé ici, **en permanence** : `bind()` exige une PreviewView déjà
-    // attachée, et la carte n'existe qu'une fois l'enregistrement lancé. Sans ça,
-    // le premier tap répondait « Camera not ready » (mesuré sur le téléphone).
-    val preview = remember(host) { host.newPreviewView(context) }
-    val owner = LocalLifecycleOwner.current
-    LaunchedEffect(Unit) {
-        if (!granted && !firstRun) askCamera.launch(Manifest.permission.CAMERA)
-    }
-    LaunchedEffect(firstRun, firstRunHandled) {
-        if (firstRun && firstRunHandled) granted = cameraGranted(context)
-    }
-    LaunchedEffect(granted) {
-        if (granted) {
-            failure = host.bind(owner)
-            if (failure == null) viewModel.attachCamera(host.actions)
-            viewModel.setCameraActive(failure == null)
-        } else {
-            viewModel.setCameraActive(false)
-        }
-    }
-    DisposableEffect(Unit) {
-        viewModel.attachCamera(host.actions)
-        onDispose {
-            viewModel.setCameraActive(false)
-            host.release()
-            viewModel.detachCamera()
-        }
-    }
-    return CameraGlue(host, granted, failure, preview)
-}
 
 /**
  * Câblage de l'analyseur sur la sonde SAM : les frames (avec leur instant d'exposition,

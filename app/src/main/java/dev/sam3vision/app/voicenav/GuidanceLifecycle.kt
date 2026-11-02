@@ -1,10 +1,12 @@
 package dev.sam3vision.app.voicenav
 
+import android.app.Activity
 import android.content.ComponentName
 import android.content.Context
+import android.content.ContextWrapper
 import android.content.Intent
 import android.content.pm.PackageManager
-import android.os.Build
+import android.util.Log
 
 /**
  * Cycle de vie du guidage hors écran : l'app en fond (home, verrouillage)
@@ -17,6 +19,8 @@ import android.os.Build
  * Ne lève jamais (vérifié au retour premier plan comme à la mise en fond).
  */
 object GuidanceLifecycle {
+
+    private const val TAG = "GuidanceLifecycle"
 
     /**
      * Service de fond du guidage (lot W1) : ce nom verrouille le contrat
@@ -33,17 +37,26 @@ object GuidanceLifecycle {
         state is VoiceNavUiState.Guiding
 
     /**
-     * Démarre le service de fond ; no-op si W1 absent ou sans permission
-     * d'arrière-plan. Idempotent (le service ignore les démarrages doublés).
+     * Faut-il démarrer le service de fond pour cet état ? Un **changement de configuration**
+     * (rotation, redimensionnement) n'est pas une sortie d'écran : l'activité revient dans
+     * la même passe, le guidage continue, et démarrer le service à ce moment-là le fait
+     * partir au pire instant (caméra démontée, Compose reconstruit, thread principal occupé).
+     * Fonction pure, testée en JVM (`GuidanceLifecycleTest`).
+     */
+    fun shouldStartBackground(state: VoiceNavUiState, changingConfigurations: Boolean): Boolean =
+        !changingConfigurations && wantsBackground(state)
+
+    /**
+     * Démarre le service de fond ; no-op si W1 absent, sans permission d'arrière-plan ou
+     * pendant un changement de configuration. Idempotent (le service ignore les démarrages
+     * doublés). Un refus système est **tracé** : c'est la panne silencieuse à instruire.
      */
     fun startBackground(context: Context) {
         val app = context.applicationContext
         if (!servicePresent(app)) return
-        runCatching {
-            val intent = serviceIntent(app)
-            if (Build.VERSION.SDK_INT >= 26) app.startForegroundService(intent)
-            else app.startService(intent)
-        }
+        if (hostIsChangingConfigurations(context)) return
+        runCatching { app.startForegroundService(serviceIntent(app)) }
+            .onFailure { Log.w(TAG, "démarrage du guidage refusé : ${it.javaClass.simpleName}") }
     }
 
     /**
@@ -53,6 +66,20 @@ object GuidanceLifecycle {
     fun stopBackground(context: Context) {
         val app = context.applicationContext
         runCatching { app.stopService(serviceIntent(app)) }
+    }
+
+    /**
+     * Vrai si le contexte vient d'une Activity en pleine reconfiguration (rotation,
+     * redimensionnement de fenêtre). Défense en profondeur : les appelants directs
+     * ([VoiceNavRoute], accueil iSee) gardent déjà le cas.
+     */
+    private fun hostIsChangingConfigurations(context: Context): Boolean {
+        var cursor: Context? = context
+        while (cursor is ContextWrapper) {
+            if (cursor is Activity) return cursor.isChangingConfigurations
+            cursor = cursor.baseContext
+        }
+        return false
     }
 
     /** Intent explicite vers le service W1, par nom de classe. */

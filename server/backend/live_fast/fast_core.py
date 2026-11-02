@@ -50,6 +50,9 @@ from types import SimpleNamespace
 # < 500 lignes/fichier, zéro duplication). Ré-exportés ici : ``service.py``,
 # ``live_app_fast.py`` et les bancs gardent ``from fast_core import clamp_int, …``.
 from fast_env import clamp_int, env_bool, env_int, gpu_name
+# Attente au verrou **bornée** : un appelant ne garde plus un slot ``max_inputs``
+# pendant tout le budget de frame, il reçoit un 429 (voir ``gpu_guard``).
+from gpu_guard import GPU_QUEUE_SECONDS, GpuBusy, acquire
 from timing import Stage, add_ms, elapsed_ms, now
 # Poids + chargements ré-exportés pour service.py et les bancs (limite 500 lignes).
 from token_cache import tokenize_cached
@@ -327,19 +330,25 @@ def _collect(ctx, vision, prompts, concepts, work_size, image_size, batch: bool,
 
 
 @contextmanager
-def _locked(gpu_lock, timers: dict):
-    """Le verrou GPU, en publiant l'attente dans ``queue_ms`` ; ``None`` = rien à sérialiser.
+def _locked(gpu_lock, timers: dict, timeout: float | None = None):
+    """Le verrou GPU, attente bornée et publiée dans ``queue_ms`` ; ``None`` = pas de verrou.
 
     Le verrou ne couvre plus que l'encodeur vision et les passes DETR : le pré-traitement
     (PIL + normalisation numpy) et l'encodage des masques se font **hors** du verrou, donc
     ils se recouvrent avec la frame suivante au lieu de rendre la carte muette (~16 ms de
     créneau GPU rendus par frame, rapport cpu-serveur piste 3).
+
+    L'attente est bornée (``GPU_QUEUE_SECONDS``, 15 s) : au-delà, ``GpuBusy`` remonte et
+    devient un ``429`` — « occupé » est un signal, pas une attente de 75 s qui immobilise
+    le slot d'entrée. ``timeout`` explicite : réservé aux tests (jamais en production).
     """
     if gpu_lock is None:
         yield
         return
     started = now()
-    gpu_lock.acquire()
+    if not acquire(gpu_lock, timeout):
+        add_ms(timers, "queue_ms", elapsed_ms(started))
+        raise GpuBusy(f"gpu busy > {GPU_QUEUE_SECONDS:g} s")
     add_ms(timers, "queue_ms", elapsed_ms(started))
     try:
         yield

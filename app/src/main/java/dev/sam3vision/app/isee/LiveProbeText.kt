@@ -59,6 +59,7 @@ fun motionSummary(motion: MotionDebug): String = buildString {
  */
 fun liveProbeDetails(state: LiveProbeState): List<String> = buildList {
     if (state.endpoint.isNotBlank()) add("endpoint: ${shortEndpoint(state.endpoint)}")
+    if (state.endpoint.isNotBlank()) add(liveProbeLinkLine(state.link))
     if (state.width > 0 && state.height > 0) add("frame: ${state.width}×${state.height}")
     if (state.frames > 0) {
         add("latency: ${state.latencyMs} ms · p95 ${state.p95Ms} ms · server ${state.serverMs} ms")
@@ -103,22 +104,48 @@ fun shortEndpoint(endpoint: String): String {
 }
 
 /**
- * Ce qui se dit **au centre de la fenêtre** tant qu'aucun masque n'est affiché :
- * réveil du GPU en cours, backend arrêté, ou simple attente de la première analyse.
- * `null` dès que la première frame est arrivée (les masques parlent d'eux-mêmes).
+ * Ce qui se dit **au centre de la fenêtre** : réveil du GPU en cours, backend arrêté,
+ * silence du lien, ou simple attente de la première analyse. `null` quand tout va bien.
+ *
+ * L'erreur passe **avant** la garde `frames > 0` : un lien muet doit se dire même après
+ * la première frame (audit C3 — sinon on marche avec des masques figés crus à jour).
  */
 fun liveProbeNotice(state: LiveProbeState): String? {
-    if (state.frames > 0) return null
     state.error?.let { return it }
+    if (state.link.silent) return silenceNotice(state.link.lastAnswerAgeMs)
+    if (state.frames > 0) return null
     if (state.warming && state.timeoutSec > 0) return "waking the SAM GPU… (up to ${state.timeoutSec} s)"
     if (state.warming) return "waking the SAM GPU… (≈ 30 s on first launch)"
     return "waiting for the first analysis…"
 }
 
 /**
- * Message d'échec lisible. Un délai dépassé = conteneur Modal endormi (~30 s de
- * réveil) : on le dit, et la frame suivante réessaie d'elle-même.
+ * « Pas de réponse depuis N s » : c'est le **lien**, pas le GPU (audit C3). Le
+ * démarrage d'un conteneur froid se dit « GPU waking up », jamais ceci — voir
+ * [probeFailureText].
  */
-fun probeFailureText(error: Throwable): String =
-    if (error is ApiError.Timeout) "GPU waking up… (retrying on the next frame)"
-    else error.message ?: "SAM call failed"
+fun silenceNotice(ageMs: Long): String = "$SILENCE_PREFIX ${ageMs / 1_000} s — network cut? (retrying)"
+
+/**
+ * Message d'échec lisible, qui distingue les trois cas réels :
+ * - silence ([ProbeLinkState.silent]) : le lien ne répond plus depuis N s ;
+ * - lien chaud qui répondait il y a une seconde : réponse lente, ce n'est pas un réveil ;
+ * - aucune réponse encore ([ProbeLinkKind.Cold]/[ProbeLinkKind.Idle]) : conteneur Modal
+ *   endormi (~30 s de réveil), la frame suivante réessaie d'elle-même.
+ */
+fun probeFailureText(error: Throwable, link: ProbeLinkState = ProbeLinkState()): String = when {
+    error !is ApiError.Timeout -> error.message ?: "SAM call failed"
+    link.silent -> silenceNotice(link.lastAnswerAgeMs)
+    link.kind == ProbeLinkKind.Warm -> "slow answer — retrying on the next frame"
+    else -> "GPU waking up… (retrying on the next frame)"
+}
+
+/**
+ * Ligne de diagnostic du lien : « link: warm · 0.3 s · fails 0 · reprises 1 ». Fonction
+ * pure (aucun Android) : le panneau la montre, la voix peut la lire.
+ */
+fun liveProbeLinkLine(link: ProbeLinkState): String {
+    val age = DistanceText.decimal(link.lastAnswerAgeMs / 1000f, 1, Locale.US)
+    val kind = link.kind.name.lowercase(Locale.US)
+    return "link: $kind · $age s · fails ${link.consecutiveFailures} · reprises ${link.reconnects}"
+}
