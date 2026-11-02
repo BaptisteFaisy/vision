@@ -25,7 +25,9 @@ private class Fix1FakeSpeaker : VoiceBusSpeaker {
  * FIX 1 : chaque coupe hors-bus (parole du user, fin de guidage, intro
  * coupée par la voix) rend le bus vocal ([VoiceBus.onSpeechIdle]) ; la
  * fermeture complète l'oublie ([VoiceBus.reset]). Sans ça, un niveau tenu
- * (ex. 12) muterait à jamais tout niveau plus bas (ex. verdict 100).
+ * (ex. 12) muterait à jamais tout niveau plus bas (ex. humains 101 — le
+ * verdict traversée, lui, est passé au cran 0 le 02/11/2026 et ne peut
+ * plus être tenu par un niveau dehors).
  */
 class Fix1BusReleaseTest {
 
@@ -44,17 +46,17 @@ class Fix1BusReleaseTest {
     }
 
     @Test
-    fun `coupe rend le bus, verdict accepte apres un niveau 12`() {
+    fun `coupe rend le bus, un post faible est accepte apres un niveau 12`() {
         VoiceBus.post(OutdoorLevel.FALLBACK, "repli")
-        VoiceBus.post(CrossingLevels.VERDICT, "verdict")
+        VoiceBus.post(CrossingLevels.HUMAN, "personne")
         assertEquals(1, speaker.said.size)
 
         // Ce que fait désormais chaque coupe hors-bus après player.stop().
         VoiceBus.onSpeechIdle()
 
-        VoiceBus.post(CrossingLevels.VERDICT, "verdict")
+        VoiceBus.post(CrossingLevels.HUMAN, "personne")
         assertEquals(2, speaker.said.size)
-        assertEquals(CrossingLevels.VERDICT, speaker.said.last().level)
+        assertEquals(CrossingLevels.HUMAN, speaker.said.last().level)
     }
 
     @Test

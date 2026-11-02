@@ -108,6 +108,39 @@ class CrossingVerdictWiringTest {
     }
 
     @Test
+    fun `un veto trafic sur feu vert interdit Cross a la voix`() {
+        // D7 : le veto voiture n'atteignait pas la voix — haptique rouge,
+        // voix « Cross. ». Un veto présent interdit désormais tout feu vert.
+        val out = engine(CrossingLight(listOf(0.1f, 0.1f, 0.2f, 0.3f), CrossingState.Green))
+            .onFrame(frame(), emptyList(), "", 0L, carVeto = true)
+        assertEquals(CrossingVerdict.DontCross, out.verdict)
+        assertEquals("Don't cross.", out.posts.single().text)
+        assertTrue(out.carVeto)
+        assertEquals(CrossingState.Red, out.overlay)
+        assertEquals(CrossingState.Red, out.haptic)
+    }
+
+    @Test
+    fun `un post refuse par le bus est rejoue a la frame suivante`() {
+        var accept = false
+        val posted = mutableListOf<String>()
+        val engine = CrossingVerdictEngine(
+            readLight = { _, _ -> CrossingLight(listOf(0.1f, 0.1f, 0.2f, 0.3f), CrossingState.Red) },
+            poster = CrossingVerdictPoster { _, text, _ -> posted.add(text); accept },
+        )
+        val first = engine.onFrame(frame(), emptyList(), "", 0L)
+        assertEquals(listOf("Don't cross."), posted)
+        assertEquals(CrossingState.Red, first.haptic)
+        // Bus occupé : le post est refusé (accept faux). La frame suivante,
+        // bien avant la répétition des 2 s, rejoue la phrase — et ne revibre
+        // pas (l'haptique est déjà passée sur le front).
+        accept = true
+        val second = engine.onFrame(frame(), emptyList(), "", 200L)
+        assertEquals(listOf("Don't cross.", "Don't cross."), posted)
+        assertNull(second.haptic)
+    }
+
+    @Test
     fun `la repetition des 2s ne vibre pas`() {
         val red = CrossingLight(listOf(0.1f, 0.1f, 0.2f, 0.3f), CrossingState.Red)
         val engine = engine(red)

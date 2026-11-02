@@ -7,9 +7,19 @@ import dev.sam3vision.core.live.LivePrompts
  * Niveaux vocaux du mode Traversée (SPEC v4, traversée exclusive) : le verdict
  * parle en premier, puis les humains, puis les bordures du passage. Chat et GPS
  * sont muets tant que le mode est actif, la dictée reste active.
+ *
+ * Échelle du bus : **le plus petit nombre gagne**. Le verdict reste au cran 100
+ * (ordre user du 02/11 : les voitures ne parlent qu'en Traversée, le cran 0
+ * dehors n'a plus de producteur) : il passe donc devant les humains (101) et les
+ * bordures (102), mais un mot d'obstacle dehors (2..12) le précède encore.
+ * La protection contre l'écrasement n'est plus le niveau mais le **ré-armement** :
+ * `VoiceBus.post` rend `false` quand la phrase est jetée, et
+ * [CrossingVerdictAnnouncer.rearm] la rejoue dès la frame suivante (mesuré A9
+ * §3 D8 : sans lui, « Don't cross. » se perdait jusqu'à 2 s, indéfiniment sous
+ * bavardage continu).
  */
 object CrossingLevels {
-    /** Verdict (feu piéton puis voitures) : prioritaire sur tout le reste. */
+    /** Verdict (feu piéton puis voitures) : prioritaire sur humains et bordures. */
     const val VERDICT = 100
 
     /** Humains du passage, après le verdict. */
@@ -62,6 +72,13 @@ object CrossingVerdictText {
  * absent = voitures en mouvement ? don't cross : cross. Véhicules = voiture
  * uniquement ([isCarLabel]) : bus, vélo, camion et moto ne tranchent jamais.
  *
+ * [decide] prend aussi le **veto trafic** (`TraverseVeto` : véhicule proche, en
+ * approche suivie, ou non prouvé immobile). Ce veto pilotait déjà l'haptique et
+ * la pastille ; sans lui la voix contredisait la vibration (« Cross. » sur vert
+ * pendant que le téléphone disait rouge — A9 §3 D7). Un veto présent interdit
+ * tout feu vert, et couvre aussi les véhicules que [isCarLabel] ignore (bus,
+ * camion, moto).
+ *
  * Pur et testé en JVM.
  */
 object CrossingVerdictRule {
@@ -72,10 +89,18 @@ object CrossingVerdictRule {
         return key == "car" || key == "cars" || key == "voiture" || key == "voitures"
     }
 
-    /** Verdict pour [light] et [carMoving] (une voiture bouge sur la frame). */
-    fun decide(light: CrossingVerdictLight, carMoving: Boolean): CrossingVerdict = when {
+    /**
+     * Verdict pour [light], [carMoving] (une voiture bouge sur la frame) et
+     * [veto] (le veto trafic de la frame, `false` = pas de veto connu).
+     */
+    fun decide(
+        light: CrossingVerdictLight,
+        carMoving: Boolean,
+        veto: Boolean = false,
+    ): CrossingVerdict = when {
         light == CrossingVerdictLight.Red -> CrossingVerdict.DontCross
         light == CrossingVerdictLight.Unknown -> CrossingVerdict.DontCross
+        veto -> CrossingVerdict.DontCross
         light == CrossingVerdictLight.Green -> CrossingVerdict.Cross
         carMoving -> CrossingVerdict.DontCross
         else -> CrossingVerdict.Cross
@@ -86,8 +111,8 @@ object CrossingVerdictRule {
      * `Evidence.Green` peut mener à « Cross. », `Unknown` comme `Absent` imposent
      * « Don't cross. » ([Evidence.toVerdictLight]).
      */
-    fun decide(evidence: Evidence, carMoving: Boolean): CrossingVerdict =
-        decide(evidence.toVerdictLight(), carMoving)
+    fun decide(evidence: Evidence, carMoving: Boolean, veto: Boolean = false): CrossingVerdict =
+        decide(evidence.toVerdictLight(), carMoving, veto)
 }
 
 /**
@@ -145,6 +170,20 @@ class CrossingVerdictAnnouncer(
     }
 
     /** Oublie verdict et délai (nouvelle traversée, nouvelle séance). */
+    /**
+     * Le post a été **refusé par le bus** (niveau écrasé, escaliers, micro) :
+     * la phrase n'a pas été émise, donc la répétition redevient due tout de
+     * suite et la frame suivante la rejoue (`onFrame` rend un signal dès que
+     * `atMs - lastSpokenAtMs >= repeatMs`). Sans ce ré-armement, l'annonceur
+     * croyait avoir parlé : 2 s de silence, ou davantage sous bavardage
+     * continu (A9 §3 D8). Appelé seulement sur refus : un verdict émis n'est
+     * jamais doublé (l'haptique a déjà vibré sur le front).
+     */
+    fun rearm(atMs: Long) {
+        val last = lastSpokenAtMs ?: return
+        lastSpokenAtMs = minOf(last, atMs - repeatMs)
+    }
+
     fun reset() {
         announced = null
         lastSpokenAtMs = null

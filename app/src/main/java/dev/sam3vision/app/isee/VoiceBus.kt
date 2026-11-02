@@ -113,32 +113,40 @@ object VoiceBus {
      * une annonce avalée ne consomme pas son tour — le producteur l'avait
      * consommé par son pré-contrôle) ; `null` = sans clé (comportement
      * inchangé : GPS, chat, repli).
+     *
+     * Rend **vrai quand la phrase est retenue et émise**, faux quand elle a
+     * été jetée (vide, sans porte-parole, micro user, mot de guidage,
+     * escaliers, niveau écrasé) : depuis le 02/11/2026 l'appelant sait donc
+     * s'il a parlé, au lieu de le supposer (A9 § 3 D8 : le verdict traversée
+     * croyait avoir parlé alors que le bus l'avait jeté ⇒ jusqu'à 2 s de
+     * silence, « Don't cross. » compris). Aucun appelant existant ne casse :
+     * ignorer une valeur de retour est légal en Kotlin.
      */
     @Synchronized
     fun post(level: Int, text: String, clipId: String? = null, clips: List<String> = emptyList(),
-        antiRepeatKey: String? = null) {
+        antiRepeatKey: String? = null): Boolean {
         if (text.isBlank()) {
             android.util.Log.w(TAG_MUTE, "bus-jet motif=vide level=$level")
             refundTurn(antiRepeatKey)
-            return
+            return false
         }
         val target = speaker
         if (target == null) {
             android.util.Log.w(TAG_MUTE, "bus-jet motif=sans-porte-parole level=$level texte=[$text]")
             refundTurn(antiRepeatKey)
-            return
+            return false
         }
         if (userHoldsMic && level != OutdoorLevel.CAR_MOVING) {
             android.util.Log.w(TAG_MUTE, "bus-jet motif=micro-user level=$level texte=[$text]")
             refundTurn(antiRepeatKey)
-            return
+            return false
         }
         val nowMs = System.currentTimeMillis()
         if (stairsBusStuck(activeLevel, nowMs, lastSayMs)) activeLevel = IDLE_LEVEL
         if (guidanceSpeaking() && level != OutdoorLevel.USER_SPEECH) {
             android.util.Log.w(TAG_MUTE, "bus-jet motif=mot-guidage-en-cours level=$level texte=[$text]")
             refundTurn(antiRepeatKey)
-            return
+            return false
         }
         if (level == OutdoorLevel.STAIRS) {
             activeLevel = level
@@ -146,22 +154,23 @@ object VoiceBus {
             lastStairsSayMs = nowMs
             holdToken++
             target.say(level, text, clipId, clips)
-            return
+            return true
         }
         if (activeLevel == OutdoorLevel.STAIRS) {
             android.util.Log.w(TAG_MUTE, "bus-jet motif=escaliers-en-cours level=$level texte=[$text]")
             refundTurn(antiRepeatKey)
-            return
+            return false
         }
         if (activeLevel != IDLE_LEVEL && level > activeLevel) {
             android.util.Log.w(TAG_MUTE, "bus-jet motif=ecrase level=$level actif=$activeLevel chat=$chatReads texte=[$text]")
             refundTurn(antiRepeatKey)
-            return
+            return false
         }
         activeLevel = level
         lastSayMs = nowMs
         holdToken++
         target.say(level, text, clipId, clips)
+        return true
     }
 
     /**

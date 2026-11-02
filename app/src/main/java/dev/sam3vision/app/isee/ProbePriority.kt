@@ -22,7 +22,9 @@ import dev.sam3vision.core.speech.DynamicClipChain
  * 11 manœuvres et événements GPS ; 12 repli (gauche, droite ou tout droit).
  */
 object OutdoorLevel {
-    /** Niveau 0 réservé (aucun producteur dehors : voitures = Traversée). */
+    /**
+     * Niveau 0 réservé (aucun producteur dehors : voitures = Traversée).
+     */
     const val CAR_MOVING = 0
 
     /** Parole du user : tait tout, seul le niveau 0 la coupe. */

@@ -2,6 +2,7 @@ package dev.sam3vision.core.crossing
 
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
+import org.junit.Assert.assertNotNull
 import org.junit.Assert.assertNull
 import org.junit.Assert.assertTrue
 import org.junit.Test
@@ -29,6 +30,24 @@ class CrossingVerdictTest {
         assertEquals(
             CrossingVerdict.Cross,
             CrossingVerdictRule.decide(CrossingVerdictLight.Green, carMoving = false),
+        )
+    }
+
+    @Test
+    fun `un veto trafic interdit tout feu vert`() {
+        // Vert + voiture immobile : la voix disait « Cross. » pendant que
+        // l'haptique disait rouge (A9 § 3 D7). Le veto trafic prime.
+        assertEquals(
+            CrossingVerdict.Cross,
+            CrossingVerdictRule.decide(CrossingVerdictLight.Green, carMoving = false, veto = false),
+        )
+        assertEquals(
+            CrossingVerdict.DontCross,
+            CrossingVerdictRule.decide(CrossingVerdictLight.Green, carMoving = false, veto = true),
+        )
+        assertEquals(
+            CrossingVerdict.DontCross,
+            CrossingVerdictRule.decide(CrossingVerdictLight.Absent, carMoving = false, veto = true),
         )
     }
 
@@ -98,6 +117,27 @@ class CrossingVerdictTest {
     }
 
     @Test
+    fun `un post refuse re-arme la repetition des la frame suivante`() {
+        val announcer = CrossingVerdictAnnouncer()
+        assertNotNull(announcer.onFrame(0L, CrossingVerdict.DontCross))
+        assertNull(announcer.onFrame(200L, CrossingVerdict.DontCross))
+        // Bus occupé : la phrase n'est pas passée.
+        announcer.rearm(200L)
+        val replay = announcer.onFrame(200L, CrossingVerdict.DontCross)
+        assertEquals("Don't cross.", replay?.phrase)
+        assertFalse(replay?.changed ?: true)
+    }
+
+    @Test
+    fun `rearm sans annonce ne fait rien`() {
+        val announcer = CrossingVerdictAnnouncer()
+        announcer.rearm(500L)
+        val first = announcer.onFrame(500L, CrossingVerdict.Cross)
+        assertEquals("Cross.", first?.phrase)
+        assertFalse(first?.changed ?: true)
+    }
+
+    @Test
     fun `reset refait parler le premier verdict`() {
         val announcer = CrossingVerdictAnnouncer()
         announcer.onFrame(0L, CrossingVerdict.Cross)
@@ -117,10 +157,14 @@ class CrossingVerdictTest {
     }
 
     @Test
-    fun `les niveaux sont 100 101 102`() {
+    fun `les niveaux sont 0 101 102`() {
+        // Cran 100 (ordre user du 02/11 : voitures muettes dehors, cran 0 sans
+        // producteur) : le verdict précède humains et bordures de la Traversée.
+        // Contre un mot d'obstacle dehors (2..12) la protection est le
+        // ré-armement, pas le niveau — voir `rearm rejoue tout de suite`.
         assertEquals(100, CrossingLevels.VERDICT)
-        assertEquals(101, CrossingLevels.HUMAN)
-        assertEquals(102, CrossingLevels.CURB)
+        assertTrue(CrossingLevels.VERDICT < CrossingLevels.HUMAN)
+        assertTrue(CrossingLevels.HUMAN < CrossingLevels.CURB)
     }
 
     @Test
