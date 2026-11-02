@@ -150,12 +150,18 @@ interface TraverseClipStore {
  * : ElevenLabs en échec ou sans clé rejoue le clip local, sans intervention.
  *
  * Pur et testé en JVM : aucune API Android ici, les quatre ports sont moqués.
+ *
+ * Trace voix ([onEvent], défaut muet) : `EXPECT` à l'entrée de [speak], puis
+ * l'issue (`PRIMARY`, `OFFLINE`, `QUEUED`, `SKIPPED_BUSY`, `UNAVAILABLE`) à
+ * chaque retour. Une phrase gardée, drainée au silence avant la courante,
+ * émet `DRAIN` puis sa propre issue, dans l'ordre parlé.
  */
 class TraverseVoice(
     private val primary: TtsClient,
     private val player: TraversePlayer,
     private val systemTts: TraverseSystemTts,
     private val store: TraverseClipStore,
+    private val onEvent: (String) -> Unit = {},
 ) {
     /**
      * Phrase douce gardée (file courte : une seule, la plus fraîche), `null` si aucune.
@@ -193,37 +199,45 @@ class TraverseVoice(
      * hors-ligne en repli automatique.
      */
     suspend fun speak(phrase: String, urgent: Boolean): TraverseVoiceOutcome {
-        if (phrase.isBlank()) return TraverseVoiceOutcome.UNAVAILABLE
+        onEvent("EXPECT")
+        if (phrase.isBlank()) return outcome(TraverseVoiceOutcome.UNAVAILABLE)
         if (urgent) {
             pending = null
             player.stop()
         } else if (player.isBusy) {
-            if (phrase == pending) return TraverseVoiceOutcome.SKIPPED_BUSY
+            if (phrase == pending) return outcome(TraverseVoiceOutcome.SKIPPED_BUSY)
             pending = phrase
-            return TraverseVoiceOutcome.QUEUED
+            return outcome(TraverseVoiceOutcome.QUEUED)
         } else {
             drainPending(phrase)
         }
-        if (playPrimary(phrase)) return TraverseVoiceOutcome.PRIMARY
-        if (playOffline(phrase)) return TraverseVoiceOutcome.OFFLINE
-        return TraverseVoiceOutcome.UNAVAILABLE
+        return outcome(playChain(phrase))
     }
+
+    /** Retour tracé : l'issue part au parent, qui la corrèle à l'`EXPECT` d'entrée. */
+    private fun outcome(out: TraverseVoiceOutcome): TraverseVoiceOutcome {
+        onEvent(out.name)
+        return out
+    }
+
+    /** Chaîne audio : ElevenLabs, puis clip hors-ligne en repli automatique. */
+    private suspend fun playChain(phrase: String): TraverseVoiceOutcome =
+        if (playPrimary(phrase)) TraverseVoiceOutcome.PRIMARY
+        else if (playOffline(phrase)) TraverseVoiceOutcome.OFFLINE
+        else TraverseVoiceOutcome.UNAVAILABLE
 
     /**
      * Dit la phrase gardée avant [phrase] (au silence : l'appelant est libre) —
-     * sauf doublon (la lecture courante la dit déjà). Chaîne audio identique,
-     * résultat ignoré : la phrase courante suit dans tous les cas.
+     * sauf doublon (la lecture courante la dit déjà). La phrase courante suit
+     * dans tous les cas ; la gardée trace `DRAIN` puis sa propre issue.
      */
     private suspend fun drainPending(phrase: String) {
         val due = pending
         pending = null
-        if (due != null && due != phrase) playKept(due)
-    }
-
-    /** Dit une phrase gardée (ElevenLabs puis cache, comme la courante). */
-    private suspend fun playKept(due: String) {
-        if (playPrimary(due)) return
-        playOffline(due)
+        if (due != null && due != phrase) {
+            onEvent("DRAIN")
+            onEvent(playChain(due).name)
+        }
     }
 
     /** Synthèse ElevenLabs puis lecture ; `false` sur erreur réseau, clé absente ou lecture ratée. */

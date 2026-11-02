@@ -20,7 +20,8 @@ class TraverseVoiceTest {
         player: FakePlayer = FakePlayer(),
         systemTts: TraverseSystemTts = FakeSystemTts(store = clips),
         store: TraverseClipStore = FakeStore(clips),
-    ) = TraverseVoice(tts, player, systemTts, store)
+        onEvent: (String) -> Unit = {},
+    ) = TraverseVoice(tts, player, systemTts, store, onEvent)
 
     @Test
     fun `phrases - libelles uniques de crossing, un etat une phrase`() {
@@ -284,5 +285,60 @@ class TraverseVoiceTest {
         assertEquals("Voiture en stationnement, à 9 heures.", TraverseParkedText.parkedPhrase(null, 0.1f, SpeechLanguage.Fr))
         assertEquals("Car parked, at 9 o'clock.", TraverseParkedText.parkedPhrase(null, 0.1f, SpeechLanguage.En))
         assertEquals("Car parked.", TraverseParkedText.parkedPhrase(null, null, SpeechLanguage.En))
+    }
+
+    @Test
+    fun `trace - EXPECT puis issue a chaque retour de speak`() = runBlocking {
+        val events = mutableListOf<String>()
+        val v = voice(onEvent = { events += it })
+
+        assertEquals(TraverseVoiceOutcome.PRIMARY, v.speak(TraversePhrases.GREEN, urgent = false))
+        assertEquals(TraverseVoiceOutcome.UNAVAILABLE, v.speak("  ", urgent = false))
+
+        assertEquals(listOf("EXPECT", "PRIMARY", "EXPECT", "UNAVAILABLE"), events)
+    }
+
+    @Test
+    fun `trace - file gardee - EXPECT et QUEUED sans lecture`() = runBlocking {
+        val events = mutableListOf<String>()
+        val player = FakePlayer(isBusy = true)
+        val v = voice(player = player, onEvent = { events += it })
+
+        assertEquals(TraverseVoiceOutcome.QUEUED, v.speak(TraversePhrases.GREEN, urgent = false))
+        assertEquals(TraverseVoiceOutcome.SKIPPED_BUSY, v.speak(TraversePhrases.GREEN, urgent = false))
+
+        assertEquals(listOf("EXPECT", "QUEUED", "EXPECT", "SKIPPED_BUSY"), events)
+        assertTrue(player.events.isEmpty())
+    }
+
+    @Test
+    fun `trace - gardee drainee au silence - DRAIN puis son issue avant la courante`() = runBlocking {
+        val events = mutableListOf<String>()
+        val player = FakePlayer(isBusy = true)
+        val v = voice(player = player, onEvent = { events += it })
+
+        assertEquals(TraverseVoiceOutcome.QUEUED, v.speak(TraversePhrases.GREEN, urgent = false))
+        player.isBusy = false
+        assertEquals(TraverseVoiceOutcome.PRIMARY, v.speak(TraversePhrases.RED, urgent = false))
+
+        assertEquals(listOf("EXPECT", "QUEUED", "EXPECT", "DRAIN", "PRIMARY", "PRIMARY"), events)
+    }
+
+    @Test
+    fun `trace - repli hors-ligne et indisponible urgent`() = runBlocking {
+        clips[TraversePhrases.GREEN] = "/cache/vert.wav"
+        val offlineEvents = mutableListOf<String>()
+        val offline = voice(tts = FakeTts(Result.failure(ApiError.PaymentRequired())), onEvent = { offlineEvents += it })
+
+        assertEquals(TraverseVoiceOutcome.OFFLINE, offline.speak(TraversePhrases.GREEN, urgent = false))
+
+        assertEquals(listOf("EXPECT", "OFFLINE"), offlineEvents)
+
+        val missingEvents = mutableListOf<String>()
+        val missing = voice(tts = FakeTts(Result.failure(ApiError.PaymentRequired())), onEvent = { missingEvents += it })
+
+        assertEquals(TraverseVoiceOutcome.UNAVAILABLE, missing.speak(TraversePhrases.RED, urgent = true))
+
+        assertEquals(listOf("EXPECT", "UNAVAILABLE"), missingEvents)
     }
 }

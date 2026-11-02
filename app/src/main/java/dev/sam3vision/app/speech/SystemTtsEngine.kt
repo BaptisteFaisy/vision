@@ -3,6 +3,7 @@ package dev.sam3vision.app.speech
 import android.content.Context
 import android.os.Bundle
 import android.speech.tts.TextToSpeech
+import android.speech.tts.UtteranceProgressListener
 import dev.sam3vision.core.settings.Settings
 import dev.sam3vision.core.speech.SpeechLanguage
 import java.util.Locale
@@ -50,8 +51,14 @@ interface TtsDriver {
  * replié en refus — cette classe ne lève jamais.
  *
  * Testée en JVM via un [TtsDriver] faux ([create] seul touche Android).
+ *
+ * Trace voix ([onEvent], défaut muet) : `closed` quand la parole est refusée
+ * moteur fermé, `blank` pour un texte vide (pilote intouché), `driver-false`
+ * quand le pilote refuse ou jette. Une phrase acceptée est silencieuse ici :
+ * sa fin (`done`, `error` en échec) arrive du pilote Android, sur un fil du
+ * moteur — [onEvent] doit donc rester non bloquant.
  */
-class SystemTtsEngine(private val driver: TtsDriver) {
+class SystemTtsEngine(private val driver: TtsDriver, private val onEvent: (String) -> Unit = {}) {
 
     @Volatile
     private var closed = false
@@ -62,11 +69,20 @@ class SystemTtsEngine(private val driver: TtsDriver) {
      * Faux si le texte est blanc, le moteur fermé, ou le pilote en échec.
      */
     fun speak(text: String, urgent: Boolean, locale: Locale, rate: Float, pitch: Float = 1f): Boolean {
-        if (closed || text.isBlank()) return false
+        if (closed) return refused("closed")
+        if (text.isBlank()) return refused("blank")
         val clean = text.trim()
         if (clean.isEmpty()) return false
-        return runCatching { driver.speak(clean, urgent, locale, Settings.clampTtsSpeed(rate), clampPitch(pitch)) }
+        val ok = runCatching { driver.speak(clean, urgent, locale, Settings.clampTtsSpeed(rate), clampPitch(pitch)) }
             .getOrDefault(false)
+        if (!ok) onEvent("driver-false")
+        return ok
+    }
+
+    /** Refus tracé : l'appelant reçoit `false`, jamais une exception. */
+    private fun refused(event: String): Boolean {
+        onEvent(event)
+        return false
     }
 
     /** Coupe la parole en cours (écran quitté, nouvel ordre). Sans effet si fermé. */
@@ -94,8 +110,8 @@ class SystemTtsEngine(private val driver: TtsDriver) {
          * Moteur branché sur le vrai TTS système. [context] est réduit à son
          * contexte applicatif : retenir une activité fuirait à la rotation.
          */
-        fun create(context: Context): SystemTtsEngine =
-            SystemTtsEngine(AndroidTtsDriver(context.applicationContext))
+        fun create(context: Context, onEvent: (String) -> Unit = {}): SystemTtsEngine =
+            SystemTtsEngine(AndroidTtsDriver(context.applicationContext, onEvent), onEvent)
 
         /** Langue de la voix → locale du moteur (anglais par défaut). */
         fun localeOf(language: SpeechLanguage): Locale = when (language) {
@@ -173,10 +189,14 @@ class TtsInitBuffer(private val max: Int = PENDING_MAX) {
  * uniquement sur Android, donc sans test JVM — le tampon ([TtsInitBuffer]),
  * la file et le cycle de vie sont testés dans [SystemTtsEngine] derrière un faux.
  */
-class AndroidTtsDriver(appContext: Context) : TtsDriver, TextToSpeech.OnInitListener {
+class AndroidTtsDriver(appContext: Context, private val onEvent: (String) -> Unit = {}) : TtsDriver, TextToSpeech.OnInitListener {
 
     private val tts = TextToSpeech(appContext, this)
     private val lock = Any()
+
+    init {
+        runCatching { tts.setOnUtteranceProgressListener(TtsTraceListener(onEvent)) }
+    }
 
     @Volatile
     private var ready = false
@@ -231,4 +251,23 @@ class AndroidTtsDriver(appContext: Context) : TtsDriver, TextToSpeech.OnInitList
             val mode = if (flush) TextToSpeech.QUEUE_FLUSH else TextToSpeech.QUEUE_ADD
             tts.speak(text, mode, Bundle(), UUID.randomUUID().toString()) == TextToSpeech.SUCCESS
         }.getOrDefault(false)
+}
+
+/**
+ * Fins de phrases système vers la trace : `done` jouée jusqu'au bout, `error`
+ * en échec — `onStart` tait (une acceptation n'apprend rien). Même motif que
+ * le `TraverseUtteranceListener` du rendu hors-ligne, sans corrélation par
+ * `utteranceId` (la parole enchaînée n'a pas d'attente à réveiller).
+ */
+private class TtsTraceListener(private val onEvent: (String) -> Unit) : UtteranceProgressListener() {
+
+    override fun onStart(utteranceId: String) = Unit
+
+    override fun onDone(utteranceId: String) {
+        onEvent("done")
+    }
+
+    override fun onError(utteranceId: String) {
+        onEvent("error")
+    }
 }

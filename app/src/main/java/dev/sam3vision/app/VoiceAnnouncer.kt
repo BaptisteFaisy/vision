@@ -18,14 +18,35 @@ import java.io.File
  * écran verrouillé, personne ne lit le bandeau — un succès mensonger y serait un
  * silence total. Les appelants « bandeau » ignorent le résultat (l'info est déjà
  * affichée en gros caractères et exposée à TalkBack) ; le micro verrouillé le publie.
+ *
+ * Trace voix ([onEvent], défaut muet) : `EXPECT` quand une phrase est demandée
+ * (texte vide = succès silencieux, rien n'est attendu), `FAIL` à chaque échec.
+ * Le lecteur interne relaie ses `play`/`stop`/`done`/`cut` au même canal : un
+ * succès se lit `EXPECT`, `stop`, `play`, `done`.
  */
-class VoiceAnnouncer(context: Context, dirName: String = DEFAULT_DIR) {
+class VoiceAnnouncer {
 
-    private val player = SpeechPlayer(
-        dir = File(context.cacheDir, dirName),
-        // Lunettes en session : la phrase sort dans la paire, sinon sur le téléphone.
-        output = { GlassesVoiceRoute.current(context) },
+    private val player: SpeechPlayer
+    private val onEvent: (String) -> Unit
+
+    constructor(context: Context, dirName: String = DEFAULT_DIR, onEvent: (String) -> Unit = {}) : this(
+        SpeechPlayer(
+            dir = File(context.cacheDir, dirName),
+            // Lunettes en session : la phrase sort dans la paire, sinon sur le téléphone.
+            output = { GlassesVoiceRoute.current(context) },
+            onEvent = onEvent,
+        ),
+        onEvent,
     )
+
+    /**
+     * Couture de test JVM (`Context` indisponible hors Android) : lecteur
+     * direct, même routage des événements — la prod passe par le [Context].
+     */
+    internal constructor(player: SpeechPlayer, onEvent: (String) -> Unit = {}) {
+        this.player = player
+        this.onEvent = onEvent
+    }
 
     /**
      * Synthétise puis lit [text]. Rien à dire (texte vide) = succès ; clé absente,
@@ -34,13 +55,20 @@ class VoiceAnnouncer(context: Context, dirName: String = DEFAULT_DIR) {
     suspend fun say(settings: Settings, text: String): Result<Unit> {
         val clean = text.trim()
         if (clean.isEmpty()) return Result.success(Unit)
+        onEvent("EXPECT")
         if (settings.ttsApiKey.isBlank()) {
-            return Result.failure(ApiError.InvalidKey("ElevenLabs key missing — enter it in Settings"))
+            return fail(ApiError.InvalidKey("ElevenLabs key missing — enter it in Settings"))
         }
         player.speed = settings.ttsSpeed
         val audio = ElevenLabsTtsClient(settings.ttsApiKey, settings.ttsVoiceId, cache = ElevenLabsTtsClient.sharedPhrases)
-            .synthesize(clean).getOrElse { return Result.failure(it) }
-        return player.play(audio)
+            .synthesize(clean).getOrElse { return fail(it) }
+        return player.play(audio).onFailure { onEvent("FAIL") }
+    }
+
+    /** Échec tracé : l'erreur typée part à l'appelant, jamais un succès mensonger. */
+    private fun fail(cause: Throwable): Result<Unit> {
+        onEvent("FAIL")
+        return Result.failure(cause)
     }
 
     fun stop() = player.stop()

@@ -52,6 +52,13 @@ internal fun sliceRateFor(durationMs: Long, sliceMs: Long = VOICE_SLICE_MS, base
  * sans toucher au reste de l'audio du téléphone. `null` = sortie par défaut.
  * Attributs parole d'accessibilité sur flux musique, comme le banc prouvé sur
  * paire (`bt_a2dp`, 27/10) : la production rejoue le chemin qui s'entend.
+ *
+ * Trace voix ([onEvent], défaut muet : aucun appelant n'est tenu de câbler) :
+ * `play` à chaque demande de lecture, `stop` à chaque coupe demandée, `done`
+ * en fin normale, `cut` quand la coupe interrompt une lecture en vol. Les
+ * échecs (synchrone comme plateforme) partent déjà par [onPlaybackError],
+ * canal inchangé : `onEvent` ne porte que le cycle de vie, jamais le détail
+ * d'erreur.
  */
 class SpeechPlayer(
     private val dir: File,
@@ -59,6 +66,7 @@ class SpeechPlayer(
     private val onPlaybackError: (String) -> Unit = {},
     speed: Float = Settings.DEFAULT_TTS_SPEED,
     private val output: () -> AudioDeviceInfo? = { null },
+    private val onEvent: (String) -> Unit = {},
 ) {
     @Volatile
     private var player: MediaPlayer? = null
@@ -88,6 +96,7 @@ class SpeechPlayer(
     suspend fun play(bytes: ByteArray): Result<Unit> = withContext(Dispatchers.IO) {
         runCatching {
             stop()
+            onEvent("play")
             playBlocking(writeCache(bytes), onComplete, onPlaybackError)
         }.onFailure { reportSyncFailure(it) }
     }
@@ -99,6 +108,7 @@ class SpeechPlayer(
     suspend fun playFile(file: File): Result<Unit> = withContext(Dispatchers.IO) {
         runCatching {
             stop()
+            onEvent("play")
             playBlocking(file, onComplete, onPlaybackError)
         }.onFailure { reportSyncFailure(it) }
     }
@@ -118,6 +128,7 @@ class SpeechPlayer(
     suspend fun playSliceFile(file: File, sliceMs: Long = VOICE_SLICE_MS): Result<Unit> = withContext(Dispatchers.IO) {
         runCatching {
             stop()
+            onEvent("play")
             playBlocking(file, onComplete, onPlaybackError, sliceMs)
         }.onFailure { reportSyncFailure(it) }
     }
@@ -126,6 +137,7 @@ class SpeechPlayer(
     suspend fun playSlice(bytes: ByteArray, sliceMs: Long = VOICE_SLICE_MS): Result<Unit> = withContext(Dispatchers.IO) {
         runCatching {
             stop()
+            onEvent("play")
             playBlocking(writeCache(bytes), onComplete, onPlaybackError, sliceMs)
         }.onFailure { reportSyncFailure(it) }
     }
@@ -136,6 +148,7 @@ class SpeechPlayer(
             runCatching {
                 stop()
                 waiter = gate
+                onEvent("play")
                 playBlocking(
                     writeCache(bytes),
                     onDone = { gate.complete(Result.success(PlaybackEnd.Done)) },
@@ -177,7 +190,7 @@ class SpeechPlayer(
         // part quand même, il ne se tait pas pour un routage raté.
         runCatching { output()?.let { device -> mp.preferredDevice = device } }
         mp.setDataSource(file.absolutePath)
-        mp.setOnCompletionListener { finishIfCurrent(current, onDone) }
+        mp.setOnCompletionListener { finishDone(current, onDone) }
         mp.setOnErrorListener { _, what, extra ->
             finishIfCurrent(current) { onError("lecture audio impossible ($what/$extra)") }
             true
@@ -205,6 +218,15 @@ class SpeechPlayer(
     }
 
     /**
+     * Fin normale gardée : émet `done` puis [block], une seule fois, si [gen]
+     * est la lecture courante. La fin en erreur (rejet plateforme) passe par
+     * [finishIfCurrent] sans `done` : l'erreur part déjà par le rappel dédié.
+     */
+    internal fun finishDone(gen: Long, block: () -> Unit) {
+        finishIfCurrent(gen) { onEvent("done"); block() }
+    }
+
+    /**
      * Arme une lecture fictive (tests JVM : `MediaPlayer` indisponible) ; rend sa
      * generation, a terminer par [finishIfCurrent] comme le ferait la plateforme.
      */
@@ -224,6 +246,8 @@ class SpeechPlayer(
     /** Arrête et libère la lecture en cours ; une file en attente rend [PlaybackEnd.Stopped]. */
     fun stop() {
         generation++
+        onEvent("stop")
+        if (waiter != null || playingNow()) onEvent("cut")
         waiter?.complete(Result.success(PlaybackEnd.Stopped))
         waiter = null
         player?.let { mp ->
@@ -233,6 +257,9 @@ class SpeechPlayer(
         }
         player = null
     }
+
+    /** Lecture réellement en cours (un lecteur terminé non libéré n'est pas coupé). */
+    private fun playingNow(): Boolean = runCatching { player?.isPlaying == true }.getOrDefault(false)
 
     /** Libération finale (onCleared du ViewModel). */
     fun release() = stop()
