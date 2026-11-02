@@ -85,7 +85,7 @@ rendu à l'écran — **non mesuré ici**, cela demande le téléphone.
 | Constante | Valeur | Fichier:ligne |
 |---|---|---|
 | Délai HTTP générique | **60 s** | `core/net/Http.kt:28` (`DEFAULT_TIMEOUT_SECONDS`) |
-| Délai d'une frame (compatibilité) | **10 s** | `core/net/HttpLiveClient.kt:14` (`LIVE_TIMEOUT_SECONDS`) |
+| Délai d'une frame (compatibilité) | **10 s** | `core/net/HttpLiveClient.kt:14` (`LIVE_TIMEOUT_SECONDS`) — voix : aucun tueur à 10 s (prouvé 02/11, le mutisme venait du mutex parole) |
 | Délai du réveil `/health` | **180 s** | `core/net/HttpLiveClient.kt:22` (`WAKE_TIMEOUT_SECONDS`) |
 | Délai d'extinction `/release` | **45 s** | `core/net/SamLifecycle.kt:10` (`RELEASE_TIMEOUT_SECONDS`) |
 | Délai d'envoi vidéo (mode tap) | **120 s** | `core/net/HttpSam31VideoClient.kt:71` (`UPLOAD_TIMEOUT_SECONDS`) |

@@ -197,7 +197,7 @@ Précisions qui comptent :
   402 → `PaymentRequired`, 409/429 → `RateLimited`, 404 « invalid function call » →
   `BackendStopped` (proxy Modal, pas de relance), sinon `Http`. Les clients renvoient des
   `Result` : un échec n'est jamais une exception qui remonte.
-- **Délais** : générique 60 s (`DEFAULT_TIMEOUT_SECONDS`, `Http.kt:29`), frame 10 s
+- **Délais** : générique 60 s (`DEFAULT_TIMEOUT_SECONDS`, `Http.kt:29`), frame 10 s (aucun tueur voix à 10 s — prouvé 02/11)
   (`LIVE_TIMEOUT_SECONDS`, `HttpLiveClient.kt:17`), réveil 180 s (`WAKE_TIMEOUT_SECONDS`,
   `:25`), extinction 45 s (`RELEASE_TIMEOUT_SECONDS`, `SamLifecycle.kt:12`), vidéo 120 s
   (`UPLOAD_TIMEOUT_SECONDS`, `HttpSam31VideoClient.kt:75`), tracker 15 s
