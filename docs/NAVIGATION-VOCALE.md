@@ -131,8 +131,10 @@ téléphone dans `BOITE-USER.md`.
 8. S'écarter de l'itinéraire Maps → Maps recalcule seul ; vérifier qu'iSee
    n'affiche et ne dit rien.
 9. Tap court sur un bouton (pas d'appui long) → action du bouton, jamais de
-   dictée ; swipe → navigation de page, jamais de dictée (non-régression
-   gestes).
+   dictée ; balayage haut (Traversée), bas (GPS) et gauche → jamais de dictée ;
+   seul le balayage vers la droite ouvre le micro (« What are you looking
+   for? ») pour la chasse d'objet (non-régression gestes, voir
+   `docs/ARCHITECTURE.md`).
 10. Couper ElevenLabs (clé vide) + dicter une navigation → Maps s'ouvre quand
     même, overlay texte seul, zéro audio.
 
