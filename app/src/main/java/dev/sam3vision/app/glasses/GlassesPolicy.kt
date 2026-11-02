@@ -288,9 +288,10 @@ fun connectLabel(state: GlassesUiState): String = when {
 }
 
 /**
- * Balayage vers la droite sur iSee : ouvre la session exactement quand le bouton le
- * pourrait (`canConnect`) — session active ou en démarrage : rien, le geste ne coupe
- * jamais un direct ni ne rejoue une ouverture. Le lien Bluetooth est attendu par
- * l'ouvreur (`awaitLinkedDevice`, 30 s) : sans paire `CONNECTED`, pas de session.
+ * Balayage vers la droite sur iSee : finit de connecter les lunettes (ouvre la session)
+ * quand le bouton le pourrait (`canConnect`) **et** que le Bluetooth est déjà monté
+ * ([linked] : une paire `CONNECTED` au SDK). Session active ou en démarrage, ou lien
+ * pas encore monté : rien, le geste ne coupe jamais un direct et n'attend jamais le
+ * Bluetooth — c'est le bouton des Réglages qui attend (30 s).
  */
-fun shouldSwipeConnect(state: GlassesUiState): Boolean = state.canConnect
+fun shouldSwipeConnect(state: GlassesUiState, linked: Boolean): Boolean = state.canConnect && linked
