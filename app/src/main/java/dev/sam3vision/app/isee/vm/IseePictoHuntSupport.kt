@@ -38,3 +38,16 @@ internal fun huntDeliveryAnchor(
     val hit = PictoHit(armed.id, armed.label, anchor[0], anchor[1], anchor[2] - anchor[0], anchor[3] - anchor[1], score)
     return hit to clock
 }
+
+/**
+ * SAM autorise-t-il l'affichage du gabarit nommé [pictoLabel] ? Un picto
+ * nommé comme un masque indoor (clés, lunettes, boîtier… — les 10
+ * concepts SAM dedans) ne s'affiche que si SAM le voit dans [samLabels]
+ * (pont FR-EN : « cles » vaut « keys ») — le gabarit seul ne montre
+ * jamais un objet que SAM ne voit pas, même si le motif matche. Un
+ * picto hors indoor (« Object » du bouton) reste gabarit seul. Pur.
+ */
+internal fun samShowsPicto(pictoLabel: String, samLabels: Set<String>): Boolean {
+    if (FindIndoorTarget.fromSpoken(pictoLabel) == null) return true
+    return samLabels.any { pictoMatchesHunt(pictoLabel, it) }
+}
