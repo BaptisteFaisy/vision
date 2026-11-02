@@ -4,6 +4,7 @@ import android.graphics.Bitmap
 import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.remember
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.asImageBitmap
 import androidx.compose.ui.unit.IntOffset
@@ -25,15 +26,17 @@ internal fun GlassesMaskLayer(
     modifier: Modifier = Modifier,
 ) {
     if (masks.isEmpty() || sentWidth <= 0 || sentHeight <= 0) return
+    // Convertis une fois par paquet (motif `SharedUi`) : plus de `asImageBitmap` par frame.
+    val images = remember(masks) { masks.map { it.asImageBitmap() } }
     Canvas(modifier.fillMaxSize()) {
         val map = cropTransform(sentWidth, sentHeight, size.width, size.height)
-        masks.forEach { mask ->
+        images.forEach { image ->
             drawImage(
-                image = mask.asImageBitmap(),
+                image = image,
                 srcOffset = IntOffset.Zero,
-                srcSize = IntSize(mask.width, mask.height),
+                srcSize = IntSize(image.width, image.height),
                 dstOffset = IntOffset(map.offsetX.roundToInt(), map.offsetY.roundToInt()),
-                dstSize = IntSize((mask.width * map.scale).roundToInt(), (mask.height * map.scale).roundToInt()),
+                dstSize = IntSize((image.width * map.scale).roundToInt(), (image.height * map.scale).roundToInt()),
             )
         }
     }

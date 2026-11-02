@@ -4,6 +4,7 @@ import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.layout.BoxWithConstraints
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.remember
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.geometry.CornerRadius
 import androidx.compose.ui.geometry.Offset
@@ -54,11 +55,15 @@ internal fun CrossingOverlayLayer(
         val marker = lightMarker(box, frameWidth, frameHeight, boxW, boxH) ?: return@BoxWithConstraints
         val accent = Color(crossingAccent(active, state))
         val stroke = with(LocalDensity.current) { STROKE_DP.dp.toPx() }
-        val laid = rememberTextMeasurer().measure(
-            tag,
-            TextStyle(color = Color.White, fontSize = TAG_FONT_SP.sp, fontWeight = FontWeight.Bold),
-            maxLines = 1,
-        )
+        val measurer = rememberTextMeasurer()
+        // Mesuré une fois par étiquette, pas à chaque composition.
+        val laid = remember(measurer, tag, boxW, boxH) {
+            measurer.measure(
+                tag,
+                TextStyle(color = Color.White, fontSize = TAG_FONT_SP.sp, fontWeight = FontWeight.Bold),
+                maxLines = 1,
+            )
+        }
         val laidH = laid.size.height.toFloat()
         val laidW = laid.size.width.toFloat()
         val tagW = laidW + TAG_PAD_H_DP * 2
@@ -99,16 +104,22 @@ internal fun TraverseVerdictBanner(
     if (tag.isEmpty()) return
     val accent = Color(traverseAccent(active, phase))
     BoxWithConstraints(modifier.fillMaxSize()) {
-        val laid = rememberTextMeasurer().measure(
-            tag,
-            TextStyle(color = Color.White, fontSize = VERDICT_FONT_SP.sp, fontWeight = FontWeight.Bold),
-            maxLines = 1,
-        )
+        val boxW = constraints.maxWidth.toFloat()
+        val boxH = constraints.maxHeight.toFloat()
+        val measurer = rememberTextMeasurer()
+        // Mesuré une fois par verdict, pas à chaque composition.
+        val laid = remember(measurer, tag, boxW, boxH) {
+            measurer.measure(
+                tag,
+                TextStyle(color = Color.White, fontSize = VERDICT_FONT_SP.sp, fontWeight = FontWeight.Bold),
+                maxLines = 1,
+            )
+        }
         val plate = verdictRect(
             laid.size.width.toFloat() + VERDICT_PAD_H_PX * 2,
             laid.size.height.toFloat() + VERDICT_PAD_V_PX * 2,
-            constraints.maxWidth.toFloat(),
-            constraints.maxHeight.toFloat(),
+            boxW,
+            boxH,
             with(LocalDensity.current) { VERDICT_TOP_MARGIN_DP.dp.toPx() },
         )
         Canvas(Modifier.fillMaxSize()) {
