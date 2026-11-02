@@ -64,4 +64,27 @@ class HeadPoseMathTest {
         assertNull(HeadPoseMath.poseOrNull(0f, 0f, 0f, 0f))
         assertNull(HeadPoseMath.poseOrNull(Float.NaN, 0f, 0f, 1f))
     }
+
+    @Test
+    fun `brut egale signe tant que le signe vaut 1`() {
+        val raw = HeadPoseMath.rawPitchRadFromQuaternion(-0.258819f, 0f, 0f, 0.9659258f)
+        val signed = HeadPoseMath.pitchRadFromQuaternion(-0.258819f, 0f, 0f, 0.9659258f)
+        assertEquals(HeadPoseMath.PITCH_SIGN, 1f, 0f)
+        assertEquals(raw, signed, 0f)
+    }
+
+    @Test
+    fun `poseOrNull respecte la hauteur passee`() {
+        val pose = HeadPoseMath.poseOrNull(-0.258819f, 0f, 0f, 0.9659258f, heightMeters = 1.8f)
+        assertNotNull(pose)
+        assertEquals(1.8f, pose!!.heightMeters, 0f)
+        assertEquals(PI.toFloat() / 6f, pose.pitchRad, 1e-3f)
+    }
+
+    @Test
+    fun `poseOrNull rend null sur hauteur invalide`() {
+        assertNull(HeadPoseMath.poseOrNull(-0.258819f, 0f, 0f, 0.9659258f, heightMeters = 0.1f))
+        assertNull(HeadPoseMath.poseOrNull(-0.258819f, 0f, 0f, 0.9659258f, heightMeters = 99f))
+        assertNull(HeadPoseMath.poseOrNull(-0.258819f, 0f, 0f, 0.9659258f, heightMeters = Float.NaN))
+    }
 }

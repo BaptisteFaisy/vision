@@ -17,20 +17,11 @@ class CameraHeightStore(context: Context) {
     private val prefs = context.applicationContext.getSharedPreferences(PREFS, Context.MODE_PRIVATE)
 
     /** Hauteur tenue, bornée main ([CameraPose.MIN..MAX]), défaut épaule 1,5 m. */
-    fun get(): Float {
-        val raw = prefs.getFloat(KEY, CameraPose.DEFAULT_HEIGHT_M)
-        if (!raw.isFinite()) return CameraPose.DEFAULT_HEIGHT_M
-        return raw.coerceIn(CameraPose.MIN_HEIGHT_M, CameraPose.MAX_HEIGHT_M)
-    }
+    fun get(): Float = clampHeightPref(prefs.getFloat(KEY, CameraPose.DEFAULT_HEIGHT_M), CameraPose.DEFAULT_HEIGHT_M)
 
     /** Mémorise la hauteur (bornée main, défaut épaule si illisible). */
     fun set(meters: Float) {
-        val clamped = if (meters.isFinite()) {
-            meters.coerceIn(CameraPose.MIN_HEIGHT_M, CameraPose.MAX_HEIGHT_M)
-        } else {
-            CameraPose.DEFAULT_HEIGHT_M
-        }
-        prefs.edit().putFloat(KEY, clamped).apply()
+        prefs.edit().putFloat(KEY, clampHeightPref(meters, CameraPose.DEFAULT_HEIGHT_M)).apply()
     }
 
     private companion object {

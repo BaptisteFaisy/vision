@@ -18,11 +18,11 @@ object HeadPoseMath {
     const val PITCH_SIGN = 1f
 
     /**
-     * Tangage [CameraPose] (rad, `+` = pique) depuis un quaternion `(x, y, z, w)`.
-     * Borné à ±π/2 par construction (`asin`) ; `NaN` si non fini ou de norme
-     * nulle (traverse comme `NaN`, ignoré par [poseOrNull]).
+     * Tangage brut (rad) depuis un quaternion `(x, y, z, w)`, **sans** [PITCH_SIGN] :
+     * la formule seule, pour le log comparatif de validation (voir `GlassesHeadPose`).
+     * Borné à ±π/2 par construction (`asin`) ; `NaN` si non fini ou de norme nulle.
      */
-    fun pitchRadFromQuaternion(x: Float, y: Float, z: Float, w: Float): Float {
+    fun rawPitchRadFromQuaternion(x: Float, y: Float, z: Float, w: Float): Float {
         if (!x.isFinite() || !y.isFinite() || !z.isFinite() || !w.isFinite()) return Float.NaN
         val norm = sqrt(x * x + y * y + z * z + w * w)
         if (!norm.isFinite() || norm <= 0f) return Float.NaN
@@ -30,17 +30,32 @@ object HeadPoseMath {
         val ny = y / norm
         val nz = z / norm
         val nw = w / norm
-        return PITCH_SIGN * asin((2f * (ny * nz - nw * nx)).coerceIn(-1f, 1f))
+        return asin((2f * (ny * nz - nw * nx)).coerceIn(-1f, 1f))
     }
 
     /**
-     * Pose lunettes (hauteur des yeux) depuis un quaternion, ou `null` (repli
-     * sténopé seul) quand le tangage manque ou que la pose est inexploitable
-     * (miroir de `PitchMath.poseOrNull`, inatteignable depuis `core`).
+     * Tangage [CameraPose] (rad, `+` = pique) depuis un quaternion `(x, y, z, w)`.
+     * Borné à ±π/2 par construction (`asin`) ; `NaN` si non fini ou de norme
+     * nulle (traverse comme `NaN`, ignoré par [poseOrNull]).
      */
-    fun poseOrNull(x: Float, y: Float, z: Float, w: Float): CameraPose? {
+    fun pitchRadFromQuaternion(x: Float, y: Float, z: Float, w: Float): Float =
+        PITCH_SIGN * rawPitchRadFromQuaternion(x, y, z, w)
+
+    /**
+     * Pose lunettes depuis un quaternion, ou `null` (repli sténopé seul) quand le
+     * tangage manque ou que la pose est inexploitable (miroir de
+     * `PitchMath.poseOrNull`, inatteignable depuis `core`). [heightMeters] vaut la
+     * hauteur des yeux (réglable, défaut [CameraPose.GLASSES_HEIGHT_M]).
+     */
+    fun poseOrNull(
+        x: Float,
+        y: Float,
+        z: Float,
+        w: Float,
+        heightMeters: Float = CameraPose.GLASSES_HEIGHT_M,
+    ): CameraPose? {
         val pitch = pitchRadFromQuaternion(x, y, z, w)
         if (!pitch.isFinite()) return null
-        return CameraPose(CameraPose.GLASSES_HEIGHT_M, pitch).takeIf { it.isValid }
+        return CameraPose(heightMeters, pitch).takeIf { it.isValid }
     }
 }

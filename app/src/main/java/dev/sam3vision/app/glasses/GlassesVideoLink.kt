@@ -187,8 +187,13 @@ object GlassesVideoLink {
      * refus (canal bêta, paire sans Motion) publie null et la sonde garde le
      * sténopé seul. Motif passerelle comme les frames et les notes.
      */
-    fun attachHeadPose(scope: CoroutineScope, onNote: (GlassesMessage) -> Unit, session: DeviceSession) {
-        headPoseFeed = GlassesHeadPose(scope, onNote).also {
+    fun attachHeadPose(
+        scope: CoroutineScope,
+        onNote: (GlassesMessage) -> Unit,
+        session: DeviceSession,
+        eyeHeightM: () -> Float = { CameraPose.GLASSES_HEIGHT_M },
+    ) {
+        headPoseFeed = GlassesHeadPose(scope, onNote, eyeHeightM = eyeHeightM).also {
             it.start(
                 attach = { session.addMotion(MotionConfiguration()).getOrNull() },
                 detach = { session.removeMotion() },

@@ -24,6 +24,7 @@ import dev.sam3vision.app.live.parseMireBlock
 import dev.sam3vision.app.live.LensQualityStore
 import dev.sam3vision.app.live.SavedCalibration
 import dev.sam3vision.app.pose.CameraHeightStore
+import dev.sam3vision.app.pose.EyeHeightStore
 import dev.sam3vision.core.distance.Calibration
 import dev.sam3vision.core.distance.CalibrationSolver
 import dev.sam3vision.core.distance.CameraPose
@@ -39,9 +40,11 @@ import java.util.Locale
 internal fun DistanceSettings(draft: Settings, onChange: (Settings) -> Unit) {
     val context = LocalContext.current
     val heights = remember(context) { CameraHeightStore(context) }
+    val eyeHeights = remember(context) { EyeHeightStore(context) }
     val calibrationStore = remember(context) { CalibrationStore(context) }
     val lensStore = remember(context) { LensQualityStore(context) }
     var heightM by remember { mutableStateOf(heights.get()) }
+    var eyeM by remember { mutableStateOf(eyeHeights.get()) }
     Column(Modifier.fillMaxWidth(), verticalArrangement = Arrangement.spacedBy(10.dp)) {
         Text(
             "Distances",
@@ -79,6 +82,15 @@ internal fun DistanceSettings(draft: Settings, onChange: (Settings) -> Unit) {
             val parsed = parseHeight(text) ?: return@LabeledField
             heightM = parsed
             heights.set(parsed)
+        }
+        LabeledField(
+            label = "Eye height in meters (glasses ~1.6)",
+            value = heightText(eyeM),
+            secret = false,
+        ) { text ->
+            val parsed = parseHeight(text) ?: return@LabeledField
+            eyeM = parsed
+            eyeHeights.set(parsed)
         }
         LensFallbackWarning(lensStore)
         CalibrationBlock(draft, onChange, calibrationStore)
