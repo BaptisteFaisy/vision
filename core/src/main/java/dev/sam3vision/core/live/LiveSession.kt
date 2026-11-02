@@ -157,6 +157,14 @@ class LiveSession(
     }
 
     /**
+     * Jambe imposée par le bit `ws_binary` du `/health` (FIX-4) : `false` = JSON direct.
+     * Sans socket, sans effet.
+     */
+    fun useBinaryWs(binary: Boolean) {
+        (client as? WsLiveClient)?.useBinaryWs(binary)
+    }
+
+    /**
      * Régulateur de latence : referme à un créneau dès que la moyenne dépasse le budget,
      * ne rouvre qu'après [REOPEN_AFTER] moyennes consécutives **sous** le budget.
      * La durée (et non un seuil bas) fait l'hystérésis : l'ancien seuil de réouverture
