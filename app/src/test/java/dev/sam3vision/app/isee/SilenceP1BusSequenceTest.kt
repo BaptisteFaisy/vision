@@ -3,9 +3,12 @@ package dev.sam3vision.app.isee
 import dev.sam3vision.app.PlaybackEnd
 import dev.sam3vision.app.SpeechPlayer
 import dev.sam3vision.app.speech.VoicePack
+import dev.sam3vision.core.curb.CurbCue
+import dev.sam3vision.core.curb.CurbEdge
 import dev.sam3vision.core.hazard.HazardCue
 import dev.sam3vision.core.hazard.HazardKind
 import dev.sam3vision.core.settings.Settings
+import dev.sam3vision.core.speech.IseeClipsEn
 import java.io.File
 import java.nio.file.Files
 import kotlinx.coroutines.test.advanceUntilIdle
@@ -118,6 +121,24 @@ class SilenceP1BusSequenceTest {
 
         assertEquals(3, rig.sink.queued)
         assertTrue(rig.attempts.isEmpty())
+    }
+
+    @Test
+    fun `say bordure sens connu = sequence jouee, zero synthese`() = runTest {
+        val rig = Rig()
+        val wish = curbWish(CurbCue("Curb detected, at 12 o'clock.", meters = 3f, edge = CurbEdge.Down))
+        val clips = wish?.clips.orEmpty()
+        assertEquals(listOf(IseeClipsEn.CURB_DOWN, IseeClipsEn.CLOCK_12), clips)
+        val speaker = BusSpeaker(this, SpeechPlayer(File(rig.tempDir(), "bus")), rig.clips(), rig.proximity())
+
+        speaker.say(OutdoorLevel.CURB, wish?.text.orEmpty(), clipId = null, clips = clips)
+        advanceUntilIdle()
+
+        assertEquals(2, rig.sink.queued)
+        assertEquals(0, rig.sink.files)
+        assertEquals(listOf("Curb down. 12 o'clock."), rig.spoken)
+        assertTrue(rig.attempts.isEmpty())
+        assertTrue(rig.said.isEmpty())
     }
 
     @Test

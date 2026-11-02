@@ -22,13 +22,14 @@ import org.junit.Test
  */
 class SilenceP1DynamicCorpusTest {
 
-    /** Cas du corpus : [attendus] vide = silence documenté (motif dans [nom]). */
+    /** Cas du corpus : [attendus] vide = silence documenté (motif dans [nom]) ; [edge] = sens bordure (dangers : défaut). */
     private data class Cas(
         val nom: String,
         val phrase: String,
         val metres: Float?,
         val attendus: List<String>,
         val kind: HazardKind = HazardKind.OTHER,
+        val edge: CurbEdge = CurbEdge.Uncertain,
     )
 
     @Test
@@ -39,7 +40,7 @@ class SilenceP1DynamicCorpusTest {
 
     @Test
     fun `corpus bordures EN = zero FAIL sans-clip`() =
-        verifie(corpusBordures()) { cas -> curbWish(CurbCue(cas.phrase, meters = cas.metres))?.clips }
+        verifie(corpusBordures()) { cas -> curbWish(CurbCue(cas.phrase, meters = cas.metres, edge = cas.edge))?.clips }
 
     /** Zéro écart entre clips obtenus et attendus sur tout le corpus, sinon la liste des FAIL. */
     private fun verifie(corpus: List<Cas>, clipsDe: (Cas) -> List<String>?) {
@@ -98,31 +99,36 @@ class SilenceP1DynamicCorpusTest {
         return cas
     }
 
-    /** Bordures : sensées (chaînées) contre détection/compte/FR (silence documenté). */
+    /** Bordures : sens connu chaîné (détection et compte inclus) contre incertain/FR (silence documenté). */
     private fun corpusBordures(): List<Cas> {
         val en = SpeechLanguage.En
         val fr = SpeechLanguage.Fr
+        val montee = CurbEdge.Up
+        val descente = CurbEdge.Down
+        val doute = CurbEdge.Uncertain
         fun horloge(cx: Float) = requireNotNull(IseeClipsEn.clock(PositionText.clockHour(cx)))
         return listOf(
-            Cas("montée 1m + heure", CurbText.phrase(CurbEdge.Up, en, 0.5f), 1f, listOf(IseeClipsEn.CURB_UP, horloge(0.5f))),
-            Cas("descente 1m + heure", CurbText.phrase(CurbEdge.Down, en, 0.1f), 1f, listOf(IseeClipsEn.CURB_DOWN, horloge(0.1f))),
-            Cas("descente 1m sans heure", CurbText.phrase(CurbEdge.Down, en, null), 1f, listOf(IseeClipsEn.CURB_DOWN)),
-            Cas("sens incertain (silence : sens inconnu)", CurbText.phrase(CurbEdge.Uncertain, en, 0.5f), 1f, emptyList()),
-            Cas("marche imminente", CurbText.stepPhrase(CurbEdge.Up, en), 0.7f, listOf(IseeClipsEn.CURB_UP)),
-            Cas("descente imminente", CurbText.stepPhrase(CurbEdge.Down, en), 0.7f, listOf(IseeClipsEn.CURB_DOWN)),
-            Cas("imminente incertaine (silence : sens inconnu)", CurbText.stepPhrase(CurbEdge.Uncertain, en), 0.7f, emptyList()),
-            Cas("consigne montée", CurbText.safetyStepPhrase(CurbEdge.Up, en), 0.5f, listOf(IseeClipsEn.CURB_UP)),
-            Cas("consigne descente", CurbText.safetyStepPhrase(CurbEdge.Down, en), 0.5f, listOf(IseeClipsEn.CURB_DOWN)),
-            Cas("consigne incertaine (silence : sens inconnu)", CurbText.safetyStepPhrase(CurbEdge.Uncertain, en), 0.5f, emptyList()),
-            Cas("détection + heure (silence : sens inconnu)", CurbText.detectedPhrase(en, 0.5f), 3f, emptyList()),
-            Cas("détection (silence : sens inconnu)", CurbText.detectedPhrase(en, null), 3f, emptyList()),
-            Cas("compte 2m (silence : sens inconnu)", CurbText.distancePhrase(2f, en), 2f, emptyList()),
-            Cas("compte 1m (silence : sens inconnu)", CurbText.distancePhrase(1f, en), 1f, emptyList()),
-            Cas("compte 0,5m (silence : sens inconnu)", CurbText.distancePhrase(0.5f, en), 0.5f, emptyList()),
-            Cas("FR montée (silence : atomes EN seuls)", CurbText.phrase(CurbEdge.Up, fr, 0.5f), 1f, emptyList()),
-            Cas("FR imminente (silence : atomes EN seuls)", CurbText.stepPhrase(CurbEdge.Down, fr), 0.7f, emptyList()),
-            Cas("FR détection (silence : atomes EN seuls)", CurbText.detectedPhrase(fr, null), 3f, emptyList()),
-            Cas("FR compte (silence : atomes EN seuls)", CurbText.distancePhrase(2f, fr), 2f, emptyList()),
+            Cas("montée 1m + heure", CurbText.phrase(montee, en, 0.5f), 1f, listOf(IseeClipsEn.CURB_UP, horloge(0.5f)), edge = montee),
+            Cas("descente 1m + heure", CurbText.phrase(descente, en, 0.1f), 1f, listOf(IseeClipsEn.CURB_DOWN, horloge(0.1f)), edge = descente),
+            Cas("descente 1m sans heure", CurbText.phrase(descente, en, null), 1f, listOf(IseeClipsEn.CURB_DOWN), edge = descente),
+            Cas("sens incertain (silence : sens inconnu)", CurbText.phrase(doute, en, 0.5f), 1f, emptyList(), edge = doute),
+            Cas("marche imminente", CurbText.stepPhrase(montee, en), 0.7f, listOf(IseeClipsEn.CURB_UP), edge = montee),
+            Cas("descente imminente", CurbText.stepPhrase(descente, en), 0.7f, listOf(IseeClipsEn.CURB_DOWN), edge = descente),
+            Cas("imminente incertaine (silence : sens inconnu)", CurbText.stepPhrase(doute, en), 0.7f, emptyList(), edge = doute),
+            Cas("consigne montée", CurbText.safetyStepPhrase(montee, en), 0.5f, listOf(IseeClipsEn.CURB_UP), edge = montee),
+            Cas("consigne descente", CurbText.safetyStepPhrase(descente, en), 0.5f, listOf(IseeClipsEn.CURB_DOWN), edge = descente),
+            Cas("consigne incertaine (silence : sens inconnu)", CurbText.safetyStepPhrase(doute, en), 0.5f, emptyList(), edge = doute),
+            Cas("détection + heure sens connu", CurbText.detectedPhrase(en, 0.5f), 3f, listOf(IseeClipsEn.CURB_DOWN, horloge(0.5f)), edge = descente),
+            Cas("détection sens connu", CurbText.detectedPhrase(en, null), 3f, listOf(IseeClipsEn.CURB_UP), edge = montee),
+            Cas("détection incertaine (silence : sens inconnu)", CurbText.detectedPhrase(en, 0.5f), 3f, emptyList(), edge = doute),
+            Cas("compte 2m sens connu", CurbText.distancePhrase(2f, en), 2f, listOf(IseeClipsEn.CURB_UP), edge = montee),
+            Cas("compte 1m sens connu", CurbText.distancePhrase(1f, en), 1f, listOf(IseeClipsEn.CURB_DOWN), edge = descente),
+            Cas("compte 0,5m sens connu", CurbText.distancePhrase(0.5f, en), 0.5f, listOf(IseeClipsEn.CURB_UP), edge = montee),
+            Cas("compte incertain (silence : sens inconnu)", CurbText.distancePhrase(2f, en), 2f, emptyList(), edge = doute),
+            Cas("FR montée sens connu (silence : atomes EN seuls)", CurbText.phrase(montee, fr, 0.5f), 1f, emptyList(), edge = montee),
+            Cas("FR imminente sens connu (silence : atomes EN seuls)", CurbText.stepPhrase(descente, fr), 0.7f, emptyList(), edge = descente),
+            Cas("FR détection sens connu (silence : atomes EN seuls)", CurbText.detectedPhrase(fr, null), 3f, emptyList(), edge = montee),
+            Cas("FR compte sens connu (silence : atomes EN seuls)", CurbText.distancePhrase(2f, fr), 2f, emptyList(), edge = descente),
         )
     }
 }

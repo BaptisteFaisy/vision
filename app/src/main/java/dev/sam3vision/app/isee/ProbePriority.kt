@@ -107,17 +107,18 @@ internal fun hazardWish(cue: HazardCue?, crossingActive: Boolean = false): Voice
 }
 
 /**
- * Vœu bordure : niveau 5 dehors, 102 en Traversée. Les sensées anglaises
- * (« Step up/down… ») partent en séquence ([DynamicClipChain.curbClips]) :
- * sans elle, la porte GPS tait la phrase (P1 silence — le texte, lui, est
- * inchangé). Pur, testé en JVM.
+ * Vœu bordure : niveau 5 dehors, 102 en Traversée. Les anglaises à sens
+ * connu (détection, compte à rebours : [DynamicClipChain.curbChain], sens
+ * du signal + cadran lu dans la phrase) partent en séquence : sans elle,
+ * la porte GPS tait la phrase (P1 silence — le texte, lui, est inchangé).
+ * Sens incertain ou FR = pas de clips (silence documenté). Pur, testé en JVM.
  */
 internal fun curbWish(cue: CurbCue?, crossingActive: Boolean = false): VoiceWish? {
     if (cue == null) return null
     return VoiceWish(
         if (crossingActive) CrossingLevels.CURB else OutdoorLevel.CURB,
         cue.phrase, AntiRepeat.KEY_CURB,
-        clips = DynamicClipChain.curbClips(cue.phrase),
+        clips = DynamicClipChain.curbChain(cue.edge, cue.phrase),
     )
 }
 

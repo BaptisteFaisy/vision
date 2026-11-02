@@ -22,8 +22,10 @@ enum class CurbEdge { Up, Down, Uncertain }
  * palier, [urgent] vrai pour les seuls paliers proches 0,7 / 0,5 m,
  * [safetyPhrase] l'alerte immédiate (« Bordure à 0,5 mètre. ») pour le seul
  * palier 0,5 m (`null` pour la détection et les paliers doux — info douce,
- * pas d'alerte), [level] le niveau VoiceBus v4 (5, bordures) et
- * [antiRepeatKey] sa clé AntiRepeat v4 (`curb`, 2 s).
+ * pas d'alerte), [level] le niveau VoiceBus v4 (5, bordures),
+ * [antiRepeatKey] sa clé AntiRepeat v4 (`curb`, 2 s) et [edge] le sens du
+ * bord (la chaîne de clips ; incertain par défaut = constructions
+ * manuelles, silence).
  */
 data class CurbCue(
     val phrase: String,
@@ -35,6 +37,8 @@ data class CurbCue(
     val level: Int = CurbWatcher.LEVEL,
     /** Clé AntiRepeat v4 : `curb` (2 s). */
     val antiRepeatKey: String = CurbWatcher.KEY_CURB,
+    /** Sens du bord : montée/descente = clips, incertain = silence. */
+    val edge: CurbEdge = CurbEdge.Uncertain,
 )
 
 /**
@@ -268,6 +272,7 @@ class CurbWatcher(
             safetyPhrase = null,
             level = LEVEL,
             antiRepeatKey = KEY_CURB,
+            edge = edge,
         )
     }
 
@@ -309,6 +314,7 @@ class CurbWatcher(
             safetyPhrase = phrase.takeIf { target == SAFETY_PALIER_METERS },
             level = LEVEL,
             antiRepeatKey = KEY_CURB,
+            edge = edge,
         )
     }
 
