@@ -12,9 +12,11 @@ import org.junit.Test
 /**
  * Contrat V1 du discriminant véhicule/fond ([VehicleBackground.decide]) : qui bouge,
  * du véhicule suivi ou de la caméra ? Le résidu = boîte − fond (fractions d'image/s)
- * est le mouvement propre du véhicule : franc ⇒ [Verdict.VEHICLE_MOVED], nul sur fond
- * franc ⇒ [Verdict.CAMERA_MOVED] (la boîte suit le porteur), les deux faibles ⇒
- * [Verdict.STATIC], doute ⇒ [Verdict.UNKNOWN].
+ * est le mouvement propre du véhicule : franc ⇒ [Verdict.VEHICLE_MOVED], nul ⇒
+ * [Verdict.CAMERA_MOVED] sur fond franc (la boîte suit le porteur) et
+ * [Verdict.STATIC] sinon, glissement de suivi sous pan franc ⇒
+ * [Verdict.CAMERA_MOVED] (tolérance), glissement sans fond franc ⇒
+ * [Verdict.UNKNOWN], comme le fond inutilisable.
  *
  * Deux niveaux : la règle seule (échantillon global piloté, déterministe) puis la
  * chaîne complète (fond estimé à l'estimateur réel sur scènes synthétiques
@@ -55,6 +57,41 @@ class VehicleBackgroundTest {
     fun `regle - ni boite ni fond, a l arret`() {
         val verdict = decide(0f, 0f, MotionSample(0f, 0f, 1f, CONFIDENT), DT_MS)
         assertEquals("$verdict", Verdict.STATIC, verdict.verdict)
+    }
+
+    @Test
+    fun `regle - derive lente du fond et boite relativement fixe, a l arret`() {
+        // Fond en dérive lente (entre les deux seuils), boîte qui le suit
+        // exactement : rien de franc ne bouge, le véhicule est à l'arrêt.
+        val ground = (VehicleBackground.STILL_SPEED + VehicleBackground.LATERAL_RATIO) / 2f
+        val boxDx = ground * DT_MS / 1000f
+        val global = MotionSample(boxDx * MotionScenes.WIDTH, 0f, 1f, CONFIDENT)
+        val verdict = decide(boxDx, 0f, global, DT_MS)
+        assertEquals("$verdict", Verdict.STATIC, verdict.verdict)
+    }
+
+    @Test
+    fun `regle - glissement de suivi sous pan franc, la camera bouge`() {
+        // Pan franc, boîte qui le suit à un glissement près (entre les deux
+        // seuils) : le suivi imparfait ne fait pas rouler une garée.
+        val ground = 0.06f
+        val slip = (VehicleBackground.STILL_SPEED + VehicleBackground.LATERAL_RATIO) / 2f
+        val boxDx = (ground + slip) * DT_MS / 1000f
+        val global = MotionSample(ground * DT_MS / 1000f * MotionScenes.WIDTH, 0f, 1f, CONFIDENT)
+        val verdict = decide(boxDx, 0f, global, DT_MS)
+        assertEquals("$verdict", Verdict.CAMERA_MOVED, verdict.verdict)
+    }
+
+    @Test
+    fun `regle - glissement sans fond franc, pas d avis`() {
+        // Même glissement sur fond faible : véhicule lent ou gigue SAM,
+        // indécidable — le doute se tait.
+        val ground = VehicleBackground.STILL_SPEED
+        val slip = (VehicleBackground.STILL_SPEED + VehicleBackground.LATERAL_RATIO) / 2f
+        val boxDx = (ground + slip) * DT_MS / 1000f
+        val global = MotionSample(ground * DT_MS / 1000f * MotionScenes.WIDTH, 0f, 1f, CONFIDENT)
+        val verdict = decide(boxDx, 0f, global, DT_MS)
+        assertEquals("$verdict", Verdict.UNKNOWN, verdict.verdict)
     }
 
     @Test
