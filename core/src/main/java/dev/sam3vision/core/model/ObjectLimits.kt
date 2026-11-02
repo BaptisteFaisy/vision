@@ -10,7 +10,8 @@ package dev.sam3vision.core.model
  *
  * Chaîne du direct : `Settings.maxObjects` ([DEFAULT_ON_SCREEN] par défaut) est
  * envoyé tel quel en `max_objects`, borné serveur à 1..32 (16 si absent). Dans
- * ce plafond, le serveur réserve [GUARDED_SLOTS] places (feu, passage piéton) :
+ * ce plafond, le serveur réserve [GUARDED_SLOTS] places (feu, passage
+ * piéton, bordure, escalier, mur) :
  * un plafond client sous cette réserve ne protège plus rien — le tri pur
  * s'applique, sans erreur.
  */
@@ -28,11 +29,12 @@ object ObjectLimits {
     const val MAX_ON_SCREEN = 32
 
     /**
-     * Places réservées par le serveur dans le plafond `/live` : une pour le
-     * meilleur feu, une pour le meilleur passage piéton (`feux_guard`, slot
-     * réservé — seuils inchangés). Miroir documentaire de la garde serveur.
+     * Places réservées par le serveur dans le plafond `/live` : une par
+     * famille gardée qui serait évincée (feu, passage piéton, bordure,
+     * escalier, mur — `feux_guard`, seuils inchangés). Miroir documentaire
+     * de la garde serveur.
      */
-    const val GUARDED_SLOTS = 2
+    const val GUARDED_SLOTS = 5
 
     /** Ramène un réglage hors bornes (saisie, vieux fichier) dans l'intervalle. */
     fun clamp(value: Int): Int = value.coerceIn(MIN_ON_SCREEN, MAX_ON_SCREEN)

@@ -12,7 +12,7 @@ package dev.sam3vision.core.speech
  * caractère près.
  *
  * Couverture : dehors niveaux 0 (voitures), 2 (humains), 4 (grillages, murs,
- * barrières), 5 (bordures), 6 (escaliers jalons 4/2/1 + marches), 7 (poteaux,
+ * barrières), 5 (bordures), 6 (escaliers jalons 2/1/0,5 + marches), 7 (poteaux,
  * mobilier, divers), 8 (passage), 10 (trottoirs, comportement actuel), 12
  * (repli gauche/droite/tout droit), verdicts traversée (+ Here, Don't go,
  * Ready, Mixed lights, Ahead), confirmations des 11 ordres dictée (sauf
@@ -54,19 +54,13 @@ object IseeClipsEn {
     const val CURB_DOWN = "curb_down"
     const val CURB_DOWN_TEXT = "Curb down."
 
-    // Niveau 6 : escaliers, jalons 4/2/1 m + nombre de marches ([number] + STEPS).
-    const val STAIRS_UP_4 = "stairs_up_4"
-    const val STAIRS_UP_4_TEXT = "Stairs up, 4 meters."
-    const val STAIRS_UP_2 = "stairs_up_2"
-    const val STAIRS_UP_2_TEXT = "Stairs up, 2 meters."
-    const val STAIRS_UP_1 = "stairs_up_1"
-    const val STAIRS_UP_1_TEXT = "Stairs up, 1 meter."
-    const val STAIRS_DOWN_4 = "stairs_down_4"
-    const val STAIRS_DOWN_4_TEXT = "Stairs down, 4 meters."
-    const val STAIRS_DOWN_2 = "stairs_down_2"
-    const val STAIRS_DOWN_2_TEXT = "Stairs down, 2 meters."
-    const val STAIRS_DOWN_1 = "stairs_down_1"
-    const val STAIRS_DOWN_1_TEXT = "Stairs down, 1 meter."
+    // Niveau 6 : escaliers, jalons 2/1/0,5 m + nombre de marches ([number] + STEPS).
+    const val STAIRS_2M = "stairs_2m"
+    const val STAIRS_2M_TEXT = "Stairs, 2 meters."
+    const val STAIRS_1M = "stairs_1m"
+    const val STAIRS_1M_TEXT = "Stairs, 1 meter."
+    const val STAIRS_HALF_M = "stairs_half_m"
+    const val STAIRS_HALF_M_TEXT = "Stairs, half a meter."
     const val STAIRS_STEPS = "stairs_steps"
     const val STAIRS_STEPS_TEXT = "Steps."
 
@@ -254,19 +248,11 @@ object IseeClipsEn {
     const val CLOCK_12 = "clock_12"
     const val CLOCK_12_TEXT = "12 o'clock."
 
-    /** Jalon escalier montant pour [meters] (4, 2, 1), `null` sinon. */
-    fun stairsUp(meters: Int): String? = when (meters) {
-        4 -> STAIRS_UP_4
-        2 -> STAIRS_UP_2
-        1 -> STAIRS_UP_1
-        else -> null
-    }
-
-    /** Jalon escalier descendant pour [meters] (4, 2, 1), `null` sinon. */
-    fun stairsDown(meters: Int): String? = when (meters) {
-        4 -> STAIRS_DOWN_4
-        2 -> STAIRS_DOWN_2
-        1 -> STAIRS_DOWN_1
+    /** Jalon escalier pour [meters] (2, 1, 0,5 — valeurs exactes en binaire), `null` sinon. */
+    fun stairsMilestone(meters: Float): String? = when (meters) {
+        2f -> STAIRS_2M
+        1f -> STAIRS_1M
+        0.5f -> STAIRS_HALF_M
         else -> null
     }
 
@@ -390,12 +376,9 @@ object IseeClipsEn {
         BARRIER to BARRIER_TEXT,
         CURB_UP to CURB_UP_TEXT,
         CURB_DOWN to CURB_DOWN_TEXT,
-        STAIRS_UP_4 to STAIRS_UP_4_TEXT,
-        STAIRS_UP_2 to STAIRS_UP_2_TEXT,
-        STAIRS_UP_1 to STAIRS_UP_1_TEXT,
-        STAIRS_DOWN_4 to STAIRS_DOWN_4_TEXT,
-        STAIRS_DOWN_2 to STAIRS_DOWN_2_TEXT,
-        STAIRS_DOWN_1 to STAIRS_DOWN_1_TEXT,
+        STAIRS_2M to STAIRS_2M_TEXT,
+        STAIRS_1M to STAIRS_1M_TEXT,
+        STAIRS_HALF_M to STAIRS_HALF_M_TEXT,
         STAIRS_STEPS to STAIRS_STEPS_TEXT,
         POLE to POLE_TEXT,
         LAMP to LAMP_TEXT,

@@ -44,24 +44,20 @@ interface VoiceBusSpeaker {
  * en amont ([dev.sam3vision.core.live.AntiRepeat], côté producteurs) : le bus n'arbitre que l'instant.
  *
  * Exception (ordre user du 02/11/2026, VOIX-DANGER § 42) : les escaliers
- * (niveau 6, compte des marches) sont prioritaires sur tout — ils coupent
- * la parole en cours (voitures, humains, bordures, chat compris) et vont
+ * (niveau 6) sont prioritaires sur tout — ils coupent la parole en cours
+ * (voitures, humains, bordures, chat et mots de guidage compris) et vont
  * au bout, personne ne les coupe (ni le niveau 0 re-posté à chaque frame,
- * ni la Traversée 100+, ni les niveaux 2 à 5) — sauf un mot de guidage en
- * cours (GPS 3/11, incoupable lui aussi : respect mutuel, § 41 — une
- * manœuvre sous un compte est reportée au silence, jamais perdue).
- * Seule la parole du user (niveau 1, micro tenu) passe devant : les
- * escaliers l'attendent. Entre deux comptes (1 s), l'esquive (mots
- * continus humains, repli 12) re-poste et parle dans le silence — au
- * milieu du cycle, jamais par-dessus le compte. Le chat, lui, attend
- * la fin des marches ([stairsActive]) : une tranche ne tient pas dans
- * l'intervalle.
+ * ni la Traversée 100+, ni les niveaux 2 à 5). Seule la parole du user
+ * (niveau 1, micro tenu) passe devant : les escaliers l'attendent. Entre
+ * deux comptes (1 s), l'esquive (mots continus humains, repli 12) re-poste
+ * et parle dans le silence — au milieu du cycle, jamais par-dessus le
+ * compte. Le chat attend la fin des marches ([stairsActive]).
  *
  * Exception (ordre user du 02/11/2026) : un mot de guidage en cours
- * (manœuvre 11, rappel 3 — clips offline ≤0,5 s) va au bout lui aussi :
- * tout le monde attend la fin du mot sauf la parole user (1, le micro
- * garde son silence), re-posts GPS compris (un « left » frais ne coupe
- * pas le « left » en cours : la redite 15 s couvre le tour perdu).
+ * (manœuvre 11, rappel 3 — clips offline ≤0,5 s) va au bout devant tous
+ * sauf la parole user (1), la bordure (5) et les escaliers (6), qui le
+ * coupent (re-posts GPS compris : un « left » frais ne coupe pas le
+ * « left » en cours, la redite 15 s couvre le tour perdu).
  *
  * Exception à l'exception (ordre user du 02/11/2026, bordures) : la
  * bordure (niveau 5) coupe un mot de guidage en cours (elle interrompt
@@ -183,7 +179,8 @@ object VoiceBus {
         }
         val nowMs = clock()
         if (stairsBusStuck(activeLevel, nowMs, lastSayMs)) activeLevel = IDLE_LEVEL
-        if (guidanceSpeaking() && level != OutdoorLevel.USER_SPEECH && level != OutdoorLevel.CURB) {
+        if (guidanceSpeaking() && level != OutdoorLevel.USER_SPEECH && level != OutdoorLevel.CURB &&
+            level != OutdoorLevel.STAIRS) {
             android.util.Log.w(TAG_MUTE, "bus-jet motif=mot-guidage-en-cours level=$level texte=[$text]")
             refundTurn(antiRepeatKey)
             return false
