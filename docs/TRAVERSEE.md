@@ -1,13 +1,14 @@
 # Mode traversée — spec v4 (contrat actuel)
 
-> **Spec v4, 01/11/2026.** Le mode traversée dit à une personne aveugle
-> **quand traverser** : verdict exclusif (feu piéton puis voitures), niveaux
-> 100 à 102, chat et GPS muets, dictée active.
+> **Spec v4, 01/11/2026** (niveaux revus le 02/11/2026). Le mode traversée dit
+> à une personne aveugle **quand traverser** : verdict exclusif (feu piéton
+> puis voitures), niveaux **0** (verdict) puis 101/102, chat et GPS muets,
+> dictée active.
 > Historique pré-v4 (recherche 10 angles, `TraverseVeto`, hystérésis,
 > voix « Vert, traversez. » / « Rouge, attendez. ») :
 > `git show 4a3c2bcf:docs/TRAVERSEE.md`.
 
-## 1. Le verdict (niveau 100)
+## 1. Le verdict (niveau 0)
 
 Règle, dans cet ordre :
 
@@ -32,7 +33,7 @@ Règle, dans cet ordre :
 
 | Niveau | Quoi | Règle |
 |---|---|---|
-| 100 | Verdict | § 1, prioritaire sur tout le reste (coupe le 101/102, jamais coupé par eux) |
+| **0** | Verdict | § 1, prioritaire sur tout le reste (coupe le 101/102, jamais coupé par eux) ; même cran que l'alerte voiture dehors — sinon n'importe quel mot d'obstacle (2 à 12) l'écrasait (A9 § 3 D8) |
 | 101 | Humains du passage + alignement | Après le verdict (humains : même phrase qu'au niveau 2 : phrase + cadran + distance, imminent immédiat ; alignement passage : mot + annonce + arrivée, niveau 8 dehors, 101 en Traversée) |
 | 102 | Bordures du passage | Après les humains (montée / descente) |
 
@@ -80,7 +81,7 @@ fait jamais seul : seuls la puce et l'ordre vocal arment le mode.
   `verdict-cross` / `verdict-dont-cross` (branche verdict). Le catalogue
   clips-en (`verdict_cross` / « Cross now. », `verdict_wait`) est aligné
   dessus à l'intégration — pas l'inverse (le verdict est la source).
-- **Niveaux** : `CrossingLevel` (100/101/102) est l'unique source côté app ;
+- **Niveaux** : `CrossingLevel` (0/101/102) est l'unique source côté app ;
   `CrossingLevels` (core, branche verdict) est replié dessus.
 - **Antirépétition du verdict** : clé `verdict:état` de la table centrale
   (2 s, changement immédiat) ; l'annonceur maison (`CrossingVerdictAnnouncer`)

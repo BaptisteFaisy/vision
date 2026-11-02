@@ -94,10 +94,17 @@ internal fun LiveProbe.computeRest(frame: LiveFrame, jpegB64: String, at: Long):
         crossing, traverseVeto, _state.value.crossingActive, frame, distances.lensSpec, jpegB64, at, speechLanguage,
         onCrop = cropLogger?.tap(), noLightGate = noLightGate,
     )
-    // Traversée : le verdict parle au bus (niveau 100), la phrase parlée se
-    // tait (humains et bordures passent par le guetteur obstacles, 101/102).
-    // Le fond juge les pistes voitures : un pan sur une garée ne bloque pas.
-    if (_state.value.crossingActive) verdictEngine.onFrame(frame, readings, jpegB64, at, motion = ProbeBackgroundMotion.lastMotion)
+    // Traversée : le verdict parle au bus (niveau 0 = CrossingLevels.VERDICT),
+    // la phrase parlée se tait (humains et bordures passent par le guetteur
+    // obstacles, 101/102). Le veto trafic de la même frame lui est passé :
+    // voiture proche/en approche ⇒ jamais « Cross. » (le feu vert ne suffit
+    // plus). Le fond juge les pistes voitures : un pan sur une garée ne bloque pas.
+    if (_state.value.crossingActive) {
+        verdictEngine.onFrame(
+            frame, readings, jpegB64, at, motion = ProbeBackgroundMotion.lastMotion,
+            carVeto = cross?.veto == true,
+        )
+    }
     val phrase = phraseOf(placed, readings, frame, at, speechLanguage,
         distances.lensSpec.widthFovDeg(frame.width, frame.height))
     feedCrossingLateral(_state.value.crossingActive, frame.objects, frame.width, frame.height, readings, distances.effectivePose(), distances.lensSpec, at, speechLanguage)

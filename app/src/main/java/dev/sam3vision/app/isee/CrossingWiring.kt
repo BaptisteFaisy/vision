@@ -152,6 +152,13 @@ internal data class CrossingPatch(
     val phase: TraversePhase,
     /** Vrai une fois l'absence de feu confirmée (voix sans-feu, feu muet). */
     val noLight: Boolean = false,
+    /**
+     * Veto trafic de la frame ([TraverseVeto] : véhicule proche, en approche
+     * suivie, bus/camion/moto compris). Publié pour que le verdict vocal ne
+     * dise jamais « Cross. » quand l'haptique et la pastille disent rouge
+     * (A9 § 3 D7) : le moteur de verdict le reçoit en `carVeto`.
+     */
+    val veto: Boolean = false,
 )
 
 /**
@@ -195,7 +202,7 @@ internal fun crossingPatchOf(
     // la lecture brute de la frame — un glitch d'une frame ne se voit ni ne se
     // sent (ordre user du 31/10, certitude rouge/vert).
     val confirmed = announcer.lastCue?.state ?: CrossingState.Red
-    return CrossingPatch(cue, confirmed, light.box, decision.state)
+    return CrossingPatch(cue, confirmed, light.box, decision.state, veto = decision.veto)
 }
 
 /**

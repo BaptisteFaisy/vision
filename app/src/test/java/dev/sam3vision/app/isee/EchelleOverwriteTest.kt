@@ -88,9 +88,18 @@ class EchelleOverwriteTest {
 
     @Test
     fun `niveaux traversee verdict puis humains puis bordures`() {
+        // Verdict au cran 100 (ordre user du 02/11 : les voitures ne parlent
+        // qu'en Traversée, le cran 0 dehors n'a plus de producteur) : devant
+        // les humains (101) et les bordures (102), mais derrière un mot
+        // d'obstacle dehors (2..12). La protection contre l'écrasement n'est
+        // donc pas le niveau : c'est le ré-armement (VoiceBus.post rend false
+        // quand la phrase est jetée, CrossingVerdictAnnouncer.rearm la rejoue
+        // dès la frame suivante — A9 § 3 D8, « Don't cross. » perdu 2 s).
         assertEquals(100, CrossingLevels.VERDICT)
         assertEquals(101, CrossingLevels.HUMAN)
         assertEquals(102, CrossingLevels.CURB)
+        assertTrue("le verdict précède les humains", CrossingLevels.VERDICT < CrossingLevels.HUMAN)
+        assertTrue("le verdict précède les bordures", CrossingLevels.VERDICT < CrossingLevels.CURB)
     }
 
     // Décision par frame.
