@@ -1,8 +1,10 @@
 package dev.sam3vision.app.isee
 
 import dev.sam3vision.app.SpeechPlayer
+import dev.sam3vision.app.speech.SystemTtsEngine
 import dev.sam3vision.app.speech.VoicePack
 import dev.sam3vision.core.live.GuidanceWord
+import dev.sam3vision.core.net.ApiError
 import dev.sam3vision.core.net.ElevenLabsTtsClient
 import dev.sam3vision.core.settings.Settings
 import dev.sam3vision.core.speech.SpeechLanguage
@@ -25,10 +27,16 @@ import kotlin.coroutines.coroutineContext
  * La parole du user ([userSpeaking] : micro tenu, transcription en cours)
  * passe devant tout — la voix coupe ce qu'elle lisait (une fois par prise
  * de parole, fanion rendu) et se tait — sauf le niveau 0 (voiture en
- * mouvement : seul 0 coupe la parole du user). Sans clé ElevenLabs, silence
- * (repli hors-ligne supprimé : la voix réseau en panne ne parle plus au
- * système). Le stop ne se répète jamais. L'appelant sérialise les appels
+ * mouvement : seul 0 coupe la parole du user). Sans clé ElevenLabs, silence.
+ * Voix réseau en panne ([isNetworkVoiceDown] : clé, crédits, cadence,
+ * timeout, réseau) : la phrase part au TTS système ([system], en file),
+ * jamais jetée quand un moteur est câblé (`null` = jet comme avant).
+ * Le stop ne se répète jamais. L'appelant sérialise les appels
  * (le porte-parole du bus tient un mutex) : dernier gagnant.
+ *
+ * Chaque entrée de parole est tracée ([SpeechLog.expect]), chaque lecture
+ * ([SpeechLog.play] + [SpeechLog.done]), chaque jet ([SpeechLog.fail] avec
+ * le motif du garde — mêmes motifs que le logcat `VoiceMute`).
  *
  * [synthesize] injecte le moteur doux (ElevenLabs en prod, faux en test),
  * [canPlay] la porte d'annonce (le niveau 0 la contourne, sécurité).
@@ -48,6 +56,7 @@ class ProximityVoice(
     private val clips: VoicePack? = null,
     private val systemBusy: () -> Boolean = { false },
     private val userSpeaking: () -> Boolean = { false },
+    private val system: SystemTtsEngine? = null,
 ) {
 
     /** Dernière phrase parlée (`null` si aucune : le stop ne se répète jamais). */
@@ -58,11 +67,36 @@ class ProximityVoice(
 
     /**
      * Jet diagnostiqué : motif au logcat en warning (visible en release —
-     * les jets sont déjà espacés par l'antirépétition), `false` rendu.
+     * les jets sont déjà espacés par l'antirépétition) et à la trace
+     * ([SpeechLog.fail], [ou] = chemin appelant), `false` rendu.
      */
-    private fun mute(text: String, level: Int, reason: String): Boolean {
+    private fun mute(ou: String, text: String, level: Int, reason: String): Boolean {
         android.util.Log.w(TAG_MUTE, "prox-jet level=$level motif=$reason texte=[$text]")
+        SpeechLog.fail(ou, reason)
         return false
+    }
+
+    /** Voix réseau en panne durable (clé, crédits, cadence, timeout, réseau) : le repli système prend le relais. */
+    private fun isNetworkVoiceDown(error: Throwable): Boolean = when (error) {
+        is ApiError.InvalidKey, is ApiError.PaymentRequired, is ApiError.RateLimited,
+        is ApiError.Timeout, is ApiError.Network -> true
+        else -> false
+    }
+
+    /**
+     * Repli TTS système (hors-ligne) : [phrase] dite sans ElevenLabs, en file
+     * (`QUEUE_ADD`, jamais de chevauchement). `true` si confiée au moteur
+     * (mémorisée comme une parole normale) ; `false` si aucun moteur câblé ou
+     * refus (non mémorisée : le jet garde le motif `panne-reseau`).
+     */
+    private fun speakOffline(phrase: String, current: Settings): Boolean {
+        val engine = system ?: return false
+        val locale = SystemTtsEngine.localeOf(current.speechLanguage)
+        if (!engine.speak(phrase, false, locale, current.ttsSpeed)) return false
+        markSpoken(phrase)
+        SpeechLog.play("repli-système", phrase)
+        SpeechLog.done(phrase)
+        return true
     }
 
     /** Nouvelle session : le stop se redira, la coupe user est ré-armée. */
@@ -90,21 +124,35 @@ class ProximityVoice(
     }
 
     /**
+     * Lecture tracée : [SpeechLog.play] avant de confier au lecteur, [SpeechLog.done]
+     * au bout, [SpeechLog.fail] `lecture` + sous-titre rendu si la lecture échoue
+     * (le rendu reste `true` : confié, comme avant — seule la trace change).
+     */
+    private suspend fun playTraced(ou: String, text: String, source: String, play: suspend () -> Result<Unit>) {
+        SpeechLog.play(source, text)
+        play().onSuccess { SpeechLog.done(text) }
+            .onFailure { SpeechLog.fail(ou, "lecture"); onSpeaking("") }
+    }
+
+    /**
      * Parle [text] au niveau [level] (clip [clipId] d'abord, synthèse sinon) ;
      * `true` si parlé (ou confié au lecteur). Parole du user (sauf niveau 0),
      * porte [canPlay] fermée (sauf niveau 0), TTS système occupé, synthèse en
-     * échec : `false`, phrase jetée (jamais redite, jamais mise en file).
+     * échec non réseau : `false`, phrase jetée (jamais redite, jamais mise en
+     * file). Panne réseau ([isNetworkVoiceDown]) : repli système si câblé.
      */
     suspend fun speak(text: String, clipId: String? = null, level: Int = OutdoorLevel.FALLBACK): Boolean {
-        if (text.isBlank()) return mute(text, level, "vide")
+        val ou = "speak"
+        SpeechLog.expect(ou, text)
+        if (text.isBlank()) return mute(ou, text, level, "vide")
         coroutineContext.ensureActive()
         if (yieldsToUser(level)) {
             cutForUser()
-            return mute(text, level, "parole-user")
+            return mute(ou, text, level, "parole-user")
         }
         val privileged = level == OutdoorLevel.CAR_MOVING
-        if (!privileged && !canPlay()) return mute(text, level, "porte-canPlay")
-        if (systemBusy()) return mute(text, level, "tts-systeme-occupe")
+        if (!privileged && !canPlay()) return mute(ou, text, level, "porte-canPlay")
+        if (systemBusy()) return mute(ou, text, level, "tts-systeme-occupe")
         val current = settings()
         val id = clipId ?: recordedClipId(text)
         val file = if (clipId != null) {
@@ -114,18 +162,22 @@ class ProximityVoice(
         }
         if (file != null) {
             markSpoken(text)
-            player.playSliceFile(file).onFailure { onSpeaking("") }
+            playTraced(ou, text, "clip") { player.playSliceFile(file) }
             return true
         }
         // Sans clip, tous les niveaux synthétisent (ordre user du 02/11 : la
         // porte GPS D-04 taisait tout le spontané — voir `mute` pour les jets).
-        if (!current.ttsConfigured) return mute(text, level, "tts-non-configure")
-        val bytes = synthesize(current.ttsApiKey, current.ttsVoiceId, text).getOrElse { return mute(text, level, "synthese-echec") }
+        if (!current.ttsConfigured) return mute(ou, text, level, "tts-non-configure")
+        val bytes = synthesize(current.ttsApiKey, current.ttsVoiceId, text).getOrElse { error ->
+            val down = isNetworkVoiceDown(error)
+            if (down && speakOffline(text, current)) return true
+            return mute(ou, text, level, if (down) "panne-reseau" else "synthese-echec")
+        }
         coroutineContext.ensureActive()
-        if (bytes.isEmpty() || (!privileged && !canPlay()) || systemBusy()) return mute(text, level, "coupe-apres-synthese")
+        if (bytes.isEmpty() || (!privileged && !canPlay()) || systemBusy()) return mute(ou, text, level, "coupe-apres-synthese")
         id?.let { clips?.put(it, current.speechLanguage, current.ttsVoiceId, bytes) }
         markSpoken(text)
-        player.playSlice(bytes).onFailure { onSpeaking("") }
+        playTraced(ou, text, "synthèse") { player.playSlice(bytes) }
         return true
     }
 
@@ -133,7 +185,7 @@ class ProximityVoice(
      * Mot du guidage au niveau [level] : clip local quand le pack l'a
      * (< 100 ms, zéro réseau), sinon synthèse mise en cache ; `true` si
      * parlé. Mêmes gardes que [speak] (user, porte, système), même jet
-     * sans file ; le stop ne se répète jamais.
+     * sans file, même repli panne réseau ; le stop ne se répète jamais.
      */
     suspend fun speakWord(
         clipId: String,
@@ -141,32 +193,38 @@ class ProximityVoice(
         language: SpeechLanguage,
         level: Int = OutdoorLevel.HUMAN,
     ): Boolean {
-        if (text.isBlank()) return mute(text, level, "vide")
-        if (text == lastText && GuidanceWord.isStopPhrase(text)) return mute(text, level, "stop-deja-dit")
+        val ou = "speakWord"
+        SpeechLog.expect(ou, text)
+        if (text.isBlank()) return mute(ou, text, level, "vide")
+        if (text == lastText && GuidanceWord.isStopPhrase(text)) return mute(ou, text, level, "stop-deja-dit")
         coroutineContext.ensureActive()
         if (yieldsToUser(level)) {
             cutForUser()
-            return mute(text, level, "parole-user")
+            return mute(ou, text, level, "parole-user")
         }
         val privileged = level == OutdoorLevel.CAR_MOVING
-        if (!privileged && !canPlay()) return mute(text, level, "porte-canPlay")
-        if (systemBusy()) return mute(text, level, "tts-systeme-occupe")
+        if (!privileged && !canPlay()) return mute(ou, text, level, "porte-canPlay")
+        if (systemBusy()) return mute(ou, text, level, "tts-systeme-occupe")
         val current = settings()
         val file = clips?.clipFor(clipId, language, current.ttsVoiceId)?.takeIf { it.isFile }
         if (file != null) {
             markSpoken(text)
-            player.playSliceFile(file).onFailure { onSpeaking("") }
+            playTraced(ou, text, "clip") { player.playSliceFile(file) }
             return true
         }
         // Sans clip, tous les niveaux synthétisent (ordre user du 02/11 : la
         // porte GPS D-04 taisait tout le spontané — voir `mute` pour les jets).
-        if (!current.ttsConfigured) return mute(text, level, "tts-non-configure")
-        val bytes = synthesize(current.ttsApiKey, current.ttsVoiceId, text).getOrElse { return mute(text, level, "synthese-echec") }
+        if (!current.ttsConfigured) return mute(ou, text, level, "tts-non-configure")
+        val bytes = synthesize(current.ttsApiKey, current.ttsVoiceId, text).getOrElse { error ->
+            val down = isNetworkVoiceDown(error)
+            if (down && speakOffline(text, current)) return true
+            return mute(ou, text, level, if (down) "panne-reseau" else "synthese-echec")
+        }
         coroutineContext.ensureActive()
-        if (bytes.isEmpty() || (!privileged && !canPlay()) || systemBusy()) return mute(text, level, "coupe-apres-synthese")
+        if (bytes.isEmpty() || (!privileged && !canPlay()) || systemBusy()) return mute(ou, text, level, "coupe-apres-synthese")
         clips?.put(clipId, language, current.ttsVoiceId, bytes)
         markSpoken(text)
-        player.playSlice(bytes).onFailure { onSpeaking("") }
+        playTraced(ou, text, "synthèse") { player.playSlice(bytes) }
         return true
     }
 
