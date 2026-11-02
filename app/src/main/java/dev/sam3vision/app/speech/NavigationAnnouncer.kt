@@ -5,7 +5,7 @@ import dev.sam3vision.core.settings.Settings
 /**
  * Phrases de navigation prononcées via le chemin TTS existant.
  *
- * Formes minimales 350 ms : « Going to X » au démarrage,
+ * Formes minimales 700 ms : « Going to X » au démarrage,
  * « No guidance. » quand il est impossible à ouvrir.
  * Pures et sans Android : testables en JVM (JUnit seul).
  */
