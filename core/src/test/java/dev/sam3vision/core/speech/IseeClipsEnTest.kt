@@ -15,15 +15,15 @@ import org.junit.Test
 class IseeClipsEnTest {
 
     @Test
-    fun `le registre couvre les 70 nouveaux clips et les 19 réutilisés`() {
-        assertEquals(89, IseeClipsEn.all.size)
+    fun `le registre couvre les 100 nouveaux clips et les 19 réutilisés`() {
+        assertEquals(119, IseeClipsEn.all.size)
     }
 
     @Test
     fun `chaque entrée du catalogue JSON est dans le registre au caractère près`() {
         val catalog = JSONObject(catalogFile().readText())
         val entries = catalog.getJSONArray("clips") + catalog.getJSONArray("reuse")
-        assertEquals(89, entries.size)
+        assertEquals(119, entries.size)
         for ((id, text) in entries) {
             assertEquals("clip $id", text, IseeClipsEn.all[id])
         }
@@ -45,6 +45,8 @@ class IseeClipsEnTest {
             assertTrue("texte $id non anglais : $text", text.all { it.code < 128 })
             if (id == IseeClipsEn.FIND_LOOKING_FOR) {
                 assertEquals("Looking for", text)
+            } else if (id.startsWith("c_")) {
+                assertTrue("atome $id ponctué : $text", !text.endsWith("."))
             } else {
                 assertTrue("texte $id sans point : $text", text.endsWith("."))
             }
@@ -139,6 +141,34 @@ class IseeClipsEnTest {
         assertEquals("Twelve.", IseeClipsEn.all[IseeClipsEn.N_12])
         assertEquals("12 o'clock.", IseeClipsEn.all[IseeClipsEn.CLOCK_12])
         assertEquals("20 meters.", IseeClipsEn.all[IseeClipsEn.METERS_20])
+    }
+
+    @Test
+    fun `verdicts detailles traversee et confirmations systeme`() {
+        val all = IseeClipsEn.all
+        assertEquals("Here.", all[IseeClipsEn.CROSS_HERE])
+        assertEquals("Don't go.", all[IseeClipsEn.CROSS_DONT_GO])
+        assertEquals("Ready.", all[IseeClipsEn.CROSS_READY])
+        assertEquals("Mixed lights.", all[IseeClipsEn.CROSS_MIXED])
+        assertEquals("Ahead.", all[IseeClipsEn.AHEAD])
+        assertEquals("No glasses.", all[IseeClipsEn.NO_GLASSES])
+        assertEquals("No guidance.", all[IseeClipsEn.NO_GUIDANCE])
+        assertEquals(IseeClipsEn.CROSS_HERE, IseeClipsEn.idForText("Here."))
+        assertEquals(IseeClipsEn.NO_GUIDANCE, IseeClipsEn.idForText("No guidance."))
+    }
+
+    @Test
+    fun `cardinaux chainables 1 a 20 et unites marches`() {
+        for (n in 1..20) {
+            assertEquals("c_$n", IseeClipsEn.cardinal(n))
+        }
+        assertNull(IseeClipsEn.cardinal(0))
+        assertNull(IseeClipsEn.cardinal(21))
+        val all = IseeClipsEn.all
+        assertEquals("thirteen", all["c_13"])
+        assertEquals("step", all[IseeClipsEn.C_STEP])
+        assertEquals("steps", all[IseeClipsEn.C_STEPS])
+        assertEquals("steps left", all[IseeClipsEn.C_STEPS_LEFT])
     }
 
     @Test
