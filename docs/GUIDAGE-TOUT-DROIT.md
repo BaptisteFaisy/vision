@@ -75,7 +75,7 @@ the street. »), silence 10 s (`sidewalk`). Coupé en traversée.
 | Moteur GPS + rappel 15 s | `app/.../voicenav/VoiceNavEngineDriver.kt`, `VoiceNavGpsVoice.kt` (`gpsReminderPhrase`) |
 | Chat : attente + reprise | `app/.../isee/ChatWaitResume.kt` (rang 9) |
 | Verdict traversée 100-102 | `core/.../crossing/CrossingVerdict.kt`, `app/.../isee/CrossingVerdictWiring.kt` |
-| Routeur dictée (10 ordres) | `core/.../speech/DictationOrder.kt`, `app/.../isee/vm/IseeDictationRouter.kt` |
+| Routeur dictée (11 ordres) | `core/.../speech/DictationOrder.kt`, `app/.../isee/vm/IseeDictationRouter.kt` |
 | Listes SAM 16/10 | `core/.../live/LivePrompts.kt` (`default`, `indoor`, `forMode`) |
 
 Contradictions résiduelles entre ces fichiers : `docs/REVUE-V4.md`.
