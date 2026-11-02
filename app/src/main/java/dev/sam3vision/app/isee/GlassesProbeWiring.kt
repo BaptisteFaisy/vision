@@ -19,7 +19,8 @@ import kotlinx.coroutines.withContext
 /**
  * Alimente la sonde SAM depuis la rue des lunettes : quand le direct vit et que la sonde
  * veut une frame, on décode la poussée du flux hors écran, on l'encode comme le téléphone
- * (JPEG 320 q55 redressé) et on l'envoie. Guidage, distances et voix suivent alors le même
+ * (JPEG redressé [ISEE_FRAME_EDGE]/[ISEE_FRAME_QUALITY], 320/q55 — pas le 480/q65 du
+ * partage aidant) et on l'envoie. Guidage, distances et voix suivent alors le même
  * chemin que le mode téléphone : parité par construction, sans toucher à
  * [Guidance][core.live.Guidance]. Le compteur de marches part aussi (même photo → Canny),
  * sinon la voix ne connaît jamais leur nombre.
@@ -96,9 +97,10 @@ private class GuidanceGate {
 
 /** Bitmap de la rue → JPEG d'envoi (hors fil UI) ; les bitmaps jetables sont recyclés aussitôt. */
 private fun bitmapToProbeJpeg(bitmap: Bitmap): String? {
-    val upright = uprightScaled(bitmap, 0, FramePolicy.EDGE)
+    // Parité téléphone (320/q55) : le 480/q65 coûtait 2,25× pixels à l'encodage.
+    val upright = uprightScaled(bitmap, 0, ISEE_FRAME_EDGE)
     feedStairCounter(upright)
-    val jpeg = runCatching { bitmapToJpegBase64(upright, FramePolicy.QUALITY) }.getOrNull()
+    val jpeg = runCatching { bitmapToJpegBase64(upright, ISEE_FRAME_QUALITY) }.getOrNull()
     if (upright !== bitmap) upright.recycle()
     bitmap.recycle()
     if (jpeg != null) countSnapshot()
@@ -128,11 +130,16 @@ internal fun applyGlassesLens(probe: LiveProbe, fromView: Boolean) {
 
 /**
  * Compteur de marches côté lunettes : la même photo redressée part au Canny
- * (miroir du `onLuma` téléphone). Silencieux en cas d'échec : le pont vers SAM
- * ne doit jamais tomber pour un compteur.
+ * (miroir du `onLuma` téléphone), au plus une fois par seconde — le compteur
+ * garde sa valeur 1,5 s (`FRESH_MS`), un Canny par frame est du CPU jeté
+ * (~2-5 ms/frame). Silencieux en cas d'échec : le pont vers SAM ne doit jamais
+ * tomber pour un compteur.
  */
 private fun feedStairCounter(bitmap: Bitmap) {
     if (bitmap.width <= 0 || bitmap.height <= 0) return
+    val nowMs = SystemClock.elapsedRealtime()
+    if (!stairFeedDue(lastStairFeedMs, nowMs)) return
+    lastStairFeedMs = nowMs
     runCatching {
         val pixels = IntArray(bitmap.width * bitmap.height)
         bitmap.getPixels(pixels, 0, bitmap.width, 0, 0, bitmap.width, bitmap.height)
@@ -140,7 +147,21 @@ private fun feedStairCounter(bitmap: Bitmap) {
     }
 }
 
+/**
+ * Le Canny des marches est-il dû ? Oui quand la fenêtre [STAIR_FEED_MS] est
+ * échue depuis [lastMs] — horloge monotone, comme la porte de guidage. Pur,
+ * testé en JVM.
+ */
+internal fun stairFeedDue(lastMs: Long, nowMs: Long): Boolean =
+    nowMs - lastMs >= STAIR_FEED_MS
+
+/** Fenêtre du Canny des marches côté lunettes : 1 s (le compteur tient 1,5 s). */
+internal const val STAIR_FEED_MS = 1_000L
+
 private var snapshots = 0L
+
+/** Dernier Canny des marches (ms monotones, `0` = jamais : le premier passe). */
+private var lastStairFeedMs = 0L
 
 /** Un envoi sur 20 journalisé (preuve que le pont lunettes → SAM tourne). */
 private fun countSnapshot() {
