@@ -24,10 +24,10 @@ import dev.sam3vision.core.speech.IseeClipsEn
  */
 internal fun crossingApproachClips(text: String): List<String> {
     if (!text.endsWith(".")) return emptyList()
-    val head = text.substringBefore(", ")
+    val head = text.substringBefore(", ").removeSuffix(".")
     if (head == "Ahead") return listOf(IseeClipsEn.CROSSWALK)
     // Sans virgule = sans distance (« Left. ») : le catalogue la parle déjà.
-    if (head == text) return emptyList()
+    if (!text.contains(", ")) return emptyList()
     return when (head) {
         "Left" -> listOf(IseeClipsEn.GO_LEFT)
         "Right" -> listOf(IseeClipsEn.GO_RIGHT)
