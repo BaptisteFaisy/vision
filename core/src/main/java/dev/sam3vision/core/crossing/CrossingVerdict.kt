@@ -25,8 +25,13 @@ enum class CrossingVerdict { Cross, DontCross }
 /**
  * Feu piéton vu par le verdict : [Red] (« don't cross »), [Green] (« cross »,
  * voitures ou pas), [Absent] (aucun feu en vue — les voitures tranchent).
+ *
+ * [Unknown] est l'absence de **preuve** lisible : boîte manquante sur une frame,
+ * couleur illisible, vert pas encore confirmé ([LightEvidenceGate]). Il impose
+ * « Don't cross. » avant tout le reste, sans quoi un raté de détection vaudrait
+ * autorisation de traverser (mesure A9 §3 D1).
  */
-enum class CrossingVerdictLight { Red, Green, Absent }
+enum class CrossingVerdictLight { Red, Green, Absent, Unknown }
 
 /**
  * Phrases du verdict, en anglais uniquement (clips) : [DONT_CROSS] quand le feu
@@ -70,10 +75,19 @@ object CrossingVerdictRule {
     /** Verdict pour [light] et [carMoving] (une voiture bouge sur la frame). */
     fun decide(light: CrossingVerdictLight, carMoving: Boolean): CrossingVerdict = when {
         light == CrossingVerdictLight.Red -> CrossingVerdict.DontCross
+        light == CrossingVerdictLight.Unknown -> CrossingVerdict.DontCross
         light == CrossingVerdictLight.Green -> CrossingVerdict.Cross
         carMoving -> CrossingVerdict.DontCross
         else -> CrossingVerdict.Cross
     }
+
+    /**
+     * Verdict pour une [Evidence] (sortie de [LightEvidenceGate]) : seule
+     * `Evidence.Green` peut mener à « Cross. », `Unknown` comme `Absent` imposent
+     * « Don't cross. » ([Evidence.toVerdictLight]).
+     */
+    fun decide(evidence: Evidence, carMoving: Boolean): CrossingVerdict =
+        decide(evidence.toVerdictLight(), carMoving)
 }
 
 /**
