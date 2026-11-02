@@ -45,4 +45,32 @@ object LiveLatencyLog {
     fun leg(binary: Boolean) {
         Log.i(TAG, TimingsText.leg(binary))
     }
+
+    /**
+     * Ligne brute d'une frame jetée : « latency — · cause sature ». Pure (aucun
+     * Android), testée en JVM — [drop] n'ajoute que l'écriture logcat. Le parseur
+     * la compte dans ses jetées (`parse_isee_lat.py`, lignes `latency` sans
+     * mesure) et ignore le token `cause` ; miroir de `LinkDrop` côté lunettes.
+     */
+    fun dropLine(cause: DropCause): String = "latency — · cause ${cause.code}"
+
+    /** Écrit la frame jetée en logcat (comptée par le parseur, hors série) ; ne lève jamais. */
+    fun drop(cause: DropCause) {
+        Log.i(TAG, dropLine(cause))
+    }
+}
+
+/**
+ * Cause d'abandon d'une frame Direct/sonde, pour le journal ([LiveLatencyLog.drop]).
+ * Le [code] est un mot unique, stable : le parseur et les recettes le relisent tel quel.
+ */
+enum class DropCause(val code: String) {
+    /** Réserve pleine : une frame plus fraîche a remplacé celle-ci. */
+    SATURATED("sature"),
+
+    /** Délai réseau dépassé : la réponse n'arrivera pas, la frame est perdue. */
+    TIMEOUT("timeout"),
+
+    /** App en arrière-plan : la frame est jetée, la carte reste éteinte. */
+    BACKGROUND("ecran"),
 }

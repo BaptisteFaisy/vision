@@ -90,4 +90,24 @@ class LiveLatencyLogTest {
         LiveLatencyLog.leg(true)
         LiveLatencyLog.leg(false)
     }
+
+    @Test
+    fun `jetee ecrit latency sans mesure, cause en mot stable`() {
+        assertEquals("latency — · cause sature", LiveLatencyLog.dropLine(DropCause.SATURATED))
+        assertEquals("latency — · cause timeout", LiveLatencyLog.dropLine(DropCause.TIMEOUT))
+        assertEquals("latency — · cause ecran", LiveLatencyLog.dropLine(DropCause.BACKGROUND))
+    }
+
+    @Test
+    fun `jetee comptee par le parseur, hors serie`() {
+        // `parse_isee_lat.py` : ligne `latency` sans chiffre = jetée, pas une frame.
+        val line = LiveLatencyLog.dropLine(DropCause.TIMEOUT)
+        assertTrue(line.startsWith("latency "))
+        assertFalse(line.contains(Regex("""latency \d""")))
+    }
+
+    @Test
+    fun `drop ne leve jamais`() {
+        DropCause.entries.forEach { LiveLatencyLog.drop(it) }
+    }
 }
