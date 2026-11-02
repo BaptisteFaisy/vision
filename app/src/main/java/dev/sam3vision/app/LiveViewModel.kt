@@ -182,16 +182,14 @@ class LiveViewModel(app: Application) : AndroidViewModel(app) {
         }
         val base = this.settings.liveBaseUrl()
         if (base.isBlank()) {
-            session = null
-            client = null
+            closeCurrentSession()
             tracker = null
             _state.update { it.copy(running = true, starting = false, error = SAM_ABSENT_LINE) }
             return
         }
         // Réveil explicite (ordre user 2026-10-29) : le boot recouvre la liaison caméra ; la 1re frame reste le signal de prêt (`LiveWakeGuard` couvre l'attente).
         // Le tracker suit des ids stables ; `/live` WS est le défaut (knobs de transport des masques).
-        session = null
-        client = null
+        closeCurrentSession()
         tracker = null
         if (trackerEnabled) {
             tracker = TrackRunner(HttpTrackClient(base))
@@ -215,10 +213,21 @@ class LiveViewModel(app: Application) : AndroidViewModel(app) {
         wake.arm().also { viewModelScope.launch { GpuWake.wake(base) } }
     }
 
+    /**
+     * Session courante refermée avant d'être oubliée : un `start()` répété
+     * (reprise, bascule SAM/tracker) écrasait le client sans `close()`, laissant
+     * le vieux socket parallèle jusqu'au idle serveur (45 s).
+     */
+    private fun closeCurrentSession() {
+        session?.close()
+        session = null
+        client?.close()
+        client = null
+    }
+
     /** Direct en vision LLM seule : ni session, ni client SAM, ni réveil GPU — juste l'image au LLM. */
     private fun startVisionOnly() {
-        session = null
-        client = null
+        closeCurrentSession()
         tracker = null
         _state.update {
             it.copy(running = true, starting = false, error = null, gpu = "", spoken = null)
