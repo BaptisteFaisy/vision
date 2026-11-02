@@ -68,8 +68,9 @@ internal class GlassesCamera(
 
     /**
      * Attache la caméra en descendant le plan audio ([GlassesAudioPlan]) : 16 kHz — le format
-     * de la dictée — puis 48 kHz mono, puis caméra seule. Un codec refusé par le flux ne doit
-     * ni priver l'app de la caméra, ni lui faire croire que le micro fonctionne.
+     * de la dictée — puis caméra seule (vidéo active : le repli 48 kHz est sauté,
+     * il doublait la charge du lien). Un codec refusé par le flux ne doit ni
+     * priver l'app de la caméra, ni lui faire croire que le micro fonctionne.
      *
      * Et en descendant l'échelle de cadence ([GLASSES_FRAME_RATE_LADDER], 15 i/s
      * seul, borne basse) : un refus reste un verdict explicite, jamais muet.
@@ -97,7 +98,8 @@ internal class GlassesCamera(
     private fun attachAtRate(frameRate: Int): RateRefusal? {
         var reason = NO_REASON
         var refusal: DeviceSessionError? = null
-        for (choice in GlassesAudioPlan.ladder(audioAllowed)) {
+        // La caméra attache toujours la vidéo : le repli 48 kHz est sauté.
+        for (choice in GlassesAudioPlan.ladder(audioAllowed, videoActive = true)) {
             val attempt = session.addCamera(configuration(choice, frameRate))
             val attached = attempt.getOrNull()
             if (attached != null) {

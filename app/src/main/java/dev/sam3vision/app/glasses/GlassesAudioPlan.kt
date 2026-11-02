@@ -24,9 +24,16 @@ object GlassesAudioPlan {
     /**
      * Essais dans l'ordre, du meilleur au dernier recours. Caméra seule en dernier : un
      * codec audio refusé ne doit pas priver l'app de la caméra.
+     *
+     * Quand la vidéo est active, le repli 48 kHz (768 kbit/s + 750 kbit/s vidéo)
+     * est sauté : il doublait presque la charge du lien radio pour un micro que
+     * la dictée rééchantillonne à 16 kHz de toute façon. Le 48 kHz reste réservé
+     * aux modes sans vidéo (photo, dictée seule), où le lien ne porte que lui.
      */
-    fun ladder(audioAllowed: Boolean): List<AudioChoice> =
-        if (audioAllowed) listOf(PREFERRED, FALLBACK, SILENT) else listOf(SILENT)
+    fun ladder(audioAllowed: Boolean, videoActive: Boolean): List<AudioChoice> =
+        if (!audioAllowed) listOf(SILENT)
+        else if (videoActive) listOf(PREFERRED, SILENT)
+        else listOf(PREFERRED, FALLBACK, SILENT)
 
     /**
      * La dictée ne prend le micro des lunettes que si le flux tourne **et** que le micro est
