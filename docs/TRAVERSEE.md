@@ -19,9 +19,9 @@ Règle, dans cet ordre :
 
 - Clips : `verdict-dont-cross` « Don't cross. », `verdict-cross` « Cross. »
   (verdict : tirets, textes courts — tranche la contradiction du § 6).
-- Répétition : **3 s, changement immédiat** — le premier verdict parle
-  aussitôt, un changement parle aussitôt, un verdict maintenu se répète
-  toutes les 3 s (clé `verdict` / `verdict:état`).
+- Répétition : **2 s, changement immédiat** (ordre user du 02/11/2026) —
+  le premier verdict parle aussitôt, un changement parle aussitôt, un
+  verdict maintenu se répète toutes les 2 s (clé `verdict` / `verdict:état`).
 - Le verdict vibre (`IseeHaptics.crossing`) et s'affiche (cadre VERT /
   ROUGE sur le feu, étiquette `CROSS` / `DON'T CROSS`) — même vocabulaire
   sur les deux surfaces, pas de cadre quand le mode est coupé ou sans feu.
@@ -30,8 +30,8 @@ Règle, dans cet ordre :
 
 | Niveau | Quoi | Règle |
 |---|---|---|
-| 100 | Verdict | § 1, prioritaire sur tout le reste |
-| 101 | Humains du passage | Après le verdict (même phrase qu'au niveau 2 : phrase + cadran + distance, imminent immédiat) |
+| 100 | Verdict | § 1, prioritaire sur tout le reste (coupe le 101/102, jamais coupé par eux) |
+| 101 | Humains du passage + alignement | Après le verdict (humains : même phrase qu'au niveau 2 : phrase + cadran + distance, imminent immédiat ; alignement passage : mot + annonce + arrivée, niveau 8 dehors, 101 en Traversée) |
 | 102 | Bordures du passage | Après les humains (montée / descente) |
 
 Chaque place `null` se tait (pas de remplissage : un verdict seul ne fait
@@ -81,7 +81,7 @@ fait jamais seul : seuls la puce et l'ordre vocal arment le mode.
 - **Niveaux** : `CrossingLevel` (100/101/102) est l'unique source côté app ;
   `CrossingLevels` (core, branche verdict) est replié dessus.
 - **Antirépétition du verdict** : clé `verdict:état` de la table centrale
-  (3 s, changement immédiat) ; l'annonceur maison (`CrossingVerdictAnnouncer`)
+  (2 s, changement immédiat) ; l'annonceur maison (`CrossingVerdictAnnouncer`)
   est replié dessus ou supprimé — pas deux mécanismes.
 - **Ancien pipeline** (`TraverseVeto`, `TraversePipeline`, voix « Vert,
   traversez. ») : **décâblé et supprimé** (missions morts-* vides :

@@ -49,7 +49,8 @@ Détail : `docs/TRAVERSEE.md`.
 - **100 verdict** : feu piéton puis voitures — **rouge ou mouvement =
   « Don't cross. », sinon « Cross. »**. Véhicules = **voiture uniquement**
   (bus, vélo, camion, moto ne tranchent jamais).
-- **101 humains** du passage, après le verdict.
+- **101 humains** du passage + alignement passage (mot + annonce +
+  arrivée : niveau 8 dehors, 101 en Traversée), après le verdict.
 - **102 bordures** du passage, après les humains.
 - **Dictée active** (les 10 ordres restent écoutés, `crossing off` compris).
 - **Chat et GPS muets** tant que le mode est actif (le chat reprend à la
@@ -104,7 +105,7 @@ une annonce avalée ne consomme pas son tour).
 | `crosswalk-align` | 8 alignement | **au changement** (l'appelant n'appelle que si ça change) |
 | `crosswalk-arrival` | 8 arrivée | **1 fois** |
 | `sidewalk` | 10 trottoirs | 10 s |
-| `verdict` / `verdict:état` | 100 verdict | **3 s, changement immédiat** (clé paramétrée : un état nouveau parle aussitôt) |
+| `verdict` / `verdict:état` | 100 verdict | **2 s, changement immédiat** (clé paramétrée : un état nouveau parle aussitôt) |
 | (aucune) | 9 chat | **aucune** (attente + reprise, pas de délai) |
 | (aux événements) | 11 GPS | aux événements moteur, pas de délai |
 

@@ -49,7 +49,7 @@ data class CrossingVerdictFrame(
 /**
  * Moteur du verdict traversée (SPEC v4) : feu piéton ([readLight], boîte nulle =
  * absent) puis voitures en mouvement (voiture uniquement, [VehicleStateWatcher]
- * nourri de voitures seules) → [CrossingVerdictRule] → annonce (3 s,
+ * nourri de voitures seules) → [CrossingVerdictRule] → annonce (2 s,
  * changement immédiat) → [posts][CrossingPriority] → [poster].
  *
  * [human] et [curb] sont les posts des missions humains/bordures (niveaux 101 et

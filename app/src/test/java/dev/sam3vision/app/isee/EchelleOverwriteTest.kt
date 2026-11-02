@@ -220,6 +220,12 @@ class EchelleOverwriteTest {
         assertNull(curbWish(null))
     }
 
+    @Test
+    fun `lateral 8 dehors, 101 en traversee`() {
+        assertEquals(OutdoorLevel.CROSSWALK, crossingLateralLevel(false))
+        assertEquals(CrossingLevels.HUMAN, crossingLateralLevel(true))
+    }
+
     // Antirépétition.
 
     @Test
@@ -237,8 +243,8 @@ class EchelleOverwriteTest {
         assertTrue(AntiRepeat.allow(AntiRepeat.KEY_SIDEWALK, 10_000L))
 
         assertTrue(AntiRepeat.allow(AntiRepeat.KEY_VERDICT, 0L))
-        assertFalse(AntiRepeat.allow(AntiRepeat.KEY_VERDICT, 2_999L))
-        assertTrue(AntiRepeat.allow(AntiRepeat.KEY_VERDICT, 3_000L))
+        assertFalse(AntiRepeat.allow(AntiRepeat.KEY_VERDICT, 1_999L))
+        assertTrue(AntiRepeat.allow(AntiRepeat.KEY_VERDICT, 2_000L))
     }
 
     @Test
@@ -276,6 +282,22 @@ class EchelleOverwriteTest {
                 FakeSpeaker.Said(OutdoorLevel.CURB, "bordure", null),
                 FakeSpeaker.Said(OutdoorLevel.HUMAN, "personne", null),
                 FakeSpeaker.Said(OutdoorLevel.HUMAN, "personne encore", null),
+            ),
+            speaker.said,
+        )
+    }
+
+    @Test
+    fun `verdict 100 coupe le 101, le 101 ne coupe jamais le 100`() {
+        speaker.idleValue = false
+        VoiceBus.post(CrossingLevels.HUMAN, "personne")
+        VoiceBus.post(CrossingLevels.VERDICT, "Don't cross.", "verdict_dont_cross")
+        VoiceBus.post(CrossingLevels.HUMAN, "personne encore")
+
+        assertEquals(
+            listOf(
+                FakeSpeaker.Said(CrossingLevels.HUMAN, "personne", null),
+                FakeSpeaker.Said(CrossingLevels.VERDICT, "Don't cross.", "verdict_dont_cross"),
             ),
             speaker.said,
         )

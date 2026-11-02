@@ -78,12 +78,12 @@ class CrossingVerdictTest {
     }
 
     @Test
-    fun `un verdict maintenu se repete toutes les 3s`() {
+    fun `un verdict maintenu se repete toutes les 2s`() {
         val announcer = CrossingVerdictAnnouncer()
         announcer.onFrame(0L, CrossingVerdict.DontCross)
         assertNull(announcer.onFrame(1_000L, CrossingVerdict.DontCross))
-        assertNull(announcer.onFrame(2_999L, CrossingVerdict.DontCross))
-        val repeat = announcer.onFrame(3_000L, CrossingVerdict.DontCross)
+        assertNull(announcer.onFrame(1_999L, CrossingVerdict.DontCross))
+        val repeat = announcer.onFrame(2_000L, CrossingVerdict.DontCross)
         assertEquals("Don't cross.", repeat?.phrase)
         assertFalse(repeat?.changed ?: true)
     }

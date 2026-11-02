@@ -37,7 +37,7 @@ class AntiRepeatTest {
         assertEquals(0L, AntiRepeat.durationMs(AntiRepeat.KEY_CROSSWALK_ALIGN))
         assertEquals(AntiRepeat.ONCE_MS, AntiRepeat.durationMs(AntiRepeat.KEY_CROSSWALK_ARRIVAL))
         assertEquals(10_000L, AntiRepeat.durationMs(AntiRepeat.KEY_SIDEWALK))
-        assertEquals(3_000L, AntiRepeat.durationMs(AntiRepeat.KEY_VERDICT))
+        assertEquals(2_000L, AntiRepeat.durationMs(AntiRepeat.KEY_VERDICT))
     }
 
     @Test
