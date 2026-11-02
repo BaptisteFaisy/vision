@@ -95,7 +95,7 @@ class VehicleStateWatcher(
         val edge: Boolean,
     )
 
-    /** Candidat à l'annonce : état, nom parlé, mesure, position, urgence, compte mobile. */
+    /** Candidat à l'annonce : état, nom parlé, mesure, position, urgence, compte mobile, preuve forte (tau/latéral). */
     private data class Pick(
         val state: State,
         val name: VehicleStateText.VehicleName,
@@ -103,6 +103,7 @@ class VehicleStateWatcher(
         val centerX: Float?,
         val urgent: Boolean,
         val movingCount: Int = 1,
+        val strong: Boolean = false,
     )
 
     private val approach = VehicleApproach()
@@ -127,7 +128,13 @@ class VehicleStateWatcher(
     /** Caméra prouvée mobile : suivi unanime ou fond franc (le suivi coupe l'arrêt). */
     val cameraMoved: Boolean get() = approach.cameraMoved || approach.fondFranc
 
-    /** Brut de la dernière frame (`pick == MOVING`, lu par le scan traversée). */
+    /**
+     * Brut de la dernière frame (lu par le verdict traversée) : vrai sur
+     * preuve forte immédiate (tau/latéral frais), ou sur croissance répétée
+     * deux frames de suite (run-2, ~400 ms à 5 ips) — une frame de gigue SAM
+     * isolée ne dit jamais mouvement. Le run se lit dans l'armement existant
+     * ([armed]) : aucune mémoire ajoutée.
+     */
     var movingThisFrame: Boolean = false
         private set
 
@@ -164,7 +171,9 @@ class VehicleStateWatcher(
         previous = current.mapValues { (key, seen) ->
             Prev(seen.area, seen.cx, seen.cy, PositionText.sceneBucket(metersFor(meters, key)), atMs, seen.closeness, seen.box, seen.edge) // PISTE2
         }
-        movingThisFrame = pick?.state == State.MOVING
+        // Fort immédiat, croissance en run-2 : [armed] porte encore la frame
+        // précédente (il est mis à jour après) — un flicker isolé ne passe pas.
+        movingThisFrame = pick?.state == State.MOVING && (pick.strong || armed == State.MOVING)
         if (pick == null) {
             hits = 0
             armed = null
@@ -252,11 +261,11 @@ class VehicleStateWatcher(
     ): Pick? {
         val tauKey = tau.label?.takeIf { tau.approaching }?.let(::vehicleKey)
         val moving = current.keys
-            .filter { candidate ->
+            .mapNotNull { candidate ->
                 // Tait par instance (l'approche juge par instance) ou par
                 // label (jamais produit aujourd'hui, mais un veto par type
                 // resterait un veto : on ne réveille pas ce qu'on a tu).
-                if (candidate in hushed || labelPart(candidate) in hushed) return@filter false
+                if (candidate in hushed || labelPart(candidate) in hushed) return@mapNotNull null
                 val prev = previous[candidate]
                 val seen = current.getValue(candidate)
                 // Fraîcheur : un tau/latéral porté par une piste morte (objet sorti,
@@ -273,16 +282,17 @@ class VehicleStateWatcher(
                 val growth = prev != null && !prev.edge && !seen.edge && isVehicleGrowth(prev.area, prev.atMs, prev.closeness, // FUSION P1+2.
                     seen.area, seen.closeness, atMs, approach.lastGlobal) &&
                     !followingCamera(prev, seen, atMs, motion)
-                (tauHit || lateralHit || growth) && inMovingRange(metersFor(meters, candidate), movingMeters)
-            }
-        val key = moving.minByOrNull { metersFor(meters, it) ?: Float.MAX_VALUE }
+                val strong = tauHit || lateralHit
+                if ((strong || growth) && inMovingRange(metersFor(meters, candidate), movingMeters)) candidate to strong else null
+            }.toMap()
+        val key = moving.keys.minByOrNull { metersFor(meters, it) ?: Float.MAX_VALUE }
             ?: return null
         val seen = current.getValue(key)
         val name = VehicleStateText.nameOf(seen.label) ?: return null
         val measured = metersFor(meters, key)
         val urgent = tau.approaching && tauKey == labelPart(key) && measured != null && measured <= NEAR_MOVING_METERS &&
             seen.cx != null && seen.cx in CENTER_LO..CENTER_HI
-        return Pick(State.MOVING, name, measured, seen.cx, urgent, moving.size)
+        return Pick(State.MOVING, name, measured, seen.cx, urgent, moving.size, moving.getValue(key))
     }
 
     /** Véhicule à l'arrêt : boîte figée (dérive, taille) et seau stable, mesuré ou non, partout. */

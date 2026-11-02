@@ -20,7 +20,7 @@ class EgoMotionTest {
         assertTrue(EgoMotion.visualUsable(MotionSample(1f, 2f, 1f, CONFIDENT)))
         assertTrue("borne incluse", EgoMotion.visualUsable(MotionSample(0f, 0f, 1f, EgoMotion.TRUST_MIN)))
         assertFalse("confiance basse", EgoMotion.visualUsable(MotionSample(1f, 2f, 1f, 0.05f)))
-        assertFalse("immobile sans confiance", EgoMotion.visualUsable(MotionSample.Zero))
+        assertTrue("zéro prouvé : frames identiques, confiance pleine", EgoMotion.visualUsable(MotionSample.Zero))
         assertFalse("dx non fini", EgoMotion.visualUsable(MotionSample(Float.NaN, 0f, 1f, CONFIDENT)))
     }
 }
