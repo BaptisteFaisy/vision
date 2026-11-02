@@ -81,11 +81,12 @@ class GlassesAnnexBTest {
     @Test
     fun `un flux longueur-prefixe garde le chemin complet a chaque acces`() {
         // Pas de raccourci vers `return bytes` : chaque accès se convertit,
-        // les octets changent à chaque frame.
-        val first = byteArrayOf(0, 0, 0, 2, 0x40, 0x01)
-        val second = byteArrayOf(0, 0, 0, 3, 0x42, 0x02, 0x03)
-        assertArrayEquals(byteArrayOf(0, 0, 0, 1, 0x40, 0x01), annexB(first))
-        assertArrayEquals(byteArrayOf(0, 0, 0, 1, 0x42, 0x02, 0x03), annexB(second))
+        // les octets changent à chaque frame. Au moins 8 octets : en dessous,
+        // `annexB` laisse passer tel quel (contrat `trop court repart tel quel`).
+        val first = byteArrayOf(0, 0, 0, 4, 0x40, 0x01, 0x02, 0x03)
+        val second = byteArrayOf(0, 0, 0, 5, 0x42, 0x02, 0x03, 0x04, 0x05)
+        assertArrayEquals(byteArrayOf(0, 0, 0, 1, 0x40, 0x01, 0x02, 0x03), annexB(first))
+        assertArrayEquals(byteArrayOf(0, 0, 0, 1, 0x42, 0x02, 0x03, 0x04, 0x05), annexB(second))
     }
 
     @Test
