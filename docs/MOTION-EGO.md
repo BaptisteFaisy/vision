@@ -81,6 +81,10 @@ Branchement :
 
 ## 5. Piste 4 — compensation gyro (`GyroCompensation`, `GyroSource`)
 
+> **PÉRIMÉ sur master (02/11)** : `GyroCompensation.kt` et `GyroSource.kt`
+> supprimés, câblage `FUSION P4` retiré de `TraverseWiring.kt` sur ordre user —
+> la décision est 100 % visuelle. Section gardée pour mémoire.
+
 Principe : le bloc-matching global sature en pan rapide (recherche ±16 px,
 modèle sans rotation) ; le vecteur de rotation du téléphone mesure le pan
 directement. Modèle sténopé au premier ordre : `dx ≈ f·Δyaw`,
@@ -144,7 +148,12 @@ Couvert par `VerdictFusionTest` (7 tests).
 | `GyroSource.MATCH_TOLERANCE_MS` | 100 ms | écart max. borne ↔ échantillon | idem |
 | `GyroSource.MAX_SAMPLES` | 128 (~2,5 s) | historique borné | idem |
 
+> Lignes gyro : **PÉRIMÉES** (code supprimé le 02/11, voir § 5).
+
 ## 8. Recette téléphone à prévoir
+
+> Recette gyro ci-dessous **PÉRIMÉE** (code supprimé le 02/11, voir § 5) ;
+> les scénarios restent valables (décision 100 % visuelle).
 
 Signes gyro (prérequis à tout usage décisionnel, `GyroSource.YAW_SIGN` /
 `PITCH_SIGN`) :
@@ -169,11 +178,10 @@ Scénarios (téléphone tenu vertical, portrait, caméra arrière) :
 ## 9. Les 3 câblages reportés (et pourquoi)
 
 1. **Gyro app** (`GyroSource` → `VehicleBackground.decide(gyro = …)`) :
-   reporté car les signes `YAW/PITCH` ne sont lus que depuis la doc Android et
-   `docs/POSE-IMU.md` — un signe inversé accuserait le monde à chaque pan.
-   Prérequis : recette § 8 (pan gauche, tilt haut), puis suivre la recette en
-   commentaire `FUSION P4` dans `TraverseWiring.kt` (lifecycle du mode, `start`
-   sur thread main, `deltaBetween` → `expectedShift` focale luma → `GyroHint`).
+   **PÉRIMÉ (voir § 5)** — code supprimé le 02/11 sur ordre user, ne plus
+   suivre la recette ci-dessous. Historique : reporté car les signes
+   `YAW/PITCH` ne sont lus que depuis la doc Android et `docs/POSE-IMU.md` —
+   un signe inversé accuserait le monde à chaque pan.
 2. **`depthByBox` sonde embarquée** : aujourd'hui seul le repli serveur
    alimente la profondeur (`DepthReadings.serverCloseness` dans
    `TraversePipeline`) ; `boxCloseness` (médiane sur carte embarquée) n'est
@@ -193,6 +201,6 @@ Scénarios (téléphone tenu vertical, portrait, caméra arrière) :
 zoom, dilatation), `DepthConfirmTest`, `TraverseVetoDepthTest`,
 `VehicleApproachDepthTest`, `VehicleStateDepthTest`,
 `TraversePipelineDepthTest`, `ApproachLabelsTest`,
-`MaskShiftTest`, `SamResiduTest` (14 tests), `GyroCompensationTest`,
-`VehicleBackgroundTest` (repli gyro), `VerdictFusionTest`,
+`MaskShiftTest`, `SamResiduTest` (14 tests),
+`VehicleBackgroundTest`, `VerdictFusionTest` (gyro supprimé, voir § 5),
 `BlockShiftTest` (via `ShiftScenes` partagé).
