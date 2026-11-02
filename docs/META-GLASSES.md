@@ -21,7 +21,7 @@ s'il était mesuré.
 | `GlassesController.kt` (471 l.) | le seul point d'entrée : init SDK, enregistrement, session, permissions, routage des gestes, analyse des frames collectées, connexion mock de recette |
 | `GlassesPolicy.kt` (225 l.) | **logique pure** : gravité + textes des messages, phases joignables, libellés, raison de non-collecte — testée en JVM |
 | `GlassesStatus.kt` (44 l.) | les 4 lignes d'état, en texte pur (testées) ; l'écran ne fait que les afficher |
-| `GlassesCamera.kt` (225 l.) | flux 24 i/s `HIGH` `compressVideo = true`, photo à la demande, pompe vidéo vers l'accueil (cadence reçue au logcat) + collecteur derrière flag |
+| `GlassesCamera.kt` (225 l.) | flux 15 i/s `HIGH` `compressVideo = true`, photo à la demande, pompe vidéo vers l'accueil (cadence reçue au logcat) + collecteur derrière flag |
 | `GlassesFrameCollector.kt` (83 l.) | pompe de production : `videoStream` → `JpegFrame`, 1 frame / 1,5 s, testée sur JVM |
 | `GlassesVideoDecoder.kt` (253 l.) | bitstream H.265 → `ArgbImage` via `MediaCodec` (collecte), **jamais essayé** |
 | `GlassesLiveDecoder.kt` (377 l.) | rendu du direct sur la surface de l'accueil (bitmap, sinon H.265 `MediaCodec` Annex B + `csd-0`), correction `TextureView` centrée (`textureViewCrop`), cadence rendue au logcat |
@@ -181,22 +181,23 @@ Une relecture de permission qui échoue (lien instable) garde l'état connu au l
 révoquer à tort : un vrai refus se dit à l'attache (`CAPABILITY_DENIED`), pas sur une
 lecture ratée.
 
-## 5. Flux d'images : 24 i/s demandés (repli 15), photo à la demande
+## 5. Flux d'images : 15 i/s demandés (max bits/image), photo à la demande
 
 - Configuration demandée au SDK : `StreamConfiguration(audioCodec = choice.toCodec(),
   videoQuality = HIGH, frameRate = GLASSES_FRAME_RATE, compressVideo = true)`
-  (`glassesStreamConfiguration`, `GlassesStreamConfig.kt`), `GLASSES_FRAME_RATE = 24`
-  avec échelle `GLASSES_FRAME_RATE_LADDER` (24 → 15, repli annoncé).
+  (`glassesStreamConfiguration`, `GlassesStreamConfig.kt`), `GLASSES_FRAME_RATE = 15`,
+  échelle `GLASSES_FRAME_RATE_LADDER` réduite à [15] (borne basse, pas de repli plus bas).
   Le SDK fixe `bitRate = 750000` bps pour toutes les qualités
   (`StreamImpl.createVideoFormat` / `VideoFormat.defaultFormat`, mwdat-camera 1.0.0).
   Il borne `frameRate` à {30, 24, 15, 7, 2} : demander 60 rend 30, sans erreur ni avertissement.
-  D'où 0,034 bit/pixel à 720×1280 / 24 i/s — c'est la cause de la pixelisation au mouvement.
+  D'où 0,054 bit/pixel à 720×1280 / 15 i/s — le maximum de bits par image à débit fixe,
+  contre 0,034 à 24 i/s (cause de la pixelisation et des déchirures au mouvement).
   Mesuré 01/11/2026 (60 demandés, ramenés à 30 par le SDK) : ~30 i/s émis, ~24.5 i/s rendus à l'écran
   (plafond CPU, voir `LUNETTES-RECETTE-TEL.md` §7). La haute qualité (720×1280)
   reste un choix de piqué : si la rue saccade, revenir à `MEDIUM` au même endroit.
   La cadence réellement reçue et rendue se lit au logcat
   (`logcat -s GlassesVideo,GlassesChain` : « N images rendues (X i/s) »,
-  « N frames (…o) (Y i/s) ») — X < Y = le téléphone perd des images, Y < 24
+  « N frames (…o) (Y i/s) ») — X < Y = le téléphone perd des images, Y < 15
   = c'est le lien qui ne suit pas.
 - L'audio n'est pas `null` : `grep -n "audioCodec = null" app/src/main` → 0. Le code monte un
   **palier** (`GlassesAudioPlan.ladder`, `GlassesAudioPlan.kt:28-29`) — 16 kHz mono préféré,
@@ -355,7 +356,7 @@ Rien de cette liste n'a été exécuté ici : **jamais essayé**, à vérifier a
 - toute session réelle : `createSession`, `start()`, `PAUSED` sur paire reposée ;
 - la permission caméra réelle du SDK et son passage en « Always allow » ;
 - la photo réelle et sa latence ; le décodage `PhotoData.HEIC` sur un vrai téléphone ;
-- le lien à 24 i/s (repli 15) : qualité, perte de trames, débit réel ;
+- le lien à 15 i/s : qualité, perte de trames, débit réel ;
 - le comportement du bouton capture réel (le doublon `SHORT_PRESS` puis `DOUBLE_PRESS` est
   traité par le code, pas constaté) ;
 - le mock : il n'a pas été lancé non plus (il demande un appareil Android) ;
@@ -372,7 +373,7 @@ l'inverse — `glasses/` n'importe rien de `glasses/bench/` (mesuré : aucune oc
 
 | | production (`glasses/`, ici) | banc (`glasses/bench/`) |
 |---|---|---|
-| Cadence | 24 i/s, repli 15 (`GlassesStreamConfig.kt`) | 24 i/s (`bench/GlassesDeviceSession.kt:12`, `:46`), config propre au banc |
+| Cadence | 15 i/s (`GlassesStreamConfig.kt`) | 24 i/s (`bench/GlassesDeviceSession.kt:12`, `:46`), config propre au banc |
 | Compression | `compressVideo = true` : bitstream H.265 | défaut SDK (`false`, YUV brut) + encodeur dédié (`bench/GlassesFrameEncoder.kt`) |
 | Trames vidéo | direct vers l'accueil + guidage (`GlassesLiveDecoder`), collecteur derrière flag éteint (`GlassesFrameCollector.kt`, H.265 via `MediaCodec`, jamais essayé) | pompées et décodées (`bench/GlassesFramePump.kt:38-44`) |
 | Audio | piste PCM demandée par palier (`GlassesAudioPlan`) ; voix sortie dans les lunettes en session par `SpeechPlayer` (`GlassesVoiceRoute`), haut-parleur en repli | routage explicite avant chaque phrase (`bench/GlassesVoice.kt`), même choix partagé (`GlassesAudioRoute.kt`) |
@@ -418,7 +419,7 @@ isole dans des fichiers courts et on met la décision dans `GlassesPolicy.kt`.
 | L'attente du lien borne désormais `STARTING` à 30 s (`LINK_WAIT_MS`) puis revient en `IDLE` avec un message ; `createSession` lui-même n'a toujours **aucun délai** | moitié corrigée le 29/10, `createSession` ouvert |
 | Messages visibles seulement dans Réglages (§7) | ouvert, hors périmètre |
 | `DonState.UNKNOWN` est affiché « non portées » (`GlassesStatus.kt:22-27`) : l'état inconnu et l'état « retirées » se ressemblent | ouvert, sans risque |
-| Qualité d'image à 24 i/s, décodage HEIC, latences | **non mesuré** (compteurs i/s reçues/rendues au logcat pour trancher lien vs téléphone) |
+| Qualité d'image à 15 i/s, décodage HEIC, latences | **non mesuré** (compteurs i/s reçues/rendues au logcat pour trancher lien vs téléphone) |
 | Aucun test d'instrumentation des lunettes | assumé : il n'y a pas de matériel |
 ## 13. Mesuré sur une paire réelle (27/10/2026)
 

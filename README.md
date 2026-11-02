@@ -331,7 +331,7 @@ in `docs/CALIBRAGE-FEU.md`, so nobody walks that road twice.
 ## Glasses live on the phone screen: ~24.5 fps rendered (measured 01/11/2026)
 
 The iSee home shows the Ray-Ban Meta stream (DAT SDK 1.0.0, `HIGH` 720×1280
-H.265) on the phone. Requests **24 fps** (`GLASSES_FRAME_RATE_LADDER` 24 → 15);
+H.265) on the phone. Requests **15 fps** (`GLASSES_FRAME_RATE = 15`, ladder floor, max bits per frame at the fixed 750 kbit/s);
 the 60 fps request of the 01/11/2026 run was clamped to 30 by the SDK, in
 silence (`docs/META-GLASSES.md` §5), and the link then delivered **~30 fps**
 steady while the phone rendered a **~24.5 fps** plateau (CPU-bound: the app burns
