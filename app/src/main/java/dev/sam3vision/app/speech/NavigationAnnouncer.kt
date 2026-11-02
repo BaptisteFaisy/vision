@@ -31,17 +31,20 @@ object NavigationPhrases {
  * la phrase ([NavigationPhrases]) et ne lève jamais ([Result]).
  *
  * @param settings réglages courants (clé et voix ElevenLabs), lus à chaque annonce.
- * @param speak synthèse puis lecture ; `suspend (Settings, String) -> Unit`.
+ * @param speak synthèse réseau puis lecture (noms GPS dynamiques : exception
+ * ElevenLabs) ; `suspend (Settings, String) -> Unit`.
+ * @param speakClip clip MP3 (phrases fixes : « No guidance. »).
  */
 class NavigationAnnouncer(
     private val settings: () -> Settings,
     private val speak: suspend (Settings, String) -> Unit,
+    private val speakClip: suspend (String) -> Unit = {},
 ) {
 
     /**
-     * Annonce « Going to X ». Une destination blanche est refusée par
-     * [Result.failure] sans rien dire ; un [speak] qui jette devient aussi
-     * [Result.failure] — jamais d'exception levée.
+     * Annonce « Going to X » (voix réseau : nom dynamique). Une destination
+     * blanche est refusée par [Result.failure] sans rien dire ; un [speak]
+     * qui jette devient aussi [Result.failure] — jamais d'exception levée.
      */
     suspend fun announceStarted(destination: String): Result<Unit> {
         if (destination.isBlank()) return Result.failure(IllegalArgumentException("empty destination"))
@@ -49,9 +52,9 @@ class NavigationAnnouncer(
     }
 
     /**
-     * Annonce « No guidance. ». Ne lève jamais : un [speak]
+     * Annonce « No guidance. » (clip MP3). Ne lève jamais : un [speakClip]
      * qui jette est converti en [Result.failure].
      */
     suspend fun announceGuidanceUnavailable(): Result<Unit> =
-        runCatching { speak(settings(), NavigationPhrases.GUIDANCE_UNAVAILABLE) }
+        runCatching { speakClip(NavigationPhrases.GUIDANCE_UNAVAILABLE) }
 }

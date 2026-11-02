@@ -97,7 +97,7 @@ class IseeSteeringOrdersTest {
     }
 
     @Test
-    fun `l activation vocale annonce le passage en vue avec sa distance`() = runTest {
+    fun `l activation vocale annonce le passage en vue, direction seule`() = runTest {
         val (probe, _) = probeHarness(this)
         val dites = mutableListOf<String>()
         val settings = Settings.Default.copy(speechLanguage = SpeechLanguage.Fr)
@@ -110,7 +110,7 @@ class IseeSteeringOrdersTest {
 
         assertTrue(probe.state.value.crossingActive)
         assertEquals(
-            listOf("Traversée on.", "Devant, 5 mètres."),
+            listOf("Traversée on.", "Devant."),
             dites,
         )
     }
@@ -127,7 +127,7 @@ class IseeSteeringOrdersTest {
         orders.runCrossing("traverser")
 
         assertTrue(probe.state.value.crossingActive)
-        assertEquals(listOf("Crossing on."), dites)
+        assertEquals(listOf("Crossing mode on."), dites)
     }
 
     @Test
@@ -144,7 +144,7 @@ class IseeSteeringOrdersTest {
         orders.runCrossing("crossing mode off")
 
         assertFalse(probe.state.value.crossingActive)
-        assertEquals(listOf("Crossing off."), dites)
+        assertEquals(listOf("Crossing mode off."), dites)
     }
 
     @Test

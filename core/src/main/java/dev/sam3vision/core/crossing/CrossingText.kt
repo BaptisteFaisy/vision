@@ -74,9 +74,13 @@ object CrossingText {
      * Confirmation parlée de l'ordre vocal : le mode vient d'être activé
      * ([on] vrai) ou coupé. Courte, dite au TTS système.
      */
+    /**
+     * Confirmation parlée du mode : libellé unique avec les ordres dictée
+     * (« Crossing mode on. » — clips `cross_on`/`cross_off` embarqués).
+     */
     fun mode(on: Boolean, language: SpeechLanguage = SpeechLanguage.DEFAULT): String =
         when (language) {
-            SpeechLanguage.En -> if (on) "Crossing on." else "Crossing off."
+            SpeechLanguage.En -> if (on) "Crossing mode on." else "Crossing mode off."
             SpeechLanguage.Fr -> if (on) "Traversée on." else "Traversée off."
         }
 

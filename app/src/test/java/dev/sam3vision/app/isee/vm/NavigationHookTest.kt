@@ -50,7 +50,7 @@ class NavigationHookTest {
         router = router,
         launcher = launcher,
         guidanceEnabled = { guidance },
-        announcer = NavigationAnnouncer({ Settings.Default }) { _, text -> recordSpoken(text) },
+        announcer = NavigationAnnouncer({ Settings.Default }, { _, text -> recordSpoken(text) }, ::recordSpoken),
         update = { fn -> state = fn(state) },
     )
 

@@ -30,8 +30,6 @@ import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
-import kotlinx.coroutines.flow.distinctUntilChanged
-import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
@@ -180,15 +178,7 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
             gpuMonitor.track(seeded.samEndpoint())
             _state.update { it.copy(settings = seeded, settingsReady = true) }
         }
-        // Une seule règle : chaque nouveau bandeau est lu à voix haute (ElevenLabs).
-        viewModelScope.launch {
-            _state
-                .map { it.dictation.overlay?.sequence to it.dictation.overlay?.spoken }
-                .distinctUntilChanged()
-                .collect { (_, spoken) ->
-                    if (spoken != null) launch { voice.say(_state.value.settings, spoken) }
-                }
-        }
+        // Bandeaux visuels seuls (ordres minimaux : pas de lecture voix des bandeaux).
     }
 
     override fun onCleared() {

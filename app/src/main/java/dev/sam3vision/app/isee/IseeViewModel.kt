@@ -43,6 +43,7 @@ import dev.sam3vision.core.nav.NavFix
 import dev.sam3vision.core.nav.NavRoute
 import dev.sam3vision.core.net.MetaImageClient
 import dev.sam3vision.core.settings.Settings
+import dev.sam3vision.core.speech.IseeClipsEn
 import dev.sam3vision.core.speech.SettingsVoiceCommand
 import dev.sam3vision.core.settings.SettingsStore
 import dev.sam3vision.core.settings.SettingsStoreFactory
@@ -182,6 +183,7 @@ class IseeViewModel(app: Application) : AndroidViewModel(app) {
      * `routeBaseUrl` est seedée — coût nul sans URL Valhalla.
      */
     private val voiceNav = IseeVoiceNav(getApplication(), { settings }, viewModelScope, ::speakNavigation,
+        speakNetwork = ::speakNetwork,
         speakRoute = { text, level -> spine.speakGps(text, level) },
         // Fin de guidage : le lecteur est coupé (une coupe ne termine
         // jamais : pas de `onComplete`) — l'état parlant et le bus sont rendus ici.
@@ -459,8 +461,18 @@ class IseeViewModel(app: Application) : AndroidViewModel(app) {
         update { it.copy(speakingEntryId = if (text.isBlank()) null else ANNOUNCEMENT_BUBBLE_ID, speakingText = text) }
     }
 
-    /** Annonce de navigation : même chemin audio que les bulles (ElevenLabs + lecteur partagé). */
+    /** Annonce de navigation : clip MP3 anglais si connu, silence sinon (zéro synthèse réseau). */
     private suspend fun speakNavigation(text: String): Unit {
+        val clipId = IseeClipsEn.idForText(text)
+        if (clipId == null) {
+            android.util.Log.w("VoiceMute", "nav-jet motif=sans-clip texte=[$text]")
+            return
+        }
+        clipPlayer.speak(clipId, urgent = false)
+    }
+
+    /** Voix réseau iSee : noms GPS dynamiques seuls (exception ElevenLabs). */
+    private suspend fun speakNetwork(text: String): Unit {
         val audio = voice.synthesize(text)
         if (audio.isEmpty()) return
         speakAnnouncement(text)
