@@ -219,7 +219,7 @@ def test_no_cudagraph_typo(_module) -> None:
     """Pas de `CUDGraph` (sans A) : la faute a cassé vision_accel au déploiement du 27/10."""
     from test_units import check
 
-    src = (BACKEND_DIR / "live_fast" / "fast_core.py").read_text(encoding="utf-8")
+    src = (BACKEND_DIR / "live_fast" / "vision_setup.py").read_text(encoding="utf-8")
     check("graphe : CUDAGraph orthographié", "CUDAGraph" in src, "absent")
     check("graphe : pas de CUDGraph", "CUDGraph" not in src, "faute présente")
 
