@@ -60,13 +60,18 @@ class LiveProbeRotationTest {
     }
 
     @Test
-    fun `negatif frais au 4e tour  - la voiture partie disparait de l'etat`() = runTest {
+    fun `negatif confirme  - un vide garde, deux vides de suite effacent`() = runTest {
         val (probe, fake) = harness(this)
         send(probe, fake, "A", 8_000_000L, frame("person", "car"))
         send(probe, fake, "B", 14_000_000L, frame("person"))
         send(probe, fake, "C", 20_000_000L, frame("person"))
-        // Groupe 0 de nouveau, voiture renvoyée sans objet : négatif frais.
+        // Groupe 0 de nouveau, voiture renvoyée sans objet : doute, gardée.
         send(probe, fake, "D", 26_000_000L, frame("person"))
+        assertTrue(probe.state.value.samDetections.any { it.label == "car" })
+        send(probe, fake, "E", 32_000_000L, frame("person"))
+        send(probe, fake, "F", 38_000_000L, frame("person"))
+        // Second vide de suite sur le groupe 0 : négatif confirmé.
+        send(probe, fake, "G", 44_000_000L, frame("person"))
         assertTrue(probe.state.value.samDetections.none { it.label == "car" })
     }
 

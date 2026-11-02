@@ -9,8 +9,9 @@ import org.junit.Test
 /**
  * Accumulateur `concept → derniers objets` : la voix et l'overlay lisent la
  * fusion des 3 groupes, jamais un groupe seul — un obstacle suivi reste visible
- * pendant que les autres groupes tournent, un négatif frais l'efface, un concept
- * sans refresh expire à 1000 ms, la mémoire est bornée.
+ * pendant que les autres groupes tournent, deux refreshes vides de suite
+ * l'effacent (négatif confirmé), un concept sans refresh expire à 2500 ms,
+ * la mémoire est bornée.
  */
 class ConceptAccumulatorTest {
 
@@ -48,12 +49,55 @@ class ConceptAccumulatorTest {
     }
 
     @Test
-    fun `negatif frais  - concept renvoye sans objet, objets effaces`() {
+    fun `negatif confirme  - un vide garde, deux vides de suite effacent`() {
         val acc = ConceptAccumulator()
         acc.update(groups[0], listOf(obj("person"), obj("car")), 0L)
-        val merged = acc.update(groups[0], listOf(obj("person")), 510L)
+        // Premier refresh vide : doute (éviction top-16 possible), voiture gardée.
+        var merged = acc.update(groups[0], listOf(obj("person")), 510L)
+        assertTrue("un seul vide ne wipe pas", merged.any { it.label == "car" })
+        // Second vide de suite : négatif confirmé, voiture vraiment partie.
+        merged = acc.update(groups[0], listOf(obj("person")), 1020L)
         assertTrue("voiture vraiment partie : plus servie", merged.none { it.label == "car" })
         assertTrue(merged.any { it.label == "person" })
+    }
+
+    @Test
+    fun `un plein entre deux vides remet le doute a zero`() {
+        val acc = ConceptAccumulator()
+        acc.update(groups[0], listOf(obj("person"), obj("car")), 0L)
+        acc.update(groups[0], listOf(obj("person")), 510L)
+        acc.update(groups[0], listOf(obj("person"), obj("car")), 1020L)
+        // Le plein a remis le compteur à zéro : ce vide est un nouveau doute.
+        val merged = acc.update(groups[0], listOf(obj("person")), 1530L)
+        assertTrue(merged.any { it.label == "car" })
+    }
+
+    @Test
+    fun `cadence lente  - un tournant a 600 ms par frame survit 2 cycles`() {
+        val acc = ConceptAccumulator()
+        // 2 cycles complets à 600 ms/frame : chaque concept rafraîchi à 1800 ms.
+        var merged = emptyList<SegObject>()
+        var now = 0L
+        repeat(2) {
+            groups.forEach { group ->
+                merged = acc.update(group, group.map { obj(it) }, now)
+                now += 600L
+            }
+        }
+        assertEquals(
+            "tous les concepts servis malgré la cadence lente",
+            LivePrompts.default.toSet(),
+            merged.map { it.label }.toSet(),
+        )
+    }
+
+    @Test
+    fun `vide sur concept expire  - pas de resurrection`() {
+        val acc = ConceptAccumulator()
+        acc.update(listOf("car"), listOf(obj("car")), 0L)
+        // Concept expiré (2500 ms passées) + refresh vide : reste vide.
+        val merged = acc.update(listOf("car"), emptyList(), 3000L)
+        assertTrue(merged.none { it.label == "car" })
     }
 
     @Test
@@ -67,21 +111,21 @@ class ConceptAccumulatorTest {
     }
 
     @Test
-    fun `expiry 1000 ms sans refresh, garde a egalite`() {
+    fun `expiry 2500 ms sans refresh, garde a egalite`() {
         val acc = ConceptAccumulator()
         acc.update(listOf("car"), listOf(obj("car")), 0L)
-        assertEquals(1, acc.snapshot(1000L).size)
-        assertTrue(acc.snapshot(1001L).isEmpty())
-        assertTrue(acc.concepts(1001L).isEmpty())
+        assertEquals(1, acc.snapshot(2500L).size)
+        assertTrue(acc.snapshot(2501L).isEmpty())
+        assertTrue(acc.concepts(2501L).isEmpty())
     }
 
     @Test
-    fun `un refresh repart pour 1000 ms`() {
+    fun `un refresh repart pour 2500 ms`() {
         val acc = ConceptAccumulator()
         acc.update(listOf("car"), listOf(obj("car")), 0L)
-        acc.update(listOf("car"), listOf(obj("car")), 900L)
-        assertEquals(1, acc.snapshot(1900L).size)
-        assertTrue(acc.snapshot(1901L).isEmpty())
+        acc.update(listOf("car"), listOf(obj("car")), 2400L)
+        assertEquals(1, acc.snapshot(4900L).size)
+        assertTrue(acc.snapshot(4901L).isEmpty())
     }
 
     @Test
