@@ -135,7 +135,8 @@ private fun LiveProbe.muteProbeLine(frame: LiveFrame, readings: List<DistanceRea
     lastMuteProbeMs = nowMs
     val labels = frame.objects.take(6).joinToString(",") { it.label }
     val poseOk = distances.effectivePose() != null
-    android.util.Log.d(TAG_MUTE, "sonde objets=${frame.objects.size} lectures=${readings.size} pose=$poseOk etiquettes=[$labels] phrase=[$phrase]")
+    val memo = rotation.accumulator.concepts(nowMs).size
+    android.util.Log.d(TAG_MUTE, "sonde objets=${frame.objects.size} lectures=${readings.size} pose=$poseOk rotation=${rotation.enabled} memo=$memo etiquettes=[$labels] phrase=[$phrase]")
 }
 
 /**
