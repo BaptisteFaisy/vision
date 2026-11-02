@@ -17,8 +17,12 @@ import kotlinx.coroutines.delay
 /** Attente maximale du lien Bluetooth avant d'ouvrir la session (mesuré : 10 à 30 s). */
 internal const val LINK_WAIT_MS = 30_000L
 
-/** Période de relecture des états de lien pendant cette attente. */
-internal const val LINK_POLL_MS = 500L
+/**
+ * Période de relecture des états de lien pendant cette attente : 100 ms —
+ * lecture d'état SDK locale, pas de trafic radio, donc l'admission ne perd
+ * jamais plus de 100 ms (contre 500 avant) une fois le lien monté.
+ */
+internal const val LINK_POLL_MS = 100L
 
 /** Vrai dès qu'une paire est `CONNECTED`. */
 internal fun hasLinkedDevice(links: List<LinkState>): Boolean =
