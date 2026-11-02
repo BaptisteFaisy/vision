@@ -467,21 +467,21 @@ internal fun observeCrossingVoice(
         if (placeMode() == PictoPlaceMode.DEHORS &&
             AntiRepeat.allow(AntiRepeat.KEY_CROSSWALK_ALIGN, System.currentTimeMillis())
         ) {
-            VoiceBus.post(crossingLateralLevel(crossingActive()), text, clip)
+            VoiceBus.post(crossingLateralLevel(crossingActive()), text, clip, antiRepeatKey = AntiRepeat.KEY_CROSSWALK_ALIGN)
         }
     },
     say = { text ->
         if (placeMode() == PictoPlaceMode.DEHORS &&
             AntiRepeat.allow(AntiRepeat.KEY_CROSSWALK_ANNOUNCE, System.currentTimeMillis())
         ) {
-            VoiceBus.post(crossingLateralLevel(crossingActive()), text)
+            VoiceBus.post(crossingLateralLevel(crossingActive()), text, antiRepeatKey = AntiRepeat.KEY_CROSSWALK_ANNOUNCE)
         }
     },
     sayArrival = { text ->
         if (placeMode() == PictoPlaceMode.DEHORS &&
             AntiRepeat.allow(AntiRepeat.KEY_CROSSWALK_ARRIVAL, System.currentTimeMillis())
         ) {
-            VoiceBus.post(crossingLateralLevel(crossingActive()), text)
+            VoiceBus.post(crossingLateralLevel(crossingActive()), text, antiRepeatKey = AntiRepeat.KEY_CROSSWALK_ARRIVAL)
         }
     },
 )

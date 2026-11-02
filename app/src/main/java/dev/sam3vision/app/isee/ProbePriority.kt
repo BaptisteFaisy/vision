@@ -127,6 +127,6 @@ internal fun offer(wish: VoiceWish?, nowMs: Long = System.currentTimeMillis()): 
     val allowed = AntiRepeat.allow(wish.key, nowMs)
     if (BuildConfig.DEBUG) android.util.Log.d(TAG_MUTE, "offre level=${wish.level} cle=${wish.key} admis=$allowed texte=[${wish.text}]")
     if (!allowed) return false
-    VoiceBus.post(wish.level, wish.text, wish.clipId, wish.clips)
+    VoiceBus.post(wish.level, wish.text, wish.clipId, wish.clips, antiRepeatKey = wish.key)
     return true
 }

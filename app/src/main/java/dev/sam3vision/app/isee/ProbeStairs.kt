@@ -74,7 +74,7 @@ internal fun LiveProbe.observeStairs(
             cue ?: return@collect
             VoiceTick.report(VoiceTick.SRC_STAIRS, VoiceWish(cue.level, cue.phrase, cue.antiRepeatKey), System.currentTimeMillis())
             if (AntiRepeat.allow(cue.antiRepeatKey, System.currentTimeMillis())) {
-                VoiceBus.post(cue.level, cue.phrase)
+                VoiceBus.post(cue.level, cue.phrase, antiRepeatKey = cue.antiRepeatKey)
             }
         }
     }
@@ -157,7 +157,7 @@ internal fun LiveProbe.observeStairsCount(
                 nowMs(),
             )
             if (AntiRepeat.allow(AntiRepeat.KEY_STAIRS_COUNT + ":" + phrase, nowMs())) {
-                VoiceBus.post(OutdoorLevel.STAIRS, phrase)
+                VoiceBus.post(OutdoorLevel.STAIRS, phrase, antiRepeatKey = AntiRepeat.KEY_STAIRS_COUNT + ":" + phrase)
             }
         }
     }

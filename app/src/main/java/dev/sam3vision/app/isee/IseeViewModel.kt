@@ -79,6 +79,7 @@ class IseeViewModel(app: Application) : AndroidViewModel(app) {
         app,
         onComplete = { update { st -> st.copy(speakingEntryId = null, speakingText = "") }; VoiceBus.onSpeechIdle() },
         onPlaybackError = { update { st -> st.copy(speakingEntryId = null, speakingText = "") }; VoiceBus.onSpeechIdle() },
+        onEvent = { SpeechLog.sink(SpeechLog.TAG, "PLAYER $it") },
     )
 
     private val _state = MutableStateFlow(IseeUiState())
@@ -109,15 +110,14 @@ class IseeViewModel(app: Application) : AndroidViewModel(app) {
     /** Zones tactiles des boutons navigation sur l'accueil (exemption racine). */
     val navButtons = NavButtonZones()
     // Arbitrage voix : obstacle → TwinLite, sinon SAM (ordre user), sonde + guetteurs + traversée.
-    private val systemTts = SystemTtsEngine.create(getApplication())
+    private val systemTts = SystemTtsEngine.create(getApplication(), onEvent = { SpeechLog.sink(SpeechLog.TAG, "TTS $it") })
     /** Clips anglais (SPEC v4) : le même pack sert les clips seuls et la voix de proximité. */
     private val voicePack = guideVoicePack(getApplication())
     /** Voix de proximité (SPEC v4) : clips d'abord, synthèse réseau sinon — parlée par le bus. */
     private val proximity = ProximityVoice(
-        player, { settings }, ::speakAnnouncement,
-        clips = voicePack,
-        systemBusy = { systemTts.speaking },
-        userSpeaking = { _state.value.holding || _state.value.transcribing },
+        player, { settings }, ::speakAnnouncement, clips = voicePack,
+        systemBusy = { systemTts.speaking }, userSpeaking = { _state.value.holding || _state.value.transcribing },
+        system = systemTts,
     )
     /** Lecteur des clips anglais : séquences et clips seuls, joués par le bus. */
     private val clipPlayer = IseeClipPlayer(voicePack, { settings.ttsVoiceId }, SpeechPlayerClipSink(player), ::speakAnnouncement)

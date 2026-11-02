@@ -72,6 +72,8 @@ internal class BusSpeaker(
                 val slice = if (level == CrossingLevels.VERDICT) null else VOICE_SLICE_MS
                 val clipOk = id != null && this@BusSpeaker.clips.speak(id, urgent = true, sliceMs = slice)
                 val proxOk = clipOk || proximity.speak(text, clipId = null, level = level)
+                if (proxOk) SpeechLog.play(if (clipOk) "clip" else "synthèse", text)
+                else SpeechLog.fail("bus", "clip+synthèse KO")
                 muteOutcome(level, text, clipId, id, clipOk, proxOk)
                 if (!clipOk && !proxOk && current == generation) {
                     VoiceBus.onSpeechIdle()
