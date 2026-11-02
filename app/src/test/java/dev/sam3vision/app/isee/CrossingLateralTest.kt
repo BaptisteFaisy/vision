@@ -6,6 +6,7 @@ import dev.sam3vision.core.crossing.CrossingLateralAnnouncer
 import dev.sam3vision.core.distance.CameraPose
 import dev.sam3vision.core.distance.DistanceReading
 import dev.sam3vision.core.distance.LensSpec
+import dev.sam3vision.core.live.AntiRepeat
 import dev.sam3vision.core.live.PlacedLabel
 import dev.sam3vision.core.model.SegObject
 import dev.sam3vision.core.speech.SpeechLanguage
@@ -13,6 +14,7 @@ import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.test.runCurrent
 import kotlinx.coroutines.test.runTest
 import org.junit.Assert.assertEquals
+import org.junit.Assert.assertFalse
 import org.junit.Assert.assertNotNull
 import org.junit.Assert.assertNull
 import org.junit.Assert.assertTrue
@@ -247,6 +249,59 @@ class CrossingLateralTest {
 
         assertEquals(listOf("Devant."), said)
         assertEquals(listOf("Sur le passage."), arrived)
+    }
+
+    @Test
+    fun `annonce oubliee apres deux absences, la vue suivante reparle`() {
+        AntiRepeat.reset()
+        try {
+            CrossingLateralWatch.reset()
+            val box = listOf(10f, 100f, 100f, 500f)
+            val objects = listOf(obj("crosswalk", box))
+            val readings = listOf(reading("crosswalk", 2.0f, box))
+            val nobody = listOf(obj("person", box))
+            // Vue 1 : l'annonce parle (2 frames) et consomme son tour.
+            CrossingLateralWatch.update(objects, 512, 1138, readings, null, LensSpec.Default, 0L, SpeechLanguage.Fr)
+            val said = CrossingLateralWatch.update(objects, 512, 1138, readings, null, LensSpec.Default, 200L, SpeechLanguage.Fr)
+            assertEquals("Gauche, 2 mètres.", said?.approach)
+            assertTrue(AntiRepeat.allow(AntiRepeat.KEY_CROSSWALK_ANNOUNCE, 1_000L))
+            assertFalse("tour consommé", AntiRepeat.allow(AntiRepeat.KEY_CROSSWALK_ANNOUNCE, 2_000L))
+            // 1 dropout : pas d'oubli (la vue n'est pas perdue).
+            CrossingLateralWatch.update(nobody, 512, 1138, emptyList(), null, LensSpec.Default, 400L, SpeechLanguage.Fr)
+            assertFalse("dropout isolé : toujours consommé", AntiRepeat.allow(AntiRepeat.KEY_CROSSWALK_ANNOUNCE, 3_000L))
+            // 2e absence : oubli — la vue suivante reproduit et reparle.
+            CrossingLateralWatch.update(nobody, 512, 1138, emptyList(), null, LensSpec.Default, 600L, SpeechLanguage.Fr)
+            CrossingLateralWatch.update(objects, 512, 1138, readings, null, LensSpec.Default, 800L, SpeechLanguage.Fr)
+            val again = CrossingLateralWatch.update(objects, 512, 1138, readings, null, LensSpec.Default, 1000L, SpeechLanguage.Fr)
+            assertEquals("Gauche, 2 mètres.", again?.approach)
+            assertTrue("vue suivante : reparle", AntiRepeat.allow(AntiRepeat.KEY_CROSSWALK_ANNOUNCE, 4_000L))
+        } finally {
+            AntiRepeat.reset()
+            CrossingLateralWatch.reset()
+        }
+    }
+
+    @Test
+    fun `reset repete oublie l annonce, reset isole non`() {
+        AntiRepeat.reset()
+        try {
+            CrossingLateralWatch.reset()
+            val box = listOf(10f, 100f, 100f, 500f)
+            val objects = listOf(obj("crosswalk", box))
+            val readings = listOf(reading("crosswalk", 2.0f, box))
+            CrossingLateralWatch.update(objects, 512, 1138, readings, null, LensSpec.Default, 0L, SpeechLanguage.Fr)
+            CrossingLateralWatch.update(objects, 512, 1138, readings, null, LensSpec.Default, 200L, SpeechLanguage.Fr)
+            assertTrue(AntiRepeat.allow(AntiRepeat.KEY_CROSSWALK_ANNOUNCE, 1_000L))
+            // Traversée loin : 1er reset (vue encore là) ne rouvre rien...
+            CrossingLateralWatch.reset()
+            assertFalse("reset isolé : toujours consommé", AntiRepeat.allow(AntiRepeat.KEY_CROSSWALK_ANNOUNCE, 2_000L))
+            // ...le 2e oublie (absence confirmée).
+            CrossingLateralWatch.reset()
+            assertTrue("2e reset : la vue suivante reparle", AntiRepeat.allow(AntiRepeat.KEY_CROSSWALK_ANNOUNCE, 3_000L))
+        } finally {
+            AntiRepeat.reset()
+            CrossingLateralWatch.reset()
+        }
     }
 
     @Test
