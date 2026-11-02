@@ -98,7 +98,7 @@ une annonce avalée ne consomme pas son tour).
 | `fence` | 4 grillages/murs/barrières | 4 s |
 | `curb` | 5 bordures | 2 s |
 | `stairs` | 6 escaliers (annonce, jalons, montée) | 2 s |
-| `stairs-count` | 6 compte des marches | 0,5 s (§ 37) |
+| `stairs-count` | 6 compte des marches | 1 s (§ 41, amende § 37) |
 | `pole` | 7 poteaux + mobilier vertical | 2 s |
 | `misc` | 7 divers (animal, poubelle, souvenirs) | 2 s |
 | `crosswalk-announce` | 8 annonce | **1 fois par vue** (oubli explicite à la vue suivante) |
@@ -265,6 +265,10 @@ par fenêtre), `ProbeHazardsTest` (silence à 499 ms) et
 Recette téléphone : escalier nommé → « N marches. » puis répétition
 toutes les 0,5 s — **non mesuré**, exige un APK sur appareil réel.
 
+> Amendé par le § 41 (ordre user du 02/11) : le même compte se répète
+> toutes les 1 s, et le compte est prioritaire sur tout (l'esquive
+> parle entre deux comptes).
+
 ## 38. Battement voix 700 ms : la priorité du moment, toutes les 700 ms (ordre user du 01/11)
 
 Le user veut une voix qui parle toutes les 700 ms pour dire la chose
@@ -396,3 +400,45 @@ parole user coupe, frame tue sans tour mangé) + mots seuls dans
 Recette téléphone : guidage vers un virage — « Left. » sec au moment de
 tourner, rien avant, jamais coupé — **non mesuré**, exige un APK sur
 appareil réel (preuves par `logcat`, jamais à l'oreille côté agent).
+
+> Amendé par le § 42 (ordre user du 02/11, même jour) : plus seul le
+> niveau 0 attend — tout le monde attend, et les escaliers coupent
+> (respect mutuel avec les mots de guidage, § 41).
+
+## 42. Compte des marches prioritaire : toutes les 1 s, esquive au milieu (ordre user du 02/11)
+
+Le user, dans l'escalier avec iSee : quand un escalier est reconnu, le
+compte (« N marches. ») se dit toutes les 1 s, prioritaire sur tout ce
+que la voix doit dire — et au milieu de chaque seconde, l'esquive dit
+« gauche » / « droite » pour passer les gens. Deux écarts au contrat
+du matin (§ 37, § 40) : le compte se taisait dès qu'une esquive
+commençait (`stairsYieldToAvoidance`), et humains, grillages et
+bordures coupaient le niveau 6 en pleine phrase.
+
+- **cadence 1 s** : les deux portes du compte passent de 0,5 s à 1 s
+  (`StairCountVoice.REPEAT_MS`, `AntiRepeat` clé `stairs-count` —
+  le changement parle toujours aussitôt, clé paramétrée
+  `stairs-count:<compte>`, battement 300 ms inchangé) : le compte
+  suit chaque pas, l'esquive tient au milieu ;
+- **bus** : le niveau 6 coupe toute parole en cours (voitures,
+  humains, bordures, chat compris) et va au bout, personne ne
+  le coupe (`VoiceBus.post` — parole du user et mot de guidage
+  en cours exceptés, § 41) ; garde anti-blocage (`stairsBusStuck`,
+  4 s : un niveau 6 orphelin ne tait plus jamais toute la voix) ;
+- **boucle** : le compteur ne cède plus à l'esquive
+  (`observeStairsCount` sans `stairsYieldToAvoidance`, gardé pour
+  l'annonce seule) — l'esquive ne perd rien : mots continus
+  humains (niveau 2, sans antirépétition) et repli 12, re-postés
+  en continu, parlent dans le silence entre deux comptes, jamais
+  par-dessus.
+
+Verrouillé par `StairCountVoiceTest` (répétition après 1 s),
+`IseeSpecV4AntiRepeatTest` + `SeuilsDehorsV4Test` (compte 1 s,
+annonce 2 s), `StairsUncuttableTest` (tous attendent, 6 coupe,
+esquive au milieu, parole user devant, garde 4 s) et
+`ProbeStairsCountVoiceTest` (cadence 1 s, compte dans l'esquive).
+
+Recette téléphone : escalier + gens qui passent — « N marches. »
+toutes les 1 s, « Gauche. »/« Droite. » entre deux — **non
+mesuré**, exige un APK sur appareil réel (preuves par `logcat`,
+jamais à l'oreille côté agent).

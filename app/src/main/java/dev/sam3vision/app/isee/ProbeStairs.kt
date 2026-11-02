@@ -107,9 +107,11 @@ internal fun stairsRoiOf(found: StairLabelSignal, width: Int, height: Int): Stai
 }
 
 /**
- * Esquive en cours (décalage humain ou couloir bouché) : les voix escaliers
- * se taisent — l'évitement prime, même sur les escaliers. Pur hors sonde
- * (lit la dernière décision guidée, posée à chaque frame en mode guidage).
+ * Esquive en cours (décalage humain ou couloir bouché) : l'annonce
+ * escaliers se tait — mais le compte des marches, lui, traverse
+ * (ordre user du 02/11 : prioritaire, l'esquive parle entre deux
+ * comptes). Pur hors sonde (lit la dernière décision guidée, posée à
+ * chaque frame en mode guidage).
  */
 internal fun LiveProbe.stairsYieldToAvoidance(): Boolean {
     if (voice.cue()?.urgent == true) return true
@@ -120,9 +122,10 @@ internal fun LiveProbe.stairsYieldToAvoidance(): Boolean {
  * Voix du compteur de marches : toutes les [tickMs] (300 ms), quand SAM nomme
  * un escalier et que la caméra voit des marches fraîches, dit combien
  * (« 5 marches. ») — changements aussitôt, même compte répété toutes les
- * 0,5 s ([StairCountVoice]), au niveau escaliers du bus (SPEC v4 : coupe la
- * parole douce, chat compris — sécurité et parole du user exceptées), coupé
- * en Traversée comme en esquive ([stairsYieldToAvoidance]). Le battement ne
+ * 1 s ([StairCountVoice]), au niveau escaliers du bus (SPEC v4 : prioritaire
+ * sur tout, parole du user exceptée — VOIX-DANGER § 41), coupé en Traversée
+ * seul : le compte traverse l'esquive (l'évitement parle entre deux comptes,
+ * mots continus et repli re-postés dans le silence). Le battement ne
  * s'arrête jamais pour une synthèse lente (le bus écrase, dernier gagnant).
  * Sans escalier nommé ou sans compte frais : silence (auto-muet caméra
  * coupée, séance finie). Rend le compteur pour le `reset()` de séance.
@@ -142,13 +145,12 @@ internal fun LiveProbe.observeStairsCount(
             val st = state.value
             if (st.crossingActive) continue
             if (placeMode() != PictoPlaceMode.DEHORS) continue
-            if (this@observeStairsCount.stairsYieldToAvoidance()) continue
             if (!stairsFoundOf(st).detected) continue
             val phrase = counter.onTick(
                 true, StairCannyCount.lineCount(), nowMs(), language(),
             ) ?: continue
             // Cle par compte (stairs-count:5 marches.) : le changement parle
-            // aussitot, le meme compte attend 0,5 s (ordre user du 01/11).
+            // aussitot, le meme compte attend 1 s (ordre user du 02/11).
             VoiceTick.report(
                 VoiceTick.SRC_STAIRS_COUNT,
                 VoiceWish(OutdoorLevel.STAIRS, phrase, AntiRepeat.KEY_STAIRS_COUNT + ":" + phrase),

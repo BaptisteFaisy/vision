@@ -31,10 +31,12 @@ private class StairsFakeSpeaker : VoiceBusSpeaker {
 }
 
 /**
- * Escaliers incoupables (ordre user du 02/11/2026) : des escaliers en cours
- * (niveau 6) vont au bout — le niveau 0 attend au lieu de couper, la
- * Traversée attend aussi ; humains, bordures et escaliers re-détectés
- * coupent toujours, et la voiture tue en amont ne mange pas son tour.
+ * Escaliers prioritaires (ordre user du 02/11/2026, VOIX-DANGER § 41 —
+ * amende l'ordre du matin, § 40) : des escaliers en cours (niveau 6)
+ * vont au bout — tout le monde attend (niveau 0, humains, GPS,
+ * grillages, bordures, chat, repli, Traversée) ; en retour les
+ * escaliers coupent toute parole en cours. Seule la parole du user
+ * passe devant. L'esquive parle dans le silence entre deux comptes.
  */
 class StairsUncuttableTest {
 
@@ -81,16 +83,71 @@ class StairsUncuttableTest {
     }
 
     @Test
-    fun `humain et bordure coupent toujours les escaliers`() {
-        VoiceBus.post(OutdoorLevel.STAIRS, "Escalier montant.")
-        VoiceBus.post(OutdoorLevel.HUMAN, "Stop.")
+    fun `tous les niveaux attendent la fin des escaliers`() {
+        VoiceBus.post(OutdoorLevel.STAIRS, "5 marches.")
+        listOf(
+            OutdoorLevel.CAR_MOVING, OutdoorLevel.HUMAN, OutdoorLevel.GPS_REMINDER,
+            OutdoorLevel.FENCE, OutdoorLevel.CURB, OutdoorLevel.POLE,
+            OutdoorLevel.CROSSWALK, OutdoorLevel.CHAT, OutdoorLevel.SIDEWALK,
+            OutdoorLevel.GPS_EVENT, OutdoorLevel.FALLBACK,
+        ).forEach { VoiceBus.post(it, "niveau $it.") }
+
+        assertEquals(1, speaker.said.size)
+
+        VoiceBus.onSpeechIdle()
+        VoiceBus.post(OutdoorLevel.FALLBACK, "Gauche.")
+        VoiceBus.post(OutdoorLevel.HUMAN, "Gauche.")
+        assertEquals(3, speaker.said.size)
+    }
+
+    @Test
+    fun `escaliers coupent l humain et le chat en cours`() {
+        VoiceBus.post(OutdoorLevel.HUMAN, "Attention, personne.")
+        VoiceBus.post(OutdoorLevel.STAIRS, "5 marches.")
 
         assertEquals(2, speaker.said.size)
 
         VoiceBus.reset()
-        VoiceBus.post(OutdoorLevel.STAIRS, "Escalier montant.")
-        VoiceBus.post(OutdoorLevel.CURB, "Bordure.")
-        assertEquals(4, speaker.said.size)
+        VoiceBus.chatSpeaking(true)
+        VoiceBus.post(OutdoorLevel.STAIRS, "5 marches.")
+        assertEquals(3, speaker.said.size)
+        VoiceBus.chatSpeaking(false)
+    }
+
+    @Test
+    fun `esquive parle dans le silence entre deux comptes`() {
+        VoiceBus.post(OutdoorLevel.STAIRS, "5 marches.")
+        VoiceBus.post(OutdoorLevel.HUMAN, "Gauche.")
+        assertEquals(1, speaker.said.size)
+
+        // Fin du compte : le mot continu, re-posté à chaque frame,
+        // parle au milieu du cycle.
+        VoiceBus.onSpeechIdle()
+        VoiceBus.post(OutdoorLevel.HUMAN, "Gauche.")
+        assertEquals(2, speaker.said.size)
+
+        // Compte suivant : il coupe l'esquive en cours.
+        VoiceBus.post(OutdoorLevel.STAIRS, "4 marches.")
+        assertEquals(3, speaker.said.size)
+    }
+
+    @Test
+    fun `escaliers attendent la parole du user`() {
+        VoiceBus.userSpeaking(true)
+        VoiceBus.post(OutdoorLevel.STAIRS, "5 marches.")
+        assertEquals(0, speaker.said.size)
+
+        VoiceBus.userSpeaking(false)
+        VoiceBus.post(OutdoorLevel.STAIRS, "5 marches.")
+        assertEquals(1, speaker.said.size)
+    }
+
+    @Test
+    fun `bus bloque sur escaliers se libere apres le delai`() {
+        assertTrue(stairsBusStuck(OutdoorLevel.STAIRS, 4_001L, 0L))
+        assertFalse(stairsBusStuck(OutdoorLevel.STAIRS, 4_000L, 0L))
+        assertFalse(stairsBusStuck(OutdoorLevel.STAIRS, 1_000L, 500L))
+        assertFalse(stairsBusStuck(OutdoorLevel.HUMAN, 99_999L, 0L))
     }
 
     @Test
