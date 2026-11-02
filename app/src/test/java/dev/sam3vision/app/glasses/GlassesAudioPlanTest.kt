@@ -21,20 +21,33 @@ class GlassesAudioPlanTest {
 
     @Test
     fun `sans autorisation de micro aucune piste audio n est demandee`() {
-        val ladder = GlassesAudioPlan.ladder(audioAllowed = false)
+        val ladder = GlassesAudioPlan.ladder(audioAllowed = false, videoActive = true)
         assertEquals(listOf(GlassesAudioPlan.SILENT), ladder)
         assertTrue(ladder.single().silent)
     }
 
     @Test
-    fun `avec autorisation le repli descend 16 kHz puis 48 kHz puis camera seule`() {
-        val ladder = GlassesAudioPlan.ladder(audioAllowed = true)
+    fun `sans video le repli descend 16 kHz puis 48 kHz puis camera seule`() {
+        val ladder = GlassesAudioPlan.ladder(audioAllowed = true, videoActive = false)
         assertEquals(
             listOf(16_000, 48_000, 0),
             ladder.map { it.hertz },
         )
         // Le meilleur format passe en premier : 48 kHz ne paie que si 16 kHz est refusé.
         assertEquals(GlassesAudioPlan.PREFERRED, ladder.first())
+    }
+
+    @Test
+    fun `avec video le 48 kHz est saute 16 kHz puis camera seule`() {
+        // 768 kbit/s audio + 750 kbit/s vidéo : le repli doublait la charge du
+        // lien radio pour un micro rééchantillonné à 16 kHz de toute façon.
+        val ladder = GlassesAudioPlan.ladder(audioAllowed = true, videoActive = true)
+        assertEquals(
+            listOf(16_000, 0),
+            ladder.map { it.hertz },
+        )
+        assertEquals(GlassesAudioPlan.PREFERRED, ladder.first())
+        assertTrue(ladder.last().silent)
     }
 
     @Test
