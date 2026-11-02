@@ -22,6 +22,18 @@ private class RefundFakeSpeaker : VoiceBusSpeaker {
     }
 }
 
+/** Porte-parole fautif : `say` lève (parole fantôme : bus tenu, rien ne parle). */
+private class ThrowingSpeaker : VoiceBusSpeaker {
+    override fun idle(): Boolean = true
+
+    override fun say(level: Int, text: String, clipId: String?, clips: List<String>) {
+        throw IllegalStateException("synthèse HS")
+    }
+
+    override fun cut() {
+    }
+}
+
 /**
  * Tour rendu sur jet (SPEC v4 § 5 : une annonce avalée ne consomme pas son
  * tour) : `post` avec clé oublie la clé sur chaque chemin jeté, la garde
@@ -105,6 +117,19 @@ class VoiceBusRefundTest {
         VoiceBus.post(OutdoorLevel.CROSSWALK, "Crosswalk.", antiRepeatKey = AntiRepeat.KEY_CROSSWALK_ANNOUNCE)
         assertEquals(listOf("Right."), speaker.said)
         assertTrue(AntiRepeat.allow(AntiRepeat.KEY_CROSSWALK_ANNOUNCE, System.currentTimeMillis()))
+    }
+
+    @Test
+    fun `say qui leve = pas de fantome, bus et tour rendus`() {
+        VoiceBus.speaker = ThrowingSpeaker()
+        val now = System.currentTimeMillis()
+        assertTrue(AntiRepeat.allow(AntiRepeat.KEY_FENCE, now))
+        assertFalse(VoiceBus.post(OutdoorLevel.FENCE, "Fence.", antiRepeatKey = AntiRepeat.KEY_FENCE))
+        assertTrue(AntiRepeat.allow(AntiRepeat.KEY_FENCE, now))
+        assertFalse(VoiceBus.post(OutdoorLevel.STAIRS, "5 marches."))
+        VoiceBus.speaker = speaker
+        assertTrue(VoiceBus.post(OutdoorLevel.FENCE, "Fence."))
+        assertEquals(listOf("Fence."), speaker.said)
     }
 
     @Test

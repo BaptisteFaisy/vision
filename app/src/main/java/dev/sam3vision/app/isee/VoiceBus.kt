@@ -120,7 +120,9 @@ object VoiceBus {
      * s'il a parlé, au lieu de le supposer (A9 § 3 D8 : le verdict traversée
      * croyait avoir parlé alors que le bus l'avait jeté ⇒ jusqu'à 2 s de
      * silence, « Don't cross. » compris). Aucun appelant existant ne casse :
-     * ignorer une valeur de retour est légal en Kotlin.
+     * ignorer une valeur de retour est légal en Kotlin. Faux aussi si le
+     * porte-parole lève (parole fantôme : bus rendu aussitôt, tour rendu —
+     * [sayOrGhost], jamais de crash producteur).
      */
     @Synchronized
     fun post(level: Int, text: String, clipId: String? = null, clips: List<String> = emptyList(),
@@ -153,8 +155,7 @@ object VoiceBus {
             lastSayMs = nowMs
             lastStairsSayMs = nowMs
             holdToken++
-            target.say(level, text, clipId, clips)
-            return true
+            return sayOrGhost(target, level, text, clipId, clips, antiRepeatKey)
         }
         if (activeLevel == OutdoorLevel.STAIRS) {
             android.util.Log.w(TAG_MUTE, "bus-jet motif=escaliers-en-cours level=$level texte=[$text]")
@@ -169,8 +170,36 @@ object VoiceBus {
         activeLevel = level
         lastSayMs = nowMs
         holdToken++
-        target.say(level, text, clipId, clips)
-        return true
+        return sayOrGhost(target, level, text, clipId, clips, antiRepeatKey)
+    }
+
+    /**
+     * Dit [text] via [target] : si [VoiceBusSpeaker.say] lève (porte-parole
+     * fautif — le bus est timbré AVANT l'appel, prouvé par le corps), la
+     * parole est fantôme (bus tenu, rien ne parle) : le bus est rendu
+     * aussitôt (jeton inchangé : encore la nôtre — réentrance sûre) et le
+     * tour d'antirépétition rendu (SPEC v4 § 5 : pas vraiment parlée) —
+     * faux, jamais de crash producteur. Sobre : un warning par fantôme.
+     * Appelée sous le verrou de [post] (comme [refundTurn]).
+     */
+    private fun sayOrGhost(
+        target: VoiceBusSpeaker,
+        level: Int,
+        text: String,
+        clipId: String?,
+        clips: List<String>,
+        antiRepeatKey: String?,
+    ): Boolean {
+        val token = holdToken
+        try {
+            target.say(level, text, clipId, clips)
+            return true
+        } catch (e: Exception) {
+            android.util.Log.w(TAG_MUTE, "bus-parole-fantome level=$level texte=[$text] cause=${e.message}")
+            if (holdToken == token) activeLevel = IDLE_LEVEL
+            refundTurn(antiRepeatKey)
+            return false
+        }
     }
 
     /**
