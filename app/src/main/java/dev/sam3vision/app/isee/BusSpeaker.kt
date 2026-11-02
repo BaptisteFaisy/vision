@@ -8,10 +8,12 @@ import dev.sam3vision.core.speech.IseeClipsEn
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Job
+import kotlinx.coroutines.NonCancellable
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.sync.withLock
+import kotlinx.coroutines.withContext
 import kotlinx.coroutines.withTimeoutOrNull
 import java.io.File
 
@@ -43,6 +45,14 @@ internal const val SAY_TIMEOUT_MS = 20_000L
  */
 internal const val RELEASE_TIMEOUT_MS = 25_000L
 
+/**
+ * Scrutation de l'attente parole (50 ms) : la prise du chemin est immédiate
+ * quand il est libre, prompte (< 50 ms) à la libération — sans jamais
+ * s'accrocher à un mutex abandonné (la boucle relit le mutex courant, un
+ * `withLock` sur l'instance coincée attendrait pour toujours).
+ */
+internal const val SPEECH_POLL_MS = 50L
+
 internal class SpeechPlayerClipSink(private val player: SpeechPlayer) : ClipSink {
     override suspend fun playFile(file: File): Result<Unit> = player.playFile(file)
     override suspend fun playSlice(file: File, sliceMs: Long): Result<Unit> = player.playSliceFile(file, sliceMs)
@@ -57,7 +67,9 @@ internal class SpeechPlayerClipSink(private val player: SpeechPlayer) : ClipSink
  * enregistré d'abord, synthèse réseau sinon pour les niveaux GPS seuls).
  *
  * Coupe d'abord le lecteur partagé (préemption physique, chat compris — la
- * tranche coupée attend sa reprise), puis parle sous mutex : une séquence en
+ * tranche coupée attend sa reprise ; tue quand le chemin est prouvé coincé :
+ * marteler un lecteur figé n'a jamais rien libéré — 38 paroles, 39 `stop`,
+ * zéro issue sur appareil), puis prend le chemin parole : une séquence en
  * cours ne bloque jamais une parole plus prioritaire (la coupe la libère,
  * pas d'interblocage). Quand le lecteur est occupé, un re-post identique
  * (même niveau, texte, clip et clips — [lastWish]) ne coupe ni ne rejoue
@@ -72,11 +84,22 @@ internal class SpeechPlayerClipSink(private val player: SpeechPlayer) : ClipSink
  * ([VoiceBus.onSpeechIdle]) ; les séquences (sans rappel) et les jets
  * libèrent ici.
  *
- * Vigile ([sayTimeoutMs], [SAY_TIMEOUT_MS] en prod) : l'attente du mutex et
+ * Chemin abandonnable ([acquireSpeech]) : un détenteur qui tient passé son
+ * propre budget ([sayTimeoutMs]) est coincé dans un appel plateforme non
+ * annulable (`prepare()` figé, observé sur appareil — ni erreur, ni fin,
+ * donc aucun rappel) : l'attente suivante l'abandonne (orphelin — à son
+ * retour éventuel, sa génération périmée ne rend rien) et parle sur un mutex
+ * frais. Une tentative bloquée ne coince plus jamais les suivantes ; le
+ * superviseur 25 s abandonne de même quand le bus tient encore (cas calme,
+ * sans nouvelle parole — sous re-posts continus le bus est légitimement tenu
+ * par la dernière, les attentes abandonnent déjà : le superviseur n'a rien
+ * à voler).
+ *
+ * Vigile ([sayTimeoutMs], [SAY_TIMEOUT_MS] en prod) : l'attente du chemin et
  * la parole partagent un seul budget — une parole qui ne parle pas à temps
- * (mutex tenu par une parole coincée, synthèse ou lecteur figés) est jetée
+ * (chemin tenu par une parole vivante, synthèse ou lecteur figés) est jetée
  * et rend le bus. Une phrase spontanée en retard est périmée, jamais rejouée.
- * Une parole qui lève sous le mutex ([speakGuarded]) rend le bus de même
+ * Une parole qui lève sur le chemin ([speakGuarded]) rend le bus de même
  * (annulation propagée, exception journalisée — jamais de `finally`
  * inconditionnel : seule la parole la plus récente rend le repos).
  */
@@ -91,13 +114,37 @@ internal class BusSpeaker(
      * faux en test JVM où `MediaPlayer` n'existe pas, donc jamais occupé).
      */
     private val isBusy: (() -> Boolean)? = null,
+    /**
+     * Horloge des âges de détention (`elapsedRealtime`, monotone : un saut
+     * NTP ne doit ni abandonner une parole vivante ni garder une coincée ;
+     * temps virtuel injecté en test JVM).
+     */
+    private val nowMs: () -> Long = { android.os.SystemClock.elapsedRealtime() },
 ) : VoiceBusSpeaker {
 
     /** Vœu confié au lecteur : l'égalité décide du doublon (re-post identique). */
     private data class SpokenWish(val level: Int, val text: String, val clipId: String?, val clips: List<String>)
 
-    /** Parole en cours sous mutex : une seule lecture du bus à la fois. */
-    private val speech = Mutex()
+    /**
+     * Chemin parole : une seule lecture du bus à la fois — mais remplaçable :
+     * un détenteur expiré est abandonné ([abandonStuckSpeech]), jamais attendu.
+     * Lu/écrit sous [gate] ; rendu par son preneur ([releaseSpeech]), même
+     * orphelin.
+     */
+    private var speech = Mutex()
+
+    /**
+     * Garde des sections critiques courtes (prise/abandon du chemin — jamais
+     * de parole dedans, donc jamais tenue : aucun interblocage possible).
+     */
+    private val gate = Mutex()
+
+    /** Prise du chemin par son détenteur ([nowMs]) : son âge prouve le coincement (sous [gate]). */
+    private var speechSinceMs: Long = 0L
+
+    /** Chemin prouvé coincé (abandon sans retour depuis) : la coupe pré-verrou est tue. */
+    @Volatile
+    private var speechJammed = false
 
     /** Compteur des paroles : seule la plus récente rend le repos. */
     private var generation = 0L
@@ -137,14 +184,19 @@ internal class BusSpeaker(
         }
         lastWish = wish
         scope.launch {
-            // Hors mutex : la coupe libère la séquence qui le tient.
-            player.stop()
+            // Hors chemin : la coupe libère la parole qui le tient — sauf
+            // chemin prouvé coincé (marteler un lecteur figé n'a jamais
+            // rien libéré).
+            if (!speechJammed) player.stop()
             var current = -1L
             var played = false
             val done = withTimeoutOrNull(sayTimeoutMs) {
-                speech.withLock {
-                    current = ++generation
+                val (taken, ticket) = acquireSpeech()
+                current = ticket
+                try {
                     played = speakGuarded(level, text, clipId, clips, current)
+                } finally {
+                    releaseSpeech(taken)
                 }
             }
             if (done == null) {
@@ -155,17 +207,83 @@ internal class BusSpeaker(
     }
 
     /**
+     * Prend le chemin parole : immédiat si libre, prompt à la libération
+     * ([SPEECH_POLL_MS]) — et jamais otage d'un détenteur expiré (son âge
+     * passé [sayTimeoutMs] : abandonné, orphelin). Rend le mutex pris et le
+     * ticket de génération (pris sous [gate] : les prises sont sérialisées
+     * même après abandon). Annulable (budget de [say]).
+     */
+    private suspend fun acquireSpeech(): Pair<Mutex, Long> {
+        while (true) {
+            val got = gate.withLock {
+                if (speech.tryLock()) {
+                    speechSinceMs = nowMs()
+                    speech to ++generation
+                } else {
+                    null
+                }
+            }
+            if (got != null) return got
+            if (abandonStuckSpeech("attente")) continue
+            delay(SPEECH_POLL_MS)
+        }
+    }
+
+    /**
+     * Abandonne le chemin parole si son détenteur est expiré (tient passé
+     * [sayTimeoutMs], son propre budget — appel plateforme non annulable) :
+     * mutex frais, coupe tue ([speechJammed]) jusqu'au prochain retour. Vrai
+     * si abandonné. Partagée par l'attente ([acquireSpeech]) et le
+     * superviseur 25 s ([watchRelease]) : sobre (un warning par abandon,
+     * jamais par parole).
+     */
+    private suspend fun abandonStuckSpeech(origin: String): Boolean {
+        val now = nowMs()
+        val age = gate.withLock {
+            val held = now - speechSinceMs
+            if (speech.isLocked && held > sayTimeoutMs) {
+                speech = Mutex()
+                speechSinceMs = now
+                speechJammed = true
+                held
+            } else {
+                null
+            }
+        }
+        if (age != null) android.util.Log.w(TAG_MUTE, "bus-mutex-abandon ms=$age loc=$origin")
+        return age != null
+    }
+
+    /**
+     * Rend le chemin parole pris par [acquireSpeech] : tout retour (même
+     * orphelin abandonné) prouve le lecteur vivant et rallume la coupe
+     * ([speechJammed]) — un chemin encore coincé se re-prouve au prochain
+     * abandon. Inannulable : une annulation ne doit jamais fuir le verrou.
+     */
+    private suspend fun releaseSpeech(taken: Mutex) {
+        withContext(NonCancellable) {
+            gate.withLock {
+                speechJammed = false
+                taken.unlock()
+            }
+        }
+    }
+
+    /**
      * Superviseur de restitution (frère, pas enfant : il survit à la parole
      * elle-même — une lecture figée ne rend jamais le bus). Lancé pour
      * chaque parole acceptée, sautée comprise : il suit le jeton le plus
      * récent — sans lui, le superviseur de la parole en cours regarderait
-     * un jeton périmé et le bus fuirait sur lecture coincée.
+     * un jeton périmé et le bus fuirait sur lecture coincée. Quand il rend
+     * le bus, il abandonne aussi le chemin parole s'il est coincé (le
+     * timeout libère le chemin, pas seulement le tour).
      */
     private fun watchRelease(heldLevel: Int, heldToken: Long, level: Int, text: String) {
         scope.launch {
             delay(RELEASE_TIMEOUT_MS)
             if (VoiceBus.holds(heldLevel, heldToken)) {
                 android.util.Log.w(TAG_MUTE, "bus-sans-retour level=$level texte=[$text] ms=$RELEASE_TIMEOUT_MS")
+                abandonStuckSpeech("superviseur")
                 VoiceBus.onSpeechIdle()
             }
         }
@@ -206,7 +324,7 @@ internal class BusSpeaker(
     }
 
     /**
-     * Parole sous mutex ([current] = sa génération) : séquence si [clips]
+     * Parole sur le chemin ([current] = sa génération) : séquence si [clips]
      * est non vide, sinon clip puis synthèse — vrai si parlé. Une annulation
      * (budget dépassé) rend le bus si dernière et se propage ; une exception
      * est journalisée ([SpeechLog.fail]) et rend le bus si dernière (faux).

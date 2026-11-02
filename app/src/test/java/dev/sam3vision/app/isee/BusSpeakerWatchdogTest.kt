@@ -9,9 +9,11 @@ import dev.sam3vision.core.speech.SpeechLanguage
 import java.io.File
 import java.nio.file.Files
 import kotlinx.coroutines.CompletableDeferred
+import kotlinx.coroutines.NonCancellable
 import kotlinx.coroutines.test.advanceTimeBy
 import kotlinx.coroutines.test.runCurrent
 import kotlinx.coroutines.test.runTest
+import kotlinx.coroutines.withContext
 import org.junit.After
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
@@ -40,13 +42,17 @@ class BusSpeakerWatchdogTest {
         val slices: MutableList<String> = mutableListOf()
         val plain: MutableList<String> = mutableListOf()
         var queued = 0
+        /** JNI figé : ignore l'annulation (mutex tenu passé le budget) jusqu'à [release]. */
+        var stuck: Boolean = false
+        val release: CompletableDeferred<Unit> = CompletableDeferred()
         override suspend fun playFile(file: File): Result<Unit> {
             plain += file.name
             return Result.success(Unit)
         }
         override suspend fun playSlice(file: File, sliceMs: Long): Result<Unit> {
             slices += file.name
-            if (hang) CompletableDeferred<Result<Unit>>().await()
+            if (stuck) withContext(NonCancellable) { release.await() }
+            else if (hang) CompletableDeferred<Result<Unit>>().await()
             return Result.success(Unit)
         }
         override suspend fun playQueued(bytes: ByteArray): Result<PlaybackEnd> {
@@ -131,6 +137,93 @@ class BusSpeakerWatchdogTest {
             VoiceBus.post(OutdoorLevel.HUMAN, "Left.", "guide_left")
             runCurrent()
             assertEquals(2, rig.sink.slices.size)
+        } finally {
+            VoiceBus.speaker = oldSpeaker
+            VoiceBus.onIdle = oldIdle
+            VoiceBus.onSpeechIdle()
+            VoiceBus.reset()
+        }
+    }
+
+    @Test
+    fun `mutex coince — timeout puis suivante parle, orpheline abandonnee`() = runTest {
+        val rig = Rig()
+        rig.sink.hang = false
+        rig.sink.stuck = true
+        val oldSpeaker = VoiceBus.speaker
+        val oldIdle = VoiceBus.onIdle
+        try {
+            VoiceBus.reset()
+            VoiceBus.speaker = BusSpeaker(
+                backgroundScope, rig.player, rig.clips, rig.proximity,
+                sayTimeoutMs = 3_000L, nowMs = { testScheduler.currentTime },
+            )
+            try {
+                // Parole 1 : se fige dans le lecteur (annulation ignorée, mutex tenu).
+                VoiceBus.post(OutdoorLevel.HUMAN, "Left.", "guide_left")
+                runCurrent()
+                assertEquals(1, rig.sink.slices.size)
+                // Budget dépassé : la coincée ne rend rien (ni bus, ni mutex).
+                advanceTimeBy(3_500L)
+                runCurrent()
+                assertEquals(1, rig.sink.slices.size)
+                // Suivante (re-post identique, lecteur libre) : abandonne et PARLE.
+                VoiceBus.post(OutdoorLevel.HUMAN, "Left.", "guide_left")
+                runCurrent()
+                assertEquals(2, rig.sink.slices.size)
+            } finally {
+                rig.sink.release.complete(Unit)
+                runCurrent()
+            }
+        } finally {
+            VoiceBus.speaker = oldSpeaker
+            VoiceBus.onIdle = oldIdle
+            VoiceBus.onSpeechIdle()
+            VoiceBus.reset()
+        }
+    }
+
+    @Test
+    fun `chemin coince — bus rendu, repare, suivante parle sans marteler`() = runTest {
+        val rig = Rig()
+        rig.sink.hang = false
+        rig.sink.stuck = true
+        val released = mutableListOf<Boolean>()
+        val oldSpeaker = VoiceBus.speaker
+        val oldIdle = VoiceBus.onIdle
+        try {
+            VoiceBus.reset()
+            VoiceBus.speaker = BusSpeaker(
+                backgroundScope, rig.player, rig.clips, rig.proximity,
+                sayTimeoutMs = 3_000L, nowMs = { testScheduler.currentTime },
+            )
+            VoiceBus.onIdle = { released += true }
+            try {
+                VoiceBus.post(OutdoorLevel.HUMAN, "Left.", "guide_left")
+                runCurrent()
+                advanceTimeBy(3_500L)
+                runCurrent()
+                VoiceBus.post(OutdoorLevel.HUMAN, "Left.", "guide_left")
+                runCurrent()
+                assertEquals(2, rig.sink.slices.size)
+                advanceTimeBy(RELEASE_TIMEOUT_MS) // calme : superviseur rend le bus (25 s)
+                runCurrent()
+                assertTrue(released.isNotEmpty())
+                rig.sink.stuck = false // lecteur réparé : la suivante parle
+                advanceTimeBy(3_500L)
+                runCurrent()
+                VoiceBus.post(OutdoorLevel.HUMAN, "Left.", "guide_left")
+                runCurrent()
+                assertEquals(3, rig.sink.slices.size)
+                assertEquals(listOf("stop", "stop"), rig.playerEvents) // coincé : coupes tues
+                VoiceBus.post(OutdoorLevel.HUMAN, "Left.", "guide_left")
+                runCurrent()
+                assertEquals(4, rig.sink.slices.size)
+                assertEquals(listOf("stop", "stop", "stop"), rig.playerEvents)
+            } finally {
+                rig.sink.release.complete(Unit)
+                runCurrent()
+            }
         } finally {
             VoiceBus.speaker = oldSpeaker
             VoiceBus.onIdle = oldIdle
