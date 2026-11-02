@@ -135,6 +135,12 @@ object AntiRepeat {
      */
     const val KEY_CROSSWALK_ARRIVAL = "crosswalk-arrival"
 
+    /**
+     * Traversée : perte du passage — sans délai (le guetteur ne parle qu'une
+     * fois par perte, comme l'alignement au changement).
+     */
+    const val KEY_CROSSWALK_LOST = "crosswalk-lost"
+
     /** Niveau 10 : trottoirs (comportement actuel) — 10 s. */
     const val KEY_SIDEWALK = "sidewalk"
 
@@ -193,8 +199,8 @@ object AntiRepeat {
         KEY_DOOR_WALL -> 4_000L
         KEY_CROSSWALK_ANNOUNCE -> 2_000L
         KEY_CROSSWALK_ARRIVAL -> ONCE_MS
-        // Mots continus, rappel GPS, alignement : sans délai (toujours autorisés).
-        KEY_HUMAN_IMMINENT, KEY_POLE_AVOID, KEY_WALL_AVOID, KEY_GPS_REMINDER, KEY_CROSSWALK_ALIGN -> 0L
+        // Mots continus, rappel GPS, alignement, perte : sans délai (toujours autorisés).
+        KEY_HUMAN_IMMINENT, KEY_POLE_AVOID, KEY_WALL_AVOID, KEY_GPS_REMINDER, KEY_CROSSWALK_ALIGN, KEY_CROSSWALK_LOST -> 0L
         // Clés inconnues : sans antirépétition (jamais bloquantes).
         else -> 0L
     }

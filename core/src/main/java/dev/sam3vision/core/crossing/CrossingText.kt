@@ -131,4 +131,14 @@ object CrossingText {
             SpeechLanguage.En -> "Here."
             SpeechLanguage.Fr -> "Sur le passage."
         }
+
+    /**
+     * Perte du passage en Traversée (« No crosswalk. » / « Passage perdu. »),
+     * dite une fois quand le passage suivi disparaît depuis [CrossingGuidance.LOST_DELAY_MS].
+     */
+    fun lost(language: SpeechLanguage = SpeechLanguage.DEFAULT): String =
+        when (language) {
+            SpeechLanguage.En -> "No crosswalk."
+            SpeechLanguage.Fr -> "Passage perdu."
+        }
 }
