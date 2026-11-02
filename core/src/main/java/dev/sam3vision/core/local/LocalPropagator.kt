@@ -24,12 +24,12 @@ import dev.sam3vision.core.mask.WarpFilter
  * fusion §7). Un masque à niveaux doux (PNG gris) peut passer `BILINEAR` au constructeur.
  *
  * Point d'insertion côté app (**documenté, non posé** — câblage UI différé, voir la PR) :
- * `LiveMaskDecoder` peint aujourd'hui des `Bitmap` coloriés et jette le `GrayMask`
- * (`decodeMaskAny`, `Masks.kt`) ; la session ne retient que ces bitmaps. Brancher cette
- * chaîne demande : retenir un `GrayMask` par objet au keyframe, appeler [propagate] à
- * chaque tick dans `LiveLocalOverlaySession.paint()`, puis colorier vers le bitmap
- * ping-pong (`colorizeGrayToBitmap`, `Masks.kt`, tampons réutilisés). Non fait ici : ce
- * chemin `Bitmap` n'est pas testable en JVM et exige une validation sur téléphone.
+ * `MaskPainter` peint aujourd'hui des `Bitmap` coloriés et expose le `GrayMask`
+ * (`lastGrays`) ; la session ne retient que ces bitmaps. Brancher cette chaîne
+ * demande : appeler [propagate] à chaque tick dans `LiveLocalOverlaySession.paint()`
+ * depuis le gris retenu, puis colorier vers le bitmap ping-pong
+ * (`colorizeGrayToBitmap`, `Masks.kt`, tampons réutilisés). Non fait ici : ce chemin
+ * `Bitmap` n'est pas testable en JVM et exige une validation sur téléphone.
  */
 class LocalPropagator(
     private val engine: LocalOverlayEngine = LocalOverlayEngine(),
