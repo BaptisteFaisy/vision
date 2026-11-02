@@ -100,7 +100,7 @@ object CurbText {
         return if (meters == whole.toFloat()) whole.toString() else meters.toString()
     }
 
-    /** Marche imminente à 0,7 m, sans heure : « Step up now. » en montée, « Step down now. » en descente, « Attention bordure. » si le sens est incertain. */
+    /** Marche imminente, sans heure : « Step up now. » en montée, « Step down now. » en descente, « Attention bordure. » si le sens est incertain. */
     fun stepPhrase(edge: CurbEdge, language: SpeechLanguage): String = when (language) {
         SpeechLanguage.Fr -> when (edge) {
             CurbEdge.Up -> "Marche, maintenant."

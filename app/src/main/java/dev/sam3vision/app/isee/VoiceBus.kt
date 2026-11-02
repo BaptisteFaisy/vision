@@ -61,6 +61,13 @@ interface VoiceBusSpeaker {
  * tout le monde attend la fin du mot sauf la parole user (1, le micro
  * garde son silence), re-posts GPS compris (un « left » frais ne coupe
  * pas le « left » en cours : la redite 15 s couvre le tour perdu).
+ *
+ * Exception à l'exception (ordre user du 02/11/2026, bordures) : la
+ * bordure (niveau 5) coupe un mot de guidage en cours (elle interrompt
+ * « droite » / « gauche », pas l'inverse) et n'est jamais coupée par eux
+ * (le rappel 3 attend la fin de la bordure ; manœuvre 11 et repli 12
+ * sont déjà sous elle). Voitures (0), parole user (1), humains (2) et
+ * escaliers (6, compte incoupable) gardent leur rang devant elle.
  */
 object VoiceBus {
     /** Aucune parole en cours : tout niveau parle. */
@@ -145,7 +152,7 @@ object VoiceBus {
         }
         val nowMs = System.currentTimeMillis()
         if (stairsBusStuck(activeLevel, nowMs, lastSayMs)) activeLevel = IDLE_LEVEL
-        if (guidanceSpeaking() && level != OutdoorLevel.USER_SPEECH) {
+        if (guidanceSpeaking() && level != OutdoorLevel.USER_SPEECH && level != OutdoorLevel.CURB) {
             android.util.Log.w(TAG_MUTE, "bus-jet motif=mot-guidage-en-cours level=$level texte=[$text]")
             refundTurn(antiRepeatKey)
             return false
@@ -162,7 +169,8 @@ object VoiceBus {
             refundTurn(antiRepeatKey)
             return false
         }
-        if (activeLevel != IDLE_LEVEL && level > activeLevel) {
+        if (curbGuidanceRefused(level, text, antiRepeatKey)) return false
+        if (activeLevel != IDLE_LEVEL && level > activeLevel && !curbPreemptsGuidance(level)) {
             android.util.Log.w(TAG_MUTE, "bus-jet motif=ecrase level=$level actif=$activeLevel chat=$chatReads texte=[$text]")
             refundTurn(antiRepeatKey)
             return false
@@ -172,6 +180,27 @@ object VoiceBus {
         holdToken++
         return sayOrGhost(target, level, text, clipId, clips, antiRepeatKey)
     }
+
+    /**
+     * Rappel GPS (3) sous une bordure en cours (5) : il attend la fin de
+     * la bordure (ordre user du 02/11/2026 — elle interrompt « droite » /
+     * « gauche », pas l'inverse ; manœuvre 11 et repli 12 sont déjà sous
+     * elle par l'échelle). Vrai = vœu jeté (tour rendu).
+     * Appelée sous le verrou de [post].
+     */
+    private fun curbGuidanceRefused(level: Int, text: String, antiRepeatKey: String?): Boolean {
+        if (activeLevel != OutdoorLevel.CURB || level != OutdoorLevel.GPS_REMINDER) return false
+        android.util.Log.w(TAG_MUTE, "bus-jet motif=bordure-en-cours level=$level texte=[$text]")
+        refundTurn(antiRepeatKey)
+        return true
+    }
+
+    /**
+     * Bordure (5) sur un mot de guidage en cours (manœuvre 11, rappel 3) :
+     * elle coupe (même ordre) — l'écrasement d'échelle ne s'applique pas.
+     */
+    private fun curbPreemptsGuidance(level: Int): Boolean =
+        level == OutdoorLevel.CURB && guidanceSpeaking()
 
     /**
      * Dit [text] via [target] : si [VoiceBusSpeaker.say] lève (porte-parole

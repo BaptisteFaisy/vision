@@ -80,16 +80,17 @@ internal fun obstacleFrame(
     // bordures, mobilier et 101/102 se taisent (le verdict 100, lui,
     // parle toujours en Traversée).
     val indoor = placeMode() == PictoPlaceMode.DEDANS
-    // Mot de guidage en cours : la frame attend sans consommer son tour
-    // d'antirépétition (ordre user du 02/11/2026 — le bus jetterait les
-    // vœux de toute façon, tours mangés ; ≤0,5 s).
+    // Mot de guidage en cours : le danger attend sans consommer son tour
+    // d'antirépétition (ordre user du 02/11/2026 — le bus jetterait le vœu
+    // de toute façon, tour mangé ; ≤0,5 s). La bordure, elle, coupe le mot
+    // (même jour, bordures : elle interrompt « droite » / « gauche »).
     val guidanceHolds = !indoor && VoiceBus.guidanceSpeaking()
     offer(
         decideFrame(
             listOf(
                 hazardWish(hazardCue, st.crossingActive)
                     ?.takeIf { (!indoor || (!st.crossingActive && hazardCue?.kind == HazardKind.PERSON)) && !guidanceHolds },
-                curbWish(curbCue, st.crossingActive).takeUnless { indoor || guidanceHolds },
+                curbWish(curbCue, st.crossingActive).takeUnless { indoor },
             ),
         ),
         nowMs,
