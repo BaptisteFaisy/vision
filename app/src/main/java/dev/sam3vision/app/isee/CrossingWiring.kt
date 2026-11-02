@@ -394,7 +394,7 @@ internal object CrossingLateralWatch {
  * l'user s'aligne à la voix (« Gauche. », « Droite. », « Tout droit. »,
  * « Sur le passage. »), le feu et le veto gardant la priorité du son (mots
  * doux, `urgent = false`). Loin ou invisible, la mémoire retombe (une ligne
- * côté sonde, plafond respecté). « Devant » redit toutes les 2 s hors traversée (8, devant le repli 12) ; 1 fois par vue en traversée.
+ * côté sonde, plafond respecté). « Crosswalk. » redit toutes les 2 s hors traversée (8, devant le repli 12) ; 1 fois par vue en traversée.
  */
 internal fun feedCrossingLateral(
     traversing: Boolean,

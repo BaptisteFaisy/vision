@@ -28,7 +28,7 @@ même temps** (bus vocal : le plus petit niveau gagne, écrasé jeté).
 | Bordure | « Curb up. » / « Curb down. » (< 6 m, 2 s) | Niveau 5 |
 | Escalier | Jalons « Stairs up/down, 4/2/1 meters. » (2 s) + marches (« Five. Steps. », 1 s, prioritaire — esquive au milieu) | Niveau 6 |
 | Animal / poubelle | « Animal. » / « Trash can. » (< 6 m, 2 s) | Niveau 7 divers |
-| Passage piéton | « Crosswalk ahead. » (toutes les 2 s hors Traversée) / « left/right » (1 fois par vue), « Aligned with the crosswalk. » (au changement), « On the crosswalk. » (1 fois) | Niveau 8 |
+| Passage piéton | « Crosswalk. » (clip < 500 ms, toutes les 2 s hors Traversée) / « left/right » (1 fois par vue), « Aligned with the crosswalk. » (au changement), « On the crosswalk. » (1 fois) | Niveau 8 |
 | Trottoir | « Sidewalk ahead/on the left/on the right. » (dérive seule, 10 s) | Niveau 10 |
 | Virage + obstacle | 0 chevauchement : manœuvre (11) et obstacle ne parlent jamais l'un sur l'autre (le plus petit gagne, écrasé jeté) | `VoiceBus` |
 | Traversée, préavis | « Crosswalk ahead. » (niveau 8), jamais de « Straight. » au bord | Niveau 8 |
@@ -76,9 +76,9 @@ même temps** (bus vocal : le plus petit niveau gagne, écrasé jeté).
    « Curb down. », 2 s.
 6. **Escalier.** Marcher vers un escalier. Attendu : jalons à 4 m, 2 m,
    1 m (« Stairs up, 4 meters. », …) + nombre de marches (« Five. Steps. »).
-7. **Passage piéton.** Attendu : « ahead » toutes les 2 s hors Traversée
-   (1 fois par vue sinon), alignement au changement seul, arrivée 1 fois.
-   Noter tout doublon.
+7. **Passage piéton.** Attendu : « Crosswalk. » toutes les 2 s hors
+   Traversée (1 fois par vue sinon), alignement au changement seul, arrivée
+   1 fois. Noter tout doublon.
 8. **Virage.** Attendu : manœuvre parlée (synthèse) ; **0 chevauchement**
    avec un obstacle (coupe franche, jamais deux voix). Capture écran.
 9. **Traversée.** Dire « mode crossing on ». Attendu : « Crossing mode on. »,
@@ -105,7 +105,7 @@ Tout écart au tableau part en **issue GitHub**, pas en commentaire.
 | 4 | « Pole./Lamp./Sign. » 2 s ; « Fence./Wall./Barrier. » 4 s | | | |
 | 5 | « Curb up./down. », 2 s | | | |
 | 6 | Jalons 4/2/1 + marches dites | | | |
-| 7 | Passage : ahead 2 s hors Traversée (sinon 1 fois par vue) / au changement / 1 fois, sans doublon | | | |
+| 7 | Passage : « Crosswalk. » 2 s hors Traversée (sinon 1 fois par vue) / au changement / 1 fois, sans doublon | | | |
 | 8 | Manœuvre + 0 chevauchement obstacle | | | |
 | 9 | « Crossing mode on. », verdict 3 s + immédiat, chat/GPS muets | | | |
 | 10 | Rappel 15 s : consigne + distance restante | | | |

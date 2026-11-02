@@ -89,6 +89,8 @@ object IseeClipsEn {
     const val CROSSWALK_RIGHT_TEXT = "Crosswalk to the right."
     const val CROSSWALK_ARRIVED = "cross_arrived"
     const val CROSSWALK_ARRIVED_TEXT = "On the crosswalk."
+    const val CROSSWALK = "crosswalk"
+    const val CROSSWALK_TEXT = "Crosswalk."
 
     // Niveau 10 : trottoirs, comportement actuel (clips existants).
     const val SIDEWALK_AHEAD = "sidewalk_ahead"
@@ -403,6 +405,7 @@ object IseeClipsEn {
         CROSSWALK_LEFT to CROSSWALK_LEFT_TEXT,
         CROSSWALK_RIGHT to CROSSWALK_RIGHT_TEXT,
         CROSSWALK_ARRIVED to CROSSWALK_ARRIVED_TEXT,
+        CROSSWALK to CROSSWALK_TEXT,
         SIDEWALK_AHEAD to SIDEWALK_AHEAD_TEXT,
         SIDEWALK_LEFT to SIDEWALK_LEFT_TEXT,
         SIDEWALK_RIGHT to SIDEWALK_RIGHT_TEXT,

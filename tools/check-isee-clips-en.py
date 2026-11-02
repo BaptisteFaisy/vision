@@ -9,7 +9,9 @@ Vérifie, sans clé ni réseau (runnable en CI) :
 3. aucun id nouveau ne collisionne avec le pack existant ;
 4. chaque MP3 attendu existe et n'est pas vide (sauf --allow-missing, pour les
    branches qui codent les clips avant leur génération) ;
-5. assets/vp_voice.txt désigne la voix par défaut de l'app (LAURE_VOICE_ID).
+5. assets/vp_voice.txt désigne la voix par défaut de l'app (LAURE_VOICE_ID) ;
+6. les clips à durée contrainte ([DURATIONS]) tiennent leur budget
+   (durée MP3 lue en stdlib, sans ffprobe).
 
 Usage : python3 tools/check-isee-clips-en.py [--allow-missing]
 """
@@ -25,6 +27,10 @@ MIRRORS = [
 CATALOG = "tools/isee-clips-en-catalog.json"
 LEGACY = "tools/voicepack-catalog.json"
 ID_RE = re.compile(r"^[a-z0-9_]+$")
+
+# Budget de durée par clip (secondes) : « Crosswalk. » dit l'annonce du
+# passage devant toutes les 2 s — ordre user du 02/11, moins de 500 ms.
+DURATIONS = {"crosswalk": 0.5}
 
 
 def repo_root() -> str:
@@ -84,6 +90,60 @@ def check_mp3(ids: list, root: str, allow_missing: bool, problems: list) -> None
                 problems.append(f"{cid}: vp_{cid}_en.mp3 manquant/vide")
 
 
+def mp3_duration(path: str) -> float | None:
+    """Durée d'un MP3 en secondes (stdlib, sans ffprobe) : saute le tag ID3v2
+    puis compte les trames MPEG-1 Layer III (1152 échantillons chacune).
+    `None` si illisible (jamais deviné)."""
+    try:
+        with open(path, "rb") as fh:
+            data = fh.read()
+    except OSError:
+        return None
+    pos = 0
+    if data[:3] == b"ID3":  # tag ID3v2 : taille synchsafe sur 4 octets
+        size = 0
+        for byte in data[6:10]:
+            size = (size << 7) | byte
+        pos = 10 + size
+    rates = (44100, 48000, 32000)
+    bitrates = (0, 32, 40, 48, 56, 64, 80, 96, 112, 128, 160, 192, 224, 256, 320)
+    frames = 0
+    rate = 0
+    while pos + 4 <= len(data):
+        if data[pos] != 0xFF or data[pos + 1] & 0xE0 != 0xE0:
+            pos += 1
+            continue
+        version = (data[pos + 1] >> 3) & 0x03
+        layer = (data[pos + 1] >> 1) & 0x03
+        bitrate = bitrates[(data[pos + 2] >> 4) & 0x0F]
+        sample = (data[pos + 2] >> 2) & 0x03
+        padding = (data[pos + 2] >> 1) & 0x01
+        if version != 0x03 or layer != 0x01 or not bitrate or sample == 0x03:
+            pos += 1
+            continue
+        rate = rates[sample]
+        pos += (144000 * bitrate) // rate + padding
+        frames += 1
+    if not frames or not rate:
+        return None
+    return frames * 1152 / rate
+
+
+def check_durations(root: str, problems: list) -> None:
+    """Les clips de [DURATIONS] tiennent leur budget (absent = check_mp3)."""
+    for cid, budget in DURATIONS.items():
+        mp3 = os.path.join(root, "app/src/main/res/raw", f"vp_{cid}_en.mp3")
+        if not (os.path.isfile(mp3) and os.path.getsize(mp3)):
+            continue
+        seconds = mp3_duration(mp3)
+        if seconds is None:
+            problems.append(f"{cid}: vp_{cid}_en.mp3 illisible")
+        elif seconds >= budget:
+            problems.append(f"{cid}: vp_{cid}_en.mp3 dure {seconds:.2f} s "
+                            f"(budget {budget:.1f} s : régénérer puis rogner, "
+                            "voir docs/VOICEPACK.md)")
+
+
 def check_voice(root: str, allow_missing: bool, problems: list) -> None:
     """vp_voice.txt désigne la voix par défaut (LAURE_VOICE_ID)."""
     settings = os.path.join(
@@ -118,6 +178,7 @@ def failures(root: str, allow_missing: bool) -> list:
     check_reuse(reuse, legacy, problems)
     check_mp3([c["id"] for c in clips + reuse],
               root, allow_missing, problems)
+    check_durations(root, problems)
     check_voice(root, allow_missing, problems)
     return problems
 

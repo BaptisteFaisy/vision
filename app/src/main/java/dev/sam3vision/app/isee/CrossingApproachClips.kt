@@ -12,6 +12,10 @@ import dev.sam3vision.core.speech.IseeClipsEn
  * posté au bus est inchangé (l'affichage lit le même texte) : seule la
  * séquence parle à la place du texte.
  *
+ * Devant, le mot dit quoi, pas où (ordre user du 02/11) : « Ahead » (avec ou
+ * sans distance) parle `crosswalk` (« Crosswalk. », clip < 500 ms, redit
+ * toutes les 2 s hors Traversée).
+ *
  * Règle d'or : jamais de mensonge — pas d'arrondi vers les paliers ronds
  * (`meters_5` sur « 2 meters » dirait « 5 meters »). Anglais seul (le pack ne
  * porte que des clips EN) : direction sans distance (« Left. », déjà résolue
@@ -20,13 +24,13 @@ import dev.sam3vision.core.speech.IseeClipsEn
  */
 internal fun crossingApproachClips(text: String): List<String> {
     if (!text.endsWith(".")) return emptyList()
-    // Sans virgule = sans distance (« Left. ») : le catalogue la parle déjà.
     val head = text.substringBefore(", ")
+    if (head == "Ahead") return listOf(IseeClipsEn.CROSSWALK)
+    // Sans virgule = sans distance (« Left. ») : le catalogue la parle déjà.
     if (head == text) return emptyList()
     return when (head) {
         "Left" -> listOf(IseeClipsEn.GO_LEFT)
         "Right" -> listOf(IseeClipsEn.GO_RIGHT)
-        "Ahead" -> listOf(IseeClipsEn.AHEAD)
         else -> emptyList()
     }
 }
