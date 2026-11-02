@@ -18,7 +18,7 @@ class LiveProbeWakeTest {
         advanceUntilIdle()
 
         assertFalse("carte chaude prouvée : session chaude", probe.state.value.warming)
-        assertEquals(10L, probe.state.value.timeoutSec)
+        assertEquals(5L, probe.state.value.timeoutSec)
     }
 
     @Test

@@ -104,8 +104,8 @@ internal const val DEFAULT_MAX_OBJECTS = 12
 /** Un log de décodage toutes N frames décodées. */
 internal const val LOG_EVERY_FRAMES = 20
 
-/** Délai normal d'un appel du direct (le réveil du conteneur passe par [COLD_TIMEOUT_SECONDS]). */
-internal const val DEFAULT_TIMEOUT_SECONDS = 10L
+/** Délai normal d'un appel du direct, 5 s (~60× le p99 serveur) ; le réveil passe par [COLD_TIMEOUT_SECONDS]. */
+internal const val DEFAULT_TIMEOUT_SECONDS = 5L
 
 /** Délai du premier appel : couvre le démarrage d'un conteneur Modal (30-50 s). */
 internal const val COLD_TIMEOUT_SECONDS = 60L

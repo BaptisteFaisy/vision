@@ -123,7 +123,7 @@ class LiveClientTest {
         // Changement de cap : plus de callTimeout de 10 s (le réveil GPU mesuré à 26,8 s
         // était tué, frame perdue et inférence facturée quand même). Le direct partage un
         // seul client pour toute l'app : DNS + TCP + TLS (71,3 ms) payés une seule fois.
-        assertEquals(10L, LIVE_TIMEOUT_SECONDS)
+        assertEquals(5L, LIVE_TIMEOUT_SECONDS)
         assertEquals(3_000, liveHttpClient().connectTimeoutMillis)
         assertEquals(5_000, liveHttpClient().writeTimeoutMillis)
         assertEquals(60_000, liveHttpClient().readTimeoutMillis)
