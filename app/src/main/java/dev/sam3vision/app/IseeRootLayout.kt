@@ -19,14 +19,15 @@ import dev.sam3vision.core.gesture.LongPressTrigger
  * - [LongPressTrigger] : appui maintenu ~300 ms → [onHoldStart] (micro ouvert) ; la
  *   vue intercepte alors tout (les enfants reçoivent un ACTION_CANCEL) jusqu'au
  *   relâchement qui émet [onHoldEnd] ;
- * - [IseeGestureBrain] : tap simple (vidéo, dès le relâchement). Ni double tap,
- *   ni balayage vertical (changement de bulle), ni page horizontale : iSee n'a
- *   plus qu'une page ni qu'une bulle à parcourir.
+ * - [IseeGestureBrain] : tap simple (vidéo, dès le relâchement) et balayage vers
+ *   le haut (bascule Traversée). Ni double tap, ni balayage vers le bas, ni page
+ *   horizontale : iSee n'a plus qu'une page ni qu'une bulle à parcourir.
  *
  * Les taps ne sont jamais consommés en-dehors d'une tenue : ce sont des observations
  * posées sur les événements, les écrans iSee restent libres de leur rendu. Les deux
- * bords latéraux restent exclus du geste système « retour » ; les balayages haut/bas
- * appartiennent au système (navigation Android), l'application ne les utilise plus.
+ * bords latéraux restent exclus du geste système « retour » ; le balayage vers le
+ * bas n'est pas utilisé (il verrouille seulement le geste), le balayage vers le
+ * haut bascule le mode Traversée.
  */
 class IseeRootLayout(context: Context) : FrameLayout(context) {
 
@@ -36,6 +37,9 @@ class IseeRootLayout(context: Context) : FrameLayout(context) {
     /** Tenue annulée sans transcription (app passée en arrière-plan pendant l'appui). */
     var onHoldCancel: (() -> Unit)? = null
     var onSingleTap: (() -> Unit)? = null
+
+    /** Balayage vers le haut confirmé : bascule du mode Traversée. */
+    var onSwipeUp: (() -> Unit)? = null
 
     /** Geste actif seulement quand les panneaux iSee sont à l'écran, sinon à l'ancienne UI. */
     var gesturesEnabled: () -> Boolean = { true }
@@ -91,6 +95,7 @@ class IseeRootLayout(context: Context) : FrameLayout(context) {
         listener = object : IseeGestureBrain.Listener {
             override fun onSingleTap() = onSingleTap?.invoke() ?: Unit
             override fun onHorizontalSwipe(rightToLeft: Boolean) = Unit // aucune page à changer
+            override fun onSwipeUp() = onSwipeUp?.invoke() ?: Unit
         },
     )
 

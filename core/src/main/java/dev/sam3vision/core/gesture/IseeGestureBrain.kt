@@ -4,8 +4,9 @@ import kotlin.math.abs
 import kotlin.math.hypot
 
 /**
- * Machine à gestes iSee, sans dépendance Android (testable en JVM) : tap simple
- * et balayage horizontal (reconnu, sans effet : iSee n'a qu'une page).
+ * Machine à gestes iSee, sans dépendance Android (testable en JVM) : tap simple,
+ * balayage horizontal (reconnu, sans effet : iSee n'a qu'une page) et balayage
+ * vers le haut (bascule du mode Traversée).
  * L'appui long reste le domaine de [LongPressTrigger] — dans la vue : quand une
  * tenue démarre, [handOffToHold] glisse tout l'état présent sous le contrôle
  * de la tenue.
@@ -15,8 +16,8 @@ import kotlin.math.hypot
  *
  * Un glissement n'est reconnu qu'une fois par geste : dès qu'un axe gagne le duel
  * (au-delà de [slopPx]), l'autre axe est verrouillé jusqu'au relâchement. Le rail
- * **vertical** n'émet rien : le balayage de changement de bulle a été supprimé.
- * Il verrouille seulement le geste — un glissement n'arrive jamais pour un tap
+ * **vertical** n'émet que vers le haut : le balayage vers le bas verrouille
+ * seulement le geste — un glissement n'arrive jamais pour un tap
  * (sinon il aurait lancé la vidéo).
  */
 class IseeGestureBrain(
@@ -24,6 +25,7 @@ class IseeGestureBrain(
     private val slopPx: Float = DEFAULT_SLOP_PX,
     private val tapMaxMs: Long = DEFAULT_TAP_MAX_MS,
     private val horizontalMinPx: Float = DEFAULT_HORIZONTAL_MIN_PX,
+    private val verticalMinPx: Float = DEFAULT_VERTICAL_MIN_PX,
 ) {
 
     interface Listener {
@@ -32,6 +34,9 @@ class IseeGestureBrain(
 
         /** Balayage horizontal confirmé ; `rightToLeft` = doigt parti vers la gauche. */
         fun onHorizontalSwipe(rightToLeft: Boolean)
+
+        /** Balayage vers le haut confirmé (bascule du mode Traversée). */
+        fun onSwipeUp()
     }
 
     private enum class Axis { None, Horizontal, Vertical }
@@ -43,6 +48,7 @@ class IseeGestureBrain(
     ) {
         var axis: Axis = Axis.None
         var horizontalEmitted: Boolean = false
+        var swipeUpEmitted: Boolean = false
     }
 
     private var press: Press? = null
@@ -68,6 +74,10 @@ class IseeGestureBrain(
         if (current.axis == Axis.Horizontal && !current.horizontalEmitted && abs(dx) > horizontalMinPx) {
             current.horizontalEmitted = true
             listener.onHorizontalSwipe(rightToLeft = dx < 0)
+        }
+        if (current.axis == Axis.Vertical && !current.swipeUpEmitted && dy < -verticalMinPx) {
+            current.swipeUpEmitted = true
+            listener.onSwipeUp()
         }
     }
 
@@ -116,5 +126,8 @@ class IseeGestureBrain(
         /** Durée maximale d'une pression pour valoir tap (au-delà : rien). */
         const val DEFAULT_TAP_MAX_MS = 450L
         const val DEFAULT_HORIZONTAL_MIN_PX = 80f
+
+        /** Course verticale vers le haut pour valoir bascule Traversée (miroir de l'horizontale). */
+        const val DEFAULT_VERTICAL_MIN_PX = 80f
     }
 }
