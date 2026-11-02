@@ -227,6 +227,35 @@ class VoiceTickTest {
     }
 
     @Test
+    fun `voeu servi mesure son retard detection annonce`() {
+        VoiceTick.report(
+            VoiceTick.SRC_STAIRS,
+            VoiceWish(OutdoorLevel.STAIRS, "escalier", AntiRepeat.KEY_STAIRS),
+            1_000L,
+        )
+        var servi = -1L
+
+        assertTrue(VoiceTick.tick(1_700L, onServed = { servi = it }))
+
+        assertEquals(700L, servi)
+        assertEquals("detection->annonce 700 ms", voiceLatencyLine(servi))
+    }
+
+    @Test
+    fun `voeu refuse ne mesure rien`() {
+        VoiceTick.report(
+            VoiceTick.SRC_STAIRS,
+            VoiceWish(OutdoorLevel.STAIRS, "escalier", AntiRepeat.KEY_STAIRS),
+            1_000L,
+        )
+        var servi = -1L
+
+        assertFalse(VoiceTick.tick(1_700L, offer = { _, _ -> false }, onServed = { servi = it }))
+
+        assertEquals(-1L, servi)
+    }
+
+    @Test
     fun `tick dedans propose le trouve cran zero`() {
         VoiceTick.report(
             VoiceTick.SRC_FIND,

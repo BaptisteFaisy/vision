@@ -1,5 +1,6 @@
 package dev.sam3vision.app.isee
 
+import android.util.Log
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.delay
@@ -65,6 +66,9 @@ internal object VoiceTick {
     /** Porte et murs dedans (cran 13, guetteur de cadran). */
     const val SRC_DOOR_WALL = "door-wall"
 
+    /** Tag logcat du retard détection → annonce : un vœu servi = une ligne. */
+    const val TAG = "VOICE_LAT"
+
     /** Vœu rapporté à [atMs] par une source ([indoor] = chaîne dedans). */
     private data class Entry(val wish: VoiceWish, val atMs: Long, val indoor: Boolean)
 
@@ -94,19 +98,31 @@ internal object VoiceTick {
      */
     @Synchronized
     fun pick(nowMs: Long, indoor: Boolean = false): VoiceWish? =
+        pickEntry(nowMs, indoor)?.wish
+
+    /** Comme [pick], avec l'instant du rapport : [tick] en tire le retard d'annonce. */
+    @Synchronized
+    private fun pickEntry(nowMs: Long, indoor: Boolean): Entry? =
         current.values
             .filter { it.indoor == indoor && nowMs - it.atMs < FRESH_MS && it.wish.text.isNotBlank() }
             .minWithOrNull(compareBy({ it.wish.level }, { -it.atMs }))
-            ?.wish
 
     /**
      * Un battement à [nowMs] : propose [pick] via [offer] (antirépétition
      * puis bus). `false` sans rien offrir (silence, même vœu dans [SAME_MS],
-     * ou refus de [offer] — retenté au battement suivant). Testé en JVM.
+     * ou refus de [offer] — retenté au battement suivant). Chaque vœu servi
+     * journalise son retard détection → annonce ([TAG]) ; [onServed] le livre
+     * aux tests. Testé en JVM.
      */
     @Synchronized
-    fun tick(nowMs: Long, indoor: Boolean = false, offer: (VoiceWish?, Long) -> Boolean = ::offer): Boolean {
-        val wish = pick(nowMs, indoor) ?: return false
+    fun tick(
+        nowMs: Long,
+        indoor: Boolean = false,
+        offer: (VoiceWish?, Long) -> Boolean = ::offer,
+        onServed: (Long) -> Unit = {},
+    ): Boolean {
+        val entry = pickEntry(nowMs, indoor) ?: return false
+        val wish = entry.wish
         val last = lastOffer
         if (last != null && last.level == wish.level && last.text == wish.text &&
             nowMs - last.atMs < SAME_MS
@@ -115,6 +131,12 @@ internal object VoiceTick {
         }
         if (!offer(wish, nowMs)) return false
         lastOffer = Offered(wish.level, wish.text, nowMs)
+        // Le battement (700 ms) + l'antirépétition (1 s) dominent l'E2E parlé
+        // (0-1700 ms) : mesuré ici, pas deviné. Le rappel début TTS du lecteur
+        // affinera l'annonce côté joueur ; la voix reste hors du 250 ms rendu.
+        val delayMs = nowMs - entry.atMs
+        onServed(delayMs)
+        Log.i(TAG, voiceLatencyLine(delayMs))
         return true
     }
 
@@ -125,6 +147,12 @@ internal object VoiceTick {
         lastOffer = null
     }
 }
+
+/**
+ * Ligne VOICE_LAT d'un vœu servi : retard détection → annonce, en ms. Pure,
+ * testée en JVM — [VoiceTick.tick] n'ajoute que l'écriture logcat.
+ */
+internal fun voiceLatencyLine(delayMs: Long): String = "detection->annonce $delayMs ms"
 
 /**
  * Battement voix de la sonde : toutes les [tickMs] (700 ms), le vœu courant
