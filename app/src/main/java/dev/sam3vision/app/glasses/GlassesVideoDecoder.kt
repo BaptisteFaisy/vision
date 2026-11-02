@@ -114,6 +114,7 @@ internal open class GlassesVideoDecoder(
                 MediaFormat.MIMETYPE_VIDEO_HEVC, frame.width, frame.height,
             )
             csd0?.let { format.setByteBuffer("csd-0", ByteBuffer.wrap(it)) }
+            applyLowLatencyKeys(format)
             MediaCodec.createDecoderByType(MediaFormat.MIMETYPE_VIDEO_HEVC).also {
                 it.configure(format, null, null, 0)
                 it.start()
@@ -233,15 +234,43 @@ internal open class GlassesVideoDecoder(
         codec = null
     }
 
-    private companion object {
-        /** Attente d'un buffer d'entrée libre, en microsecondes. */
-        const val INPUT_TIMEOUT_US = 50_000L
+    /**
+     * Clés basse latence du décodeur : pas de mise en file interne, cadence
+     * annoncée à l'opérateur, priorité temps réel, aucun B-frame à réordonner.
+     *
+     * Miroir des clés du direct (`GlassesLiveDecoder`, qui garde sa copie
+     * privée) : le pont mérite le même décodeur nerveux, une frame manquée y
+     * est conflée (la suivante arrive ~67 ms plus tard à 15 i/s). Chaque clé
+     * est posée dans son propre `runCatching`, comme côté direct.
+     */
+    private fun applyLowLatencyKeys(format: MediaFormat) {
+        runCatching { format.setInteger(MediaFormat.KEY_LOW_LATENCY, 1) }
+        runCatching { format.setInteger(MediaFormat.KEY_OPERATING_RATE, OPERATING_RATE) }
+        runCatching { format.setInteger(MediaFormat.KEY_PRIORITY, 0) }
+        runCatching { format.setInteger(MediaFormat.KEY_MAX_B_FRAMES, 0) }
+    }
+
+    internal companion object {
+        /**
+         * Attente d'un buffer d'entrée libre, en microsecondes : 5 ms, comme le
+         * direct — un codec qui ne libère rien en 5 ms ne libérera rien non
+         * plus en 50, et la frame suivante est conflée à la place.
+         */
+        const val INPUT_TIMEOUT_US = 5_000L
 
         /** Attente d'un buffer de sortie par tour, en microsecondes. */
         const val OUTPUT_TIMEOUT_US = 10_000L
 
-        /** Attente totale d'une image décodée après chaque entrée, en millisecondes. */
-        const val OUTPUT_WAIT_MS = 300L
+        /**
+         * Attente totale d'une image décodée après chaque entrée, en
+         * millisecondes : ~une demi-période image à 15 i/s (66,7 ms). L'ancien
+         * 300 ms était le seul poste au-delà du budget 250 ms — pire cas
+         * 350 ms avec l'entrée ; désormais ~45 ms.
+         */
+        const val OUTPUT_WAIT_MS = 40L
+
+        /** Cadence annoncée au décodeur (clé `operating-rate`), en images par seconde. */
+        const val OPERATING_RATE = 15
 
         /** Créations ratées d'affilée avant l'abandon (effacé par [release]). */
         const val MAX_FAILURES = 3
