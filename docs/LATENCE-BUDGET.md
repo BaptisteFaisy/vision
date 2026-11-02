@@ -443,7 +443,7 @@ Ce que cette campagne change et ne change pas :
 |---|---|---|
 | transport du Direct | `core/net/LiveClientFactory.kt`, `core/net/WsLiveClient.kt` | **WebSocket** vers `/live/ws`, pas de `POST` par frame |
 | gain du WebSocket sur le `POST`, mesuré côté serveur | `core/net/WsLiveClient.kt:13` (commentaire daté) | 50,3 ms contre 81,4 ms — ~31 ms gagnés par frame |
-| cadence prudente du Direct | `core/live/LiveSession.kt:35` (`Cadence.Direct`) | 350 / 500 / 900 ms → l'attente réelle est **plus haute** que l'hypothèse du § 4 |
+| cadence prudente du Direct | `core/live/LiveSession.kt:37` (`Cadence.Direct`) | 350 / 500 / 900 ms → l'attente réelle est **plus haute** que l'hypothèse du § 4 |
 | ce que cet arbre refuse d'affirmer | `docs/PERF.md` § 1 et § 3 | latences, fps, réveil de conteneur : « non mesuré ici » |
 | instrument côté client | `core/live/LiveStats.kt`, banc JVM `LiveFrameBudgetTest` | coûts CPU mesurés en microsecondes, hors JPEG et hors radio |
 | décomposition du poste `capt` | `core/live/TimingsText.kt` (`capsplit`), `app/isee/IseeCameraPane.kt` | `age` / `enc` / `b64` / `cb` / `total`, 1 frame sur 20, même dump `ISEE_LAT` |
