@@ -186,7 +186,9 @@ internal fun CameraLive(glue: CameraGlue, probe: LiveProbe, viewModel: IseeViewM
 /**
  * Chiffres sur la vidéo, scopés chiffres : pastilles, flèche, consigne et feu ne
  * recomposent qu'à l'écriture #2 (ou battement/prédiction), jamais sur les pixels.
- * Partagée par la rue du téléphone ([CameraLive]) et celle des lunettes.
+ * Partagée par la rue du téléphone ([CameraLive]) et celle des lunettes. La
+ * consigne est arbitrée ([ArbitratedInstruction]) : direction parlée par défaut,
+ * cas prioritaires (voiture, escaliers, verdict) par-dessus.
  */
 @Composable
 internal fun ProbeVideoRest(probe: LiveProbe) {
@@ -196,7 +198,7 @@ internal fun ProbeVideoRest(probe: LiveProbe) {
     val followed = remember(rest.followed) { rest.followed.toSet() }
     LiveDistanceLayer(rest.distanceLayer, topInset = 0.dp, followed = followed, modifier = Modifier.fillMaxSize())
     SteeringLayer(rest.steering)
-    InstructionLayer(rest.pulse)
+    ArbitratedInstruction(probe)
     CrossingOnVideo(rest)
 }
 
