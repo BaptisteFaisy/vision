@@ -30,7 +30,7 @@ package dev.sam3vision.core.live
  *   l'appelant n'appelle que quand l'alignement change) ;
  * - `crosswalk-arrival` = 1 fois (niveau 8, arrivée sur le passage) ;
  * - `sidewalk` = 10 s (niveau 10, trottoirs) ;
- * - `verdict` = 3 s avec changement immédiat (traversée : le verdict
+ * - `verdict` = 2 s avec changement immédiat (traversée : le verdict
  *   nouveau parle tout de suite, voir les clés paramétrées ci-dessous).
  * - `find-found` = 2 s (dedans : trouvaille find, niveau 0 indoor).
  * - `door-wall` = 4 s (dedans : porte et murs, niveau 13).
@@ -126,9 +126,9 @@ object AntiRepeat {
     const val KEY_SIDEWALK = "sidewalk"
 
     /**
-     * Traversée : verdict (feu piéton puis voitures) — 3 s, changement
+     * Traversée : verdict (feu piéton puis voitures) — 2 s, changement
      * immédiat : postez `verdict:état` (un état nouveau parle aussitôt, le
-     * même état attend 3 s).
+     * même état attend 2 s).
      */
     const val KEY_VERDICT = "verdict"
 
@@ -175,7 +175,7 @@ object AntiRepeat {
         KEY_POLE -> 2_000L
         KEY_MISC -> 2_000L
         KEY_SIDEWALK -> 10_000L
-        KEY_VERDICT -> 3_000L
+        KEY_VERDICT -> 2_000L
         KEY_FIND_FOUND -> 2_000L
         KEY_DOOR_WALL -> 4_000L
         KEY_CROSSWALK_ANNOUNCE, KEY_CROSSWALK_ARRIVAL -> ONCE_MS

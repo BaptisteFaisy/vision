@@ -278,8 +278,12 @@ class IseeViewModel(app: Application) : AndroidViewModel(app) {
         // Bus vocal (SPEC v4) : câblé par la colonne (porte-parole, reprise chat, parole du user).
         spine.wireBus(BusSpeaker(viewModelScope, player, clipPlayer, proximity), state)
         probe.observeSpoken(viewModelScope, placeMode = { _state.value.placeMode })
-        // Placement sur le passage (mot + approche + arrivée, niveau 8).
-        observeCrossingVoice(viewModelScope, placeMode = { _state.value.placeMode })
+        // Placement sur le passage (mot + approche + arrivée, niveau 8 dehors, 101 en Traversée).
+        observeCrossingVoice(
+            viewModelScope,
+            placeMode = { _state.value.placeMode },
+            crossingActive = { probe.state.value.crossingActive },
+        )
         probe.observeCrossing(viewModelScope, haptics)
         probe.observeGlassesLive(viewModelScope, { settings }, { camera?.lensSpec }, { pitch.stop() }, { pitch.start() }, lensFeeds::mire)
         probe.observeHeadPose(viewModelScope)

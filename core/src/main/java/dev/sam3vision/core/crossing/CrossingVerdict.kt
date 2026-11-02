@@ -89,7 +89,7 @@ data class CrossingVerdictCue(
 /**
  * Annonceur du verdict : le premier verdict parle aussitôt, un changement parle
  * aussitôt ([CrossingVerdictCue.changed]), un verdict maintenu se répète toutes
- * les [REPEAT_MS] ms (3 s, SPEC v4). Pur et testé en JVM : [atMs] est fourni.
+ * les [REPEAT_MS] ms (2 s, ordre user du 02/11/2026). Pur et testé en JVM : [atMs] est fourni.
  */
 class CrossingVerdictAnnouncer(
     private val repeatMs: Long = REPEAT_MS,
@@ -136,8 +136,8 @@ class CrossingVerdictAnnouncer(
     }
 
     companion object {
-        /** Répétition d'un verdict maintenu (SPEC v4, changement immédiat). */
-        const val REPEAT_MS = 3_000L
+        /** Répétition d'un verdict maintenu (2 s, changement immédiat). */
+        const val REPEAT_MS = 2_000L
     }
 }
 

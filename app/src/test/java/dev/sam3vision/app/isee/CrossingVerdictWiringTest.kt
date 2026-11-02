@@ -105,13 +105,13 @@ class CrossingVerdictWiringTest {
     }
 
     @Test
-    fun `la repetition des 3s ne vibre pas`() {
+    fun `la repetition des 2s ne vibre pas`() {
         val red = CrossingLight(listOf(0.1f, 0.1f, 0.2f, 0.3f), CrossingState.Red)
         val engine = engine(red)
         val first = engine.onFrame(frame(), emptyList(), "", 0L)
         assertEquals(CrossingState.Red, first.haptic)
         assertTrue(engine.onFrame(frame(), emptyList(), "", 1_000L).posts.isEmpty())
-        val repeat = engine.onFrame(frame(), emptyList(), "", 3_000L)
+        val repeat = engine.onFrame(frame(), emptyList(), "", 2_000L)
         assertEquals(1, repeat.posts.size)
         assertNull(repeat.haptic)
         assertEquals(CrossingState.Red, repeat.overlay)

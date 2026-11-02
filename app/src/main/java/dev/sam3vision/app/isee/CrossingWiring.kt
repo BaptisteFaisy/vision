@@ -11,6 +11,7 @@ import dev.sam3vision.core.crossing.CrossingCue
 import dev.sam3vision.core.crossing.CrossingDistance
 import dev.sam3vision.core.crossing.CrossingGuidance
 import dev.sam3vision.core.crossing.CrossingLateralAnnouncer
+import dev.sam3vision.core.crossing.CrossingLevels
 import dev.sam3vision.core.crossing.CrossingOffer
 import dev.sam3vision.core.crossing.CrossingState
 import dev.sam3vision.core.crossing.CrossingText
@@ -442,35 +443,45 @@ internal fun observeCrossingLateral(
 }
 
 /**
- * Voix du guidage latéral sur le bus (SPEC v4, niveau 8) : mot
- * d'alignement en clip (clé alignement, au changement), annonce localisée
- * (clé annonce, 1 fois par vue), arrivée (clé arrivée, 1 fois). Sans file
- * ni rattrapage : l'écrasé n'est jamais redit. Dehors uniquement.
+ * Cran du guidage latéral : 8 dehors, 101 en Traversée (avec les humains,
+ * après le verdict — à 8, l'alignement écraserait le verdict 100 et le
+ * verdict ne pourrait jamais le recouper). Pur, testé en JVM.
+ */
+internal fun crossingLateralLevel(traversing: Boolean): Int =
+    if (traversing) CrossingLevels.HUMAN else OutdoorLevel.CROSSWALK
+
+/**
+ * Voix du guidage latéral sur le bus (SPEC v4, niveau 8 dehors, 101 en
+ * Traversée) : mot d'alignement en clip (clé alignement, au changement),
+ * annonce localisée (clé annonce, 1 fois par vue), arrivée (clé arrivée,
+ * 1 fois). Sans file ni rattrapage : l'écrasé n'est jamais redit. Dehors
+ * uniquement.
  */
 internal fun observeCrossingVoice(
     scope: CoroutineScope,
     placeMode: () -> PictoPlaceMode = { PictoPlaceMode.DEHORS },
+    crossingActive: () -> Boolean = { false },
 ) = observeCrossingLateral(
     CrossingLateralWatch.flow, scope,
     speakWord = { clip, text ->
         if (placeMode() == PictoPlaceMode.DEHORS &&
             AntiRepeat.allow(AntiRepeat.KEY_CROSSWALK_ALIGN, System.currentTimeMillis())
         ) {
-            VoiceBus.post(OutdoorLevel.CROSSWALK, text, clip)
+            VoiceBus.post(crossingLateralLevel(crossingActive()), text, clip)
         }
     },
     say = { text ->
         if (placeMode() == PictoPlaceMode.DEHORS &&
             AntiRepeat.allow(AntiRepeat.KEY_CROSSWALK_ANNOUNCE, System.currentTimeMillis())
         ) {
-            VoiceBus.post(OutdoorLevel.CROSSWALK, text)
+            VoiceBus.post(crossingLateralLevel(crossingActive()), text)
         }
     },
     sayArrival = { text ->
         if (placeMode() == PictoPlaceMode.DEHORS &&
             AntiRepeat.allow(AntiRepeat.KEY_CROSSWALK_ARRIVAL, System.currentTimeMillis())
         ) {
-            VoiceBus.post(OutdoorLevel.CROSSWALK, text)
+            VoiceBus.post(crossingLateralLevel(crossingActive()), text)
         }
     },
 )
