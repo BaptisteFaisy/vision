@@ -2,8 +2,9 @@
 """parse_isee_voix_selftest.py — assertions du parseur ISEE_VOIX, hors du module.
 
 Extrait de `scripts/parse_isee_voix.py` pour tenir la limite maison (< 500 lignes
-par fichier, < 50 par fonction) : les trois blocs (orphelins, coupes, tts-propre)
-vivent ici, le parseur garde un appel paresseux (`--selftest`). Aucune logique
+par fichier, < 50 par fonction) : les quatre blocs (orphelins, coupes,
+tts-propre, continuité) vivent ici, le parseur garde un appel paresseux
+(`--selftest`). Aucune logique
 dupliquée : ce module ne fait qu'importer et asserter.
 
 Usage :
@@ -15,9 +16,10 @@ Bibliothèque standard seule ; aucun réseau, aucun fichier temporaire, aucun ap
 
 import sys
 
-from parse_isee_voix import (coupes_player, coupes_tts, couvre_play, ecart, evenements,
-                             horodatage, orphelins_par_phrase, parse_ligne, parse_texte,
-                             rafales_coupe, recoups_niveau, silences_m5, verdict, verdict_coupe)
+from parse_isee_voix import (SEUIL_SILENCE_S, coupes_player, coupes_tts, couvre_play,
+                             ecart, ecarts_silence, evenements, horodatage,
+                             orphelins_par_phrase, parse_ligne, parse_texte, rafales_coupe,
+                             recoups_niveau, silences_m5, taux_parole, verdict, verdict_coupe)
 
 TRACE_TENU = """I ISEE_VOIX: EXPECT voie=FENCE phrase=[Stop.]
 I ISEE_VOIX: PLAY source=clip detail=[Stop.]
@@ -60,6 +62,32 @@ ISEE_VOIX: PLAYER play
 ISEE_VOIX: PLAYER done
 ISEE_VOIX: DONE phrase=[Stop.]
 ISEE_VOIX: PLAYER stop
+"""
+
+TRACE_CONTINU = """11-02 15:00:00.000  1000  1000 I ISEE_VOIX: EXPECT voie=FENCE phrase=[Porte.]
+11-02 15:00:00.000  1000  1000 I ISEE_VOIX: PLAY source=clip detail=[Porte.]
+11-02 15:00:01.000  1000  1000 I ISEE_VOIX: PLAYER done
+11-02 15:00:01.000  1000  1000 I ISEE_VOIX: DONE phrase=[Porte.]
+11-02 15:00:02.000  1000  1000 I ISEE_VOIX: PLAY source=clip detail=[Voiture.]
+11-02 15:00:03.000  1000  1000 I ISEE_VOIX: PLAYER done
+11-02 15:00:03.000  1000  1000 I ISEE_VOIX: DONE phrase=[Voiture.]
+"""
+
+TRACE_TROU = """11-02 15:00:00.000  1000  1000 I ISEE_VOIX: EXPECT voie=FENCE phrase=[Stop.]
+11-02 15:00:00.000  1000  1000 I ISEE_VOIX: PLAY source=clip detail=[Stop.]
+11-02 15:00:01.000  1000  1000 I ISEE_VOIX: PLAYER done
+11-02 15:00:01.000  1000  1000 I ISEE_VOIX: DONE phrase=[Stop.]
+11-02 15:00:08.000  1000  1000 I ISEE_VOIX: PLAY source=clip detail=[Voiture.]
+11-02 15:00:09.000  1000  1000 I ISEE_VOIX: PLAYER done
+11-02 15:00:09.000  1000  1000 I ISEE_VOIX: DONE phrase=[Voiture.]
+"""
+
+TRACE_MICRO = """11-02 15:00:00.000  1000  1000 I ISEE_VOIX: PLAY source=clip detail=[Porte.]
+11-02 15:00:01.000  1000  1000 I ISEE_VOIX: PLAYER done
+11-02 15:00:01.000  1000  1000 I ISEE_VOIX: DONE phrase=[Porte.]
+11-02 15:00:04.000  1000  1000 W VoiceMute: bus-jet motif=micro-user level=2 texte=[Voiture.]
+11-02 15:00:08.000  1000  1000 I ISEE_VOIX: PLAY source=clip detail=[Voiture.]
+11-02 15:00:09.000  1000  1000 I ISEE_VOIX: DONE phrase=[Voiture.]
 """
 
 
@@ -123,9 +151,49 @@ def selftest_tts_propre():
     return 9
 
 
+def selftest_continuite():
+    """Continu pur, trou 8 s, micro tenu, seuil, wrap, sans-ts : 15 assertions.
+
+    Session inactive : non taggée (aucune ligne ISEE_VOIX/VoiceMute ne porte
+    l'état de session) — aucun écart exclu de ce fait. Micro tenu : `bus-jet
+    motif=micro-user` ou `prox-jet motif=parole-user` (jet ponctuel, écart
+    entier exclu — approximation assumée : la tenue n'est pas datée fin).
+    """
+    assert SEUIL_SILENCE_S == 5.0
+    continu = evenements(TRACE_CONTINU)
+    assert [g[0] for g in ecarts_silence(continu)] == [2.0]
+    lignes, propre = verdict_coupe(continu)
+    tenu = "\n".join(lignes)
+    assert propre and "max 2.00s" in tenu and "0 écart(s) > 5s" in tenu, lignes
+    pct, couvert, total = taux_parole(continu)
+    assert abs(pct - 200 / 3) < 0.01 and (couvert, total) == (2.0, 3.0)
+    trou = evenements(TRACE_TROU)
+    lignes, propre = verdict_coupe(trou)
+    vide = "\n".join(lignes)
+    assert not propre and "silence×1" in lignes[-1], lignes
+    assert "silence 8.00s (fautif)" in vide and "15:00:08.000" in vide, lignes
+    assert abs(taux_parole(trou)[0] - 200 / 9) < 0.01
+    assert verdict_coupe(trou, 10)[1]
+    micro = evenements(TRACE_MICRO)
+    lignes, propre = verdict_coupe(micro)
+    tenu_micro = "\n".join(lignes)
+    assert propre and "(1 exclu(s) micro)" in tenu_micro, lignes
+    assert "micro tenu, exclu" in tenu_micro and "fautif" not in tenu_micro, lignes
+    assert parse_ligne("W VoiceMute: bus-jet motif=micro-user level=2 texte=[A.]") == ("MICRO", "", "")
+    assert parse_ligne("W VoiceMute: prox-jet level=1 motif=parole-user texte=[A.]") == ("MICRO", "", "")
+    assert taux_parole(evenements(TRACE_PROPRE)) == (None, None, None)
+    nuit = ("11-02 23:59:59.000  1000  1000 I ISEE_VOIX: PLAY source=clip detail=[A.]\n"
+            "11-03 00:00:01.000  1000  1000 I ISEE_VOIX: PLAY source=clip detail=[B.]\n")
+    assert ecarts_silence(evenements(nuit))[0][0] == 2.0
+    seul = "11-02 15:00:00.000  1000  1000 I ISEE_VOIX: PLAY source=clip detail=[A.]\n"
+    assert taux_parole(evenements(seul)) == (None, 0.0, 0.0)
+    return 15
+
+
 def selftest():
-    """Assertions du parseur : trois blocs (orphelins, coupes, tts-propre)."""
-    total = selftest_orphelins() + selftest_coupes() + selftest_tts_propre()
+    """Assertions du parseur : quatre blocs (orphelins, coupes, tts-propre, continuité)."""
+    total = (selftest_orphelins() + selftest_coupes() + selftest_tts_propre()
+             + selftest_continuite())
     print(f"selftest voix : {total} assertions OK")
     return 0
 
