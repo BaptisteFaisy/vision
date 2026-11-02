@@ -79,6 +79,10 @@ internal class GlassesFrameCollector(
                     // Latest-wins : un JPEG plus frais annule l'envoi précédent
                     // au lieu de faire la queue derrière lui (ancienneté
                     // bornée par le throttle, pas par le RTT serveur).
+                    // L'envoi supplanté peut n'avoir jamais démarré : il est
+                    // journalisé, sinon la frame admise qui ne part pas
+                    // disparaîtrait sans trace (aucun `onDrop` ne la compte).
+                    upload?.let { if (it.isActive) onLog("frame superseded") }
                     upload?.cancel()
                     onLog("frame forwarded: ${flagged.width}x${flagged.height}")
                     upload = launch { onFrame(flagged) }

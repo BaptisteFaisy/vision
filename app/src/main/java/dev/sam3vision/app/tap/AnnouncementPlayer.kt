@@ -14,6 +14,12 @@ data class PrewarmReport(val ready: Int, val generated: Int, val missing: List<S
 /**
  * MP3 embarqués (voix Laure) du mode tap : copie le clip de [word] vers
  * [file] ; `false` si aucun clip. Couture écran : pack voix.
+ *
+ * **Appelé depuis plusieurs coroutines à la fois** : [AnnouncementPlayer.prewarm]
+ * lance une `async` par mot sur `Dispatchers.IO` (3 en parallèle, mesuré sur
+ * `DefaultDispatcher-worker-*` distincts). Une implémentation ne doit donc ni
+ * muter d'état partagé non synchronisé, ni supposer un appel séquentiel ; les
+ * clips étant des fichiers distincts, l'écriture concurrente reste sûre.
  */
 fun interface TapBundled {
     fun fill(word: Announcement, file: File): Boolean

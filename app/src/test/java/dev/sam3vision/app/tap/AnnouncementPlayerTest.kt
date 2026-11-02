@@ -4,6 +4,7 @@ import dev.sam3vision.app.SpeechPlayer
 import java.io.File
 import java.nio.file.Files
 import java.util.Collections
+import java.util.concurrent.CopyOnWriteArrayList
 import kotlinx.coroutines.runBlocking
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
@@ -16,10 +17,17 @@ import org.junit.Test
  */
 class AnnouncementPlayerTest {
 
-    /** Embarqué factice : écrit un faux mp3, échecs programmables. */
+    /**
+     * Embarqué factice : écrit un faux mp3, échecs programmables.
+     *
+     * [fill] est appelé depuis les trois coroutines `Dispatchers.IO` de `prewarm`
+     * (mesuré : `DefaultDispatcher-worker-1/3/4` simultanés) : [filled] doit donc
+     * être thread-safe. Une simple `mutableListOf` y perdait un `add` sur trois
+     * (`elementData[size++]` n'est pas atomique) → `expected:<3> but was:<2>`.
+     */
     private class FakeBundled(private val failOn: Set<Announcement> = emptySet()) : TapBundled {
         // `prewarm` remplit en parallèle (`async`) : une liste simple perd des ajouts.
-        val filled: MutableList<Announcement> = Collections.synchronizedList(mutableListOf())
+        val filled: MutableList<Announcement> = CopyOnWriteArrayList()
 
         override fun fill(word: Announcement, file: File): Boolean {
             filled += word
