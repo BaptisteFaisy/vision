@@ -110,7 +110,7 @@ class SilenceP1WishClipsTest {
         val phrase = CurbText.distancePhrase(2f, SpeechLanguage.En)
         val wish = curbWish(CurbCue(phrase, meters = 2f, tier = CurbTier.FAR, edge = CurbEdge.Up))
 
-        assertEquals("Curb at 2 meters.", wish?.text)
+        assertEquals("Curb 2 m.", wish?.text)
         assertEquals(listOf(IseeClipsEn.CURB_UP), wish?.clips)
     }
 
