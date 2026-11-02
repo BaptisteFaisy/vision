@@ -11,6 +11,7 @@ import dev.sam3vision.core.traverse.VehicleStateWatcher
 import kotlinx.coroutines.test.runTest
 import org.junit.After
 import org.junit.Assert.assertEquals
+import org.junit.Assert.assertFalse
 import org.junit.Assert.assertTrue
 import org.junit.Before
 import org.junit.Test
@@ -148,6 +149,31 @@ class StairsUncuttableTest {
         assertFalse(stairsBusStuck(OutdoorLevel.STAIRS, 4_000L, 0L))
         assertFalse(stairsBusStuck(OutdoorLevel.STAIRS, 1_000L, 500L))
         assertFalse(stairsBusStuck(OutdoorLevel.HUMAN, 99_999L, 0L))
+    }
+
+    @Test
+    fun `escaliers attendent la parole gps en cours`() {
+        VoiceBus.post(OutdoorLevel.GPS_EVENT, "Tournez à droite.")
+        VoiceBus.post(OutdoorLevel.STAIRS, "5 marches.")
+
+        assertEquals(1, speaker.said.size)
+
+        VoiceBus.onSpeechIdle()
+        VoiceBus.post(OutdoorLevel.STAIRS, "5 marches.")
+        assertEquals(2, speaker.said.size)
+    }
+
+    @Test
+    fun `escaliers actifs jusqu a 2 s sans compte`() {
+        val nowMs = System.currentTimeMillis()
+        VoiceBus.post(OutdoorLevel.STAIRS, "5 marches.")
+
+        assertTrue(VoiceBus.stairsActive(nowMs))
+        assertTrue(VoiceBus.stairsActive(nowMs + 1_999L))
+        assertTrue(VoiceBus.stairsActive(nowMs + 99_999L))
+
+        VoiceBus.onSpeechIdle()
+        assertFalse(VoiceBus.stairsActive(nowMs + 3_000L))
     }
 
     @Test

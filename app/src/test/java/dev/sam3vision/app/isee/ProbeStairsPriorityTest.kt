@@ -23,8 +23,9 @@ import org.junit.Test
 
 /**
  * Priorité du compteur de marches : il parle toutes les secondes devant les
- * positions et le guidage normal — mais l'évitement (décalage humain,
- * couloir bouché, stop) parle toujours, même sur les escaliers.
+ * positions et le guidage normal — l'évitement (décalage humain, couloir
+ * bouché, stop) est émis devant le compteur et parle au bus entre deux
+ * comptes (plus par-dessus, § 41) ; l'annonce seule cède à l'esquive.
  */
 @OptIn(ExperimentalCoroutinesApi::class)
 class ProbeStairsPriorityTest {
@@ -91,7 +92,7 @@ class ProbeStairsPriorityTest {
     }
 
     @Test
-    fun `esquive humaine tait les escaliers`() = runTest {
+    fun `esquive humaine tait l annonce escaliers`() = runTest {
         // Hors couloir (pas bouché) mais dans la fenêtre d'esquive (2 m de l'axe).
         val probe = probe(this, guide = true)
         probe.voice.phrase(0L, listOf(personne(0.78f, 3.0f)), SteeringCap.Straight)
@@ -104,7 +105,7 @@ class ProbeStairsPriorityTest {
     }
 
     @Test
-    fun `couloir bouche tait les escaliers`() = runTest {
+    fun `couloir bouche tait l annonce escaliers`() = runTest {
         val probe = probe(this, guide = true)
         probe.voice.phrase(0L, listOf(personne(0.5f, 1.0f)), SteeringCap.Straight)
 
@@ -138,7 +139,7 @@ class ProbeStairsPriorityTest {
     }
 
     @Test
-    fun `evitement parle sur les escaliers, cap normal tu`() = runTest {
+    fun `evitement emis devant le compteur, cap normal tu`() = runTest {
         val probe = probe(this, guide = true)
         StairCannyCount.offerLuma(stairsLuma())
         assertTrue(StairCannyCount.lineCount() > 0)

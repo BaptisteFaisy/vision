@@ -17,7 +17,8 @@ import org.junit.Test
  * SPEC v4 morts-voix : les portes et files sont supprimées (le bus
  * arbitre), le repli hors-ligne et son signal sont supprimés (sans clé ou
  * voix réseau en panne : silence, jamais de TTS système — seuls les clips
- * parlent sans réseau, et seule la voix GPS synthétise).
+ * parlent sans réseau, et seules les voix GPS + compte escaliers
+ * synthétisent, § 41).
  */
 class MortsVoixV4Test {
 
@@ -49,6 +50,17 @@ class MortsVoixV4Test {
             assertEquals(listOf("Turn left in 20 meters."), rig.attempts)
             assertTrue(rig.spoken.isEmpty())
         }
+    }
+
+    @Test
+    fun `compte escaliers synthetise comme gps`() = runTest {
+        val rig = Rig()
+        val voice = rig.voice()
+
+        assertTrue(voice.speak("5 marches.", level = OutdoorLevel.STAIRS))
+
+        assertEquals(listOf("5 marches."), rig.attempts)
+        assertEquals(listOf("5 marches."), rig.spoken)
     }
 
     @Test

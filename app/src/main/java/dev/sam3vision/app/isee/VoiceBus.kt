@@ -46,11 +46,14 @@ interface VoiceBusSpeaker {
  * la parole en cours (voitures, humains, bordures, chat compris) et vont
  * au bout, personne ne les coupe (ni le niveau 0 re-posté à chaque frame,
  * ni la Traversée 100+, ni les niveaux 2 à 5) — sauf un mot de guidage en
- * cours (GPS 3/11, incoupable lui aussi : respect mutuel, § 41). Seule la
- * parole du user (niveau 1, micro tenu) passe devant : les escaliers
- * l'attendent. Entre deux comptes (1 s), l'esquive (mots continus
- * humains, repli 12) re-poste et parle dans le silence — au milieu du
- * cycle, jamais par-dessus le compte.
+ * cours (GPS 3/11, incoupable lui aussi : respect mutuel, § 41 — une
+ * manœuvre sous un compte est reportée au silence, jamais perdue).
+ * Seule la parole du user (niveau 1, micro tenu) passe devant : les
+ * escaliers l'attendent. Entre deux comptes (1 s), l'esquive (mots
+ * continus humains, repli 12) re-poste et parle dans le silence — au
+ * milieu du cycle, jamais par-dessus le compte. Le chat, lui, attend
+ * la fin des marches ([stairsActive]) : une tranche ne tient pas dans
+ * l'intervalle.
  *
  * Exception (ordre user du 02/11/2026) : un mot de guidage en cours
  * (manœuvre 11, rappel 3 — clips offline ≤0,5 s) va au bout lui aussi :
@@ -81,6 +84,9 @@ object VoiceBus {
 
     /** Horodatage de la dernière parole acceptée (repli silence). */
     private var lastSayMs: Long = 0L
+
+    /** Horodatage du dernier compte accepté (le chat attend la fin, pas le silence). */
+    private var lastStairsSayMs: Long = 0L
 
     /** Le user tient le micro (niveau 1) : seul le niveau 0 passe. */
     private var userHoldsMic = false
@@ -119,6 +125,7 @@ object VoiceBus {
         if (level == OutdoorLevel.STAIRS) {
             activeLevel = level
             lastSayMs = nowMs
+            lastStairsSayMs = nowMs
             target.say(level, text, clipId, clips)
             return
         }
@@ -137,8 +144,8 @@ object VoiceBus {
 
     /**
      * Vrai quand des escaliers parlent (niveau 6 en cours) : les producteurs
-     * de niveau 0 s'y taisent en amont (sans consommer leur tour
-     * d'antirépétition) au lieu d'être jetés par [post].
+     * s'y taisent en amont (sans consommer leur tour d'antirépétition —
+     * [offer] et les guetteurs directs) au lieu d'être jetés par [post].
      */
     @Synchronized
     fun stairsSpeaking(): Boolean = activeLevel == OutdoorLevel.STAIRS
@@ -151,6 +158,16 @@ object VoiceBus {
     @Synchronized
     fun guidanceSpeaking(): Boolean =
         activeLevel == OutdoorLevel.GPS_EVENT || activeLevel == OutdoorLevel.GPS_REMINDER
+
+    /**
+     * Vrai quand les escaliers sont actifs à [nowMs] : compte en cours, ou
+     * dernier compte il y a moins de [STAIRS_QUIET_MS] (le chat attend la
+     * fin des marches, pas le prochain silence — une tranche ne tient pas
+     * dans l'intervalle).
+     */
+    @Synchronized
+    fun stairsActive(nowMs: Long): Boolean =
+        stairsSpeaking() || nowMs - lastStairsSayMs < STAIRS_QUIET_MS
 
     /**
      * Silence écoulé depuis la dernière parole acceptée (repli 12 : parler
@@ -214,6 +231,7 @@ object VoiceBus {
         userHoldsMic = false
         chatReads = false
         lastSayMs = 0L
+        lastStairsSayMs = 0L
     }
 }
 
@@ -229,3 +247,6 @@ internal fun stairsBusStuck(activeLevel: Int, nowMs: Long, lastSayMs: Long): Boo
 
 /** Silence maximal sous un niveau 6 (4 s : 4 comptes manqués, jamais en direct normal). */
 internal const val STAIRS_BUS_TTL_MS = 4_000L
+
+/** Fin des marches : 2 s sans compte accepté (2 cycles manqués, le compte bat à 1 s). */
+internal const val STAIRS_QUIET_MS = 2_000L
