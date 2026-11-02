@@ -14,12 +14,17 @@ import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.geometry.Size
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.ImageBitmap
 import androidx.compose.ui.graphics.Shadow
 import androidx.compose.ui.graphics.asImageBitmap
 import androidx.compose.ui.graphics.drawscope.Stroke
@@ -30,6 +35,8 @@ import androidx.compose.ui.text.rememberTextMeasurer
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import dev.sam3vision.core.picto.PictoHit
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.withContext
 
 /** Un repère à l'écran : son rectangle (px écran) et le nom de l'objet. */
 data class PictoRect(val left: Float, val top: Float, val right: Float, val bottom: Float, val label: String)
@@ -51,10 +58,12 @@ fun LivePictoOverlay(layer: PictoOverlay?) {
             color = Color.Yellow, fontSize = 30.sp, fontWeight = FontWeight.Bold,
             shadow = Shadow(Color.Black.copy(alpha = 0.8f), Offset(0f, 3f), 6f),
         )
+        // Étiquettes mesurées une fois par paquet, hors du dessin.
+        val laidOut = remember(rects, measurer) { rects.map { measurer.measure(it.label, style, maxLines = 1) } }
         Canvas(Modifier.fillMaxSize()) {
-            rects.forEach { rect ->
+            rects.forEachIndexed { index, rect ->
                 drawRect(Color.Yellow, Offset(rect.left, rect.top), Size(rect.right - rect.left, rect.bottom - rect.top), style = Stroke(width = 5f))
-                val text = measurer.measure(rect.label, style, maxLines = 1)
+                val text = laidOut[index]
                 drawText(textLayoutResult = text, topLeft = Offset(rect.left, rect.top - text.size.height - 6f))
             }
         }
@@ -89,11 +98,19 @@ private val BIG_PICTO_SIZE = 176.dp
 fun LivePictoBig(layer: PictoOverlay?, pngOf: (String) -> ByteArray?) {
     if (layer == null || layer.empty) return
     val hit = layer.hits.firstOrNull() ?: return
-    val bitmap = remember(hit.pictoId) {
-        runCatching {
-            pngOf(hit.pictoId)?.let { BitmapFactory.decodeByteArray(it, 0, it.size) }
-        }.getOrNull()?.asImageBitmap()
-    } ?: return
+    // Décodage hors thread UI : le PNG (dizaines de ms) ne bloque plus la
+    // composition — le nom seul s'affiche en attendant, rien sans PNG (démo).
+    var bitmap by remember(hit.pictoId) { mutableStateOf<ImageBitmap?>(null) }
+    var failed by remember(hit.pictoId) { mutableStateOf(false) }
+    LaunchedEffect(hit.pictoId) {
+        val decoded = withContext(Dispatchers.IO) {
+            runCatching {
+                pngOf(hit.pictoId)?.let { BitmapFactory.decodeByteArray(it, 0, it.size) }
+            }.getOrNull()?.asImageBitmap()
+        }
+        if (decoded == null) failed = true else bitmap = decoded
+    }
+    if (failed) return
     Box(Modifier.fillMaxSize(), contentAlignment = Alignment.TopCenter) {
         Column(
             Modifier
@@ -103,7 +120,7 @@ fun LivePictoBig(layer: PictoOverlay?, pngOf: (String) -> ByteArray?) {
                 .padding(12.dp),
             horizontalAlignment = Alignment.CenterHorizontally,
         ) {
-            Image(bitmap, contentDescription = hit.label, modifier = Modifier.size(BIG_PICTO_SIZE))
+            bitmap?.let { Image(it, contentDescription = hit.label, modifier = Modifier.size(BIG_PICTO_SIZE)) }
             Text(hit.label, color = Color.Yellow, fontSize = 22.sp, fontWeight = FontWeight.Bold)
         }
     }
