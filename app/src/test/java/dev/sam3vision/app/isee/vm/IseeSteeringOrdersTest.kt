@@ -169,6 +169,34 @@ class IseeSteeringOrdersTest {
         }
     }
 
+    @Test
+    fun `la bascule rend vrai a chaque vrai changement`() = runTest {
+        val (probe, _) = probeHarness(this)
+        val orders = orders(probe)
+
+        assertTrue(orders.toggleCrossing())
+        assertTrue(probe.state.value.crossingActive)
+
+        assertTrue(orders.toggleCrossing())
+        assertFalse(probe.state.value.crossingActive)
+    }
+
+    @Test
+    fun `l ordre vocal repete ne reconfigure pas la sonde`() = runTest {
+        val (probe, fake) = probeHarness(this)
+        val dites = mutableListOf<String>()
+        val orders = IseeSteeringOrders(probe, { Settings.Default }, { dites += it }, {})
+
+        orders.runCrossing("crossing mode on")
+        val fermees = fake.closed
+
+        orders.runCrossing("crossing mode on")
+
+        assertTrue(probe.state.value.crossingActive)
+        assertEquals(fermees, fake.closed)
+        assertEquals(listOf("Crossing mode on.", "Crossing mode on."), dites)
+    }
+
     private fun orders(probe: LiveProbe) =
         IseeSteeringOrders(probe, { Settings.Default }, {}, {})
 }

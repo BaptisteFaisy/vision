@@ -44,9 +44,21 @@ internal class IseeVoiceSpine(
 
     }
 
-    /** Traversée basculée : à l'allumage tout se tait (verdict propriétaire), à l'arrêt le chat reprend. */
+    /**
+     * Dernier état Traversée traité : la coupe et la reprise ne partent que sur
+     * une bascule réelle — un ordre répété (voix, puce) ne re-coupe pas.
+     */
+    private var lastCrossing: Boolean = crossingActive()
+
+    /**
+     * Traversée basculée : à l'allumage tout se tait (verdict propriétaire), à
+     * l'arrêt le chat reprend. Sans effet si l'état n'a pas changé.
+     */
     fun onCrossingChanged() {
-        if (crossingActive()) {
+        val active = crossingActive()
+        if (active == lastCrossing) return
+        lastCrossing = active
+        if (active) {
             cutSpeech()
             stopVoice()
         } else {
