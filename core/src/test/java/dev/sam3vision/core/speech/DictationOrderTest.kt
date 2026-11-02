@@ -60,6 +60,75 @@ class DictationOrderTest {
     }
 
     @Test
+    fun `mode gps francais guide vers la gare`() {
+        assertEquals(
+            DictationOrder.GpsGo("la gare"),
+            DictationOrders.parse("mode GPS je veux aller à la gare"),
+        )
+        assertEquals(
+            DictationOrder.GpsGo("gare Montparnasse"),
+            DictationOrders.parse("mode GPS je veux aller gare Montparnasse"),
+        )
+        assertEquals(
+            DictationOrder.GpsGo("la gare"),
+            DictationOrders.parse("mode GPS emmène-moi à la gare"),
+        )
+        assertEquals(
+            DictationOrder.GpsGo("la gare"),
+            DictationOrders.parse("mode GPS aller à la gare"),
+        )
+        assertEquals(
+            DictationOrder.GpsGo("la gare"),
+            DictationOrders.parse("mode GPS va à la gare"),
+        )
+    }
+
+    @Test
+    fun `mode gps lieu nu guide vers le lieu`() {
+        assertEquals(
+            DictationOrder.GpsGo("gare de Lyon"),
+            DictationOrders.parse("mode GPS gare de Lyon"),
+        )
+        assertEquals(
+            DictationOrder.GpsGo("gare de Lyon"),
+            DictationOrders.parse("mode GPS direction gare de Lyon"),
+        )
+        assertEquals(
+            DictationOrder.GpsGo("the station"),
+            DictationOrders.parse("mode GPS take me to the station"),
+        )
+    }
+
+    @Test
+    fun `mode gps seul redemande la destination`() {
+        assertEquals(DictationOrder.GpsAsk, DictationOrders.parse("mode GPS"))
+        assertEquals(DictationOrder.GpsAsk, DictationOrders.parse("mode gps ?"))
+        assertEquals(DictationOrder.GpsAsk, DictationOrders.parse("mode GPS please"))
+        assertEquals(DictationOrder.GpsAsk, DictationOrders.parse("mode GPS je veux aller"))
+        assertEquals(DictationOrder.GpsAsk, DictationOrders.parse("mode GPS je veux aller à"))
+        assertEquals(DictationOrder.GpsAsk, DictationOrders.parse("mode GPS I want to go"))
+        assertEquals(DictationOrder.GpsAsk, DictationOrders.parse("mode GPS I want to go to"))
+        assertEquals(DictationOrder.GpsAsk, DictationOrders.parse("mode GPS I want to go to   ?"))
+    }
+
+    @Test
+    fun `mode gps question de lieu part au llm`() {
+        assertNull(DictationOrders.parse("mode GPS où est la gare"))
+        assertNull(DictationOrders.parse("mode GPS ou aller ?"))
+        assertNull(DictationOrders.parse("mode GPS where is the station"))
+        assertNull(DictationOrders.parse("mode GPS how far is the station"))
+    }
+
+    @Test
+    fun `mode gps garde questions protege les lieux courts`() {
+        assertEquals(DictationOrder.GpsGo("Oust"), DictationOrders.parse("mode GPS Oust"))
+        assertEquals(
+            DictationOrder.GpsGo("Howard street"),
+            DictationOrders.parse("mode GPS Howard street"),
+        )
+    }
+
+    @Test
     fun `mode gps off coupe le gps`() {
         assertEquals(DictationOrder.GpsOff, DictationOrders.parse("mode GPS off"))
     }
@@ -150,7 +219,6 @@ class DictationOrderTest {
         assertNull(DictationOrders.parse("mode dedans"))
         assertNull(DictationOrders.parse("mode cross"))
         assertNull(DictationOrders.parse("mode find"))
-        assertNull(DictationOrders.parse("mode gps"))
         assertNull(DictationOrders.parse("mode glasses"))
     }
 
@@ -165,8 +233,6 @@ class DictationOrderTest {
     fun `un ordre a libelle vide part au llm`() {
         assertNull(DictationOrders.parse("mode find my"))
         assertNull(DictationOrders.parse("mode find my   "))
-        assertNull(DictationOrders.parse("mode GPS I want to go to"))
-        assertNull(DictationOrders.parse("mode GPS I want to go to   ?"))
     }
 
     @Test
@@ -179,6 +245,9 @@ class DictationOrderTest {
         assertTrue(DictationOrders.isOrder("mode find my mug"))
         assertTrue(DictationOrders.isOrder("mode find off"))
         assertTrue(DictationOrders.isOrder("mode GPS I want to go to la gare"))
+        assertTrue(DictationOrders.isOrder("mode GPS je veux aller à la gare"))
+        assertTrue(DictationOrders.isOrder("mode GPS gare de Lyon"))
+        assertTrue(DictationOrders.isOrder("mode GPS"))
         assertTrue(DictationOrders.isOrder("mode GPS off"))
         assertTrue(DictationOrders.isOrder("mode glasses on"))
         assertTrue(DictationOrders.isOrder("mode glasses off"))
