@@ -3,6 +3,23 @@
 Le journal part du 2026-10-26 après 19 h : le commit de départ, puis une entrée par fait
 livré et ses preuves (tâche, fichiers, chiffres) dans l'arbre.
 
+## 2026-11-02 — iSee : annonces des marches incoupables, niveau 0 et Traversée attendent (branche `fix/isee-marches-incoupables`)
+
+- **Demande** : l'annonce des marches dans un escalier (« Escalier montant. »,
+  « 5 marches. », « Plus que N marches. », « Dernière marche. ») va au bout,
+  sans être coupée par « Car. » (niveau 0) ni par la Traversée.
+- **Cause** : écrasement pur du bus voix v4 — le niveau 0, re-posté à chaque
+  frame, coupait le niveau 6 en pleine phrase.
+- **Fait** : `VoiceBus.post` jette le niveau 0 pendant un niveau 6 en cours
+  (seule exception à l'écrasement pur ; la Traversée 100+, déjà non préemptive
+  sur 6, attend aussi) ; le vœu véhicule se tait en amont
+  (`VoiceBus.stairsSpeaking`, tour `car-moving` non consommé). Humains, GPS,
+  grillages, bordures et escaliers re-détectés coupent toujours.
+- **Preuve** : `StairsUncuttableTest` (+5, nouveau) vert ; `:app` + `:core`
+  5 140 tests, 0 échec ; `check-kotlin-limits.py` vert ; APK debug
+  1.0.1375-931aa0b installé sur le téléphone de test (2c6852ac, `dumpsys`
+  relit la version). Recette rue **non mesurée** (preuves par `logcat`).
+
 ## 2026-11-02 — iSee : en guidage caméra ouverte, la boule s'efface et la rue grandit (branche `fix/isee-guidage-sans-bulle-camera-grande`)
 
 - **Demande** : quand la caméra et la carte sont affichées, ne plus montrer

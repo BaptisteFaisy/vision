@@ -131,7 +131,10 @@ internal fun obstacleFrame(
     offer(
         decideFrame(
             listOf(
-                vehicleWish(vehicleCue).takeUnless { indoor },
+                // Escaliers en cours : la voiture attend sans consommer son
+                // tour d'antirépétition (ordre user du 02/11/2026 — le bus
+                // jetterait le vœu de toute façon, tour mangé).
+                vehicleWish(vehicleCue).takeUnless { indoor || VoiceBus.stairsSpeaking() },
                 hazardWish(hazardCue, st.crossingActive)
                     ?.takeIf { !indoor || (!st.crossingActive && hazardCue?.kind == HazardKind.PERSON) },
                 curbWish(curbCue, st.crossingActive).takeUnless { indoor },
