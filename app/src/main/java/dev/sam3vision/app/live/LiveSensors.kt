@@ -100,7 +100,7 @@ internal class DistanceTicker(
 
     companion object {
         /**
-         * Pas du ticker : 80 ms — 10 Hz nominaux avec la marge du jitter
+         * Pas du ticker : 80 ms — 12,5 Hz nominaux avec la marge du jitter
          * d'ordonnancement (`delay` ne réveille jamais en avance), et sous
          * les 150 ms exigés.
          */
