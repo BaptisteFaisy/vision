@@ -32,6 +32,7 @@ import dev.sam3vision.app.glasses.bench.SpikeLaunch
 import dev.sam3vision.app.glasses.debugMockConnect
 import dev.sam3vision.app.glasses.refresh
 import dev.sam3vision.app.isee.IseeViewModel
+import dev.sam3vision.app.isee.vm.onSwipeUp
 import dev.sam3vision.app.locked.LockedMicBridge
 import dev.sam3vision.app.perms.canAskBackground
 
