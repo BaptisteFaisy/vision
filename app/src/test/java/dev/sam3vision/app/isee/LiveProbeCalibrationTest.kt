@@ -18,6 +18,7 @@ import org.junit.After
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertNotNull
 import org.junit.Assert.assertNull
+import org.junit.Assert.assertSame
 import org.junit.Assert.assertTrue
 import org.junit.Test
 
@@ -42,6 +43,7 @@ class LiveProbeCalibrationTest {
         assertEquals(CameraPose.Glasses, probe.distances.pose)
         assertNotNull(probe.session)
         assertNotNull(probe.coldSession)
+        assertSame("session unique partagée froide et chaude", probe.session, probe.coldSession)
         assertEquals(0, fake.closed)
     }
 
