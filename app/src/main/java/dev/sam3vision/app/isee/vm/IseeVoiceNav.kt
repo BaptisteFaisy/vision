@@ -183,6 +183,14 @@ class IseeVoiceNav(
     }
 
     /**
+     * Destination brute (ordre « mode GPS … X », dictée du maintien après
+     * balayage vers le bas) : le préfixe reconstruit l'intention que la
+     * session parse, puis le guidage démarre direct (`autoStartOnVoice`).
+     * Une seule implémentation du préfixe, partagée par les deux chemins.
+     */
+    suspend fun goTo(destination: String): Boolean = run("I want to go to " + destination)
+
+    /**
      * Détour obstacle de la sonde : transmis au pilote (recalcul Valhalla
      * depuis le GPS temps réel s'il dure). Sans effet si le pilote n'a
      * jamais démarré.

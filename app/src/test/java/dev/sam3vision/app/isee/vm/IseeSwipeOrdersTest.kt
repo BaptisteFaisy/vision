@@ -16,14 +16,18 @@ import org.junit.Test
 
 /**
  * Les deux balayages de la surface iSee : vers le bas, l'ordre GPS existant
- * « active le GPS » ; vers la droite, une question parlée puis le micro — la
- * chasse part avec l'objet entendu, jamais avec un silence.
+ * « active le GPS » (+ maintien : l'endroit dicté part en destination) ; vers
+ * la droite, une question parlée puis le micro — la chasse part avec l'objet
+ * entendu, jamais avec un silence.
  */
 class IseeSwipeOrdersTest {
 
     private val spokenClips = mutableListOf<String>()
     private val modes = mutableListOf<String>()
     private val gpsOrders = mutableListOf<String>()
+    private val destinations = mutableListOf<String>()
+    private var silences = 0
+    private val haptics = mutableListOf<String>()
     private var state = IseeUiState()
     private var voiceOn = false
 
@@ -31,6 +35,8 @@ class IseeSwipeOrdersTest {
     private class FakeListening(
         var text: String = "",
         var available: Boolean = true,
+        /** Rend un dicté blanc (transcription vide réelle) au lieu de `null`. */
+        var finishBlank: Boolean = false,
     ) : FindListening {
         var starts = 0
         var discards = 0
@@ -43,7 +49,8 @@ class IseeSwipeOrdersTest {
 
         override suspend fun finish(settings: Settings): Dictated? {
             finishes++
-            return if (text.isBlank()) null else Dictated(text, ByteArray(0))
+            if (text.isBlank() && !finishBlank) return null
+            return Dictated(text, ByteArray(0))
         }
 
         override fun discard() {
@@ -66,6 +73,10 @@ class IseeSwipeOrdersTest {
         placeMode = { placeMode },
         sayClip = { spokenClips += it },
         update = { fn -> state = fn(state) },
+        runDestination = { destinations += it; true },
+        silence = { silences++ },
+        hapticStart = { haptics += "start" },
+        hapticEnd = { haptics += "end" },
         clock = { testScheduler.currentTime },
     )
 
@@ -138,6 +149,124 @@ class IseeSwipeOrdersTest {
 
         assertEquals(IseeStatusText.MIC_UNAVAILABLE, state.status)
         assertTrue("aucune chasse", modes.isEmpty())
+        assertFalse("plus d'écoute", orders.asking())
+    }
+
+    @Test
+    fun `le maintien apres slide-bas ouvre le micro destination`() = runTest {
+        val listening = FakeListening(text = "gare de Lyon")
+        val orders = swipe(listening)
+
+        orders.askDestination()
+
+        assertEquals("micro ouvert une fois", 1, listening.starts)
+        assertEquals("voix coupée", 1, silences)
+        assertEquals(listOf("start"), haptics)
+        assertTrue("écoute tenue", orders.asking())
+        assertEquals("aucun clip de question", emptyList<String>(), spokenClips)
+        assertTrue("aucun ordre GPS rejoué", gpsOrders.isEmpty())
+        orders.sendDestination()
+        advanceUntilIdle()
+    }
+
+    @Test
+    fun `le relachement envoie l'endroit brut en destination`() = runTest {
+        val listening = FakeListening(text = "gare de Lyon")
+        val orders = swipe(listening)
+
+        orders.askDestination()
+        orders.sendDestination()
+        advanceUntilIdle()
+
+        assertEquals("transcrit une fois", 1, listening.finishes)
+        assertEquals(listOf("gare de Lyon"), destinations)
+        assertEquals(listOf("start", "end"), haptics)
+        assertFalse("plus d'écoute", orders.asking())
+    }
+
+    @Test
+    fun `destination blanche : « Say again. » et rien n'est envoye`() = runTest {
+        val listening = FakeListening(text = "  ", finishBlank = true)
+        val orders = swipe(listening)
+
+        orders.askDestination()
+        orders.sendDestination()
+        advanceUntilIdle()
+
+        assertEquals(IseeStatusText.NOTHING_HEARD, state.status)
+        assertEquals(listOf(IseeClipsEn.FIND_NOTHING), spokenClips)
+        assertTrue("aucune destination", destinations.isEmpty())
+        assertFalse("plus d'écoute", orders.asking())
+    }
+
+    @Test
+    fun `relachement sans maintien : aucun envoi`() = runTest {
+        val listening = FakeListening(text = "gare de Lyon")
+        val orders = swipe(listening)
+
+        orders.sendDestination()
+        advanceUntilIdle()
+
+        assertEquals("rien de transcrit", 0, listening.finishes)
+        assertTrue("aucune destination", destinations.isEmpty())
+        assertTrue("aucune haptique", haptics.isEmpty())
+    }
+
+    @Test
+    fun `destination, micro indisponible : motif pose et pas d'ecoute`() = runTest {
+        val listening = FakeListening(available = false)
+        val orders = swipe(listening)
+
+        orders.askDestination()
+        advanceUntilIdle()
+
+        assertEquals(IseeStatusText.MIC_UNAVAILABLE, state.status)
+        assertTrue("aucune destination", destinations.isEmpty())
+        assertFalse("plus d'écoute", orders.asking())
+    }
+
+    @Test
+    fun `l'ecoute destination bloque « Quoi chercher ? »`() = runTest {
+        val listening = FakeListening(text = "gare de Lyon")
+        val orders = swipe(listening)
+
+        orders.askDestination()
+        orders.askToFind()
+        advanceUntilIdle()
+
+        assertEquals("micro ouvert une fois (destination)", 1, listening.starts)
+        assertEquals("aucune question posée", emptyList<String>(), spokenClips)
+        assertTrue("aucune chasse", modes.isEmpty())
+        orders.sendDestination()
+        advanceUntilIdle()
+    }
+
+    @Test
+    fun `« Quoi chercher ? » bloque l'ecoute destination`() = runTest {
+        val listening = FakeListening(text = "mes clés")
+        val orders = swipe(listening)
+
+        orders.askToFind()
+        // L'écoute tient déjà le micro : la destination ne l'ouvre pas.
+        orders.askDestination()
+
+        assertEquals("micro pas ouvert par la destination", 0, listening.starts)
+        assertEquals("pas de coupe intempestive", 0, silences)
+        advanceUntilIdle()
+    }
+
+    @Test
+    fun `annuler le maintien jette sans transcrire`() = runTest {
+        val listening = FakeListening(text = "gare de Lyon")
+        val orders = swipe(listening)
+
+        orders.askDestination()
+        orders.cancelDestination()
+        advanceUntilIdle()
+
+        assertEquals("l'enregistrement est jeté", 1, listening.discards)
+        assertEquals("rien de transcrit", 0, listening.finishes)
+        assertTrue("aucune destination", destinations.isEmpty())
         assertFalse("plus d'écoute", orders.asking())
     }
 }

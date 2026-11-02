@@ -224,14 +224,14 @@ class IseeViewModel(app: Application) : AndroidViewModel(app) {
             update { it.copy(picto = it.picto.copy(phase = PictoPhase.Idle, hits = emptyList()), status = confirm) }
             navSpeaker.speakNavigation(confirm)
         },
-        gpsGo = { destination -> voiceNav.run("I want to go to " + destination) },
+        gpsGo = { destination -> voiceNav.goTo(destination) },
         gpsAsk = { navSpeaker.speakNetwork(NavClarifyText.ask(settings.speechLanguage)) },
         gpsOff = { voiceNav.runOrder("disable the GPS") },
         glasses = { glassesOrder.run("iSee") },
     ))
     private val glassesInbox = IseeGlassesInbox(viewModelScope, shots, { _state.value }, ::update, ::silenceForGlasses, ::answerHeard, cameraOps::stopVideo, probe::stop, { cameraOps.startVideo(); syncProbe() })
     /** Balayages bas/droite : fonction GPS et « Quoi chercher ? » (voir [IseeSwipeOrders]). */
-    private val swipe = IseeSwipeOrders(viewModelScope, modes::run, voiceNav::runOrder, dictation, { mic.preview().speaking }, { settings }, { _state.value.placeMode }, { navSpeaker.speakClipAndWait(it) }, ::update)
+    private val swipe = IseeSwipeOrders(viewModelScope, modes::run, voiceNav::runOrder, dictation, { mic.preview().speaking }, { settings }, { _state.value.placeMode }, { navSpeaker.speakClipAndWait(it) }, ::update, voiceNav::goTo, ::silenceForGlasses, haptics::holdStart, haptics::holdEnd)
     private val holdTalk = IseeHoldTalk(viewModelScope, { active }, ::silenceForGlasses, shots, { _state.value }, ::update, haptics, dictation, liveDictation, streamDictation, { settings }, cameraOps, ::transcribeAndAnswer, glassesInbox::onTap, { _state.value.placeMode }, modes::applyPlace, System::currentTimeMillis, swipe::asking)
     private val glassesOrder = IseeGlassesOrder({ navSpeaker.speakNavigation(it) }, ::update, { glassesSession })
 
