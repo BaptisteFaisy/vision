@@ -192,7 +192,7 @@ def main(argv):
     if args or (chemin is None and sys.stdin.isatty()):
         print("usage : parse_glasses_link.py [fichier] [--skip K]", file=sys.stderr)
         return 2
-    texte = open(chemin, encoding="utf-8").read() if chemin else sys.stdin.read()
+    texte = open(chemin, encoding="utf-8", errors="replace").read() if chemin else sys.stdin.read()
     return main_link(texte, skip)
 
 
