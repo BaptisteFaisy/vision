@@ -96,7 +96,8 @@ internal fun LiveProbe.computeRest(frame: LiveFrame, jpegB64: String, at: Long):
     )
     // Traversée : le verdict parle au bus (niveau 100), la phrase parlée se
     // tait (humains et bordures passent par le guetteur obstacles, 101/102).
-    if (_state.value.crossingActive) verdictEngine.onFrame(frame, readings, jpegB64, at)
+    // Le fond juge les pistes voitures : un pan sur une garée ne bloque pas.
+    if (_state.value.crossingActive) verdictEngine.onFrame(frame, readings, jpegB64, at, motion = ProbeBackgroundMotion.lastMotion)
     val phrase = phraseOf(placed, readings, frame, at, speechLanguage,
         distances.lensSpec.widthFovDeg(frame.width, frame.height))
     feedCrossingLateral(_state.value.crossingActive, frame.objects, frame.width, frame.height, readings, distances.effectivePose(), distances.lensSpec, at, speechLanguage)
