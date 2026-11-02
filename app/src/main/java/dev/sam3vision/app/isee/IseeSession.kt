@@ -27,6 +27,7 @@ class IseeSession(
     /** Fermeture complète : plus rien à l'écran, puis plus rien sur le téléphone. */
     fun onClosed() {
         player.stop()
+        VoiceBus.reset()
         update {
             it.copy(
                 entries = emptyList(),
