@@ -52,7 +52,7 @@ suspend fun awaitFirstFix(
 }
 
 /** Un provider au moins est actif : sinon aucun fix ne viendra jamais. */
-private fun anyProviderEnabled(manager: LocationManager): Boolean =
+internal fun anyProviderEnabled(manager: LocationManager): Boolean =
     runCatching { manager.isProviderEnabled(LocationManager.GPS_PROVIDER) }.getOrDefault(false) ||
         runCatching { manager.isProviderEnabled(LocationManager.NETWORK_PROVIDER) }.getOrDefault(false)
 
