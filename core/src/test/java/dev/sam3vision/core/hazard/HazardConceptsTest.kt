@@ -190,4 +190,18 @@ class HazardConceptsTest {
         assertFalse(HazardConcepts.isGuidedBody("scooter"))
         assertFalse(HazardConcepts.isGuidedBody("trampoline"))
     }
+
+    @Test
+    fun `murs reconnus FR EN pluriel`() {
+        assertTrue(HazardConcepts.isWall("wall"))
+        assertTrue(HazardConcepts.isWall("mur"))
+        assertTrue(HazardConcepts.isWall("MURS"))
+        assertTrue(HazardConcepts.isWall("walls"))
+        assertFalse(HazardConcepts.isWall("barrier"))
+        assertFalse(HazardConcepts.isWall("fence"))
+        assertFalse(HazardConcepts.isWall("person"))
+        assertFalse(HazardConcepts.isWall("  "))
+        assertTrue(HazardConcepts.isHazard("wall"))
+        assertTrue(HazardConcepts.isHazard("mur"))
+    }
 }
