@@ -49,6 +49,15 @@ MAX_OBJECTS_MIN = 1
 LIVE_DEFAULT_PROMPTS = ("person", "car", "dog", "chair")
 
 
+def deploy_sha() -> str:
+    """SHA déployé, cuit dans l'image (``DEPLOY_SHA``) ; ``unknown`` sans lui.
+
+    Zéro appel git au runtime (pas de dépôt dans l'image) : le script de déploiement
+    pose la variable, ``lever_env()`` la recuit — ``/health`` ne fait que la lire.
+    """
+    return os.environ.get("DEPLOY_SHA") or "unknown"
+
+
 class Sam3LiveService:
     """Modèle chargé une fois, leviers activables, verrou GPU unique.
 
@@ -104,6 +113,8 @@ class Sam3LiveService:
             self.ctx["detr_graphs"] = None
         from depth import ensure_depth
         ensure_depth(self.ctx, device, dtype)
+        self._gpu_lock = threading.Lock()
+        self._warmup_frame()
         self.gpu_name = gpu_name()
         self.load_seconds = round(time.monotonic() - started, 1)
         snap = getattr(self, "snap_seconds", None)
@@ -114,7 +125,21 @@ class Sam3LiveService:
         # à 185,8 s pour un snap de 20,4 s) ; boot complet : écart ≈ 2-5 s. Seuil
         # 30 s : le gel minimal (scaledown 60 s) le dépasse toujours (29/10/2026).
         self.restored = (age is not None and snap is not None and age - snap > 30)
-        self._gpu_lock = threading.Lock()
+
+    def _warmup_frame(self) -> None:
+        """Une frame factice jetée : capture DETR + cache tokenize chauds avant le réel.
+
+        Post-restore donc graphes valides ; non-bloquant — le boot ne casse jamais
+        là-dessus (bancs sans modèle : l'échec est avalé et loggé).
+        """
+        from PIL import Image
+
+        try:
+            run_frame(self.ctx, Image.new("RGB", (512, 512)),
+                      list(LIVE_DEFAULT_PROMPTS), WORK_EDGE_DEFAULT, MAX_OBJECTS_DEFAULT,
+                      BATCH_PROMPTS, gpu_lock=self._gpu_lock, with_depth=False)
+        except Exception as exc:  # noqa: BLE001 — le pré-chauffe est un bonus
+            print(f"warmup: frame factice ignorée ({exc})", flush=True)
 
     def _live_sync(self, image_b64, prompts, max_objects, work_edge, batch_prompts, edge,
                    mask_encoding=None, mask_format=None, mask_edge=0,
@@ -233,12 +258,12 @@ class Sam3LiveService:
 
         image = decode_image(image_b64)
         concepts = normalize_prompts(prompts) if prompts is not None else None
-        with self._gpu_lock:
-            if concepts is None:
+        if concepts is None:
+            with self._gpu_lock:
                 return run_segmentation(self.ctx["model"], self.ctx["processor"],
                                         self.ctx["device"], self.ctx["dtype"], image, None)
-            result = segment_frame(self.ctx, image, concepts, WORK_EDGE_MAX, MAX_OBJECTS,
-                                   BATCH_PROMPTS)
+        result = segment_frame(self.ctx, image, concepts, WORK_EDGE_MAX, MAX_OBJECTS,
+                               BATCH_PROMPTS, gpu_lock=self._gpu_lock)
         result.pop("_edge_applied", None)
         result.pop("_edge_ok", None)
         return result
@@ -263,7 +288,10 @@ class Sam3LiveService:
         Région/cloud lus sur les deux hôtes (``MODAL_*`` / ``BASETEN_*``) vers un champ
         stable ; ``load_seconds`` = phase GPU seule, ``restored``/``load_breakdown`` le boot.
         """
-        return {"ok": True, "model": MODEL_LABEL, "device": self.ctx.get("device_label", "cpu"),
+        sha = deploy_sha()
+        return {"ok": True, "model": MODEL_LABEL, "version": MODEL_LABEL,
+                "sha": sha, "commit": sha, "ws_binary": True,
+                "device": self.ctx.get("device_label", "cpu"),
                 "depth": self.ctx.get("depth_model_id"),
                 "gpu": getattr(self, "gpu_name", "unknown"),
                 "region": (os.environ.get("MODAL_REGION") or os.environ.get("BASETEN_REGION")
