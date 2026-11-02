@@ -114,7 +114,7 @@ internal open class GlassesVideoDecoder(
                 MediaFormat.MIMETYPE_VIDEO_HEVC, frame.width, frame.height,
             )
             csd0?.let { format.setByteBuffer("csd-0", ByteBuffer.wrap(it)) }
-            applyLowLatencyKeys(format)
+            applyDecoderLowLatencyKeys(format, OPERATING_RATE)
             MediaCodec.createDecoderByType(MediaFormat.MIMETYPE_VIDEO_HEVC).also {
                 it.configure(format, null, null, 0)
                 it.start()
@@ -235,22 +235,6 @@ internal open class GlassesVideoDecoder(
         runCatching { codec?.stop() }
         runCatching { codec?.release() }
         codec = null
-    }
-
-    /**
-     * Clés basse latence du décodeur : pas de mise en file interne, cadence
-     * annoncée à l'opérateur, priorité temps réel, aucun B-frame à réordonner.
-     *
-     * Miroir des clés du direct (`GlassesLiveDecoder`, qui garde sa copie
-     * privée) : le pont mérite le même décodeur nerveux, une frame manquée y
-     * est conflée (la suivante arrive ~67 ms plus tard à 15 i/s). Chaque clé
-     * est posée dans son propre `runCatching`, comme côté direct.
-     */
-    private fun applyLowLatencyKeys(format: MediaFormat) {
-        runCatching { format.setInteger(MediaFormat.KEY_LOW_LATENCY, 1) }
-        runCatching { format.setInteger(MediaFormat.KEY_OPERATING_RATE, OPERATING_RATE) }
-        runCatching { format.setInteger(MediaFormat.KEY_PRIORITY, 0) }
-        runCatching { format.setInteger(MediaFormat.KEY_MAX_B_FRAMES, 0) }
     }
 
     internal companion object {
