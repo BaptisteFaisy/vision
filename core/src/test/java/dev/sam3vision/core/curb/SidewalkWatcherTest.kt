@@ -20,7 +20,7 @@ class SidewalkWatcherTest {
         assertNull(watcher.onPosition(SidewalkPosition.Ahead, 0L))
         val cue = watcher.onPosition(SidewalkPosition.Ahead, 200L)!!
 
-        assertEquals("Sidewalk ahead.", cue.phrase)
+        assertEquals("Sidewalk.", cue.phrase)
         assertEquals(SidewalkPosition.Ahead, cue.position)
         assertEquals(200L, watcher.lastAlertMs)
     }
@@ -32,7 +32,7 @@ class SidewalkWatcherTest {
         assertNull(watcher.onPosition(SidewalkPosition.Across, 0L))
         val cue = watcher.onPosition(SidewalkPosition.Across, 200L)!!
 
-        assertEquals("Sidewalk across the street.", cue.phrase)
+        assertEquals("Sidewalk across.", cue.phrase)
         assertEquals(SidewalkPosition.Across, cue.position)
         assertEquals(200L, watcher.lastAlertMs)
     }
@@ -55,7 +55,7 @@ class SidewalkWatcherTest {
         assertNull(watcher.onPosition(SidewalkPosition.Left, 400L))
         val cue = watcher.onPosition(SidewalkPosition.Left, 600L)!!
 
-        assertEquals("Sidewalk on the left.", cue.phrase)
+        assertEquals("Sidewalk left.", cue.phrase)
         assertEquals(SidewalkPosition.Left, cue.position)
     }
 
@@ -67,7 +67,7 @@ class SidewalkWatcherTest {
         assertNull(watcher.onPosition(SidewalkPosition.Across, 400L))
         val cue = watcher.onPosition(SidewalkPosition.Across, 600L)!!
 
-        assertEquals("Sidewalk across the street.", cue.phrase)
+        assertEquals("Sidewalk across.", cue.phrase)
         assertEquals(SidewalkPosition.Across, cue.position)
     }
 
@@ -106,7 +106,7 @@ class SidewalkWatcherTest {
         watcher.onPosition(SidewalkPosition.Right, 0L, SpeechLanguage.En)
         val cue = watcher.onPosition(SidewalkPosition.Right, 200L, SpeechLanguage.En)!!
 
-        assertEquals("Sidewalk on the right.", cue.phrase)
+        assertEquals("Sidewalk right.", cue.phrase)
     }
 
     @Test
@@ -116,7 +116,7 @@ class SidewalkWatcherTest {
         watcher.onPosition(SidewalkPosition.Across, 0L, SpeechLanguage.En)
         val cue = watcher.onPosition(SidewalkPosition.Across, 200L, SpeechLanguage.En)!!
 
-        assertEquals("Sidewalk across the street.", cue.phrase)
+        assertEquals("Sidewalk across.", cue.phrase)
     }
 
     @Test

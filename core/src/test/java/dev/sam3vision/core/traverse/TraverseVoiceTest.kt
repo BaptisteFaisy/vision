@@ -32,7 +32,7 @@ class TraverseVoiceTest {
     fun `phrases - libelles uniques de crossing, un etat une phrase`() {
         assertEquals(CrossingText.phrase(CrossingState.Red), TraversePhrases.RED)
         assertEquals(CrossingText.phrase(CrossingState.Green), TraversePhrases.GREEN)
-        assertEquals("Sidewalk across the street.", TraversePhrases.SIDEWALK_ACROSS)
+        assertEquals("Sidewalk across.", TraversePhrases.SIDEWALK_ACROSS)
         assertEquals("Here.", TraversePhrases.ON_CROSSWALK)
         assertEquals(
             listOf(
@@ -47,7 +47,7 @@ class TraverseVoiceTest {
     fun `clipIdFor - les 4 phrases vers leurs mp3, inconnue nulle`() {
         assertEquals("cross_red", TraversePhrases.clipIdFor(TraversePhrases.RED))
         assertEquals("cross_green", TraversePhrases.clipIdFor(TraversePhrases.GREEN))
-        assertEquals("sidewalk_across", TraversePhrases.clipIdFor(TraversePhrases.SIDEWALK_ACROSS))
+        assertEquals("sidewalk_across_short", TraversePhrases.clipIdFor(TraversePhrases.SIDEWALK_ACROSS))
         assertEquals("cross_here", TraversePhrases.clipIdFor(TraversePhrases.ON_CROSSWALK))
         assertNull(TraversePhrases.clipIdFor("Bonjour."))
     }

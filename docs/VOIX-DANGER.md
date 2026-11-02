@@ -38,7 +38,7 @@ chat (9) et GPS (3, 11) en synthèse réseau.
 | 7 | Poteau ≤ 15 m droit devant : **mot continu** (§ 36) ; mobilier vertical + divers < 6 m : doux confirmé | `guide_left`, `guide_right` (poteau) ; `pole`, `lamp`, `sign`, `animal`, `bin`, `keepsake` (divers) |
 | 8 | Passages piétons < 6 m | Annonce (**« devant » toutes les 2 s** hors Traversée, 1 fois par vue sinon) + alignement **au changement** + arrivée **1 fois** | `cross_approach_*`, `crosswalk_aligned`, `cross_arrived` |
 | 9 | Réponses du chat | **Attente + reprise depuis la coupure** (tranche interrompue rejouée) ; **seule file restante** | Synthèse réseau (chat) |
-| 10 | Trottoirs | **Absolu (§ 45)** : coupe tout (escaliers et guidage compris), va au bout ; seul le micro user passe devant | `sidewalk_*` (existants) |
+| 10 | Trottoirs | **Absolu (§ 45)** : coupe tout, va au bout, seul le micro user passe devant ; **< 500 ms (§ 46)** : formes courtes lues en pastille 500 ms | `sidewalk_*_short` (nouveaux, `sidewalk_*` gardés pour le voicepack) |
 | 11 | GPS manœuvres et événements | Aux événements moteur | Synthèse réseau (GPS) |
 | 12 | Repli | **Rien à dire + silence 300 ms** : gauche, droite ou tout droit selon GPS + obstacles | `guide_left`, `guide_right`, `guide_straight` |
 
@@ -611,3 +611,42 @@ attendu) et `ProbeStairsCountVoiceTest` (+1 : compte attendu, tour intact).
 Recette téléphone : trottoir nommé pendant un compte — l'annonce entière
 aussitôt, le compte juste après — **non mesuré**, exige un APK sur appareil
 réel (preuves par `logcat`, jamais à l'oreille côté agent).
+
+## 46. Trottoir en moins de 500 ms : formes courtes + pastille 500 ms (ordre user du 02/11)
+
+L'annonce absolue (§ 45) bloquait la voix 1,5 à 2 s (clips mesurés :
+`ahead` 1,49 s, `left` 1,57 s, `right` 1,65 s, `across` 2,04 s — même à
+×3, plafond d'intelligibilité, trois sur quatre dépassaient 500 ms).
+Nouveau contrat : l'annonce tient en moins de 500 ms.
+
+- **formes courtes** : « Sidewalk. », « Sidewalk left. », « Sidewalk
+  right. », « Sidewalk across. » (`SidewalkText`, EN) — le FR est
+  inchangé (muet en v4 : pas de clip FR, seuls les niveaux GPS
+  synthétisent) ;
+- **nouveaux clips** : `sidewalk_*_short` (catalogue `clips`, miroir
+  `IseeClipsEn`, garde `check-isee-clips-en.py`) — les `sidewalk_*`
+  existants sont gardés (partagés avec le voicepack, section `reuse`) ;
+- **pauses trimmées** : la synthèse mettait jusqu'à 1 s de pauses dans
+  1,8 s d'audio — les MP3 commis sont trimmés (silences tête/queue
+  retirés, pauses internes plafonnées à 0,1 s) : `across` 0,91 s, `left`
+  0,81 s, `right` 0,76 s, `ahead` 0,50 s (mesurés `ffprobe`, pics
+  −9/−11 dB). Recette de reproduction (un `--regenerate` perd le trim) :
+  `ffmpeg -i IN -af silenceremove=start_periods=1:start_duration=0:
+  start_threshold=-30dB:stop_periods=-1:stop_duration=0.1:
+  stop_threshold=-30dB -codec:a libmp3lame -b:a 128k OUT` ;
+- **pastille 500 ms** : le niveau 10 se lit en tranche 500 ms
+  (`sliceMsForLevel`, verdict entier et 700 ms inchangés) — à vitesse de
+  base ×1,9 les quatre annonces tiennent (481/426/399/261 ms jouées,
+  aucune accélération au-delà du réglage) ;
+- **traversée** : le but suit la forme courte (« Sidewalk across. ») lue
+  dans son clip court (`TraversePhrases.clipIdFor`).
+
+Verrouillé par `VoiceSliceTest` (+2 : pastille par niveau, bus 500 ms),
+`IseeClipsEnTest` (registre 122, miroir, 4 clefs inverses),
+`SidewalkWatcherTest` + `SeuilsDehorsV4Test` (phrases courtes),
+`TraverseVoiceTest` + `TraverseVetoPriorityTest` (but court + clip court)
+et `GUIDAGE-TOUT-DROIT.md` (phrases citées).
+
+Recette téléphone : trottoir nommé — annonce brève (< 500 ms), voix
+libérée aussitôt — intelligibilité à valider à l'oreille (vitesse de
+base, pas d'accélération forcée).

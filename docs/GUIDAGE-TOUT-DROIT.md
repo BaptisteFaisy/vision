@@ -38,9 +38,9 @@ même temps** (bus vocal, le plus petit gagne).
 
 Le trottoir n'est pas un obstacle : c'est un **rail**. L'app ne parle que
 si l'utilisateur n'est plus dessus (dérive, contournement) — trottoir
-droit devant = aucun mot. Annonces au changement seul (« Sidewalk ahead. »,
-« Sidewalk on the left. », « Sidewalk on the right. », « Sidewalk across
-the street. »), silence 10 s (`sidewalk`). Coupé en traversée.
+droit devant = aucun mot. Annonces au changement seul (« Sidewalk. »,
+« Sidewalk left. », « Sidewalk right. », « Sidewalk across. » — formes
+courtes § 46, pastille 500 ms), silence 10 s (`sidewalk`). Coupé en traversée.
 
 ## 4. Repli (12) : gauche, droite ou tout droit
 
