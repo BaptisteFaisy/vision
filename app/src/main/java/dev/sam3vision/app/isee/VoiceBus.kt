@@ -31,10 +31,11 @@ interface VoiceBusSpeaker {
  * Bus vocal SPEC v4, contrat partagé : `fun VoiceBus.post(level, text, clipId?, clips)`.
  *
  * Écrasement pur : le plus petit nombre gagne. Au repos, tout niveau parle ;
- * pendant une parole, seul un niveau plus petit (ou égal — même source
- * re-détectée, dernier gagnant) coupe et parle ; l'écrasé n'est jamais redit
+ * pendant une parole, seul un niveau plus petit (ou égal — dernier gagnant)
+ * coupe et parle ; l'écrasé n'est jamais redit
  * (pas de file — sauf le chat, niveau 9, qui reprend depuis la coupure au
- * lieu de perdre). Échelle dehors 0 à 12 ([OutdoorLevel]), Traversée 100 à
+ * lieu de perdre, et les escaliers, niveau 6, qui ont une place unique,
+ * § ci-dessous). Échelle dehors 0 à 12 ([OutdoorLevel]), Traversée 100 à
  * 102 ([dev.sam3vision.core.crossing.CrossingLevels]).
  *
  * La parole du user (niveau 1, [userSpeaking]) tait tout sauf le niveau 0
@@ -68,6 +69,11 @@ interface VoiceBusSpeaker {
  * (le rappel 3 attend la fin de la bordure ; manœuvre 11 et repli 12
  * sont déjà sous elle). Voitures (0), parole user (1), humains (2) et
  * escaliers (6, compte incoupable) gardent leur rang devant elle.
+ *
+ * Exception (ordre user du 03/11/2026, VOIX-DANGER § 44) : une phrase
+ * d'escaliers n'est jamais coupée par une autre phrase d'escaliers — elle
+ * attend en place unique (dernier gagnant, TTL [STAIRS_PENDING_TTL_MS])
+ * et joue à la fin de la courante ([onSpeechIdle]).
  */
 object VoiceBus {
     /** Aucune parole en cours : tout niveau parle. */
@@ -104,6 +110,30 @@ object VoiceBus {
     /** Horodatage du dernier compte accepté (le chat attend la fin, pas le silence). */
     private var lastStairsSayMs: Long = 0L
 
+    /**
+     * Phrase escaliers en attente de fin de la phrase courante (niveau 6
+     * seulement, dernier gagnant) : une phrase de marches ne se coupe jamais
+     * elle-même — ordre user du 03/11, « il se coupe en permanence et
+     * n'arrive pas à dire le nombre de marches ».
+     */
+    private var pendingStairs: PendingStairs? = null
+
+    /** Phrase escaliers retenue : texte, clip, chaîne, instant et clé d'antirépétition. */
+    private data class PendingStairs(
+        val text: String,
+        val clipId: String?,
+        val clips: List<String>,
+        val atMs: Long,
+        val key: String?,
+    )
+
+    /**
+     * Horloge du bus (`System.currentTimeMillis` en prod ; temps virtuel en
+     * test JVM). [reset] la rend d'origine : un test ne fuit pas dans le suivant.
+     */
+    @Volatile
+    internal var clock: () -> Long = { System.currentTimeMillis() }
+
     /** Le user tient le micro (niveau 1) : seul le niveau 0 passe. */
     private var userHoldsMic = false
 
@@ -113,9 +143,10 @@ object VoiceBus {
     /**
      * Propose [text] au niveau [level] (clip [clipId] si connu, séquence
      * [clips] si non vide) : parlé aussitôt si rien ne parle ou si [level]
-     * écrase la parole en cours, jeté sinon (jamais redit, jamais mis en
-     * file). La décision lit [activeLevel], pas le lecteur (sinon une parole
-     * décidée mais pas encore jouée laisserait passer un niveau plus bas).
+     * écrase la parole en cours, retenu (escaliers, place unique) ou jeté
+     * sinon (jamais redit). La décision lit [activeLevel], pas le lecteur
+     * (sinon une parole décidée mais pas encore jouée laisserait passer un
+     * niveau plus bas).
      * [antiRepeatKey] rend son tour quand l'annonce est jetée (SPEC v4 § 5 :
      * une annonce avalée ne consomme pas son tour — le producteur l'avait
      * consommé par son pré-contrôle) ; `null` = sans clé (comportement
@@ -123,7 +154,7 @@ object VoiceBus {
      *
      * Rend **vrai quand la phrase est retenue et émise**, faux quand elle a
      * été jetée (vide, sans porte-parole, micro user, mot de guidage,
-     * escaliers, niveau écrasé) : depuis le 02/11/2026 l'appelant sait donc
+     * niveau écrasé) : depuis le 02/11/2026 l'appelant sait donc
      * s'il a parlé, au lieu de le supposer (A9 § 3 D8 : le verdict traversée
      * croyait avoir parlé alors que le bus l'avait jeté ⇒ jusqu'à 2 s de
      * silence, « Don't cross. » compris). Aucun appelant existant ne casse :
@@ -150,7 +181,7 @@ object VoiceBus {
             refundTurn(antiRepeatKey)
             return false
         }
-        val nowMs = System.currentTimeMillis()
+        val nowMs = clock()
         if (stairsBusStuck(activeLevel, nowMs, lastSayMs)) activeLevel = IDLE_LEVEL
         if (guidanceSpeaking() && level != OutdoorLevel.USER_SPEECH && level != OutdoorLevel.CURB) {
             android.util.Log.w(TAG_MUTE, "bus-jet motif=mot-guidage-en-cours level=$level texte=[$text]")
@@ -158,11 +189,7 @@ object VoiceBus {
             return false
         }
         if (level == OutdoorLevel.STAIRS) {
-            activeLevel = level
-            lastSayMs = nowMs
-            lastStairsSayMs = nowMs
-            holdToken++
-            return sayOrGhost(target, level, text, clipId, clips, antiRepeatKey)
+            return postStairs(target, text, clipId, clips, antiRepeatKey, nowMs)
         }
         if (activeLevel == OutdoorLevel.STAIRS) {
             android.util.Log.w(TAG_MUTE, "bus-jet motif=escaliers-en-cours level=$level texte=[$text]")
@@ -201,6 +228,42 @@ object VoiceBus {
      */
     private fun curbPreemptsGuidance(level: Int): Boolean =
         level == OutdoorLevel.CURB && guidanceSpeaking()
+
+    /**
+     * Poste une phrase escaliers (niveau 6). Bus libre ou tenu par un autre
+     * niveau : elle parle tout de suite (les escaliers coupent tout, § 40).
+     * Escaliers déjà en cours : elle est **retenue** en place unique (la plus
+     * récente écrase) et parlera à la fin de la phrase courante — une phrase
+     * de marches ne se coupe jamais elle-même (ordre user du 03/11 : « il se
+     * coupe en permanence et n'arrive pas à dire le nombre de marches » ;
+     * compte qui oscille, annonce re-détectée, répétition 1 s et battement
+     * 700 ms visaient tous le même niveau 6). Rend vrai dans les deux cas :
+     * retenue = elle parlera.
+     */
+    private fun postStairs(
+        target: VoiceBusSpeaker,
+        text: String,
+        clipId: String?,
+        clips: List<String>,
+        antiRepeatKey: String?,
+        nowMs: Long,
+    ): Boolean {
+        if (activeLevel == OutdoorLevel.STAIRS) {
+            pendingStairs = PendingStairs(text, clipId, clips, nowMs, antiRepeatKey)
+            // `lastStairsSayMs` seul : le chat attend la fin des marches, mais
+            // `lastSayMs` reste celui de la dernière parole RÉELLE — sinon la
+            // garde `stairsBusStuck` (4 s) ne pourrait plus jamais libérer un
+            // niveau 6 dont la fin de lecture s'est perdue.
+            lastStairsSayMs = nowMs
+            if (BuildConfig.DEBUG) android.util.Log.d(TAG_MUTE, "bus-escaliers-en-attente texte=[$text]")
+            return true
+        }
+        activeLevel = OutdoorLevel.STAIRS
+        lastSayMs = nowMs
+        lastStairsSayMs = nowMs
+        holdToken++
+        return sayOrGhost(target, OutdoorLevel.STAIRS, text, clipId, clips, antiRepeatKey)
+    }
 
     /**
      * Dit [text] via [target] : si [VoiceBusSpeaker.say] lève (porte-parole
@@ -293,12 +356,69 @@ object VoiceBus {
      * Fin de lecture (appelée par le lecteur) : rend la parole, sauf si le
      * user tient le micro ou si le chat lit (ils gardent leur niveau).
      */
-    @Synchronized
-    fun onSpeechIdle() {
-        if (userHoldsMic || chatReads) return
-        if (activeLevel == IDLE_LEVEL) return
-        activeLevel = IDLE_LEVEL
+    fun onSpeechIdle() = onSpeechIdle(cut = false)
+
+    /**
+     * Fin de lecture, [cut] vrai quand la lecture a été **coupée** (parole du
+     * user, sortie d'écran, intro, arrêt du lecteur de clips) et non terminée :
+     * la phrase escaliers retenue est alors abandonnée (tour rendu) au lieu
+     * d'être dite par-dessus la raison de la coupe.
+     *
+     * Le corps n'est **pas** sous le verrou du bus : la phrase retenue est
+     * retirée et la place réservée sous verrou, puis parlée hors verrou —
+     * `say` prend le verrou du lecteur et le rappel de fin de lecture le
+     * prend en tenant celui du lecteur (jamais deux verrous croisés).
+     */
+    fun onSpeechIdle(cut: Boolean) {
+        val next: PendingStairs?
+        synchronized(this) {
+            if (userHoldsMic || chatReads) return
+            if (cut) {
+                pendingStairs?.let { refundTurn(it.key) }
+                pendingStairs = null
+                next = null
+            } else {
+                next = takePendingStairs()
+            }
+            if (next != null) {
+                activeLevel = OutdoorLevel.STAIRS
+                lastSayMs = clock()
+                lastStairsSayMs = lastSayMs
+                holdToken++
+            } else {
+                if (activeLevel == IDLE_LEVEL) return
+                activeLevel = IDLE_LEVEL
+            }
+        }
+        if (next != null) {
+            val target = speaker
+            if (target != null) {
+                sayOrGhost(target, OutdoorLevel.STAIRS, next.text, next.clipId, next.clips, next.key)
+                return
+            }
+            refundTurn(next.key)
+            return
+        }
         onIdle?.invoke()
+    }
+
+    /**
+     * Retire la phrase escaliers retenue **sous verrou** : rend son tour et
+     * `null` si elle est périmée ([STAIRS_PENDING_TTL_MS] : un compte qui
+     * date de la phrase précédente ne se dit plus — le prochain tick
+     * repostera le compte courant) ; rend la phrase sinon.
+     */
+    private fun takePendingStairs(): PendingStairs? {
+        val next = pendingStairs ?: return null
+        pendingStairs = null
+        val nowMs = clock()
+        if (nowMs - next.atMs > STAIRS_PENDING_TTL_MS) {
+            if (BuildConfig.DEBUG) android.util.Log.d(TAG_MUTE, "bus-escaliers-perime texte=[${next.text}]")
+            refundTurn(next.key)
+            return null
+        }
+        if (BuildConfig.DEBUG) android.util.Log.d(TAG_MUTE, "bus-escaliers-enchaine texte=[${next.text}]")
+        return next
     }
 
     /**
@@ -311,6 +431,10 @@ object VoiceBus {
         if (speaking == userHoldsMic) return
         userHoldsMic = speaking
         if (speaking) {
+            // Le user prend la parole : la phrase escaliers en attente est
+            // abandonnée (le compte sera reposté au tick suivant), son tour rendu.
+            pendingStairs?.let { refundTurn(it.key) }
+            pendingStairs = null
             speaker?.cut()
             activeLevel = OutdoorLevel.USER_SPEECH
         } else if (activeLevel == OutdoorLevel.USER_SPEECH) {
@@ -346,6 +470,8 @@ object VoiceBus {
         lastSayMs = 0L
         lastStairsSayMs = 0L
         holdToken = 0L
+        pendingStairs = null
+        clock = { System.currentTimeMillis() }
     }
 }
 
@@ -364,3 +490,10 @@ internal const val STAIRS_BUS_TTL_MS = 4_000L
 
 /** Fin des marches : 2 s sans compte accepté (2 cycles manqués, le compte bat à 1 s). */
 internal const val STAIRS_QUIET_MS = 2_000L
+
+/**
+ * Fraîcheur d'une phrase escaliers retenue : 1,5 s. Au-delà, le compte a été
+ * dit pour l'image d'avant (la phrase en cours a duré plus longtemps qu'un
+ * cycle) — le redire serait périmé ; le tick suivant reposte le compte courant.
+ */
+internal const val STAIRS_PENDING_TTL_MS = 1_500L

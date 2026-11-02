@@ -352,11 +352,14 @@ class EchelleOverwriteTest {
     }
 
     @Test
-    fun `offre escaliers passe sous un compte`() {
+    fun `offre escaliers passe sous un compte, en attente`() {
         VoiceBus.post(OutdoorLevel.STAIRS, "5 marches.")
 
         assertTrue(offer(VoiceWish(OutdoorLevel.STAIRS, "4 marches.", "test-escaliers-passe"), nowMs = 0L))
 
+        // La phrase en cours va au bout ; l'offre escaliers attend son tour.
+        assertEquals(1, speaker.said.size)
+        VoiceBus.onSpeechIdle()
         assertEquals(2, speaker.said.size)
     }
 
