@@ -29,11 +29,11 @@ import kotlinx.coroutines.withContext
  *   au lieu d'être jeté ; les frames de configuration brutes alimentent son
  *   `csd-0` sans passer par l'étranglement (elles ne portent aucune image).
  *
- * Deux frames en vol, pipelinées : le décodage de la frame N+1 tourne pendant
- * l'envoi (analyse réseau + voix) de la frame N. Le décodage reste séquentiel
- * (le `MediaCodec` n'est pas réentrant) et les envois partent dans l'ordre
- * d'admission — au plus une attente avant chaque envoi, jamais deux analyses
- * ni deux voix en même temps.
+ * Latest-wins : quand un JPEG plus frais est prêt, l'envoi précédent est
+ * annulé au lieu d'être attendu — attendre sérialisait les envois sur le RTT
+ * serveur (SAM/LLM en secondes), et la rue envoyée avait l'âge de la file. Le
+ * décodage reste séquentiel (le `MediaCodec` n'est pas réentrant) et au plus
+ * un envoi vit à la fois — jamais deux analyses ni deux voix en même temps.
  *
  * Le verdict et l'étranglement précèdent toute copie : une frame rejetée ne
  * touche ni le décodeur ni l'encodeur (aucun octet copié). Toute frame
@@ -76,9 +76,10 @@ internal class GlassesFrameCollector(
                     // journalisé + marqué, jamais jeté.
                     glassesAspectNote(frame.width, frame.height)?.let(onLog)
                     val flagged = jpeg.withAspectFlag(frame.width, frame.height)
-                    // Un seul envoi en vol : le précédent s'achève avant que
-                    // celui-ci parte — les analyses restent ordonnées.
-                    upload?.join()
+                    // Latest-wins : un JPEG plus frais annule l'envoi précédent
+                    // au lieu de faire la queue derrière lui (ancienneté
+                    // bornée par le throttle, pas par le RTT serveur).
+                    upload?.cancel()
                     onLog("frame forwarded: ${flagged.width}x${flagged.height}")
                     upload = launch { onFrame(flagged) }
                 }

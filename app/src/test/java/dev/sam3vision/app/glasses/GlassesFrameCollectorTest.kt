@@ -7,7 +7,6 @@ import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.flow
 import kotlinx.coroutines.flow.flowOf
 import kotlinx.coroutines.runBlocking
-import kotlinx.coroutines.withTimeout
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertTrue
 import org.junit.Test
@@ -20,9 +19,9 @@ import org.junit.Test
  *
  * Ce que ces tests verrouillent : un throttling d'~1 frame/400 ms par rejet
  * (pas d'attente qui suspendrait le flux), le routage compressé → décodeur /
- * brut → YUV / config → `csd-0`, le pipeline (le décodage chevauche l'envoi
- * précédent, les envois restent ordonnés), et le silence documenté de chaque
- * jet (journalisé et compté par cause, jamais levé).
+ * brut → YUV / config → `csd-0`, le latest-wins (un JPEG plus frais annule
+ * l'envoi précédent au lieu de faire la queue), et le silence documenté de
+ * chaque jet (journalisé et compté par cause, jamais levé).
  */
 class GlassesFrameCollectorTest {
 
@@ -241,15 +240,16 @@ class GlassesFrameCollectorTest {
     }
 
     @Test
-    fun `le decodage chevauche l envoi precedent, les envois restent ordonnes`() = runBlocking {
+    fun `un envoi lent est annule quand une frame plus fraiche est prete`() = runBlocking {
         val decoder = FakeDecoder()
         var encoded = 0
         val pipe = GlassesFrameCollector(
             decoder = decoder,
-            // Chaque envoi attend le second décodage : en séquentiel, le premier
-            // envoi s'achèverait avant lui et le garde temporel lâcherait.
+            // Premier envoi volontairement lent (SAM/LLM en secondes) : sans
+            // latest-wins, le second attendrait derrière lui et la rue envoyée
+            // aurait l'âge de la file.
             onFrame = { frame ->
-                withTimeout(5_000L) { while (decoder.decoded < 2) delay(10L) }
+                if (frame.base64 == "b64-1") delay(60_000L)
                 frames += frame
             },
             onLog = { journal += it },
@@ -267,7 +267,7 @@ class GlassesFrameCollectorTest {
 
         pipe.run(video)
 
-        assertEquals("deux décodages, deux envois", 2, decoder.decoded)
-        assertEquals("envois dans l'ordre d'admission", listOf("b64-1", "b64-2"), frames.map { it.base64 })
+        assertEquals("deux décodages", 2, decoder.decoded)
+        assertEquals("seule la plus fraîche part", listOf("b64-2"), frames.map { it.base64 })
     }
 }
