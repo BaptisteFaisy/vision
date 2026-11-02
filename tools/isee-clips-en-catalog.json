@@ -408,6 +408,22 @@
     {
       "en": "Where to?",
       "id": "where_to"
+    },
+    {
+      "en": "Sidewalk.",
+      "id": "sidewalk_ahead_short"
+    },
+    {
+      "en": "Sidewalk left.",
+      "id": "sidewalk_left_short"
+    },
+    {
+      "en": "Sidewalk right.",
+      "id": "sidewalk_right_short"
+    },
+    {
+      "en": "Sidewalk across.",
+      "id": "sidewalk_across_short"
     }
   ],
   "reuse": [

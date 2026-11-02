@@ -15,15 +15,15 @@ import org.junit.Test
 class IseeClipsEnTest {
 
     @Test
-    fun `le registre couvre les 104 nouveaux clips et les 19 réutilisés`() {
-        assertEquals(123, IseeClipsEn.all.size)
+    fun `le registre couvre les 106 nouveaux clips et les 21 réutilisés`() {
+        assertEquals(127, IseeClipsEn.all.size)
     }
 
     @Test
     fun `chaque entrée du catalogue JSON est dans le registre au caractère près`() {
         val catalog = JSONObject(catalogFile().readText())
         val entries = catalog.getJSONArray("clips") + catalog.getJSONArray("reuse")
-        assertEquals(123, entries.size)
+        assertEquals(127, entries.size)
         for ((id, text) in entries) {
             assertEquals("clip $id", text, IseeClipsEn.all[id])
         }
@@ -83,6 +83,10 @@ class IseeClipsEnTest {
         assertEquals("Aligned with the crosswalk.", all[IseeClipsEn.CROSSWALK_ALIGNED])
         assertEquals("On the crosswalk.", all[IseeClipsEn.CROSSWALK_ARRIVED])
         assertEquals("Sidewalk ahead.", all[IseeClipsEn.SIDEWALK_AHEAD])
+        assertEquals("Sidewalk.", all[IseeClipsEn.SIDEWALK_AHEAD_SHORT])
+        assertEquals("Sidewalk left.", all[IseeClipsEn.SIDEWALK_LEFT_SHORT])
+        assertEquals("Sidewalk right.", all[IseeClipsEn.SIDEWALK_RIGHT_SHORT])
+        assertEquals("Sidewalk across.", all[IseeClipsEn.SIDEWALK_ACROSS_SHORT])
         assertEquals("Cross.", all[IseeClipsEn.VERDICT_CROSS])
         assertEquals("Don't cross.", all[IseeClipsEn.VERDICT_WAIT])
         assertEquals("Left.", all[IseeClipsEn.GO_LEFT])
@@ -186,6 +190,10 @@ class IseeClipsEnTest {
         assertEquals(IseeClipsEn.SIDEWALK_LEFT, IseeClipsEn.idForText("Sidewalk on the left."))
         assertEquals(IseeClipsEn.SIDEWALK_RIGHT, IseeClipsEn.idForText("Sidewalk on the right."))
         assertEquals(IseeClipsEn.SIDEWALK_ACROSS, IseeClipsEn.idForText("Sidewalk across the street."))
+        assertEquals(IseeClipsEn.SIDEWALK_AHEAD_SHORT, IseeClipsEn.idForText("Sidewalk."))
+        assertEquals(IseeClipsEn.SIDEWALK_LEFT_SHORT, IseeClipsEn.idForText("Sidewalk left."))
+        assertEquals(IseeClipsEn.SIDEWALK_RIGHT_SHORT, IseeClipsEn.idForText("Sidewalk right."))
+        assertEquals(IseeClipsEn.SIDEWALK_ACROSS_SHORT, IseeClipsEn.idForText("Sidewalk across."))
         assertEquals(IseeClipsEn.HUMAN_IMMINENT, IseeClipsEn.idForText("Stop."))
         assertEquals(IseeClipsEn.HUMAN_PERSON, IseeClipsEn.idForText("Person."))
         assertEquals(IseeClipsEn.CAR, IseeClipsEn.idForText("Car."))
