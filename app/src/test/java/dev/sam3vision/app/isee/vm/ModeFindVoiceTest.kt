@@ -31,36 +31,36 @@ class ModeFindVoiceTest {
     fun `mode find my mug dedans chasse n importe quel objet`() = runBlocking {
         assertTrue(voice().run("mode find my mug"))
         assertEquals(listOf("mug"), found)
-        assertEquals(listOf("Looking for mug."), spoken)
-        assertEquals("Looking for mug.", state.status)
+        assertEquals(listOf("Finding mug."), spoken)
+        assertEquals("Finding mug.", state.status)
     }
 
     @Test
     fun `mode find my tolere casse ponctuation et please`() = runBlocking {
         assertTrue(voice().run("Mode find my tv remote, please!"))
         assertEquals(listOf("tv remote"), found)
-        assertEquals(listOf("Looking for tv remote."), spoken)
+        assertEquals(listOf("Finding tv remote."), spoken)
     }
 
     @Test
     fun `mode find my dehors refuse sans chasse`() = runBlocking {
         assertTrue(voice(PictoPlaceMode.DEHORS).run("mode find my mug"))
         assertTrue(found.isEmpty())
-        assertEquals(listOf("Find works indoors only."), spoken)
-        assertEquals("Find works indoors only.", state.status)
+        assertEquals(listOf("Indoors only."), spoken)
+        assertEquals("Indoors only.", state.status)
     }
 
     @Test
     fun `la confirmation parle la langue de la voix`() = runBlocking {
         assertTrue(voice(language = SpeechLanguage.Fr).run("mode find my mug"))
-        assertEquals(listOf("Je cherche mug."), spoken)
-        assertEquals("Je cherche mug.", state.status)
+        assertEquals(listOf("Cherche mug."), spoken)
+        assertEquals("Cherche mug.", state.status)
     }
 
     @Test
     fun `le refus dehors parle la langue de la voix`() = runBlocking {
         assertTrue(voice(PictoPlaceMode.DEHORS, SpeechLanguage.Fr).run("mode find my mug"))
-        assertEquals(listOf("La recherche ne marche que dedans."), spoken)
+        assertEquals(listOf("Que dedans."), spoken)
     }
 
     @Test

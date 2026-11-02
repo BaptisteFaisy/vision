@@ -90,14 +90,14 @@ object PictoVoiceText {
 
     /** L'ordre « mode find my X » part : SAM suit X, son pictogramme se crée. */
     fun findStarted(label: String, language: SpeechLanguage = SpeechLanguage.Fr): String = when (language) {
-        SpeechLanguage.Fr -> "Je cherche $label."
-        SpeechLanguage.En -> "Looking for $label."
+        SpeechLanguage.Fr -> "Cherche $label."
+        SpeechLanguage.En -> "Finding $label."
     }
 
     /** La recherche dehors : refusée, jamais de picto dehors. */
     fun refused(language: SpeechLanguage = SpeechLanguage.DEFAULT): String = when (language) {
-        SpeechLanguage.Fr -> "La recherche ne marche que dedans."
-        SpeechLanguage.En -> "Find works indoors only."
+        SpeechLanguage.Fr -> "Que dedans."
+        SpeechLanguage.En -> "Indoors only."
     }
 
     /**
