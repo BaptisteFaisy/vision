@@ -28,6 +28,15 @@ class VoiceSliceTest {
     }
 
     @Test
+    fun `pastille trottoir 500 ms, verdict entier, reste 700 ms`() {
+        assertEquals(500L, dev.sam3vision.app.SIDEWALK_SLICE_MS)
+        assertEquals(null, sliceMsForLevel(CrossingLevels.VERDICT))
+        assertEquals(500L, sliceMsForLevel(OutdoorLevel.SIDEWALK))
+        assertEquals(700L, sliceMsForLevel(OutdoorLevel.HUMAN))
+        assertEquals(700L, sliceMsForLevel(OutdoorLevel.STAIRS))
+    }
+
+    @Test
     fun `sous la tranche on garde la vitesse du reglage`() {
         assertEquals(1.9f, sliceRateFor(durationMs = 674L, sliceMs = 700L, baseSpeed = 1.9f))
         assertEquals(1.9f, sliceRateFor(durationMs = 0L, sliceMs = 700L, baseSpeed = 1.9f))
@@ -77,10 +86,39 @@ class VoiceSliceTest {
         assertEquals(listOf("vp_verdict_cross_en"), sink.plain)
     }
 
-    /** Puits faux : distingue lecture simple et lecture en tranche. */
+    @Test
+    fun `bus lit le trottoir en 500 ms, le reste en 700 ms`() = runTest {
+        val sink = SliceSink()
+        val speaker = BusSpeaker(
+            scope = backgroundScope,
+            player = SpeechPlayer(Files.createTempDirectory("tranche500").toFile()),
+            clips = IseeClipPlayer(
+                clips = VoicePack(
+                    filesDir = Files.createTempDirectory("tranche500-pack").toFile(),
+                    packVoiceId = { "voix-test" },
+                    bundledClip = { "faux-mp3".toByteArray() },
+                ),
+                voiceId = { "voix-test" },
+                sink = sink,
+            ),
+            proximity = ProximityVoice(
+                player = SpeechPlayer(Files.createTempDirectory("tranche500-vox").toFile()),
+                settings = { dev.sam3vision.core.settings.Settings.Default },
+            ),
+        )
+
+        speaker.say(OutdoorLevel.SIDEWALK, "Car.", "car", emptyList())
+        speaker.say(OutdoorLevel.HUMAN, "Car.", "car", emptyList())
+        runCurrent()
+
+        assertEquals(listOf(500L, 700L), sink.slicedMs)
+    }
+
+    /** Puits faux : distingue lecture simple et lecture en tranche (durées capturées). */
     private class SliceSink : ClipSink {
         val plain = mutableListOf<String>()
         val sliced = mutableListOf<String>()
+        val slicedMs = mutableListOf<Long>()
 
         override suspend fun playFile(file: File): Result<Unit> {
             plain += file.nameWithoutExtension
@@ -89,6 +127,7 @@ class VoiceSliceTest {
 
         override suspend fun playSlice(file: File, sliceMs: Long): Result<Unit> {
             sliced += file.nameWithoutExtension
+            slicedMs += sliceMs
             return Result.success(Unit)
         }
 
