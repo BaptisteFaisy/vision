@@ -56,7 +56,7 @@ class LiveProbeSteeringTest {
     }
 
     @Test
-    fun `cap gauche bouche dit le passage TwinLite`() = runTest {
+    fun `cap gauche bouche dit le cote degage`() = runTest {
         val (probe, fake) = harness(this, guide = true)
         probe.setSteering(SteeringCap.Left)
         probe.onFrame("A", captureAtNs = 8_000_000L)
@@ -68,7 +68,9 @@ class LiveProbeSteeringTest {
         fake.respond("B", frame(listOf(personneGauche())))
         advanceUntilIdle()
 
-        assertEquals("right.", probe.state.value.spoken)
+        // Même côté qu'avant, mot SAM : le décalage passe devant le couloir
+        // et l'humain inconnu parle dès 3 m (ordre user du 02/11).
+        assertEquals("Right.", probe.state.value.spoken)
     }
 
     @Test

@@ -208,13 +208,13 @@ class LateralNudgeTest {
     }
 
     @Test
-    fun `reset oublie l approche`() {
+    fun `reset oublie l approche d un objet`() {
         val suivi = LateralNudgeTracker()
-        suivi.onFrame(0L, listOf(personne(0.65f, 3.0f)))
-        suivi.onFrame(250L, listOf(personne(0.65f, 2.6f)))
+        suivi.onFrame(0L, listOf(mur(0.65f, 3.0f)))
+        suivi.onFrame(250L, listOf(mur(0.65f, 2.6f)))
         suivi.reset()
 
-        assertNull(suivi.onFrame(500L, listOf(personne(0.65f, 2.2f))))
+        assertNull(suivi.onFrame(500L, listOf(mur(0.65f, 2.2f))))
     }
 
     @Test
@@ -258,12 +258,12 @@ class LateralNudgeTest {
     }
 
     @Test
-    fun `a 1,5 m on conseille, a 1,6 m on attend la confirmation`() {
+    fun `a 1,5 m un objet conseille, a 1,6 m il attend`() {
         val proche = LateralNudgeTracker()
-        assertEquals(SteeringCap.Left, proche.onFrame(0L, listOf(personne(0.65f, 1.5f)))!!.side)
+        assertEquals(SteeringCap.Left, proche.onFrame(0L, listOf(mur(0.65f, 1.5f)))!!.side)
 
         val loin = LateralNudgeTracker()
-        assertNull(loin.onFrame(0L, listOf(personne(0.65f, 1.6f))))
+        assertNull(loin.onFrame(0L, listOf(mur(0.65f, 1.6f))))
     }
 
     /**
