@@ -32,6 +32,7 @@ import dev.sam3vision.app.isee.vm.IseePicto
 
 import dev.sam3vision.app.isee.vm.IseeStatusText
 import dev.sam3vision.app.isee.vm.IseeSteeringOrders
+import dev.sam3vision.app.isee.vm.IseeSwipeOrders
 import dev.sam3vision.app.isee.vm.IseeTranscript
 import dev.sam3vision.app.isee.vm.IseeVoice
 import dev.sam3vision.app.isee.vm.IseeModeOrders
@@ -234,7 +235,9 @@ class IseeViewModel(app: Application) : AndroidViewModel(app) {
         glasses = { glassesOrder.run("iSee") },
     ))
     private val glassesInbox = IseeGlassesInbox(viewModelScope, shots, { _state.value }, ::update, ::silenceForGlasses, ::answerHeard, cameraOps::stopVideo, probe::stop, { cameraOps.startVideo(); syncProbe() })
-    private val holdTalk = IseeHoldTalk(viewModelScope, { active }, ::silenceForGlasses, shots, { _state.value }, ::update, haptics, dictation, liveDictation, streamDictation, { settings }, cameraOps, ::transcribeAndAnswer, glassesInbox::onTap, { _state.value.placeMode }, modes::applyPlace, System::currentTimeMillis)
+    /** Balayages bas/droite : fonction GPS et « Quoi chercher ? » (voir [IseeSwipeOrders]). */
+    private val swipe = IseeSwipeOrders(viewModelScope, modes::run, voiceNav::runOrder, dictation, { mic.preview().speaking }, { _state.value.speakingEntryId != null }, { settings }, { _state.value.placeMode }, { navSpeaker.speakNetwork(it) }, ::update)
+    private val holdTalk = IseeHoldTalk(viewModelScope, { active }, ::silenceForGlasses, shots, { _state.value }, ::update, haptics, dictation, liveDictation, streamDictation, { settings }, cameraOps, ::transcribeAndAnswer, glassesInbox::onTap, { _state.value.placeMode }, modes::applyPlace, System::currentTimeMillis, swipe::asking)
     private val glassesOrder = IseeGlassesOrder({ navSpeaker.speakNavigation(it) }, ::update, { glassesSession })
 
     /** Ordre vocal de vitesse : réglage persisté, confirmation à la nouvelle vitesse. */
@@ -250,7 +253,7 @@ class IseeViewModel(app: Application) : AndroidViewModel(app) {
     var active: Boolean = false
         set(value) {
             field = value
-            if (!value) onHoldCancel()
+            if (!value) gestures.onHoldCancel()
         }
 
     /** Caméra de la fenêtre flottante, câblée par le composable à l'attachement. */
@@ -303,6 +306,9 @@ class IseeViewModel(app: Application) : AndroidViewModel(app) {
 
     /** Témoins tactiles Traversée + lieu, extraits du ViewModel (limite 500 lignes). */
     val modeChips = IseeModeChips(viewModelScope, { _state.value.placeMode }, modes::run, { if (steering.toggleCrossing()) spine.onCrossingChanged() })
+
+    /** Gestes de la surface (tenue, tap, balayages) : relais unique, voir [IseeGestures]. */
+    val gestures = IseeGestures(holdTalk, swipe, modeChips::toggleCrossing)
 
     override fun onCleared() {
         liveDictation.stop()
@@ -383,13 +389,6 @@ class IseeViewModel(app: Application) : AndroidViewModel(app) {
         probe.cadence.continuous = settings.continuousCadenceEnabled
         player.speed = settings.ttsSpeed
     }
-
-    // ————— Gestes —————
-
-    fun onHoldStart() = holdTalk.start()
-    fun onHoldEnd() = holdTalk.end()
-    fun onHoldCancel() = holdTalk.cancel()
-    fun onSingleTap() = holdTalk.singleTap()
 
     // ————— Appui long : micro → texte → réponse parlée —————
 
@@ -475,13 +474,13 @@ class IseeViewModel(app: Application) : AndroidViewModel(app) {
 
     /** Purge totale à la fermeture de l'activité (option A) : table + cache. */
     fun onAppClosed() {
-        onHoldCancel()
+        gestures.onHoldCancel()
         session.onClosed()
     }
 
     /** L'app part derrière : minuteur armé (option C), sonde arrêtée sauf session lunettes. */
     fun onBackground() {
-        onHoldCancel()
+        gestures.onHoldCancel()
         session.onBackground()
         IseeBackground.enter(probe)
         // Guidage affiché sur l'accueil : GPS + voix maintenus par le service (W1).

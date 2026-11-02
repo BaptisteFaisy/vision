@@ -50,7 +50,7 @@ class IseeDictation(
      * tenue trop courte, refusée avant tout appel réseau.
      */
     private val onSettled: () -> Unit = {},
-) {
+) : FindListening {
 
     /** Vrai entre le début d'une tenue et son relâchement (ou son rejet). */
     private var armed = false
@@ -60,7 +60,7 @@ class IseeDictation(
      * état. Une tenue déjà ouverte ne rouvre rien : l'appelant garde la main sur
      * `holding`, comme avant.
      */
-    fun start(): Boolean {
+    override fun start(): Boolean {
         if (armed) return true
         armed = true
         val opened = mic.start()
@@ -75,7 +75,7 @@ class IseeDictation(
      * Idempotente : sans tenue en cours, le micro n'est pas touché une seconde fois et
      * l'état de l'écran n'est pas réécrit.
      */
-    suspend fun finish(settings: Settings): Dictated? {
+    override suspend fun finish(settings: Settings): Dictated? {
         if (!armed) return null
         armed = false
         update { it.copy(transcribing = true, status = IseeStatusText.STEP_TRANSCRIBING) }
@@ -98,7 +98,7 @@ class IseeDictation(
     }
 
     /** Jette l'enregistrement en cours ; sans effet si le micro est déjà rendu. */
-    fun discard() {
+    override fun discard() {
         armed = false
         mic.abort()
     }

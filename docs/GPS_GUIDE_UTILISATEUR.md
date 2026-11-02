@@ -22,6 +22,11 @@ aucun suivi) — c'est la ligne d'état des Réglages qui le dit.
    description de la scène.
 3. **Stop** : « arrête le guidage » (ou « stop », « annule la navigation »)
    à tout moment → « Guidage arrêté » + retour au repos.
+4. **Balayage vers le bas** (geste, sans parler) : active la fonction GPS,
+   exactement comme « active le GPS » — réglage `navigationGuidanceEnabled`
+   persisté, accusé parlé, le guidage reprendra à la demande (« je veux aller
+   à X »). La destination, elle, se dit toujours : un balayage ne porte pas de
+   nom de lieu.
 
 ## 2. Voir (les écrans)
 
@@ -111,6 +116,8 @@ entendue + app au premier plan).
 - Guidage éteint : fiche lieu + « Voici la fiche de X », pas de guidage.
 - Stop vocal hors session : ignoré (chemin question normal), pas d'erreur.
 - « Où est X », « c'est loin X ? » : questions LLM, jamais un ordre.
-- Tap court / swipe : geste seul, jamais de dictée.
+- Tap court / balayage haut / balayage bas : geste seul, jamais de dictée
+  (seul le balayage vers la droite ouvre le micro, pour demander l'objet à
+  chercher — voir `docs/ARCHITECTURE.md`, tableau des gestes).
 - « va à gauche » : ordre de cap prioritaire, jamais une navigation.
 - Verrou sans guidage actif : aucun service, aucune notification.

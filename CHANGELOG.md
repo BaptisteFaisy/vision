@@ -3,6 +3,48 @@
 Le journal part du 2026-10-26 après 19 h : le commit de départ, puis une entrée par fait
 livré et ses preuves (tâche, fichiers, chiffres) dans l'arbre.
 
+## 2026-11-02 — iSee : balayage bas = GPS, balayage droite = « quoi chercher ? » (branche `feat/isee-gestes-bas-droite`)
+
+- **Demande** (user, 02/11 22:55) : « quand je slide vers le bas cela active le mode gps
+  et vers la droite cela active le mode picto ». Cadrage : bas = l'ordre existant
+  « active le GPS » (pas un guidage sans destination) ; droite = iSee demande l'objet
+  **à voix haute** et ouvre le micro, le mot entendu devient le X de `mode find my X`.
+- **Cause** : le rail vertical de `IseeGestureBrain` n'émettait que vers le haut
+  (Traversée), le bas verrouillait le geste sans rien faire ; l'horizontal était
+  reconnu puis jeté (`onHorizontalSwipe = Unit`) — deux gestes libres, aucun câblage.
+- **Fait** :
+  - `core/gesture/IseeGestureBrain.kt` : le rail émet une fois par geste, vers le haut
+    (`onSwipeUp`, Traversée) **ou** vers le bas (`onSwipeDown`, GPS) ; l'horizontal
+    n'émet que vers la droite (`onSwipeRight`), la gauche reste muette.
+  - `app/isee/vm/IseeSwipeOrders.kt` (nouveau) : `gpsOn()` rejoue l'ordre vocal
+    « active le GPS » puis dit l'accusé (le clip de l'ordre est muet depuis la v4, aucun
+    MP3 ne porte « GPS enabled ») ; `askToFind()` dit « What are you looking for? » par
+    synthèse réseau, ouvre le micro (`IseeDictation` via la nouvelle interface
+    `FindListening`), attend la fin de la parole, puis lance `mode find my X` — le
+    chemin existant (concept SAM, génération à la première détection, ancrage, refus
+    dehors).
+  - `core/picto/FindAsk.kt` (nouveau) : `FindAskPolicy` (fin d'écoute à la fin de la
+    parole, plafond 8 s, silence jeté à 5 s) et `FindLabelFromSpeech` (« mes clés » →
+    « cles », déterminants et « please » retirés, le pont FR-EN de la chasse prend le
+    relais).
+  - `app/isee/IseeGestures.kt` (nouveau) : les cinq gestes (tenue, tap, haut, bas,
+    droite) en un seul relais posé dans `MainActivity.buildRoot` ;
+    `IseeHoldTalk` gagne `busy` (= `IseeSwipeOrders.asking`) : pendant l'écoute, tenue
+    et tap se taisent, un seul geste tient le micro. `IseeViewModel` reste à **498**
+    lignes (extractions, pas d'ajout).
+  - Textes parlés dans `PictoVoiceText` (`askWhatToFind`, `nothingHeard`) ; docs
+    `docs/ARCHITECTURE.md` (tableau des gestes), `docs/GPS_GUIDE_UTILISATEUR.md` (§ 1
+    balayage bas, § 7 non-régression).
+- **Preuves** : `:core` 3 449 tests / 0 échec (+ `FindAskTest`, `IseeGestureBrainTest`
+  étendu bas/droite/gauche), `:app` 2 179 tests / 0 échec (+ `IseeSwipeOrdersTest`,
+  5 cas : ordre GPS, refus dehors, question→chasse, silence jeté, micro indisponible),
+  `check-kotlin-limits` OK (1 535 fichiers), `check-isee-clips-en` OK,
+  `check-isee-design` OK, `assembleDebug` OK.
+- **Non vérifié** : recette téléphone (appareil occupé par un autre agent au moment du
+  lot) — les gestes n'ont pas encore été balayés sur un vrai écran ; la question et le
+  « rien entendu » passent par la synthèse réseau (à figer en clips avec
+  `ELEVENLABS_API_KEY=… python3 tools/gen-isee-clips-en.py` pour revenir hors-ligne).
+
 ## 2026-11-02 — Serveur : déploiements Modal réparés (branche `fix-deploy-modal-init`)
 
 - **Demande** : déploiement `sam3-eu-a100` (garde escaliers/murs PR #1025) refusé par Modal.
