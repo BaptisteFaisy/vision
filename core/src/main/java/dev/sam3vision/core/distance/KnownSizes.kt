@@ -222,6 +222,18 @@ object KnownSizes {
     )
 
     /**
+     * Vrai si [label] est un défaut du direct sans hauteur typique ([DEPTH_ONLY]) :
+     * sa distance vient de la profondeur ou du plan de sol, jamais du sténopé.
+     * Tolérant comme [heightMeters] (casse, accents, espaces, pluriel simple).
+     */
+    fun isDepthOnly(label: String): Boolean {
+        val key = canonical(label)
+        if (key.isEmpty()) return false
+        if (DEPTH_ONLY.contains(key)) return true
+        return key.endsWith("s") && key.length > 3 && DEPTH_ONLY.contains(key.dropLast(1))
+    }
+
+    /**
      * Repli par tête du composé : premier mot (français, « sac à dos » trouve
      * « sac ») puis dernier (anglais, « a traffic sign » trouve « sign »).
      */

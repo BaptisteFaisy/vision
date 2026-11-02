@@ -1,5 +1,6 @@
 package dev.sam3vision.app.depth
 
+import android.util.Log
 import dev.sam3vision.core.depth.DepthReadings
 import dev.sam3vision.core.distance.DistanceReading
 import dev.sam3vision.core.model.LiveFrame
@@ -23,9 +24,10 @@ interface DepthMeter {
  * et chaque réponse porte la proximité de ses objets (`SegObject.depth`, 0..1,
  * grand = proche). Aucune inférence sur le téléphone — la carte monoculaire
  * (Depth Anything V2 Small) tourne sur le GPU Modal, une fois par 8 frames, et
- * le serveur répète ses médianes entre deux : `refineWithCloseness` les remet
- * en mètres. Réponse sans médiane (backend sans modèle, ancien backend) : le
- * sténopé passe tel quel, jamais d'erreur.
+ * le serveur répète ses médianes entre deux : `refineStatusWithCloseness` les
+ * remet en mètres. Réponse sans médiane (backend sans modèle, ancien backend) :
+ * le sténopé passe tel quel, jamais d'erreur. Un objet DEPTH_ONLY resté sans
+ * distance est journalisé (`Log.w`, cause incluse), jamais tu.
  */
 object ServerDepthMeter : DepthMeter {
     override fun readingsFor(frame: LiveFrame, pinhole: List<DistanceReading>): List<DistanceReading> {
@@ -34,11 +36,15 @@ object ServerDepthMeter : DepthMeter {
             if (closeness.isEmpty()) {
                 pinhole
             } else {
-                DepthReadings.refineWithCloseness(
+                DepthReadings.refineStatusWithCloseness(
                     frame.objects.toDetections(frame.width, frame.height),
                     pinhole,
                     closeness,
-                )
+                    onUnmeasured = { miss ->
+                        val detail = "${miss.label} ${miss.reason} (bas coupe=${miss.cutBottom})"
+                        Log.w("sam3vision", "sans distance : $detail")
+                    },
+                ).readings
             }
         } catch (e: Exception) {
             pinhole
