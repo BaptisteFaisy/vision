@@ -4,13 +4,15 @@ import dev.sam3vision.core.distance.KnownSizes
 import dev.sam3vision.core.live.PersonLabels
 
 /**
- * Concepts qui font parler le guetteur danger : la personne et le poteau
- * (mot d'évitement « Droite. »/« Gauche. » en continu — niveaux 2 et 7,
- * ordre user du 01/11 : la position optimale se dit en permanence), les
- * grillages, les murs et les barrières (niveau 4, moins de 6 m), le
- * mobilier vertical (lampadaire, panneau) et les divers (niveau 7, moins
- * de 6 m, spec v4). Dire « Attention … » — iSee décrit, en douceur ; les
- * mots du guidage disent où aller, l'attention dit quoi éviter.
+ * Concepts qui font parler le guetteur danger : la personne, le poteau
+ * et le mur (mot d'évitement « Droite. »/« Gauche. » en continu —
+ * niveaux 2, 7 et 4, ordre user du 01/11 : la position optimale se dit
+ * en permanence — les murs ne se nomment jamais, ordre user du 02/11 :
+ * ils s'esquivent, ils ne se disent pas), les grillages et les barrières
+ * (niveau 4, moins de 6 m), le mobilier vertical (lampadaire, panneau)
+ * et les divers (niveau 7, moins de 6 m, spec v4). Dire « Attention … »
+ * — iSee décrit, en douceur ; les mots du guidage disent où aller,
+ * l'attention dit quoi éviter.
  *
  * Le français reste reconnu : un label « barrière » compte comme
  * « barrier ». Le poteau parle depuis la v4 (niveau 7) : [isSpoken] ne le
@@ -141,6 +143,14 @@ object HazardConcepts {
     fun isBarrier(label: String): Boolean = nameOf(label)?.en == "barrier"
 
     /**
+     * Vrai si [label] désigne un mur (le nom anglais fait foi, jamais une
+     * table à part) : jamais nommé à la voix (ordre user — les murs
+     * s'esquivent, ils ne se disent pas), il parle en mot d'évitement
+     * continu comme le poteau ([HazardWatcher]).
+     */
+    fun isWall(label: String): Boolean = nameOf(label)?.en == "wall"
+
+    /**
      * Niveau VoiceBus v4 de [label] : 2 la personne, 4 les grillages, les
      * murs et les barrières, 7 les poteaux, le mobilier vertical et les
      * divers. Label inconnu = 7 (divers, jamais la priorité d'une personne).
@@ -156,9 +166,9 @@ object HazardConcepts {
 
     /**
      * Clé AntiRepeat v4 de [label] (annonce douce) : `human-soft` la
-     * personne (le mot continu dit `human-imminent` / `pole-avoid`, voir
-     * [HazardWatcher]), `fence` les grillages, murs et barrières, `pole`
-     * le reste. Label inconnu = `pole`.
+     * personne (le mot continu dit `human-imminent` / `pole-avoid` /
+     * `wall-avoid`, voir [HazardWatcher]), `fence` les grillages et les
+     * barrières, `pole` le reste. Label inconnu = `pole`.
      */
     fun antiRepeatKey(label: String): String = when (levelOf(label)) {
         HazardWatcher.LEVEL_PERSON -> HazardWatcher.KEY_HUMAN_SOFT
@@ -170,7 +180,8 @@ object HazardConcepts {
      * Sorte parlée de [label] : personne (tout ce qui se contourne comme un
      * corps — personne, enfant, poussette, fauteuil roulant, chien),
      * barrière, poteau (mot d'évitement continu, niveau 7), ou divers
-     * (clôture, mur, animal, poubelle…).
+     * (clôture, mur, animal, poubelle… — le mur parle en mot continu
+     * comme le poteau, voir [HazardWatcher]).
      */
     fun kindOf(label: String): HazardKind {
         val en = nameOf(label)?.en ?: return HazardKind.OTHER
@@ -198,6 +209,6 @@ enum class HazardKind {
     /** Poteau : mot d'évitement continu comme la personne (niveau 7). */
     POLE,
 
-    /** Divers : clôture, mur, lampadaire, panneau, animal, poubelle, souvenirs… (niveau 7). */
+    /** Divers : clôture, mur, lampadaire, panneau, animal, poubelle, souvenirs… (niveau 7 — le mur, niveau 4, parle en mot continu). */
     OTHER,
 }

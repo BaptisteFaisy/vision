@@ -247,6 +247,7 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
     /**
      * Dit à voix haute où sont les objets segmentés (« Personne à gauche, chaise au centre »).
      * Même bascule que le direct, même voix ElevenLabs ; silencieux sans objet ou sans clé.
+     * Les murs sont nommés : c'est une photo, pas une marche — aucune esquive à dire.
      */
     private fun announcePositions(objects: List<SegObject>, settings: Settings) {
         val photo = _state.value.photo
@@ -254,7 +255,7 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
         val placed = objects.mapNotNull {
             PositionText.fromDetection(Detection(it.label, it.score, it.box, photo.width, photo.height))
         }
-        val phrase = PositionText.phrase(placed, language = settings.speechLanguage) ?: return
+        val phrase = PositionText.phrase(placed, language = settings.speechLanguage, nameWalls = true) ?: return
         viewModelScope.launch { voice.say(settings, phrase) }
     }
 

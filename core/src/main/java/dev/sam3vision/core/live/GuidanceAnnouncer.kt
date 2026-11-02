@@ -5,6 +5,7 @@ import dev.sam3vision.core.curb.RailState
 import dev.sam3vision.core.curb.SidewalkPosition
 import dev.sam3vision.core.curb.SidewalkRail
 import dev.sam3vision.core.distance.LensSpec
+import dev.sam3vision.core.hazard.HazardConcepts
 import dev.sam3vision.core.model.Passage
 import dev.sam3vision.core.speech.SpeechLanguage
 
@@ -116,7 +117,9 @@ class GuidanceAnnouncer(
      * cap (ordre de retour), une absence parle prudemment ; le bouché prime.
      * [samPassage] est le passage conseillé par SAM : bouché et côté du
      * serveur, obstacle chiffré du téléphone ; `null` (backend antérieur) =
-     * décision locale. [holeSide] est le côté du trou de grillage (ouvert,
+     * décision locale. Le serveur ne voit que les personnes : un mur qui
+     * bouche localement reprend la main sur son « libre » ([wallBlocks]).
+     * [holeSide] est le côté du trou de grillage (ouvert,
      * proche, localisé par l'appelant) : sur couloir bouché sans chemin
      * optimal, on part vers lui sauf humain à moins de 1 m — sinon
      * l'évitement générique. Direction stable : redite toutes les [repeatMs]
@@ -152,11 +155,16 @@ class GuidanceAnnouncer(
         val effective = routeCap ?: cap
         val space = free ?: FreeSpace.of(labels, hfovDeg)
         val range = rangeFor(speedMps)
-        val decision = samPassage?.let { samDecision(it, labels, effective, hfovDeg, range) }
-            ?: Guidance.decide(
-                labels, effective, range, hfovDeg, free = space, speedMps = speedMps,
-                holeSide = holeSide,
-            )
+        val local = Guidance.decide(
+            labels, effective, range, hfovDeg, free = space, speedMps = speedMps,
+            holeSide = holeSide,
+        )
+        val server = samPassage?.let { samDecision(it, labels, effective, hfovDeg, range) }
+        val decision = if (server != null && !server.blocked && wallBlocks(local)) {
+            local
+        } else {
+            server ?: local
+        }
         lastDecision = decision
         lastSidewalk = sidewalk
         lastNudge = null
@@ -178,6 +186,15 @@ class GuidanceAnnouncer(
         val word = clearedReturnWord(sidewalk, decision.cap, labels, hfovDeg, range)
         return freeWord(atMs, word, language, ageMs)
     }
+
+    /**
+     * Le serveur ne juge que les personnes ([Passage]) : un mur qui bouche
+     * le couloir localement reprend la main sur un « libre » serveur (ordre
+     * user : les murs s'esquivent, ils ne se disent pas — et ils comptent
+     * pour décider gauche/droite).
+     */
+    private fun wallBlocks(decision: GuidanceDecision): Boolean =
+        decision.blocked && decision.obstacle?.label?.let { HazardConcepts.isWall(it) } == true
 
     /**
      * Mot de voie libre, muet sur une frame périmée quand il affirme « Tout

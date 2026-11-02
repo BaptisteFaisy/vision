@@ -75,7 +75,7 @@ object AntiRepeat {
      */
     const val KEY_GPS_REMINDER = "gps-reminder"
 
-    /** Niveau 4 : grillages + murs + barrières < 6 m — 4 s. */
+    /** Niveau 4 : grillages + barrières < 6 m — 4 s (les murs disent `wall-avoid`, continu). */
     const val KEY_FENCE = "fence"
 
     /** Niveau 5 : bordures < 6 m — 2 s. */
@@ -99,6 +99,12 @@ object AntiRepeat {
      * toujours autorisé ([allow] ne mémorise rien pour cette clé).
      */
     const val KEY_POLE_AVOID = "pole-avoid"
+
+    /**
+     * Niveau 4 : mot mur continu (murs < 6 m dans le couloir) — hors table,
+     * toujours autorisé ([allow] ne mémorise rien pour cette clé).
+     */
+    const val KEY_WALL_AVOID = "wall-avoid"
 
     /** Niveau 7 : divers (animal, poubelle, souvenirs) < 6 m — 2 s. */
     const val KEY_MISC = "misc"
@@ -180,7 +186,7 @@ object AntiRepeat {
         KEY_DOOR_WALL -> 4_000L
         KEY_CROSSWALK_ANNOUNCE, KEY_CROSSWALK_ARRIVAL -> ONCE_MS
         // Mots continus, rappel GPS, alignement : sans délai (toujours autorisés).
-        KEY_HUMAN_IMMINENT, KEY_POLE_AVOID, KEY_GPS_REMINDER, KEY_CROSSWALK_ALIGN -> 0L
+        KEY_HUMAN_IMMINENT, KEY_POLE_AVOID, KEY_WALL_AVOID, KEY_GPS_REMINDER, KEY_CROSSWALK_ALIGN -> 0L
         // Clés inconnues : sans antirépétition (jamais bloquantes).
         else -> 0L
     }

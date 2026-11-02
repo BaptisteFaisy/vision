@@ -31,12 +31,15 @@ class PositionAnnouncer(
     /**
      * Frame observée à [atMs] : renvoie la phrase à prononcer, ou `null` s'il faut
      * garder le silence. [language] est la langue de la voix (Réglages) : elle ne
-     * change ni les seuils, ni la mémoire de scène.
+     * change ni les seuils, ni la mémoire de scène. [nameWalls] : la chasse
+     * nommée nomme les murs (l'utilisateur les cherche — partout ailleurs,
+     * les murs s'esquivent, ils ne se disent pas).
      */
     fun onFrame(
         atMs: Long,
         labels: List<PlacedLabel>,
         language: SpeechLanguage = SpeechLanguage.DEFAULT,
+        nameWalls: Boolean = false,
     ): String? {
         val key = PositionText.key(labels) { id, meters -> buckets.bucketOf(id, meters) }
         if (key.isEmpty()) {
@@ -45,7 +48,7 @@ class PositionAnnouncer(
             return null
         }
         if (!gate.admit(atMs, key, firstSight = true)) return null
-        val phrase = PositionText.phrase(labels, maxObjects, language) ?: return null
+        val phrase = PositionText.phrase(labels, maxObjects, language, nameWalls) ?: return null
         gate.markSpoken(key, atMs, phrase)
         return phrase
     }
