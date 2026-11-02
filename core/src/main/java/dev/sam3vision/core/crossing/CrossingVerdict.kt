@@ -23,15 +23,15 @@ object CrossingLevels {
 enum class CrossingVerdict { Cross, DontCross }
 
 /**
- * Feu piéton vu par le verdict : [Red] (« don't cross »), [Green] (les voitures
- * tranchent), [Absent] (aucun feu en vue — les voitures tranchent aussi).
+ * Feu piéton vu par le verdict : [Red] (« don't cross »), [Green] (« cross »,
+ * voitures ou pas), [Absent] (aucun feu en vue — les voitures tranchent).
  */
 enum class CrossingVerdictLight { Red, Green, Absent }
 
 /**
  * Phrases du verdict, en anglais uniquement (clips) : [DONT_CROSS] quand le feu
- * est rouge ou qu'une voiture bouge, [CROSS] sinon. [clipId] est le clip stable
- * de la phrase — zéro synthèse à la volée sur ce chemin.
+ * est rouge ou qu'une voiture bouge hors vert, [CROSS] sinon. [clipId] est le
+ * clip stable de la phrase — zéro synthèse à la volée sur ce chemin.
  */
 object CrossingVerdictText {
     const val DONT_CROSS = "Don't cross."
@@ -52,9 +52,10 @@ object CrossingVerdictText {
 }
 
 /**
- * Règle du verdict (SPEC v4) : feu piéton rouge = don't cross ; vert ou absent =
- * voitures en mouvement ? don't cross : cross. Véhicules = voiture uniquement
- * ([isCarLabel]) : bus, vélo, camion et moto ne tranchent jamais.
+ * Règle du verdict (SPEC v4) : feu piéton rouge = don't cross ; vert = cross,
+ * voitures en mouvement ou pas (le vert gagne toujours, ordre user du 02/11) ;
+ * absent = voitures en mouvement ? don't cross : cross. Véhicules = voiture
+ * uniquement ([isCarLabel]) : bus, vélo, camion et moto ne tranchent jamais.
  *
  * Pur et testé en JVM.
  */
@@ -69,6 +70,7 @@ object CrossingVerdictRule {
     /** Verdict pour [light] et [carMoving] (une voiture bouge sur la frame). */
     fun decide(light: CrossingVerdictLight, carMoving: Boolean): CrossingVerdict = when {
         light == CrossingVerdictLight.Red -> CrossingVerdict.DontCross
+        light == CrossingVerdictLight.Green -> CrossingVerdict.Cross
         carMoving -> CrossingVerdict.DontCross
         else -> CrossingVerdict.Cross
     }

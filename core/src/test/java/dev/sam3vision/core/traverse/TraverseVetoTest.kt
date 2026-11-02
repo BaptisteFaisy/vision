@@ -13,8 +13,10 @@ import org.junit.Assert.assertTrue
 import org.junit.Test
 
 /**
- * Le veto trafic force « attendez » même sur vert confirmé ; le vert seul fait
- * traverser. Bloque : l'approche (croissance, tau suivi) et la proximité sans
+ * Le veto trafic force « attendez » hors vert ; sur vert confirmé, le vert
+ * gagne toujours (ordre user du 02/11) — le suivi continue pour trancher dès
+ * le flip rouge, et le guidage obstacles reste actif devant un objet proche.
+ * Bloque hors vert : l'approche (croissance, tau suivi) et la proximité sans
  * arrêt prouvé (< 15 m sténopé). Ne bloque plus : l'arrêt prouvé (mesuré
  * ≤ 15 m, centre quasi fixe, portée stable à 0,5 m, croissance sous le
  * tremblé 4 %, fond fixe) — une garée n'interdit pas la traversée. Focale de
@@ -41,10 +43,44 @@ class TraverseVetoTest {
     }
 
     @Test
+    fun `vert et voiture en mouvement - traverse quand meme, guidage garde`() {
+        // Ordre user du 02/11 : sur vert confirmé, le trafic ne bloque plus.
+        val veto = TraverseVeto()
+        val first = veto.update(true, listOf(detection("car", 0.9f, listOf(0f, 0f, 60f, 50f))), focalPx)
+        assertFalse(first.veto)
+        assertEquals(TraversePhase.PRET, first.state)
+        assertEquals("ready", first.cue)
+        val second = veto.update(true, listOf(detection("car", 0.9f, listOf(0f, 0f, 200f, 200f))), focalPx)
+        assertFalse("vert + approche : pas de veto", second.veto)
+        assertNull(second.blockingLabel)
+        assertNull(second.blockingMeters)
+        assertEquals(TraversePhase.TRAVERSER, second.state)
+        assertEquals("cross", second.cue)
+        assertTrue("objet proche : guidage gardé malgré le vert", second.keepObstacleGuidance)
+    }
+
+    @Test
+    fun `vert et approche suivie - traverse, ttc informatif garde`() {
+        // Le suivi ne bloque plus sur vert, mais il remonte son TTC (pistes
+        // tenues chaudes pour trancher dès le flip rouge).
+        val veto = TraverseVeto()
+        veto.update(true, listOf(detection("car", 0.9f, listOf(270f, 210f, 370f, 270f))), focalPx, 0L)
+        veto.update(true, listOf(detection("car", 0.9f, listOf(265f, 207f, 375f, 273f))), focalPx, 100L)
+        veto.update(true, listOf(detection("car", 0.9f, listOf(260f, 204f, 380f, 276f))), focalPx, 200L)
+        veto.update(true, listOf(detection("car", 0.9f, listOf(255f, 201f, 385f, 279f))), focalPx, 300L)
+        veto.update(true, listOf(detection("car", 0.9f, listOf(250f, 198f, 390f, 282f))), focalPx, 400L)
+        val sixth = veto.update(true, listOf(detection("car", 0.9f, listOf(245f, 195f, 395f, 285f))), focalPx, 500L)
+
+        assertFalse("vert + tau : pas de veto", sixth.veto)
+        assertNotNull("suivi tenu chaud : TTC remonté", sixth.approachTtcSeconds)
+        assertEquals(TraversePhase.TRAVERSER, sixth.state)
+    }
+
+    @Test
     fun `voiture proche sans approche - veto quand meme`() {
         val veto = TraverseVeto()
         val nearCar = detection("car", 0.9f, listOf(0f, 0f, 200f, 200f))
-        val decision = veto.update(true, listOf(nearCar), focalPx)
+        val decision = veto.update(false, listOf(nearCar), focalPx)
         assertTrue("proximité mesurée : veto (audit 31/10)", decision.veto)
         assertEquals(TraversePhase.ATTENDRE, decision.state)
         assertEquals("car", decision.blockingLabel)
@@ -55,10 +91,10 @@ class TraverseVetoTest {
     @Test
     fun `voiture proche en croissance - veto avec distance`() {
         val veto = TraverseVeto()
-        veto.update(true, listOf(detection("car", 0.9f, listOf(0f, 0f, 60f, 60f))), focalPx)
-        val decision = veto.update(true, listOf(detection("car", 0.9f, listOf(0f, 0f, 200f, 200f))), focalPx)
+        veto.update(false, listOf(detection("car", 0.9f, listOf(0f, 0f, 60f, 60f))), focalPx)
+        val decision = veto.update(false, listOf(detection("car", 0.9f, listOf(0f, 0f, 200f, 200f))), focalPx)
         assertTrue(decision.veto)
-        assertEquals(TraversePhase.ALERTE, decision.state)
+        assertEquals(TraversePhase.ATTENDRE, decision.state)
         assertEquals("wait", decision.cue)
         assertEquals("car", decision.blockingLabel)
         assertEquals(7.25f, decision.blockingMeters!!, 0.01f)
@@ -69,11 +105,11 @@ class TraverseVetoTest {
     fun `voiture qui approche au loin force attendez des la deuxieme frame`() {
         val veto = TraverseVeto()
         val far = detection("car", 0.9f, listOf(0f, 0f, 60f, 50f))
-        val first = veto.update(true, listOf(far), focalPx)
+        val first = veto.update(false, listOf(far), focalPx)
         assertFalse(first.veto)
-        assertEquals(TraversePhase.PRET, first.state)
+        assertEquals(TraversePhase.ATTENDRE, first.state)
         val nearer = detection("car", 0.9f, listOf(0f, 0f, 80f, 60f))
-        val second = veto.update(true, listOf(nearer), focalPx)
+        val second = veto.update(false, listOf(nearer), focalPx)
         assertTrue(second.veto)
         assertEquals("wait", second.cue)
         assertEquals(24.17f, second.blockingMeters!!, 0.05f)
@@ -95,13 +131,13 @@ class TraverseVetoTest {
     @Test
     fun `score limite - 0_35 ignore meme en croissance, 0_36 bloque`() {
         val weak = TraverseVeto()
-        weak.update(true, listOf(detection("car", 0.35f, listOf(0f, 0f, 200f, 200f))), focalPx)
-        val ignored = weak.update(true, listOf(detection("car", 0.35f, listOf(0f, 0f, 220f, 220f))), focalPx)
+        weak.update(false, listOf(detection("car", 0.35f, listOf(0f, 0f, 200f, 200f))), focalPx)
+        val ignored = weak.update(false, listOf(detection("car", 0.35f, listOf(0f, 0f, 220f, 220f))), focalPx)
         assertFalse("au seuil : ignoré malgré la croissance", ignored.veto)
         assertNull(ignored.blockingLabel)
         val strong = TraverseVeto()
-        strong.update(true, listOf(detection("car", 0.36f, listOf(0f, 0f, 200f, 200f))), focalPx)
-        val blocked = strong.update(true, listOf(detection("car", 0.36f, listOf(0f, 0f, 220f, 220f))), focalPx)
+        strong.update(false, listOf(detection("car", 0.36f, listOf(0f, 0f, 200f, 200f))), focalPx)
+        val blocked = strong.update(false, listOf(detection("car", 0.36f, listOf(0f, 0f, 220f, 220f))), focalPx)
         assertTrue("au-dessus du seuil + croissance : veto", blocked.veto)
         assertEquals("car", blocked.blockingLabel)
     }
@@ -127,20 +163,21 @@ class TraverseVetoTest {
     }
 
     @Test
-    fun `veto pendant la traversee donne alerte puis reconfirmation`() {
+    fun `flip vert-rouge en traversee - alerte puis reconfirmation`() {
         val veto = TraverseVeto()
         veto.update(true, emptyList(), focalPx)
         veto.update(true, emptyList(), focalPx)
         assertEquals(TraversePhase.TRAVERSER, veto.currentState)
-        veto.update(true, listOf(detection("car", 0.8f, listOf(0f, 0f, 60f, 50f))), focalPx)
         val alert = veto.update(
-            true,
+            false,
             listOf(detection("car", 0.8f, listOf(0f, 0f, 200f, 250f))),
             focalPx,
         )
         assertEquals(TraversePhase.ALERTE, alert.state)
         assertEquals("wait", alert.cue)
         assertTrue(alert.veto)
+        val waited = veto.update(false, emptyList(), focalPx)
+        assertEquals(TraversePhase.ATTENDRE, waited.state)
         val reconfirmed = veto.update(true, emptyList(), focalPx)
         assertEquals(TraversePhase.PRET, reconfirmed.state)
         val resumed = veto.update(true, emptyList(), focalPx)
@@ -148,18 +185,20 @@ class TraverseVetoTest {
     }
 
     @Test
-    fun `veto juste avant de partir donne alerte puis reconfirmation`() {
+    fun `flip vert-rouge avant de partir - alerte puis reconfirmation`() {
         val veto = TraverseVeto()
         veto.update(true, listOf(detection("car", 0.9f, listOf(0f, 0f, 60f, 60f))), focalPx)
         assertEquals(TraversePhase.PRET, veto.currentState)
         val alert = veto.update(
-            true,
+            false,
             listOf(detection("car", 0.9f, listOf(0f, 0f, 200f, 200f))),
             focalPx,
         )
         assertEquals(TraversePhase.ALERTE, alert.state)
         assertEquals("wait", alert.cue)
         assertTrue(alert.veto)
+        val waited = veto.update(false, emptyList(), focalPx)
+        assertEquals(TraversePhase.ATTENDRE, waited.state)
         val reconfirmed = veto.update(true, emptyList(), focalPx)
         assertEquals(TraversePhase.PRET, reconfirmed.state)
         val resumed = veto.update(true, emptyList(), focalPx)
@@ -178,9 +217,9 @@ class TraverseVetoTest {
     @Test
     fun `sans focale seule l approche compte`() {
         val veto = TraverseVeto()
-        veto.update(true, listOf(detection("car", 0.9f, listOf(0f, 0f, 60f, 50f))), focalPx = 0f)
+        veto.update(false, listOf(detection("car", 0.9f, listOf(0f, 0f, 60f, 50f))), focalPx = 0f)
         val growing = veto.update(
-            true,
+            false,
             listOf(detection("car", 0.9f, listOf(0f, 0f, 80f, 60f))),
             focalPx = 0f,
         )
@@ -243,12 +282,12 @@ class TraverseVetoTest {
     @Test
     fun `approche suivie - le TTC remonte dans la decision`() {
         val veto = TraverseVeto()
-        val first = veto.update(true, listOf(detection("car", 0.9f, listOf(270f, 210f, 370f, 270f))), focalPx, 0L)
-        veto.update(true, listOf(detection("car", 0.9f, listOf(265f, 207f, 375f, 273f))), focalPx, 100L)
-        veto.update(true, listOf(detection("car", 0.9f, listOf(260f, 204f, 380f, 276f))), focalPx, 200L)
-        veto.update(true, listOf(detection("car", 0.9f, listOf(255f, 201f, 385f, 279f))), focalPx, 300L)
-        veto.update(true, listOf(detection("car", 0.9f, listOf(250f, 198f, 390f, 282f))), focalPx, 400L)
-        val sixth = veto.update(true, listOf(detection("car", 0.9f, listOf(245f, 195f, 395f, 285f))), focalPx, 500L)
+        val first = veto.update(false, listOf(detection("car", 0.9f, listOf(270f, 210f, 370f, 270f))), focalPx, 0L)
+        veto.update(false, listOf(detection("car", 0.9f, listOf(265f, 207f, 375f, 273f))), focalPx, 100L)
+        veto.update(false, listOf(detection("car", 0.9f, listOf(260f, 204f, 380f, 276f))), focalPx, 200L)
+        veto.update(false, listOf(detection("car", 0.9f, listOf(255f, 201f, 385f, 279f))), focalPx, 300L)
+        veto.update(false, listOf(detection("car", 0.9f, listOf(250f, 198f, 390f, 282f))), focalPx, 400L)
+        val sixth = veto.update(false, listOf(detection("car", 0.9f, listOf(245f, 195f, 395f, 285f))), focalPx, 500L)
 
         assertFalse("piste jeune : pas de TTC", first.veto)
         assertNull(first.approachTtcSeconds)
@@ -268,8 +307,8 @@ class TraverseVetoTest {
         repeat(13) { index ->
             val box = growingBox(index)
             val atMs = index * 100L
-            bareLast = bare.update(true, listOf(detection("car", 0.9f, box)), focalPx = 0f, atMs = atMs)
-            aidedLast = aided.update(true, listOf(detection("car", 0.9f, box)), focalPx = 0f, atMs = atMs, motion = motion)
+            bareLast = bare.update(false, listOf(detection("car", 0.9f, box)), focalPx = 0f, atMs = atMs)
+            aidedLast = aided.update(false, listOf(detection("car", 0.9f, box)), focalPx = 0f, atMs = atMs, motion = motion)
         }
 
         assertNotNull("sans fond, le suivi voit l'approche", bareLast!!.approachTtcSeconds)
@@ -288,7 +327,7 @@ class TraverseVetoTest {
         val nearCar = detection("car", 0.9f, listOf(0f, 0f, 200f, 200f))
         var last: TraverseDecision? = null
         repeat(4) { index ->
-            last = veto.update(true, listOf(nearCar), focalPx, atMs = index * 100L, motion = motion)
+            last = veto.update(false, listOf(nearCar), focalPx, atMs = index * 100L, motion = motion)
         }
 
         assertTrue("7,25 m statique sous pan : veto", last!!.veto)
@@ -307,7 +346,7 @@ class TraverseVetoTest {
         repeat(13) { index ->
             val detections = mutableListOf(driftingBusDetection(index))
             if (index >= 11) detections.add(0, youngCarDetection(index - 11))
-            last = veto.update(true, detections, focalPx = 0f, atMs = index * 100L, motion = motion)
+            last = veto.update(false, detections, focalPx = 0f, atMs = index * 100L, motion = motion)
         }
 
         assertTrue("croissance jeune non jugée : veto", last!!.veto)
@@ -315,40 +354,41 @@ class TraverseVetoTest {
     }
 
     @Test
-    fun `arret confirme a 7m - vert autorise des la deuxieme frame`() {
-        // Ordre user du 01/11 : vert + immobile ≤ 15 m → on traverse.
+    fun `arret confirme a 7m - pas de veto des la deuxieme frame`() {
+        // Ordre user du 01/11 : immobile ≤ 15 m → pas de veto (le vert gagne
+        // de toute façon depuis le 02/11 : cette suite verrouille le hors-vert).
         val veto = TraverseVeto()
         val box = listOf(220f, 140f, 420f, 340f) // centrée, 200 px de haut → 7,25 m
-        val first = veto.update(true, listOf(detection("car", 0.9f, box)), focalPx, 0L)
-        assertTrue("première frame : doute bloque", first.veto)
-        val second = veto.update(true, listOf(detection("car", 0.9f, box)), focalPx, 100L)
-        assertFalse("arrêt confirmé ≤ 15 m : le vert décide", second.veto)
-        assertEquals(TraversePhase.PRET, second.state)
-        val third = veto.update(true, listOf(detection("car", 0.9f, box)), focalPx, 200L)
+        val first = veto.update(false, listOf(detection("car", 0.9f, box)), focalPx, 0L)
+        assertTrue("première frame : pas d'arrêt prouvé, bloque", first.veto)
+        val second = veto.update(false, listOf(detection("car", 0.9f, box)), focalPx, 100L)
+        assertFalse("arrêt confirmé ≤ 15 m : pas de veto", second.veto)
+        assertEquals(TraversePhase.ATTENDRE, second.state)
+        val third = veto.update(false, listOf(detection("car", 0.9f, box)), focalPx, 200L)
         assertFalse(third.veto)
-        assertEquals(TraversePhase.TRAVERSER, third.state)
+        assertEquals(TraversePhase.ATTENDRE, third.state)
     }
 
     @Test
-    fun `arret confirme a 12m - vert autorise`() {
+    fun `arret confirme a 12m - pas de veto`() {
         val veto = TraverseVeto()
         val box = listOf(259f, 179f, 381f, 300f) // centrée, 121 px de haut → ~12 m
-        veto.update(true, listOf(detection("car", 0.9f, box)), focalPx, 0L)
-        val second = veto.update(true, listOf(detection("car", 0.9f, box)), focalPx, 100L)
-        assertFalse("arrêt confirmé à 12 m : le vert décide", second.veto)
-        assertEquals(TraversePhase.PRET, second.state)
+        veto.update(false, listOf(detection("car", 0.9f, box)), focalPx, 0L)
+        val second = veto.update(false, listOf(detection("car", 0.9f, box)), focalPx, 100L)
+        assertFalse("arrêt confirmé à 12 m : pas de veto", second.veto)
+        assertEquals(TraversePhase.ATTENDRE, second.state)
     }
 
     @Test
-    fun `garee hors couloir immobile - vert autorise sans pan`() {
+    fun `garee hors couloir immobile - pas de veto sans pan`() {
         // Même boîte que le test pan (cx = 0,156, hors couloir) mais caméra
-        // fixe : prouvée immobile, elle n'interdit pas la traversée.
+        // fixe : prouvée immobile, pas de veto.
         val veto = TraverseVeto()
         val box = listOf(0f, 0f, 200f, 200f)
-        veto.update(true, listOf(detection("car", 0.9f, box)), focalPx, 0L)
-        val second = veto.update(true, listOf(detection("car", 0.9f, box)), focalPx, 100L)
-        assertFalse("immobile ≤ 15 m, fond fixe : le vert décide", second.veto)
-        assertEquals(TraversePhase.PRET, second.state)
+        veto.update(false, listOf(detection("car", 0.9f, box)), focalPx, 0L)
+        val second = veto.update(false, listOf(detection("car", 0.9f, box)), focalPx, 100L)
+        assertFalse("immobile ≤ 15 m, fond fixe : pas de veto", second.veto)
+        assertEquals(TraversePhase.ATTENDRE, second.state)
     }
 
     @Test
@@ -356,8 +396,8 @@ class TraverseVetoTest {
         // De face, centre fixe, seau « 12 » stable, mais boîte qui grandit :
         // ça roule, pas d'exemption d'arrêt.
         val veto = TraverseVeto()
-        veto.update(true, listOf(detection("car", 0.9f, listOf(261f, 181f, 379f, 298f))), focalPx, 0L)
-        val second = veto.update(true, listOf(detection("car", 0.9f, listOf(259f, 179f, 381f, 300f))), focalPx, 100L)
+        veto.update(false, listOf(detection("car", 0.9f, listOf(261f, 181f, 379f, 298f))), focalPx, 0L)
+        val second = veto.update(false, listOf(detection("car", 0.9f, listOf(259f, 179f, 381f, 300f))), focalPx, 100L)
         assertTrue("croissance : approche, pas arrêt", second.veto)
         assertEquals("car", second.blockingLabel)
         assertEquals(11.98f, second.blockingMeters!!, 0.05f)
@@ -366,17 +406,17 @@ class TraverseVetoTest {
     @Test
     fun `tremble de mesure a frontiere de seau - arret prouve quand meme`() {
         // 7,47 m ↔ 7,51 m : les seaux « 7 »/« 8 » alternent, la portée (±4 cm)
-        // dit l'arrêt — le vert décide.
+        // dit l'arrêt — pas de veto.
         val veto = TraverseVeto()
         val boxA = listOf(220f, 143f, 420f, 337f) // 200×194 → 7,47 m
         val boxB = listOf(219.5f, 143.5f, 420.5f, 336.5f) // 201×193 → 7,51 m
-        veto.update(true, listOf(detection("car", 0.9f, boxA)), focalPx, 0L)
-        val second = veto.update(true, listOf(detection("car", 0.9f, boxB)), focalPx, 100L)
+        veto.update(false, listOf(detection("car", 0.9f, boxA)), focalPx, 0L)
+        val second = veto.update(false, listOf(detection("car", 0.9f, boxB)), focalPx, 100L)
         assertFalse("tremblé de mesure : arrêt prouvé", second.veto)
-        assertEquals(TraversePhase.PRET, second.state)
-        val third = veto.update(true, listOf(detection("car", 0.9f, boxA)), focalPx, 200L)
+        assertEquals(TraversePhase.ATTENDRE, second.state)
+        val third = veto.update(false, listOf(detection("car", 0.9f, boxA)), focalPx, 200L)
         assertFalse(third.veto)
-        assertEquals(TraversePhase.TRAVERSER, third.state)
+        assertEquals(TraversePhase.ATTENDRE, third.state)
     }
 
     @Test
@@ -385,13 +425,13 @@ class TraverseVetoTest {
         val veto = TraverseVeto()
         val boxA = listOf(220f, 140f, 420f, 340f) // 200×200 → 7,25 m
         val boxB = listOf(219f, 139f, 421f, 341f) // 202×202 → 7,18 m
-        veto.update(true, listOf(detection("car", 0.9f, boxA)), focalPx, 0L)
-        val second = veto.update(true, listOf(detection("car", 0.9f, boxB)), focalPx, 100L)
+        veto.update(false, listOf(detection("car", 0.9f, boxA)), focalPx, 0L)
+        val second = veto.update(false, listOf(detection("car", 0.9f, boxB)), focalPx, 100L)
         assertFalse("tremblé de boîte : arrêt prouvé", second.veto)
-        assertEquals(TraversePhase.PRET, second.state)
-        val third = veto.update(true, listOf(detection("car", 0.9f, boxB)), focalPx, 200L)
+        assertEquals(TraversePhase.ATTENDRE, second.state)
+        val third = veto.update(false, listOf(detection("car", 0.9f, boxB)), focalPx, 200L)
         assertFalse(third.veto)
-        assertEquals(TraversePhase.TRAVERSER, third.state)
+        assertEquals(TraversePhase.ATTENDRE, third.state)
     }
 
     /** Boîte qui grandit (+10 px/frame) en dérivant (+5 px/frame). */

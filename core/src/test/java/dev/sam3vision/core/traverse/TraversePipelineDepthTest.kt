@@ -28,7 +28,7 @@ class TraversePipelineDepthTest {
         val pipeline = TraversePipeline()
         var decision: TraverseDecision? = null
         listOf(100f, 110f, 120f, 130f, 140f, 150f, 160f).forEachIndexed { index, width ->
-            val out = pipeline.onFrame(listOf(seg(width, depth)), 640, 480, true, -1f, index * 100L)
+            val out = pipeline.onFrame(listOf(seg(width, depth)), 640, 480, false, -1f, index * 100L)
             decision = out.decision
         }
         return decision!!

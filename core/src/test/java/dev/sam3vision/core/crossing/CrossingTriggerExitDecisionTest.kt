@@ -11,13 +11,14 @@ import org.junit.Assert.assertTrue
 import org.junit.Test
 
 /**
- * Table de décision du mode Traversée : le feu **et** l'état des véhicules
- * décident, en anglais mot pour mot (« You can cross » / « Don't cross yet »).
+ * Table de décision du mode Traversée : le feu vert gagne toujours (ordre
+ * user du 02/11), même avec des véhicules en mouvement ; hors vert, l'état
+ * des véhicules décide, en anglais mot pour mot (« You can cross » /
+ * « Don't cross yet »).
  *
- * Un véhicule en mouvement (ou proche non prouvé immobile) force l'attente
- * même sur vert ; un véhicule prouvé immobile (mesuré ≤ 15 m, centre quasi
- * fixe, seau stable, boîte qui ne grandit pas, fond fixe) ne bloque plus. Le
- * rouge interdit toujours (état binaire, fini le doute).
+ * Un véhicule prouvé immobile (mesuré ≤ 15 m, centre quasi fixe, seau
+ * stable, boîte qui ne grandit pas, fond fixe) ne bloque plus. Le rouge
+ * interdit toujours (état binaire, fini le doute).
  *
  * Sortie : 4 frames publiées sans passage ni feu, ou 4 s d'horloge sans
  * scène (le réseau figé ne coince plus le mode).
@@ -36,15 +37,15 @@ class CrossingTriggerExitDecisionTest {
     private fun stoppedBox(): List<Float> = listOf(70f, 0f, 570f, 500f)
 
     @Test
-    fun `vert et vehicule en mouvement - Don't cross yet`() {
+    fun `vert et vehicule en mouvement - You can cross`() {
         val veto = TraverseVeto()
         veto.update(true, listOf(detection("car", 0.9f, listOf(0f, 0f, 60f, 50f))), focalPx, 0L)
         val decision = veto.update(true, listOf(detection("car", 0.9f, listOf(0f, 0f, 80f, 60f))), focalPx, 500L)
 
-        assertTrue(decision.veto)
-        assertEquals(TraversePhase.ALERTE, decision.state)
-        assertEquals(CrossingState.Red, decision.crossingState())
-        assertEquals("Don't cross yet", CrossingText.phrase(decision.crossingState(), SpeechLanguage.En))
+        assertFalse("le vert gagne sur le trafic", decision.veto)
+        assertEquals(TraversePhase.TRAVERSER, decision.state)
+        assertEquals(CrossingState.Green, decision.crossingState())
+        assertEquals("You can cross", CrossingText.phrase(decision.crossingState(), SpeechLanguage.En))
     }
 
     @Test
@@ -54,7 +55,7 @@ class CrossingTriggerExitDecisionTest {
         val confirmed = veto.update(true, listOf(detection("car", 0.9f, stoppedBox())), focalPx, 500L)
 
         assertFalse("arrêt confirmé : pas de veto", confirmed.veto)
-        assertEquals(TraversePhase.PRET, confirmed.state)
+        assertEquals(TraversePhase.TRAVERSER, confirmed.state)
         val decision = veto.update(true, listOf(detection("car", 0.9f, stoppedBox())), focalPx, 1000L)
 
         assertFalse(decision.veto)

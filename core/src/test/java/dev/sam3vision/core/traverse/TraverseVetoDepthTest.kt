@@ -27,7 +27,7 @@ class TraverseVetoDepthTest {
     private fun frame(veto: TraverseVeto, widthPx: Float, atMs: Long, closeness: Float?): TraverseDecision {
         val det = detection(box(widthPx))
         return veto.update(
-            lightGreen = true,
+            lightGreen = false,
             detections = listOf(det),
             focalPx = -1f,
             atMs = atMs,

@@ -30,7 +30,7 @@ data class TraverseOutput(
  *
  * 1. [TraverseState] anti-scintillement sur les objets SAM ;
  * 2. conversion en [Detection] (mêmes dimensions que l'appelant direct) ;
- * 3. [TraverseVeto] : un véhicule qui approche ou proche force « attendez » ;
+ * 3. [TraverseVeto] : hors vert, un véhicule qui approche ou proche force « attendez » ;
  * 4. [CrossingAnnouncer] : le signal vocal, confirmé sur plusieurs frames —
  *    [TraversePhase.PRET] et [TraversePhase.TRAVERSER] valent vert, `ATTENDRE`
  *    et `ALERTE` valent rouge (binaire, voir [CrossingAnnouncer]) ;

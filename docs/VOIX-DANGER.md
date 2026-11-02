@@ -46,9 +46,10 @@ chat (9) et GPS (3, 11) en synthèse réseau.
 
 Détail : `docs/TRAVERSEE.md`.
 
-- **100 verdict** : feu piéton puis voitures — **rouge ou mouvement =
-  « Don't cross. », sinon « Cross. »**. Véhicules = **voiture uniquement**
-  (bus, vélo, camion, moto ne tranchent jamais).
+- **100 verdict** : vert confirmé = **« Cross. »** même avec des voitures
+  en mouvement ; sinon (rouge / sans feu), mouvement = **« Don't cross. »**,
+  sinon **« Cross. »**. Véhicules = **voiture uniquement** (bus, vélo,
+  camion, moto ne tranchent jamais).
 - **101 humains** du passage + alignement passage (mot + annonce +
   arrivée : niveau 8 dehors, 101 en Traversée), après le verdict.
 - **102 bordures** du passage, après les humains.
