@@ -58,7 +58,7 @@ class VoiceNavSpeakerTest {
 
         val phrase = speaker(driver).onTurn(SteeringCap.Left, 100f)
 
-        assertEquals("Continuez dans cette direction.", phrase)
+        assertEquals("Tout droit.", phrase)
         assertEquals(1, driver.calls.size)
         assertEquals(FakeSpeakerDriver.Call(phrase!!, false, Locale.FRENCH, Settings.Default.ttsSpeed), driver.calls[0])
     }
@@ -81,7 +81,7 @@ class VoiceNavSpeakerTest {
 
         now += 5_000L
 
-        assertEquals("Tournez à gauche.", voice.onTurn(SteeringCap.Left, 20f))
+        assertEquals("À gauche.", voice.onTurn(SteeringCap.Left, 20f))
         assertEquals(2, driver.calls.size)
     }
 
@@ -91,7 +91,7 @@ class VoiceNavSpeakerTest {
 
         val phrase = speaker(driver).onTurn(SteeringCap.Left, 20f, "rue de Rivoli")
 
-        assertEquals("Tournez à gauche, rue de Rivoli.", phrase)
+        assertEquals("À gauche, rue de Rivoli.", phrase)
         assertEquals(1, driver.calls.size)
     }
 
@@ -102,7 +102,7 @@ class VoiceNavSpeakerTest {
 
         val phrase = voice.onTurn(SteeringCap.Right, 100f, "Main Street")
 
-        assertEquals("Continue in this direction, Main Street.", phrase)
+        assertEquals("Straight on, Main Street.", phrase)
         assertEquals(Locale.ENGLISH, driver.calls.single().locale)
     }
 
@@ -114,7 +114,7 @@ class VoiceNavSpeakerTest {
 
         val phrase = voice.onOffRoute()
 
-        assertEquals("Vous vous êtes écarté de l'itinéraire. Recalcul en cours.", phrase)
+        assertEquals("Hors route.", phrase)
         assertEquals(2, driver.calls.size)
         assertTrue(driver.calls[1].flush)
     }
@@ -123,15 +123,15 @@ class VoiceNavSpeakerTest {
     fun `arrivee recalcul depart`() {
         val arrivals = FakeSpeakerDriver()
         assertEquals(
-            "Vous êtes arrivé à la gare de Lyon.",
+            "Arrivé à la gare de Lyon.",
             speaker(arrivals).onArrival("la gare de Lyon"),
         )
         val reroutes = FakeSpeakerDriver()
-        assertEquals("Nouvel itinéraire calculé.", speaker(reroutes).onRerouted())
+        assertEquals("Nouvelle route.", speaker(reroutes).onRerouted())
         assertTrue(reroutes.calls.single().flush)
         val starts = FakeSpeakerDriver()
         assertEquals(
-            "Navigation vers la gare de Lyon",
+            "Vers la gare de Lyon.",
             speaker(starts).onStarted("la gare de Lyon"),
         )
     }
@@ -165,16 +165,16 @@ class VoiceNavSpeakerTest {
 
         // Hors-trace : urgence, la voix IA a le droit de couvrir le user.
         // (La consigne gardée sous le user n'a jamais atteint le moteur.)
-        assertEquals("Vous vous êtes écarté de l'itinéraire. Recalcul en cours.", voice.onOffRoute())
+        assertEquals("Hors route.", voice.onOffRoute())
         assertEquals(1, driver.calls.size)
         assertTrue(driver.calls[0].flush)
 
         // Recalcul : urgence aussi.
-        assertEquals("Nouvel itinéraire calculé.", voice.onRerouted())
+        assertEquals("Nouvelle route.", voice.onRerouted())
         assertEquals(2, driver.calls.size)
 
         // Arrivée : urgence.
-        assertEquals("Vous êtes arrivé à la gare de Lyon.", voice.onArrival("la gare de Lyon"))
+        assertEquals("Arrivé à la gare de Lyon.", voice.onArrival("la gare de Lyon"))
         assertEquals(3, driver.calls.size)
     }
 
@@ -190,7 +190,7 @@ class VoiceNavSpeakerTest {
 
         // La consigne retenue par la porte repart telle quelle : le silence
         // n'a pas marqué la phrase comme dite.
-        assertEquals("Continuez dans cette direction.", voice.onTurn(SteeringCap.Left, 100f))
+        assertEquals("Tout droit.", voice.onTurn(SteeringCap.Left, 100f))
         assertEquals(1, driver.calls.size)
     }
 
@@ -212,9 +212,9 @@ class VoiceNavSpeakerTest {
         val voice = speaker(driver)
         voice.onStarted("la gare de Lyon")
 
-        assertEquals("Guidage arrêté.", voice.onStopped())
+        assertEquals("Guidage coupé.", voice.onStopped())
         assertEquals(
-            "Navigation vers la gare de Lyon",
+            "Vers la gare de Lyon.",
             voice.onStarted("la gare de Lyon"),
         )
     }
@@ -289,10 +289,10 @@ class VoiceNavSpeakerTest {
         // Le créneau est pris par la file : l'événement courant se réessaiera.
         assertNull(voice.onTurn(SteeringCap.Right, 100f))
         assertEquals(1, driver.calls.size)
-        assertEquals("Continuez dans cette direction.", driver.calls.single().text)
+        assertEquals("Tout droit.", driver.calls.single().text)
 
         now += 5_000L
-        assertEquals("Continuez dans cette direction.", voice.onTurn(SteeringCap.Right, 100f))
+        assertEquals("Tout droit.", voice.onTurn(SteeringCap.Right, 100f))
         assertEquals(2, driver.calls.size)
     }
 
@@ -319,7 +319,7 @@ class VoiceNavSpeakerTest {
 
         driver.speakingValue = false
         now += 6_000L
-        assertEquals("Continuez dans cette direction.", voice.onTurn(SteeringCap.Right, 100f))
+        assertEquals("Tout droit.", voice.onTurn(SteeringCap.Right, 100f))
 
         assertEquals(1, driver.calls.size)
     }
@@ -332,7 +332,7 @@ class VoiceNavSpeakerTest {
 
         val phrase = voice.onOffRoute()
 
-        assertEquals("Vous vous êtes écarté de l'itinéraire. Recalcul en cours.", phrase)
+        assertEquals("Hors route.", phrase)
         assertEquals(1, driver.calls.size)
         assertTrue(driver.calls.single().flush)
 
@@ -350,7 +350,7 @@ class VoiceNavSpeakerTest {
         assertNull(voice.onTurn(SteeringCap.Left, 100f))
 
         driver.fail = false
-        assertEquals("Continuez dans cette direction.", voice.onTurn(SteeringCap.Left, 100f))
+        assertEquals("Tout droit.", voice.onTurn(SteeringCap.Left, 100f))
         // Deux tentatives tracées (refusée puis réussie) : « non marqué » vise la
         // mémoire anti-répétition (la réémission reparle), pas le journal pilote.
         assertEquals(2, driver.calls.size)

@@ -89,8 +89,8 @@ class CrossingVoiceCommandTest {
     fun `les phrases dites par le guidage ne redebranchent pas`() {
         // Le micro peut réentendre le haut-parleur : ces phrases contiennent
         // « crosswalk » (voire « on » devant) sans être des ordres.
-        assertNull(CrossingVoiceCommand.parse("Crosswalk in 50 meters"))
-        assertNull(CrossingVoiceCommand.parse("On the crosswalk."))
+        assertNull(CrossingVoiceCommand.parse("Crosswalk."))
+        assertNull(CrossingVoiceCommand.parse("Here."))
     }
 
     @Test

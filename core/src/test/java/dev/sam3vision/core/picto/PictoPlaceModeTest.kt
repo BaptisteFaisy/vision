@@ -48,9 +48,9 @@ class PictoPlaceModeTest {
 
     @Test
     fun `la bascule se confirme dans la langue de la voix`() {
-        assertEquals("Mode dedans activé.", PlaceModeText.switched(PictoPlaceMode.DEDANS, SpeechLanguage.Fr))
-        assertEquals("Mode dehors activé.", PlaceModeText.switched(PictoPlaceMode.DEHORS, SpeechLanguage.Fr))
-        assertEquals("Indoor mode on.", PlaceModeText.switched(PictoPlaceMode.DEDANS, SpeechLanguage.En))
-        assertEquals("Outdoor mode on.", PlaceModeText.switched(PictoPlaceMode.DEHORS, SpeechLanguage.En))
+        assertEquals("Dedans.", PlaceModeText.switched(PictoPlaceMode.DEDANS, SpeechLanguage.Fr))
+        assertEquals("Dehors.", PlaceModeText.switched(PictoPlaceMode.DEHORS, SpeechLanguage.Fr))
+        assertEquals("Inside.", PlaceModeText.switched(PictoPlaceMode.DEDANS, SpeechLanguage.En))
+        assertEquals("Outside.", PlaceModeText.switched(PictoPlaceMode.DEHORS, SpeechLanguage.En))
     }
 }

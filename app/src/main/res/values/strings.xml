@@ -4,50 +4,50 @@
 
     <!-- Navigation: stable keys, EN contract texts. -->
     <!-- Confirmation: “Navigating to X” (cf. NavigationPhrases.started). -->
-    <string name="nav_confirm_destination">Navigating to %1$s</string>
+    <string name="nav_confirm_destination">Going to %1$s</string>
     <!-- Error: guidance cannot be opened (cf. GUIDANCE_UNAVAILABLE). -->
-    <string name="nav_guidance_unavailable">I can’t open the guidance</string>
+    <string name="nav_guidance_unavailable">No guidance.</string>
     <!-- Settings: “GPS guidance” switch (cf. NavigationToggle). -->
     <string name="nav_guidance_toggle_label">Guide to the confirmed destination</string>
     <!-- Voice guidance: named arrival (cf. VoiceNavPhrases.arrived). -->
-    <string name="nav_voice_arrived">You have arrived at %1$s</string>
+    <string name="nav_voice_arrived">Arrived at %1$s</string>
     <!-- Voice guidance: unnamed arrival (cf. VoiceNavPhrases.ARRIVED_PLAIN). -->
-    <string name="nav_voice_arrived_plain">You have arrived at your destination</string>
+    <string name="nav_voice_arrived_plain">Arrived</string>
     <!-- Voice guidance: engine off-route, reroute requested (cf. VoiceNavPhrases.OFF_ROUTE). -->
-    <string name="nav_voice_left_route">You have left the route. Recalculating.</string>
+    <string name="nav_voice_left_route">Off route.</string>
     <!-- Voice guidance: back on track (cf. VoiceNavPhrases.BACK_ON_ROUTE). -->
     <string name="nav_voice_back_on_route">Back on route.</string>
     <!-- Voice guidance: upcoming maneuver, verb + distance (cf. VoiceNavPhrases.ahead). -->
-    <string name="nav_voice_maneuver">%1$s in %2$s</string>
+    <string name="nav_voice_maneuver">%1$s.</string>
     <!-- Voice guidance: upcoming crossing (cf. VoiceNavPhrases.crossingAhead). -->
-    <string name="nav_voice_crossing">Crosswalk in %1$s</string>
+    <string name="nav_voice_crossing">Crosswalk.</string>
     <!-- Voice guidance: crossing passed, resume (cf. VoiceNavPhrases.CROSSING_DONE). -->
-    <string name="nav_voice_crossing_done">Crossing finished.</string>
+    <string name="nav_voice_crossing_done">Crossed.</string>
 
     <!-- On-board voice guidance: English system voice (cf. VoiceNavPhrases). -->
     <!-- Arrival: “You have arrived at X” (empty destination = unnamed). -->
-    <string name="nav_voice_arrival">You have arrived at %1$s.</string>
+    <string name="nav_voice_arrival">Arrived at %1$s.</string>
     <!-- Off-track: urgent phrase, cuts the current phrase. -->
-    <string name="nav_voice_offroute">You are off route. Recalculating.</string>
+    <string name="nav_voice_offroute">Off route.</string>
     <!-- New route after reroute. -->
-    <string name="nav_voice_rerouted">New route calculated.</string>
+    <string name="nav_voice_rerouted">New route.</string>
     <!-- Guidance ended on user order. -->
-    <string name="nav_voice_stopped">Guidance stopped.</string>
+    <string name="nav_voice_stopped">Stopped.</string>
     <!-- Straight line, no distance. -->
-    <string name="nav_voice_continue">Continue straight ahead.</string>
+    <string name="nav_voice_continue">Straight on.</string>
 
     <!-- Confirmation: voice question (cf. VoiceNavPhrases.confirmQuestion). -->
-    <string name="nav_confirm_question">Do you really want to go to %1$s? Travel time: %2$s. Answer yes or no.</string>
+    <string name="nav_confirm_question">Go to %1$s? %2$s. Yes?</string>
     <!-- Confirmation without summary: question without the time. -->
-    <string name="nav_confirm_question_no_time">Do you really want to go to %1$s? Answer yes or no.</string>
+    <string name="nav_confirm_question_no_time">Go to %1$s? Yes?</string>
     <!-- Confirmation refused (cf. VoiceNavPhrases.CONFIRM_CANCELLED). -->
     <string name="nav_confirm_cancelled">Cancelled.</string>
     <!-- “yes” while loading (cf. VoiceNavPhrases.CONFIRM_LOADING). -->
-    <string name="nav_confirm_loading">Your route is still loading, one moment.</string>
+    <string name="nav_confirm_loading">Loading route.</string>
     <!-- Guidance off: place page opened (cf. VoiceNavPhrases.placeOpened). -->
-    <string name="nav_place_opened">Here is the page for %1$s</string>
+    <string name="nav_place_opened">Page: %1$s.</string>
     <!-- Stop order consumed (cf. VoiceNavPhrases.STOP_DONE). -->
-    <string name="nav_stop_done">Guidance stopped</string>
+    <string name="nav_stop_done">Stopped</string>
     <!-- Arrival reported by the engine (cf. VoiceNavPhrases.ARRIVED). -->
-    <string name="nav_arrived">Arrived at destination</string>
+    <string name="nav_arrived">Arrived</string>
 </resources>

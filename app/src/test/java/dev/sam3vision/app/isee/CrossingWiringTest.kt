@@ -107,7 +107,7 @@ class CrossingWiringTest {
             announcer, veto, true, frame, LensSpec.Default, "", 200L, SpeechLanguage.Fr,
         )
 
-        assertEquals("Rouge, attendez.", patch?.cue?.phrase)
+        assertEquals("Rouge.", patch?.cue?.phrase)
         assertEquals(CrossingState.Red, patch?.state)
     }
 
@@ -132,7 +132,7 @@ class CrossingWiringTest {
 
     @Test
     fun `signal - le PRET vert dit pret, pas traversez`() {
-        val cue = CrossingCue("Vert, traversez.", false, CrossingState.Green)
+        val cue = CrossingCue("Vert.", false, CrossingState.Green)
         val ready = crossingCueOf(cue, TraversePhase.PRET, SpeechLanguage.Fr)
         assertEquals("Prêt.", ready?.phrase)
         assertEquals(CrossingState.Green, ready?.state)
@@ -141,14 +141,14 @@ class CrossingWiringTest {
 
     @Test
     fun `signal - hors PRET vert, phrase inchangee, silence garde`() {
-        val green = CrossingCue("Vert, traversez.", false, CrossingState.Green)
+        val green = CrossingCue("Vert.", false, CrossingState.Green)
         assertEquals(
-            "Vert, traversez.",
+            "Vert.",
             crossingCueOf(green, TraversePhase.TRAVERSER, SpeechLanguage.Fr)?.phrase,
         )
-        val red = CrossingCue("Rouge, attendez.", true, CrossingState.Red)
+        val red = CrossingCue("Rouge.", true, CrossingState.Red)
         assertEquals(
-            "Rouge, attendez.",
+            "Rouge.",
             crossingCueOf(red, TraversePhase.PRET, SpeechLanguage.Fr)?.phrase,
         )
         assertNull(crossingCueOf(null, TraversePhase.PRET, SpeechLanguage.Fr))
@@ -156,9 +156,9 @@ class CrossingWiringTest {
 
     @Test
     fun `signal - la contradiction remplace la phrase, urgence gardee`() {
-        val cue = CrossingCue("Rouge, attendez.", true, CrossingState.Red)
+        val cue = CrossingCue("Rouge.", true, CrossingState.Red)
         val out = crossingCueOf(cue, TraversePhase.ATTENDRE, SpeechLanguage.Fr, contradiction = true)
-        assertEquals("Feux contradictoires, attendez.", out?.phrase)
+        assertEquals("Feux mixtes.", out?.phrase)
         assertEquals(CrossingState.Red, out?.state)
         assertTrue(out?.urgent ?: false)
     }

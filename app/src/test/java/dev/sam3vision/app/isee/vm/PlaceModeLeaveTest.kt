@@ -27,7 +27,7 @@ class PlaceModeLeaveTest {
         assertTrue(order().run("mode dehors"))
         assertEquals(PictoPlaceMode.DEHORS, state.placeMode)
         assertEquals(1, leaves)
-        assertEquals(listOf("Mode dehors activé."), spoken)
+        assertEquals(listOf("Dehors."), spoken)
     }
 
     @Test

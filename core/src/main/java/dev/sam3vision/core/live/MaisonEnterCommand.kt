@@ -36,13 +36,13 @@ object MaisonEnterText {
 
     /** Le direct maison s'ouvre : le dire, dans la langue de la voix. */
     fun entered(language: SpeechLanguage = SpeechLanguage.DEFAULT): String = when (language) {
-        SpeechLanguage.Fr -> "Mode maison activé. Je cherche les objets de l'appartement."
-        SpeechLanguage.En -> "Home mode on. Looking for household objects."
+        SpeechLanguage.Fr -> "Mode maison."
+        SpeechLanguage.En -> "Home mode."
     }
 
     /** Déjà en mode maison : le confirmer sans relancer le direct. */
     fun already(language: SpeechLanguage = SpeechLanguage.DEFAULT): String = when (language) {
-        SpeechLanguage.Fr -> "Déjà en mode maison."
-        SpeechLanguage.En -> "Already in home mode."
+        SpeechLanguage.Fr -> "Déjà actif."
+        SpeechLanguage.En -> "Already on."
     }
 }

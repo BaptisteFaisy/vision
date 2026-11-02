@@ -35,8 +35,8 @@ class PlaceModeOrderTest {
     fun `mode dehors bascule et confirme a voix haute`() = runBlocking {
         assertTrue(order().run("mode dehors"))
         assertEquals(PictoPlaceMode.DEHORS, state.placeMode)
-        assertEquals(listOf("Mode dehors activé."), spoken)
-        assertEquals("Mode dehors activé.", state.status)
+        assertEquals(listOf("Dehors."), spoken)
+        assertEquals("Dehors.", state.status)
     }
 
     @Test
@@ -46,14 +46,14 @@ class PlaceModeOrderTest {
         assertEquals(PictoPlaceMode.DEHORS, state.placeMode)
         assertTrue(orders.run("mode dedans"))
         assertEquals(PictoPlaceMode.DEDANS, state.placeMode)
-        assertEquals(listOf("Mode dehors activé.", "Mode dedans activé."), spoken)
+        assertEquals(listOf("Dehors.", "Dedans."), spoken)
     }
 
     @Test
     fun `outdoor mode confirme en anglais quand la voix est anglaise`() = runBlocking {
         assertTrue(order(SpeechLanguage.En).run("outdoor mode"))
         assertEquals(PictoPlaceMode.DEHORS, state.placeMode)
-        assertEquals(listOf("Outdoor mode on."), spoken)
+        assertEquals(listOf("Outside."), spoken)
     }
 
     @Test
@@ -81,7 +81,7 @@ class PlaceModeOrderTest {
         assertEquals(PictoPhase.Idle, state.picto.phase)
         assertTrue(state.picto.hits.isEmpty())
         assertEquals(2, state.picto.armed)
-        assertEquals("Mode dehors activé.", state.status)
+        assertEquals("Dehors.", state.status)
     }
 
     @Test

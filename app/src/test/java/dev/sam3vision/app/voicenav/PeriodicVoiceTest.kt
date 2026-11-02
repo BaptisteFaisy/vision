@@ -14,19 +14,19 @@ class PeriodicVoiceTest {
 
     @Test
     fun `rappel anglais sans rue ni distance`() {
-        assertEquals("Continue straight ahead.", phrase(WalkDirective.Straight))
+        assertEquals("Straight on.", phrase(WalkDirective.Straight))
         assertEquals("Turn left.", phrase(WalkDirective.Left))
         assertEquals("Turn right.", phrase(WalkDirective.Right))
         assertEquals("Turn around.", phrase(WalkDirective.TurnAround))
-        assertEquals("Cross the street.", phrase(WalkDirective.Cross))
-        assertEquals("At the roundabout, follow the road.", phrase(WalkDirective.Roundabout))
+        assertEquals("Cross now.", phrase(WalkDirective.Cross))
+        assertEquals("Roundabout.", phrase(WalkDirective.Roundabout))
     }
 
     @Test
     fun `rappel relatif suit la langue de la voix`() {
-        assertEquals("Continuez tout droit.", phrase(WalkDirective.Straight, SpeechLanguage.Fr))
-        assertEquals("Tournez à gauche.", phrase(WalkDirective.Left, SpeechLanguage.Fr))
-        assertEquals("Tournez à droite.", phrase(WalkDirective.Right, SpeechLanguage.Fr))
+        assertEquals("Tout droit.", phrase(WalkDirective.Straight, SpeechLanguage.Fr))
+        assertEquals("À gauche.", phrase(WalkDirective.Left, SpeechLanguage.Fr))
+        assertEquals("À droite.", phrase(WalkDirective.Right, SpeechLanguage.Fr))
     }
 
     private fun phrase(directive: WalkDirective, language: SpeechLanguage = SpeechLanguage.En): String =

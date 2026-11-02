@@ -1,6 +1,8 @@
 package dev.sam3vision.app.isee
 
 import dev.sam3vision.app.SpeechPlayer
+import dev.sam3vision.app.VOICE_SLICE_MS
+import dev.sam3vision.core.crossing.CrossingLevels
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.sync.Mutex
@@ -8,13 +10,13 @@ import kotlinx.coroutines.sync.withLock
 import java.io.File
 
 /**
- * [SpeechPlayer] vu comme [ClipSink] : le fichier part en lecture simple
- * (fin signalée par le rappel du lecteur), la tranche en file (fin rendue à
- * l'appelant, sans rappel — l'enchaînement ne libère pas le bus entre deux
- * tranches).
+ * [SpeechPlayer] vu comme [ClipSink] : lecture simple (fin au rappel),
+ * tranche 350 ms ([playSlice], verdicts exceptés — dits entiers) ou tranche
+ * en file (fin rendue, sans rappel — sans libération du bus entre tranches).
  */
 internal class SpeechPlayerClipSink(private val player: SpeechPlayer) : ClipSink {
     override suspend fun playFile(file: File): Result<Unit> = player.playFile(file)
+    override suspend fun playSlice(file: File, sliceMs: Long): Result<Unit> = player.playSliceFile(file, sliceMs)
     override suspend fun playQueued(bytes: ByteArray) = player.playQueued(bytes)
     override fun stop() = player.stop()
 }
@@ -61,7 +63,8 @@ internal class BusSpeaker(
                     return@withLock
                 }
                 val id = clipId ?: spokenClipId(text)
-                if (id != null && this@BusSpeaker.clips.speak(id, urgent = true)) return@withLock
+                val slice = if (level == CrossingLevels.VERDICT) null else VOICE_SLICE_MS
+                if (id != null && this@BusSpeaker.clips.speak(id, urgent = true, sliceMs = slice)) return@withLock
                 if (!proximity.speak(text, clipId = null, level = level) && current == generation) {
                     VoiceBus.onSpeechIdle()
                 }

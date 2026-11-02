@@ -42,7 +42,7 @@ code (porte du job `ci`, comme `check-budget-derive.py`).
    scène à la place.
 4. **Confirmation (implicite, one-shot)** : pas de question oui/non (non-but
    MVP : garder le geste unique mains libres). La confirmation = relecture
-   vocale immédiate « Navigating to X » + overlay affichant la destination
+   vocale immédiate « Going to X » + overlay affichant la destination
    (34 sp). Si la destination entendue est fausse, l'utilisateur dit « stop guidance » (ordre STOP, consommé avant le LLM) puis redicte.
 5. **Guidage** : handoff système — intent `google.navigation:q=X&mode=w`
    (piéton par défaut) ciblé sur `com.google.android.apps.maps`. Maps guide
@@ -69,11 +69,11 @@ ils suivent le chemin normal (question → LLM).
 |---|---|
 | Écoute | « Listening. Speak, then release to send. » |
 | Transcription en cours | « Transcription. One moment. » |
-| Destination comprise + guidage lancé | « Navigating to X » |
-| Repli navigateur (Maps absent) | « Navigating to X » (même phrase ; l'overlay dit « Route opened in the browser ») |
-| Guidage impossible (aucune app capable) | « I can't open the guidance » |
-| Réglage guidage éteint | « Here is the page for X » |
-| Ordre STOP (« stop / cancel the guidance / navigation », « arrête / stop le guidage ») | « Guidance stopped » |
+| Destination comprise + guidage lancé | « Going to X » |
+| Repli navigateur (Maps absent) | « Going to X » (même phrase ; l'overlay dit « Route opened in the browser ») |
+| Guidage impossible (aucune app capable) | « No guidance. » |
+| Réglage guidage éteint | « Page: X. » |
+| Ordre STOP (« stop / cancel the guidance / navigation », « arrête / stop le guidage ») | « Stopped » |
 
 Règles : une seule voix à la fois (la phrase en cours est coupée si un
 nouvel ordre arrive) ; erreurs toujours vocales + overlay, jamais overlay
@@ -81,7 +81,7 @@ seul ; langue des phrases = langue de la voix (`SpeechLanguage`), pas de
 l'interface ; sans clé TTS configurée : aucune annonce, overlays texte seuls
 — le lancement Maps reste possible.
 
-Note STOP : Maps n'est pas pilotable par iSee ; « Guidance stopped » confirme
+Note STOP : Maps n'est pas pilotable par iSee ; « Stopped » confirme
 l'oubli de destination + le retour à l'accueil iSee (à dire une fois dans
 l'aide vocale).
 
@@ -100,9 +100,9 @@ l'aide vocale).
    deux échouent : overlay Erreur rouge « Error. \<msg Meta\>. \<msg Scribe\>. »
    + lecture vocale des deux messages ; destination jamais inventée.
 6. **TTS / ElevenLabs KO au moment de confirmer** : le lancement Maps a quand
-   même lieu (le guidage ne dépend pas de la voix) ; overlay « Navigating to X » seul, sans audio ; erreur TTS journalisée, pas parlée (on ne
+   même lieu (le guidage ne dépend pas de la voix) ; overlay « Going to X » seul, sans audio ; erreur TTS journalisée, pas parlée (on ne
    parle pas d'une panne de voix à la voix).
-7. **Maps absent** : repli URL universelle navigateur (overlay « Route opened in the browser ») ; si aucun navigateur : « I can't open the guidance » + `Result.failure`, jamais de crash.
+7. **Maps absent** : repli URL universelle navigateur (overlay « Route opened in the browser ») ; si aucun navigateur : « No guidance. » + `Result.failure`, jamais de crash.
 8. **Micro occupé** (vidéo tap en cours) : refus en amont « microphone already busy with video » (libellé MicBus), pas d'écoute.
 9. **Micro verrouillé** (écran verrouillé) : hors scope MVP — `LockedMicAnswer`
    ne route pas encore vers la navigation (limite documentée
@@ -117,14 +117,14 @@ téléphone dans `BOITE-USER.md`.
 
 1. Appui long 1 s au centre → overlay « Listening / Speak, then release to send. » + annonce vocale ; relâcher en silence → overlay Transcription
    puis retour chat sans annonce navigation.
-2. Dicter « take me to King's Cross station » → overlay « Navigating to King's Cross station » + voix « Navigating to King's Cross station » + bascule vers
+2. Dicter « take me to King's Cross station » → overlay « Going to King's Cross station » + voix « Going to King's Cross station » + bascule vers
    Google Maps en guidage piéton vers cette destination.
 3. Dicter « where is the nearest pharmacy » → PAS de bascule Maps ;
    réponse chat normale (question LLM).
 4. Dicter « take me to » (sans X) → PAS d'erreur, chemin question normal,
    zéro annonce navigation.
-5. Réglage guidage sur non + dicter « go to the Eiffel Tower » → voix « Here is the page for the Eiffel Tower » + fiche lieu ouverte, PAS de guidage.
-6. Dicter « stop guidance » après un lancement → voix « Guidance stopped »
+5. Réglage guidage sur non + dicter « go to the Eiffel Tower » → voix « Page: the Eiffel Tower. » + fiche lieu ouverte, PAS de guidage.
+6. Dicter « stop guidance » après un lancement → voix « Stopped »
    + retour accueil iSee.
 7. Mode avion + dicter une navigation → overlay Erreur rouge affichant les
    deux messages ASR + lecture vocale ; aucune ouverture Maps.
@@ -144,12 +144,12 @@ avec le code qui l'utilise (X remplace `%1$s` dans ce tableau).
 
 | Clé | Texte EN | Statut |
 |---|---|---|
-| `nav_confirm_destination` | « Navigating to X » | en place |
-| `nav_guidance_unavailable` | « I can’t open the guidance » | en place |
+| `nav_confirm_destination` | « Going to X » | en place |
+| `nav_guidance_unavailable` | « No guidance. » | en place |
 | `nav_guidance_toggle_label` | « Guide to the confirmed destination » | en place |
-| `nav_place_opened` | « Here is the page for X » | en place |
+| `nav_place_opened` | « Page: X. » | en place |
 | `nav_browser_fallback` | « Route opened in the browser » | à venir |
-| `nav_stop_done` | « Guidance stopped » | en place |
+| `nav_stop_done` | « Stopped » | en place |
 | `nav_mic_busy_video` | « microphone already busy with video » | à venir |
 
 Aide sous l'interrupteur (en dur dans le composable, comme les autres aides) :
@@ -167,7 +167,7 @@ Motifs STOP déterministes (insensibles casse/accents) : « arrête / stop / can
 | Routage transcript → requête | `core/src/main/java/dev/sam3vision/core/usecase/NavigationRouter.kt` |
 | Consommation avant le LLM (cap → navigation → traversée → LLM) | `app/src/main/java/dev/sam3vision/app/isee/vm/NavigationHook.kt` |
 | Chaîne de replis (jamais d'exception) | `app/src/main/java/dev/sam3vision/app/navigation/NavigationLauncher.kt` |
-| Phrases « Navigating to X » / indisponible | `app/src/main/java/dev/sam3vision/app/speech/NavigationAnnouncer.kt::NavigationPhrases` |
+| Phrases « Going to X » / indisponible | `app/src/main/java/dev/sam3vision/app/speech/NavigationAnnouncer.kt::NavigationPhrases` |
 | Réglage guidage | `core/src/main/java/dev/sam3vision/core/settings/Settings.kt::navigationGuidanceEnabled` — défaut oui |
 | Dictée : Meta puis repli Scribe, MicBus un seul AudioRecord | `core/src/main/java/dev/sam3vision/core/net/FallbackSpeechClient.kt` |
 | Voix : ElevenLabs-only, silencieuse en échec | `app/src/main/java/dev/sam3vision/app/VoiceAnnouncer.kt` |

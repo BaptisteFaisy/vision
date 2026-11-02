@@ -15,33 +15,33 @@ class TraverseClipStoreTest {
     @Test
     fun `pathFor - stable par phrase, distinct par texte`() {
         val store = store()
-        assertEquals(store.pathFor("Rouge, attendez."), store.pathFor("Rouge, attendez."))
-        assertNotEquals(store.pathFor("Rouge, attendez."), store.pathFor("Vert, traversez."))
-        assertTrue(store.pathFor("Rouge, attendez.").endsWith(".wav"))
+        assertEquals(store.pathFor("Rouge."), store.pathFor("Rouge."))
+        assertNotEquals(store.pathFor("Rouge."), store.pathFor("Vert."))
+        assertTrue(store.pathFor("Rouge.").endsWith(".wav"))
     }
 
     @Test
     fun `clipFor - null quand absent ou vide`() {
         val store = store()
-        assertNull(store.clipFor("Rouge, attendez."))
-        java.io.File(store.pathFor("Rouge, attendez.")).writeBytes(ByteArray(0))
-        assertNull("fichier vide = inutilisable", store.clipFor("Rouge, attendez."))
+        assertNull(store.clipFor("Rouge."))
+        java.io.File(store.pathFor("Rouge.")).writeBytes(ByteArray(0))
+        assertNull("fichier vide = inutilisable", store.clipFor("Rouge."))
     }
 
     @Test
     fun `clipFor - chemin quand le clip est ecrit`() {
         val store = store()
-        val path = store.pathFor("Rouge, attendez.")
+        val path = store.pathFor("Rouge.")
         java.io.File(path).writeBytes(byteArrayOf(1, 2, 3))
-        assertEquals(path, store.clipFor("Rouge, attendez."))
+        assertEquals(path, store.clipFor("Rouge."))
     }
 
     @Test
     fun `sha16 - seize hex stables`() {
-        val hash = DirTraverseClipStore.sha16("Rouge, attendez.")
+        val hash = DirTraverseClipStore.sha16("Rouge.")
         assertEquals(16, hash.length)
         assertTrue(hash.all { it in '0'..'9' || it in 'a'..'f' })
-        assertEquals(hash, DirTraverseClipStore.sha16("Rouge, attendez."))
-        assertNotEquals(hash, DirTraverseClipStore.sha16("Vert, traversez."))
+        assertEquals(hash, DirTraverseClipStore.sha16("Rouge."))
+        assertNotEquals(hash, DirTraverseClipStore.sha16("Vert."))
     }
 }

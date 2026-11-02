@@ -108,6 +108,7 @@ fun LiveProbe.observeIndoorDoors(
             val readings = st.distanceLayer?.readings ?: return@collect
             val cue = IndoorDoorWall.cueOf(readings, st.width, st.height)
             val out = watcher.onCue(cue, System.currentTimeMillis(), allow) ?: return@collect
+            VoiceTick.report(VoiceTick.SRC_DOOR_WALL, VoiceWish(FindIndoorLevels.DOOR_WALL, out.text, AntiRepeat.KEY_DOOR_WALL + ":" + out.kind + ":" + out.clock, out.clipId), System.currentTimeMillis(), indoor = true)
             post(FindIndoorLevels.DOOR_WALL, out.text, out.clipId)
         }
     }
