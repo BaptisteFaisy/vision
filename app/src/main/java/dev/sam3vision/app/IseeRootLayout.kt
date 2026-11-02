@@ -54,6 +54,12 @@ class IseeRootLayout(context: Context) : FrameLayout(context) {
     var crossingZone: (() -> RectF?)? = null
 
     /**
+     * Zone tactile de la puce lieu, mêmes règles que [pictoZone] : un DOWN
+     * dedans descend au chip au lieu de toggler la vidéo.
+     */
+    var placeModeZone: (() -> RectF?)? = null
+
+    /**
      * Zones tactiles des boutons navigation de l'accueil (Démarrer, Annuler,
      * Arrêter, saisie clavier), mêmes règles que [pictoZone] : un DOWN dedans
      * descend au bouton — sans ça, la confirmation et l'arrêt sur l'accueil
@@ -99,7 +105,7 @@ class IseeRootLayout(context: Context) : FrameLayout(context) {
     }
 
     /**
-     * iSee n'a que des contrôles tactiles exemptés (Picto, Traversée, boutons nav) : hors de leurs
+     * iSee n'a que des contrôles tactiles exemptés (Picto, Traversée, lieu, boutons nav) : hors de leurs
      * zones, quand ses panneaux sont à l'écran, la racine prend le geste dès le
      * DOWN. Sans ça, un balayage non consommé remontait au système, qui ouvrait
      * le volet de notifications au milieu d'un swipe (mesuré sur le téléphone).
@@ -113,6 +119,7 @@ class IseeRootLayout(context: Context) : FrameLayout(context) {
      */
     private var pictoPass = false
     private var crossingPass = false
+    private var placeModePass = false
     private var navPass = false
 
     override fun onInterceptTouchEvent(ev: MotionEvent): Boolean {
@@ -122,12 +129,14 @@ class IseeRootLayout(context: Context) : FrameLayout(context) {
         if (ev.actionMasked == MotionEvent.ACTION_DOWN) {
             pictoPass = inZone(pictoZone?.invoke(), ev)
             crossingPass = inZone(crossingZone?.invoke(), ev)
+            placeModePass = inZone(placeModeZone?.invoke(), ev)
             navPass = inZones(navZones?.invoke().orEmpty(), ev)
         }
-        if (pictoPass || crossingPass || navPass) {
+        if (pictoPass || crossingPass || placeModePass || navPass) {
             if (ev.actionMasked == MotionEvent.ACTION_UP || ev.actionMasked == MotionEvent.ACTION_CANCEL) {
                 pictoPass = false
                 crossingPass = false
+                placeModePass = false
                 navPass = false
             }
             return false
