@@ -101,6 +101,7 @@ private fun GuidingHead(
                 state.update,
                 Modifier.fillMaxWidth().height(170.dp),
                 showAttribution = false,
+                cornerColor = AppColors.background,
             )
         }
         GuidanceProgress(state)

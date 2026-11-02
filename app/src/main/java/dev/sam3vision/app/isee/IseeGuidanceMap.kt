@@ -51,6 +51,8 @@ internal fun IseeGuidanceBlock(
             state.update,
             Modifier.fillMaxWidth().height(160.dp),
             showAttribution = false,
+            // Fond de la scène Portrait : les coins repeints s'y fondent.
+            cornerColor = Color.White,
         )
         GuidanceInstruction(state)
     }
