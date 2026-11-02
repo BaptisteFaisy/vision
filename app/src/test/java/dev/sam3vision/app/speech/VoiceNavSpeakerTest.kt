@@ -118,7 +118,7 @@ class VoiceNavSpeakerTest {
     }
 
     @Test
-    fun `hors trace coupe la phrase en cours`() {
+    fun `hors trace ne coupe pas, grave sans flush`() {
         val driver = FakeSpeakerDriver()
         val voice = speaker(driver)
         voice.onTurn(SteeringCap.Left, 20f)
@@ -127,7 +127,8 @@ class VoiceNavSpeakerTest {
 
         assertEquals("Hors route.", phrase)
         assertEquals(2, driver.calls.size)
-        assertTrue(driver.calls[1].flush)
+        assertEquals(false, driver.calls[1].flush)
+        assertEquals(SystemTtsEngine.SAFETY_PITCH, driver.calls[1].pitch, 0f)
     }
 
     @Test
@@ -139,7 +140,7 @@ class VoiceNavSpeakerTest {
         )
         val reroutes = FakeSpeakerDriver()
         assertEquals("Nouvelle route.", speaker(reroutes).onRerouted())
-        assertTrue(reroutes.calls.single().flush)
+        assertEquals(false, reroutes.calls.single().flush)
         val starts = FakeSpeakerDriver()
         assertEquals(
             "Vers la gare de Lyon.",
@@ -336,15 +337,19 @@ class VoiceNavSpeakerTest {
         assertNull(voice.onOffRoute())
         assertTrue(driver.calls.isEmpty())
 
-        // Au silence : le danger d'abord (voix grave, sans flush), puis l'événement courant.
+        // Au silence : le danger d'abord (voix grave, sans flush) ; l'événement
+        // courant attend son tour (délai de porte), il se dit au tick suivant.
         driver.speakingValue = false
-        voice.onTurn(SteeringCap.Right, 20f)
+        assertNull(voice.onTurn(SteeringCap.Right, 20f))
 
-        assertEquals(2, driver.calls.size)
+        assertEquals(1, driver.calls.size)
         assertEquals("Hors route.", driver.calls[0].text)
         assertEquals(SystemTtsEngine.SAFETY_PITCH, driver.calls[0].pitch, 0f)
         assertEquals(false, driver.calls[0].flush)
-        assertEquals("Right.", driver.calls[1].text)
+
+        now += 3_000L
+        assertEquals("Right.", voice.onTurn(SteeringCap.Right, 20f))
+        assertEquals(2, driver.calls.size)
     }
 
     @Test
