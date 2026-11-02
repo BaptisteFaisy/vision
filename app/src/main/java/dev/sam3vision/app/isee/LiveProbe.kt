@@ -28,6 +28,7 @@ import dev.sam3vision.app.LiveMaskTransport
 import dev.sam3vision.app.depth.DepthMeter
 import dev.sam3vision.app.live.LiveAdaptive
 import dev.sam3vision.app.live.LiveFrameCadence
+import dev.sam3vision.app.live.DropCause
 import dev.sam3vision.app.live.LiveLatencyLog
 import dev.sam3vision.core.model.LiveFrame
 import dev.sam3vision.core.traverse.TraverseVeto
@@ -345,10 +346,11 @@ _state.update { it.cleared() }
      * (`imageInfo.timestamp`, ns monotones — c'est lui qui rend la latence perçue
      * mesurable) : mise en réserve si un créneau est pris, envoyée tout de suite sinon.
      * Rien n'est mis en file au-delà d'une frame : la scène a changé, une vieille image
-     * n'apprend rien.
+     * n'apprend rien. [glassesSeq] = séquence lunettes (`-1` = téléphone, sans jointure).
      */
-    fun onFrame(jpegB64: String, captureAtNs: Long = 0L) {
-        if (!foregroundGate.foreground || jpegB64.isBlank()) return
+    fun onFrame(jpegB64: String, captureAtNs: Long = 0L, glassesSeq: Long = -1L) {
+        if (!foregroundGate.foreground) { LiveLatencyLog.drop(DropCause.BACKGROUND); return }
+        if (jpegB64.isBlank()) return
         val exposedAtMs = if (captureAtNs > 0L) captureAtNs / 1_000_000L else System.currentTimeMillis()
         ProbeBackgroundMotion.offer(jpegB64, exposedAtMs) // fond V1 pour les veilleurs.
         val encodedAtNs = clock()
@@ -357,7 +359,8 @@ _state.update { it.cleared() }
             return
         }
         if (active.saturated) {
-            reserve.offer(jpegB64, captureAtNs, encodedAtNs)
+            if (reserve.pending) LiveLatencyLog.drop(DropCause.SATURATED)
+            reserve.offer(jpegB64, captureAtNs, encodedAtNs, glassesSeq)
             return
         }
         // Deux créneaux : plein ⟺ saturé (plus ⟺ en vol) — le garde temporel seul décide.
@@ -366,7 +369,7 @@ _state.update { it.cleared() }
         cadence.markSent(active, now)
         if (!adaptive.admit()) return // keyframe : propagation locale, rien à envoyer
         priorityArmed = false
-        dispatch(active, jpegB64, captureAtNs, encodedAtNs, now)
+        dispatch(active, jpegB64, captureAtNs, encodedAtNs, now, glassesSeq)
     }
 
     /**
@@ -379,13 +382,13 @@ _state.update { it.cleared() }
         jpegB64: String,
         captureAtNs: Long,
         encodedAtNs: Long,
-        at: Long,
+        at: Long, glassesSeq: Long = -1L,
     ) {
         wifiLock.hold() // direct ouvert : la radio ne dort plus (repli silencieux sinon).
         rate.record(at)
         // Échéance posée par l'appelant (`admits`/`markSent`) : `dispatch` envoie, il ne décide pas.
         // Nouvelle frame : la chronologie repart de l'exposition du capteur.
-        chronology.beginFrame(captureAtNs, encodedAtNs)
+        chronology.beginFrame(captureAtNs, encodedAtNs, glassesSeq)
         // Hors du thread principal : la sérialisation de la frame (JSON + base64) et la
         // normalisation des concepts ne doivent jamais tomber dans la boucle de composition.
         val send = rotation.send(state.value.conceptsSent)
@@ -403,7 +406,7 @@ _state.update { it.cleared() }
         val now = System.currentTimeMillis()
         cadence.markSent(active, now)
         priorityArmed = false
-        dispatch(active, reserved.jpegB64, reserved.captureAtNs, reserved.encodedAtNs, now)
+        dispatch(active, reserved.jpegB64, reserved.captureAtNs, reserved.encodedAtNs, now, reserved.seq)
     }
 
     /** Corps de la dernière réponse → [crowd] (hystérésis de [crowdOf]), puis cadence des
@@ -437,7 +440,7 @@ _state.update { it.cleared() }
                 // Échec : le compte d'objets n'est pas remis à zéro — les masques affichés
                 // restent les derniers connus, seul le message d'erreur change.
                 val error = result.exceptionOrNull() ?: ApiError.BadResponse("SAM call failed")
-                if (!warmed && error is ApiError.Timeout) sayColdTimeout()
+                if (error is ApiError.Timeout) { if (!warmed) sayColdTimeout(); LiveLatencyLog.drop(DropCause.TIMEOUT) }
                 val cause = error.cause?.let { " + ${it::class.simpleName} ${it.message}" } ?: ""
                 android.util.Log.w("sam3vision", "live KO: ${error::class.simpleName} ${error.message}$cause")
                 _state.update { it.copy(error = probeFailureText(error), timings = shown.snapshot()) }

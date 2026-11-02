@@ -105,6 +105,20 @@ class LatestFrameSlotTest {
     }
 
     @Test
+    fun `seq voyage avec la frame, telephone seul sans jointure`() {
+        val slot = LatestFrameSlot()
+        slot.offer("A", 1L, 2L, seq = 12L)
+        val out = payload()
+        assertTrue(slot.take(out))
+        assertEquals(12L, out.seq)
+
+        slot.offer("B", 3L, 4L)
+        val phone = payload()
+        assertTrue(slot.take(phone))
+        assertEquals(-1L, phone.seq)
+    }
+
+    @Test
     fun `reserve perimee apres le seuil, jamais a vide`() {
         val slot = LatestFrameSlot()
         assertFalse("vide = jamais périmée", slot.stale(nowNs = 1_000_000_000L, thresholdMs = 50L))
