@@ -182,8 +182,10 @@ internal fun needsCodecRebuild(
  * directement sur la surface. Le décodage bitmap est exactement celui de `GlassesFrames`
  * (les octets copiés y repassent en `VideoFrame`) : zéro duplication.
  *
- * Un seul appelant à la fois (le collecteur du flux) ; `setSurface`/`release` viennent de
- * l'UI — tout est donc verrouillé, et rien ne lève jamais (un rendu raté rend `false`).
+ * Un seul appelant de `render` à la fois (le collecteur du flux) ; `setSurface`/`release`
+ * viennent de l'UI. Seul le cliché (surface, fermé) est pris sous verrou : le rendu
+ * (`MediaCodec`, dessin bitmap) tourne hors verrou pour ne jamais bloquer l'UI — et rien
+ * ne lève jamais (un rendu raté rend `false`).
  */
 class GlassesLiveDecoder(
     private val onVideoSize: (Int, Int) -> Unit = { _, _ -> },
@@ -191,6 +193,8 @@ class GlassesLiveDecoder(
 ) {
     private val lock = Any()
     private var surface: Surface? = null
+    /** Volatile : posé par `release` (UI, sous verrou), relu par `render` (hors verrou). */
+    @Volatile
     private var codec: MediaCodec? = null
     private var codecWidth = 0
     private var codecHeight = 0
@@ -221,9 +225,12 @@ class GlassesLiveDecoder(
      * Rend une frame copiée ; `true` = une image est affichée (l'accueil peut marquer le
      * direct vivant). Une frame de config codec rend `false` : elle prépare, sans image.
      */
-    fun render(frame: GlassesFrame): Boolean = synchronized(lock) {
-        if (closed) return false
-        val target = surface ?: return false
+    fun render(frame: GlassesFrame): Boolean {
+        // Cliché sous verrou, rendu hors verrou : `MediaCodec` (entrée 5 ms + sortie
+        // 33 ms) ne bloque plus l'UI qui pose sa surface ou libère le décodeur.
+        // `release` en cours de rendu : les appels codec lèvent, le `runCatching`
+        // jette le codec et rend `false` — le prochain rendu le recrée.
+        val target = synchronized(lock) { if (closed) null else surface } ?: return false
         if (frame.width <= 0 || frame.height <= 0 || frame.bytes.isEmpty()) return false
         return runCatching { renderLocked(target, frame) }.getOrElse { dropCodecLocked(); false }
     }
