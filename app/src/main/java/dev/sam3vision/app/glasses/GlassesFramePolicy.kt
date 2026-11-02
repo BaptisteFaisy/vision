@@ -2,7 +2,9 @@ package dev.sam3vision.app.glasses
 
 import dev.sam3vision.app.MAX_IMAGE_EDGE
 import dev.sam3vision.core.distance.CropGeometry
+import dev.sam3vision.core.distance.LensSpec
 import java.util.Locale
+import kotlin.math.abs
 import kotlin.math.max
 import kotlin.math.roundToInt
 
@@ -196,3 +198,45 @@ internal fun frameVerdict(
     width <= 0 || height <= 0 -> FrameVerdict.DROP_DIMENSIONS
     else -> FrameVerdict.ENCODE
 }
+
+// ---- Garde d'aspect du flux (W3) -------------------------------------------
+// Le SDK n'expose ni dimensions ni orientation : le flux est supposé 9:16
+// portrait (HIGH 720x1280, MEDIUM 504x896). Si une frame brute s'en écarte
+// (rotation, recadrage SDK, mauvaise qualité), les FOV du flux
+// (LensSpec.glassesStreamForSensorH) ne valent plus : on journalise et on lève
+// le flag JpegFrame.aspectOff, jamais de drop (le verdict a déjà trié). Pur,
+// testé en JVM. Comparaison sur les dimensions BRUTES du SDK, jamais sur le
+// JPEG recadré 4:3 (720x960) qui suit.
+
+/** Écart relatif toléré au 9:16 : les arrondis passent, les dérives non. */
+internal const val GLASSES_ASPECT_TOLERANCE = 0.02f
+
+/**
+ * Écart relatif de `width`×`height` au 9:16 du flux, `null` si inexploitable.
+ * Pur, testé en JVM.
+ */
+internal fun glassesAspectDeviation(width: Int, height: Int): Float? {
+    if (width <= 0 || height <= 0) return null
+    val aspect = width.toFloat() / height
+    return abs(aspect - LensSpec.GLASSES_ASPECT) / LensSpec.GLASSES_ASPECT
+}
+
+/** Vrai quand la frame brute s'écarte du 9:16 au-delà de [tolerance]. */
+internal fun isGlassesAspectOff(width: Int, height: Int, tolerance: Float = GLASSES_ASPECT_TOLERANCE): Boolean =
+    glassesAspectDeviation(width, height)?.let { it > tolerance } ?: false
+
+/**
+ * Ligne de journal quand la frame brute s'écarte du 9:16, `null` sinon
+ * (frame tenue ou dimensions inexploitables).
+ */
+internal fun glassesAspectNote(width: Int, height: Int, tolerance: Float = GLASSES_ASPECT_TOLERANCE): String? {
+    val deviation = glassesAspectDeviation(width, height) ?: return null
+    if (deviation <= tolerance) return null
+    val aspect = width.toFloat() / height
+    return "frame aspect inattendu : %dx%d (%.3f, attendu 9:16 = %.4f, ecart %.1f %%) - distances sur repli"
+        .format(Locale.US, width, height, aspect, LensSpec.GLASSES_ASPECT, deviation * 100f)
+}
+
+/** Copie marquée [JpegFrame.aspectOff] depuis les dimensions brutes du SDK. */
+internal fun JpegFrame.withAspectFlag(rawWidth: Int, rawHeight: Int): JpegFrame =
+    copy(aspectOff = isGlassesAspectOff(rawWidth, rawHeight))

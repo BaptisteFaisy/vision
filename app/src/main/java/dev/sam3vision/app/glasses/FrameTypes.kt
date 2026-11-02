@@ -17,6 +17,13 @@ data class JpegFrame(
     val width: Int,
     val height: Int,
     val capturedAtMs: Long,
+    /**
+     * Garde W3 : vrai quand la frame brute s'écartait du 9:16
+     * ([isGlassesAspectOff]) — l'aval mesure sur repli (`LensOrigin.FALLBACK`
+     * côté live). Comparé sur les dimensions brutes, pas sur
+     * `width`×`height` (recadré 4:3).
+     */
+    val aspectOff: Boolean = false,
 )
 
 /**

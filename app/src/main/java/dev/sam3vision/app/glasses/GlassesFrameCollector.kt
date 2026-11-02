@@ -72,11 +72,15 @@ internal class GlassesFrameCollector(
                     }
                     lastSentAt = nowMs()
                     val jpeg = decodeAndEncode(frame) ?: return@collect
+                    // Garde W3 : aspect de la frame BRUTE (avant recadrage),
+                    // journalisé + marqué, jamais jeté.
+                    glassesAspectNote(frame.width, frame.height)?.let(onLog)
+                    val flagged = jpeg.withAspectFlag(frame.width, frame.height)
                     // Un seul envoi en vol : le précédent s'achève avant que
                     // celui-ci parte — les analyses restent ordonnées.
                     upload?.join()
-                    onLog("frame forwarded: ${jpeg.width}x${jpeg.height}")
-                    upload = launch { onFrame(jpeg) }
+                    onLog("frame forwarded: ${flagged.width}x${flagged.height}")
+                    upload = launch { onFrame(flagged) }
                 }
             }
         }
