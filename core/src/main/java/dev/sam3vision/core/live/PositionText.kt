@@ -2,6 +2,7 @@ package dev.sam3vision.core.live
 
 import dev.sam3vision.core.cycle.CycleConcepts
 import dev.sam3vision.core.distance.DistanceText
+import dev.sam3vision.core.hazard.HazardConcepts
 import dev.sam3vision.core.model.Detection
 import dev.sam3vision.core.model.SeenObject
 import dev.sam3vision.core.speech.SpeechLanguage
@@ -136,25 +137,47 @@ object PositionText {
      * heure n'est cité qu'une fois ; au-delà de [maxObjects] objets cités, le reste
      * est résumé (« et 2 autres objets » / « and 2 other objects »). Les cycles
      * (vélo, trottinette) ne sont jamais nommés (ordre user du 02/11 : virés).
+     * Les murs non plus (ordre user : ils s'esquivent, ils ne se disent pas) :
+     * seuls face à la voix, c'est le côté d'évitement qui parle ([wallAvoidance]).
+     * [nameWalls] : la chasse nommée et l'analyse photo nomment les murs —
+     * l'utilisateur les a demandés, ou décrit une image fixe où il n'y a
+     * aucune esquive à dire.
      */
     fun phrase(
         labels: List<PlacedLabel>,
         maxObjects: Int = MAX_OBJECTS,
         language: SpeechLanguage = SpeechLanguage.DEFAULT,
+        nameWalls: Boolean = false,
     ): String? {
+        val walls = labels.filter { HazardConcepts.isWall(it.label) }
         val cleaned = labels
             .filter { it.label.isNotBlank() }
             .filter { !CycleConcepts.isCycle(it.label) }
+            .filter { nameWalls || !HazardConcepts.isWall(it.label) }
             .map { it.copy(label = it.label.trim()) }
             // La signature reste française : elle ne dépend pas de la langue de la voix.
             .distinctBy { it.label.lowercase() to it.position }
             .sortedWith(compareBy({ distanceOf(it) }, { abs(it.centerX - 0.5f) }, { it.label }))
-        if (cleaned.isEmpty()) return null
+        if (cleaned.isEmpty()) {
+            if (walls.isEmpty()) return null
+            return wallAvoidance(walls, language)
+        }
         val shown = cleaned.take(maxObjects.coerceAtLeast(1))
         val body = shown.joinToString(", ") { item(it, language) }
         val hidden = cleaned.size - shown.size
         val text = if (hidden > 0) "$body, ${others(hidden, language)}." else "$body."
         return text.replaceFirstChar { it.uppercaseChar() }
+    }
+
+    /**
+     * Murs seuls face à la voix : le côté d'évitement ([Guidance], cap
+     * droit), jamais le nom — `null` si le couloir reste libre (un mur
+     * visible mais hors couloir ne fait pas dévier). Pur, testé en JVM.
+     */
+    private fun wallAvoidance(walls: List<PlacedLabel>, language: SpeechLanguage): String? {
+        val decision = Guidance.decide(walls, SteeringCap.Straight)
+        if (!decision.blocked) return null
+        return GuidanceWord.fromSide(decision.side ?: GuidanceSide.Left).text(language)
     }
 
     /**

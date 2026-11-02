@@ -227,13 +227,13 @@ class LiveAskSession(
         guide(hits, nowMs)
     }
 
-    /** Guidage : les détections du mot chassé parlent, les autres restent muettes. */
+    /** Guidage : les détections du mot chassé parlent, murs compris (l'utilisateur les cherche). */
     private suspend fun guide(hits: List<PictoHit>, nowMs: Long) {
         val hunt = pictoHunt ?: return
         val targets = hits.filter { PictoVoiceOrder.matches(hunt, it.label) }
         if (targets.isEmpty()) return
         val placed = targets.map { PlacedLabel(it.label, it.x + it.w / 2f, x0 = it.x, x1 = it.x + it.w) }
-        val phrase = guideAnnouncer.onFrame(nowMs, placed, settings().speechLanguage) ?: return
+        val phrase = guideAnnouncer.onFrame(nowMs, placed, settings().speechLanguage, nameWalls = true) ?: return
         state.update { it.copy(spoken = phrase) }
         if (!pictoSpeaking.tryLock()) return
         try {

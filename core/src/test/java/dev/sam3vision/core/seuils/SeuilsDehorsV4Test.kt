@@ -113,7 +113,7 @@ class SeuilsDehorsV4Test {
 
     @Test
     fun `cloture mur barriere parlent niveau 4 sous 6m`() {
-        for (label in listOf("fence", "grillage", "wall", "mur", "barrier")) {
+        for (label in listOf("fence", "grillage", "barrier")) {
             val watcher = HazardWatcher()
             val signal = HazardSignal(detected = true, meters = 5.5f, label = label, centerX = 0.5f)
             watcher.onSignal(signal, 1_000L, En)
@@ -121,6 +121,17 @@ class SeuilsDehorsV4Test {
             assertNotNull("label $label", cue)
             assertEquals("label $label", 4, cue!!.level)
             assertEquals("label $label", "fence", cue.antiRepeatKey)
+        }
+        // Murs (ordre user du 02/11) : jamais nommés, mot d'évitement continu niveau 4.
+        for (label in listOf("wall", "mur")) {
+            val watcher = HazardWatcher()
+            val signal = HazardSignal(detected = true, meters = 5.5f, label = label, centerX = 0.5f)
+            val cue = watcher.onSignal(signal, 1_000L, En)
+            assertNotNull("label $label", cue)
+            assertEquals("label $label", "Right.", cue!!.phrase)
+            assertEquals("label $label", 4, cue.level)
+            assertEquals("label $label", "wall-avoid", cue.antiRepeatKey)
+            assertTrue("label $label", cue.urgent)
         }
         val watcher = HazardWatcher()
         val barrier = HazardSignal(detected = true, meters = 5.5f, label = "barrier", centerX = 0.5f)

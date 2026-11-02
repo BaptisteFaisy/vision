@@ -130,20 +130,20 @@ data class HazardCue(
  * Phrases « Attention … », FR/EN comme les positions (`PositionText`) :
  * « Attention à la barrière, à 2 heures. » / « Attention, barrier, at 2
  * o'clock. » — une info de description, jamais une consigne (l'ordre user :
- * iSee décrit, en douceur, au cadran des aveugles) — sauf les corps et
- * le poteau, qui disent le mot d'évitement en continu (ordre user du
- * 01/11, voir [avoidWord]).
+ * iSee décrit, en douceur, au cadran des aveugles) — sauf les corps, le
+ * poteau et les murs, qui disent le mot d'évitement en continu (ordres
+ * user du 01/11 et du 02/11, voir [avoidWord]).
  */
 object HazardText {
     /** Axe marché : en deçà, l'obstacle est à gauche — on passe à droite. */
     private const val AXIS_MID = 0.5f
 
     /**
-     * « Gauche. » / « Left. » : les corps et le poteau disent le mot
-     * d'évitement en continu — le côté conseillé est l'opposé de
+     * « Gauche. » / « Left. » : les corps, le poteau et les murs disent le
+     * mot d'évitement en continu — le côté conseillé est l'opposé de
      * l'obstacle (à gauche de l'axe = on passe à droite). Axe pile ou
      * heure inconnue = droite par défaut (prior, à valider rue : on serre
-     * à droite). Corps et poteau seuls (les autres dangers restent
+     * à droite). Corps, poteau et murs seuls (les autres dangers restent
      * descriptifs, voir [phrase]) ; le mot part en clip, voir
      * [HazardWatcher].
      */
@@ -173,13 +173,14 @@ object HazardText {
 }
 
 /**
- * Parole du [HazardSignal] (SPEC v4 + ordre continu du 01/11) : les corps
- * et le poteau disent le mot d'évitement en continu dès la 1re frame
+ * Parole du [HazardSignal] (SPEC v4 + ordre continu du 01/11 + murs du
+ * 02/11) : les corps, le poteau et les murs disent le mot d'évitement en
+ * continu dès la 1re frame
  * (« Droite. »/« Gauche. », clips `guide_*`, départ < 100 ms, répété
  * toutes les [AVOID_REPEAT_MS] tant que présent, immédiat au changement
  * de mot — la position optimale se dit en permanence) ; le reste parle
  * en doux confirmé ([confirmFrames] positifs consécutifs, puis silence
- * par groupe : grillages/murs/barrières 4 s, divers 2 s — un groupe ne
+ * par groupe : grillages/barrières 4 s, divers 2 s — un groupe ne
  * fait plus taire les autres). Le mot continu ne consomme pas les
  * silences doux et ne passe pas par la voix de sécurité.
  *
@@ -192,7 +193,7 @@ class HazardWatcher(
     /** Doux consécutifs en cours (un mot continu remet à zéro). */
     private var otherHits: Int = 0
 
-    /** Instant de la dernière annonce grillage/mur/barrière, [NO_INSTANT] si aucune. */
+    /** Instant de la dernière annonce grillage/barrière, [NO_INSTANT] si aucune. */
     private var lastFenceMs: Long = NO_INSTANT
 
     /** Instant de la dernière annonce divers, [NO_INSTANT] si aucune. */
@@ -208,7 +209,7 @@ class HazardWatcher(
     val lastAlertMs: Long?
         get() = maxOf(lastFenceMs, lastDiversMs).takeIf { it != NO_INSTANT }
 
-    /** Candidat parlé de la frame : sorte, nom, distance, centre, niveau v4 et continuité. */
+    /** Candidat parlé de la frame : sorte, nom, distance, centre, niveau v4, continuité et mur. */
     private data class Candidate(
         val kind: HazardKind,
         val name: HazardConcepts.HazardName,
@@ -217,6 +218,7 @@ class HazardWatcher(
         val level: Int,
         val continuous: Boolean,
         val trackId: Int? = null,
+        val wall: Boolean = false,
     )
 
     /**
@@ -232,21 +234,24 @@ class HazardWatcher(
 
     /**
      * Candidat de la frame : le signal retenu, `null` si rien à dire. Les
-     * corps et le poteau parlent en continu ; le reste en doux confirmé.
+     * corps, le poteau et les murs parlent en continu ; le reste en doux
+     * confirmé.
      */
     private fun candidateOf(signal: HazardSignal): Candidate? {
         if (!signal.detected) return null
         val label = signal.label ?: return null
         if (!HazardConcepts.isSpoken(label)) return null
         val name = HazardConcepts.nameOf(label) ?: return null
-        val continuous = HazardConcepts.isGuidedBody(label) || HazardConcepts.isPole(label)
+        val wall = HazardConcepts.isWall(label)
+        val continuous = HazardConcepts.isGuidedBody(label) || HazardConcepts.isPole(label) || wall
         return Candidate(HazardConcepts.kindOf(label), name, signal.meters, signal.centerX,
-            HazardConcepts.levelOf(label), continuous, trackId = signal.trackId)
+            HazardConcepts.levelOf(label), continuous, trackId = signal.trackId, wall = wall)
     }
 
     /**
-     * Mot d'évitement continu : dit dès la 1re frame (clip `guide_*`,
-     * répété toutes les [AVOID_REPEAT_MS], immédiat au changement de mot).
+     * Mot d'évitement continu (corps, poteau, mur) : dit dès la 1re frame
+     * (clip `guide_*`, répété toutes les [AVOID_REPEAT_MS], immédiat au
+     * changement de mot).
      */
     private fun onContinuous(candidate: Candidate, nowMs: Long, language: SpeechLanguage): HazardCue? {
         otherHits = 0
@@ -255,13 +260,14 @@ class HazardWatcher(
         lastAvoidWord = word
         lastAvoidMs = nowMs
         val pole = candidate.kind == HazardKind.POLE
+        val key = if (pole) KEY_POLE_AVOID else if (candidate.wall) KEY_WALL_AVOID else KEY_HUMAN_IMMINENT
         return HazardCue(word, candidate.meters, urgent = true, kind = candidate.kind, trackId = candidate.trackId,
-            level = candidate.level, antiRepeatKey = if (pole) KEY_POLE_AVOID else KEY_HUMAN_IMMINENT)
+            level = candidate.level, antiRepeatKey = key)
     }
 
     /**
-     * Hors corps et poteau : doux confirmé, silence du groupe
-     * (grillages/murs/barrières [FENCE_COOLDOWN_MS], divers [cooldownMs]).
+     * Hors corps, poteau et murs : doux confirmé, silence du groupe
+     * (grillages/barrières [FENCE_COOLDOWN_MS], divers [cooldownMs]).
      */
     private fun onOther(candidate: Candidate, nowMs: Long, language: SpeechLanguage): HazardCue? {
         otherHits++
@@ -296,7 +302,7 @@ class HazardWatcher(
         /** Silence entre deux annonces douces divers (SPEC v4 : 2 s ; le mot continu l'ignore). */
         const val DEFAULT_COOLDOWN_MS = 2_000L
 
-        /** Silence entre deux annonces grillages/murs/barrières (SPEC v4 : 4 s). */
+        /** Silence entre deux annonces grillages/barrières (SPEC v4 : 4 s). */
         const val FENCE_COOLDOWN_MS = 4_000L
 
         /** Au-delà de cette distance (m), le mobilier ne fait pas parler (SPEC v4 : 6 m). */
@@ -340,7 +346,10 @@ class HazardWatcher(
         /** Clé AntiRepeat v4 : mot d'évitement poteau continu (immédiat, répété à 300 ms). */
         const val KEY_POLE_AVOID = "pole-avoid"
 
-        /** Clé AntiRepeat v4 : grillages, murs et barrières (4 s). */
+        /** Clé AntiRepeat v4 : mot d'évitement mur continu (immédiat, répété à 300 ms). */
+        const val KEY_WALL_AVOID = "wall-avoid"
+
+        /** Clé AntiRepeat v4 : grillages et barrières (4 s). */
         const val KEY_FENCE = "fence"
 
         /** Clé AntiRepeat v4 : poteaux, mobilier vertical et divers (2 s). */
