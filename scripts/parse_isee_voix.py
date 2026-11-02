@@ -34,6 +34,8 @@ done`, `error` et refus = fin expliquée) ; `clip` et `synthèse` passent
 par le lecteur (fin = `PLAYER done`). Les deltas demandent l'horodatage
 logcat (`MM-DD HH:MM:SS.mmm`) ; sans lui, l'ordre seul parle (durées
 `?`, ni rafale ni rapprochement temporel).
+Silences : écarts PLAY→PLAY > 5 s (seuil, micro tenu exclu), max, taux
+de parole (PLAY→fin) ; verdict-coupe final : PROPRE = 0 coupe + 0 silence.
 
 Usage :
     python3 scripts/parse_isee_voix.py voix.txt
@@ -56,6 +58,8 @@ LIGNE_PLAYER = re.compile(r"ISEE_VOIX:\s*PLAYER\s+(\w+)\s*$")
 LIGNE_TTS = re.compile(r"ISEE_VOIX:\s*TTS\s+(\S+)\s*$")
 LIGNE_BUS_PAROLE = re.compile(r"VoiceMute:\s*bus-parole\s+level=(\S+)\s+texte=\[(.*?)\]")
 LIGNE_PAROLE_JETEE = re.compile(r"VoiceMute:\s*PAROLE JETEE\s+level=(\S+)\s+texte=\[(.*?)\]")
+#: Jet micro tenu : phrase jetée car le user parle (bus) ou transcrit (proximité).
+LIGNE_MICRO = re.compile(r"VoiceMute:\s*(?:bus-jet motif=micro-user|prox-jet \S+ motif=parole-user)")
 HORODATAGE = re.compile(r"(\d{2})-(\d{2})\s+(\d{2}):(\d{2}):(\d{2})\.(\d{3})")
 
 #: Seule source PLAY parlée par le moteur TTS (fin = `TTS done`).
@@ -66,6 +70,7 @@ SEUIL_RAFALE_S = 1.0
 SEUIL_RAPPROCHES_S = 2.0
 #: `PAROLE JETEE` sous ce délai après un cut = coupe + silence (M5).
 FENETRE_M5_S = 2.0
+SEUIL_SILENCE_S = 5.0  # écart PLAY→PLAY fautif au-delà (voix jamais muette)
 #: Mots d'événement qui portent l'analyse coupe (hors orphelins).
 MOTS_COUPE = frozenset({"PLAYER", "TTS", "BUS-PAROLE", "PAROLE-JETEE"})
 #: Cadences typiques des rafales : 300 ms = mots continus, 1 s = compte, 2 s = verdict.
@@ -98,6 +103,9 @@ def parse_ligne(brute):
     trouve = LIGNE_PAROLE_JETEE.search(brute)
     if trouve:
         return ("PAROLE-JETEE", trouve.group(1), trouve.group(2))
+    trouve = LIGNE_MICRO.search(brute)
+    if trouve:
+        return ("MICRO", "", "")
     return None
 
 
@@ -181,6 +189,11 @@ def ecart(avant, apres):
 def fmt_duree(delta):
     """`0.42s`, ou `?` sans horodatage."""
     return f"{delta:.2f}s" if delta is not None else "?"
+
+
+def fmt_ts(ts):
+    """`HH:MM:SS.mmm` depuis les secondes du jour, ou `?`."""
+    return "?" if ts is None else f"{int(ts // 3600):02}:{int(ts // 60) % 60:02}:{ts % 60:06.3f}"
 
 
 def evenements(texte):
@@ -339,6 +352,34 @@ def coupes_tts(evs):
     return coupes
 
 
+def ecarts_silence(evs):
+    """(écart, ts, détail, ts, détail, micro) entre PLAY horodatés voisins."""
+    plays = [(i, t, d) for i, (t, mot, _, d) in enumerate(evs) if mot == "PLAY" and t is not None]
+    return [(ecart(a, b), a, da, b, db, any(evs[k][1] == "MICRO" for k in range(i1 + 1, i2)))
+            for (i1, a, da), (i2, b, db) in zip(plays, plays[1:])]
+
+
+def taux_parole(evs):
+    """(% couvert, couvert, total) : part du temps avec du son (PLAY→fin).
+
+    Son allumé au PLAY, éteint au premier DONE / PLAYER (hors play) / TTS (dernier ts sinon)."""
+    dates = [e for e in evs if e[0] is not None]
+    plays = [e[0] for e in dates if e[1] == "PLAY"]
+    if not dates or not plays:
+        return None, None, None
+    couvert, ouvert = 0.0, None
+    # Sentinelle DONE : ferme une parole encore en vol au dernier horodatage.
+    for ts, mot, premier, _ in dates + [(dates[-1][0], "DONE", "", "")]:
+        if mot == "PLAY":
+            ouvert = ts if ouvert is None else ouvert
+        elif ouvert is not None and (mot in ("DONE", "TTS") or
+                                     (mot == "PLAYER" and premier != "play")):
+            couvert += ecart(ouvert, ts)
+            ouvert = None
+    total = ecart(plays[0], dates[-1][0])
+    return (100.0 * couvert / total if total > 0 else None), couvert, total
+
+
 def lignes_autos(autos):
     """Une ligne par auto-coupe : couple coupé/remplaçant + deltas."""
     lignes = []
@@ -366,18 +407,21 @@ def lignes_motifs(seches, rafales, recoups, silences, tts):
     return lignes
 
 
-def verdict_coupe(evs):
-    """(lignes, propre) : section coupes + verdict binaire COUPE/PROPRE.
+def verdict_coupe(evs, seuil=SEUIL_SILENCE_S):
+    """(lignes, propre) : coupes + silences + verdict final COUPE/PROPRE.
 
-    COUPE dès qu'un son a été interrompu (auto-coupe, sèche, M5, TTS) ;
-    PROPRE sinon — `stop` à vide ignorés, recoups seules informatives
-    (un re-post sans cut n'a rien interrompu).
+    COUPE dès qu'un son a été interrompu (auto-coupe, sèche, M5, TTS) ou
+    dès qu'un écart PLAY→PLAY dépasse [seuil] (jamais muet en session) ;
+    PROPRE sinon — `stop` à vide ignorés, recoups seules informatives.
     """
     autos, seches = coupes_player(evs)
     rafales = rafales_coupe(evs)
     recoups = recoups_niveau(evs)
     silences = silences_m5(evs)
     tts = coupes_tts(evs)
+    ecarts = ecarts_silence(evs)
+    fautifs = [g for g in ecarts if g[0] > seuil and not g[5]]
+    exclus = [g for g in ecarts if g[0] > seuil and g[5]]
     stops = sum(1 for e in evs if e[1] == "PLAYER" and e[2] == "stop")
     cuts = len(autos) + len(seches)
     lignes = []
@@ -388,16 +432,25 @@ def verdict_coupe(evs):
         lignes.append("coupes : aucune trace PLAYER/TTS/VoiceMute")
     lignes += lignes_autos(autos)
     lignes += lignes_motifs(seches, rafales, recoups, silences, tts)
+    lignes.append(f"silences : max {fmt_duree(max([g[0] for g in ecarts], default=None))}, " +
+                  f"{len(fautifs)} écart(s) > {seuil:g}s ({len(exclus)} exclu(s) micro)")
+    for gap, ta, da, tb, db, micro in sorted(fautifs + exclus, reverse=True)[:5]:
+        lignes.append(f"silence {gap:.2f}s ({'micro tenu, exclu' if micro else 'fautif'}) : "
+                      f"[{da}] {fmt_ts(ta)} → [{db}] {fmt_ts(tb)}")
+    pct, _, _ = taux_parole(evs)
+    lignes.append(f"parole : {pct:.0f}% couverte" if pct is not None else "parole : ?")
     motifs = [("auto-coupe", len(autos)), ("coupe-sèche", len(seches)),
               ("rafale", len(rafales)), ("recoupe-niveau", len(recoups)),
-              ("coupe+silence-M5", len(silences)), ("coupe-TTS", len(tts))]
+              ("coupe+silence-M5", len(silences)), ("coupe-TTS", len(tts)),
+              ("silence", len(fautifs))]
     dus = sorted(((nom, n) for nom, n in motifs if n), key=lambda m: (-m[1], m[0]))
-    propre = not autos and not seches and not silences and not tts
+    propre = not autos and not seches and not silences and not tts and not fautifs
     if propre:
-        lignes.append(f"verdict-coupe : PROPRE (0 cut avec son interrompu ; "
-                      f"{max(0, stops - cuts)} stop(s) à vide ignoré(s))")
+        lignes.append(f"verdict-coupe : PROPRE (0 cut avec son interrompu, "
+                      f"0 écart > {seuil:g}s ; {max(0, stops - cuts)} stop(s) à vide ignoré(s))")
     else:
-        lignes.append(f"verdict-coupe : COUPE ({len(autos)} auto-coupe(s) ; top : " +
+        lignes.append(f"verdict-coupe : COUPE ({len(autos)} auto-coupe(s), "
+                      f"{len(fautifs)} silence(s) ; top : " +
                       ", ".join(f"{nom}×{n}" for nom, n in dus[:3]) + ")")
     return lignes, propre
 
