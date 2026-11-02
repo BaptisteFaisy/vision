@@ -202,6 +202,9 @@ class MainActivity : ComponentActivity() {
         onSwipeUp = isee.gestures::onSwipeUp
         onSwipeDown = isee.gestures::onSwipeDown
         onSwipeRight = { swipeRight() }
+        onSwipeHoldStart = isee.gestures::onSwipeHoldStart
+        onSwipeHoldEnd = isee.gestures::onSwipeHoldEnd
+        onSwipeHoldCancel = isee.gestures::onSwipeHoldCancel
         pictoZone = { isee.picto.chipZone() }
         crossingZone = { isee.modeChips.crossing.zone() }
         placeModeZone = { isee.modeChips.place.zone() }

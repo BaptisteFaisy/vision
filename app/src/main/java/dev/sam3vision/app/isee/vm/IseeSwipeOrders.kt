@@ -32,21 +32,26 @@ interface FindListening {
  * - **vers le bas** : la fonction GPS, exactement l'ordre vocal « active le
  *   GPS » ([runGpsOrder] → `VoiceNavSession.enableFromVoice` : réglage
  *   `navigationGuidanceEnabled` persisté + accusé parlé) ;
+ * - **vers le bas + maintien** (demande user du 03/11/2026) : le doigt resté
+ *   posé ouvre le micro ([askDestination]), l'endroit dicté part tel quel en
+ *   destination au relâchement ([sendDestination] → [runDestination]) et le
+ *   guidage démarre direct, sans question ni bouton ;
  * - **vers la droite** : iSee demande « Quoi chercher ? », ouvre le micro sans
  *   doigt ([listenForObject], fin à la fin de la parole — [FindAskPolicy]),
  *   puis la chasse part par le chemin existant `mode find my X` ([runMode] :
  *   concept SAM, génération du picto à sa première détection, ancrage, refus
  *   dehors et confirmation parlée).
  *
- * Rien n'est réimplémenté ici : les deux gestes rejouent les ordres vocaux, ils
- * ne parlent ni à SAM ni à la caméra. Pendant l'écoute, la surface appartient à
- * la question ([asking]) : l'appui long et le tap sont ignorés, sinon deux
- * gestes se disputeraient le même micro.
+ * Rien n'est réimplémenté ici : les gestes rejouent les ordres vocaux, ils ne
+ * parlent ni à SAM ni à la caméra. Pendant une écoute, la surface appartient à
+ * la question ([asking]) : l'appui long, le tap et l'autre écoute sont ignorés,
+ * sinon deux gestes se disputeraient le même micro.
  *
  * Les deux phrases du geste et les accusés GPS sont des **clips du pack
  * anglais** (`IseeClipsEn.FIND_ASK`, `FIND_NOTHING`, `GPS_ENABLED`…) : zéro
  * synthèse réseau, la voix reste hors-ligne comme le reste de la v4. La
- * question est jouée **jusqu'à sa fin** avant que le micro ne s'ouvre.
+ * question « Quoi chercher ? » est jouée **jusqu'à sa fin** avant que le micro
+ * ne s'ouvre ; la destination n'a pas de question (le doigt est déjà posé).
  */
 class IseeSwipeOrders(
     private val scope: CoroutineScope,
@@ -59,6 +64,14 @@ class IseeSwipeOrders(
     /** Joue un clip du pack et attend sa fin (voir `IseeNavSpeaker.speakClipAndWait`). */
     private val sayClip: suspend (String) -> Unit,
     private val update: StateUpdate,
+    /** Destination brute entendue → guidage (même chemin que l'ordre « mode GPS … X »). */
+    private val runDestination: suspend (String) -> Boolean,
+    /** Parler coupe la voix en cours (l'accusé « GPS enabled » du balayage). */
+    private val silence: () -> Unit,
+    /** Salve franche à l'ouverture du micro destination (même retour que l'appui long). */
+    private val hapticStart: () -> Unit,
+    /** Queue de 200 ms au relâchement (même retour que l'appui long). */
+    private val hapticEnd: () -> Unit,
     private val clock: () -> Long = System::currentTimeMillis,
 ) {
 
@@ -66,8 +79,12 @@ class IseeSwipeOrders(
     @Volatile
     private var listening = false
 
-    /** Vrai pendant l'écoute ; la surface est alors réservée à la question. */
-    fun asking(): Boolean = listening
+    /** L'écoute destination (maintien après balayage vers le bas) tient le micro. */
+    @Volatile
+    private var destinationListening = false
+
+    /** Vrai pendant une écoute ; la surface est alors réservée à la question. */
+    fun asking(): Boolean = listening || destinationListening
 
     /**
      * Balayage vers le bas : « active le GPS », exactement l'ordre vocal —
@@ -84,8 +101,53 @@ class IseeSwipeOrders(
      * entendu. Dehors, refus parlé comme l'ordre vocal (jamais de picto dehors)
      * — et pas de micro ouvert pour rien.
      */
+    /**
+     * Maintien après balayage vers le bas : le micro destination s'ouvre (même
+     * dictée que l'appui long, sans son contexte photo — une destination n'en
+     * a pas besoin). Sans effet si une écoute tient déjà le micro.
+     */
+    fun askDestination() {
+        if (listening || destinationListening) return
+        destinationListening = true
+        silence()
+        hapticStart()
+        if (dictation.start()) {
+            update { it.copy(status = null) }
+        } else {
+            destinationListening = false
+            update { it.copy(status = IseeStatusText.MIC_UNAVAILABLE) }
+        }
+    }
+
+    /**
+     * Relâchement du maintien : l'endroit dicté part tel quel en destination
+     * ([runDestination], guidage direct) ; un silence redit « Say again. » et
+     * n'envoie rien. Sans effet sans maintien en cours.
+     */
+    fun sendDestination() {
+        if (!destinationListening) return
+        destinationListening = false
+        hapticEnd()
+        scope.launch {
+            val heard = dictation.finish(settings()) ?: return@launch
+            if (heard.text.isBlank()) {
+                nothingHeard()
+                return@launch
+            }
+            runDestination(heard.text)
+        }
+    }
+
+    /** Maintien annulé (app en arrière-plan en plein maintien) : micro relâché, rien de transcrit. */
+    fun cancelDestination() {
+        if (!destinationListening) return
+        destinationListening = false
+        dictation.discard()
+        hapticEnd()
+    }
+
     fun askToFind() {
-        if (listening) return
+        if (listening || destinationListening) return
         if (!placeMode().pictoEnabled) {
             scope.launch { sayClip(IseeClipsEn.FIND_REFUSED) }
             return

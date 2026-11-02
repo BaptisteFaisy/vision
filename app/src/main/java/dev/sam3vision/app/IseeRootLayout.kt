@@ -11,10 +11,11 @@ import android.widget.FrameLayout
 import androidx.annotation.RequiresApi
 import dev.sam3vision.core.gesture.IseeGestureBrain
 import dev.sam3vision.core.gesture.LongPressTrigger
+import dev.sam3vision.core.gesture.SwipeHoldTrigger
 
 /**
  * Racine de la fenêtre iSee : la seule vue qui voit **tous** les gestes de la surface
- * de l'app (l'unique page chat, textures et bulles confondues). Deux machines y tournent :
+ * de l'app (l'unique page chat, textures et bulles confondues). Trois machines y tournent :
  *
  * - [LongPressTrigger] : appui maintenu ~300 ms → [onHoldStart] (micro ouvert) ; la
  *   vue intercepte alors tout (les enfants reçoivent un ACTION_CANCEL) jusqu'au
@@ -22,7 +23,11 @@ import dev.sam3vision.core.gesture.LongPressTrigger
  * - [IseeGestureBrain] : tap simple (vidéo, dès le relâchement), balayage vers
  *   le haut (bascule Traversée), vers le bas (mode GPS) et vers la droite
  *   (« quoi chercher ? »). Ni double tap, ni page horizontale vers la gauche :
- *   iSee n'a qu'une page ni qu'une bulle à parcourir.
+ *   iSee n'a qu'une page ni qu'une bulle à parcourir ;
+ * - [SwipeHoldTrigger] : balayage vers le bas confirmé puis doigt maintenu
+ *   ~300 ms → [onSwipeHoldStart] (micro destination) jusqu'au relâchement qui
+ *   émet [onSwipeHoldEnd] (envoi). Un balayage relâché vite garde son seul
+ *   effet GPS, sans micro.
  *
  * Les taps ne sont jamais consommés en-dehors d'une tenue : ce sont des observations
  * posées sur les événements, les écrans iSee restent libres de leur rendu. Les deux
@@ -47,6 +52,15 @@ class IseeRootLayout(context: Context) : FrameLayout(context) {
 
     /** Balayage vers la droite confirmé : session lunettes si joignable, sinon « Quoi chercher ? ». */
     var onSwipeRight: (() -> Unit)? = null
+
+    /** Maintien après balayage vers le bas : ouvrir le micro destination. */
+    var onSwipeHoldStart: (() -> Unit)? = null
+
+    /** Relâchement du maintien : couper le micro et envoyer la destination. */
+    var onSwipeHoldEnd: (() -> Unit)? = null
+
+    /** Maintien annulé sans transcription (app passée en arrière-plan pendant le maintien). */
+    var onSwipeHoldCancel: (() -> Unit)? = null
 
     /** Geste actif seulement quand les panneaux iSee sont à l'écran, sinon à l'ancienne UI. */
     var gesturesEnabled: () -> Boolean = { true }
@@ -80,6 +94,11 @@ class IseeRootLayout(context: Context) : FrameLayout(context) {
 
     private val handler = Handler(Looper.getMainLooper())
     private var capturing = false
+    private var swipeCapturing = false
+
+    /** Dernière position vue (DOWN/MOVE) : le maintien s'arme dessus à la confirmation du balayage. */
+    private var lastX = 0f
+    private var lastY = 0f
 
     private val trigger = LongPressTrigger(
         scheduler = ::scheduleDelayed,
@@ -98,11 +117,34 @@ class IseeRootLayout(context: Context) : FrameLayout(context) {
         },
     )
 
+    private val swipeHold = SwipeHoldTrigger(
+        scheduler = ::scheduleDelayed,
+        listener = object : SwipeHoldTrigger.Listener {
+            override fun onSwipeHoldStart() {
+                swipeCapturing = true
+                brain.handOffToHold()
+                onSwipeHoldStart?.invoke()
+            }
+
+            override fun onSwipeHoldEnd() {
+                swipeCapturing = false
+                brain.holdReleased()
+                onSwipeHoldEnd?.invoke()
+            }
+        },
+    )
+
     private val brain = IseeGestureBrain(
         listener = object : IseeGestureBrain.Listener {
             override fun onSingleTap() = onSingleTap?.invoke() ?: Unit
             override fun onSwipeUp() = onSwipeUp?.invoke() ?: Unit
-            override fun onSwipeDown() = onSwipeDown?.invoke() ?: Unit
+            override fun onSwipeDown() {
+                // Le maintien s'arme sur la position de confirmation : tenu
+                // ~300 ms, il ouvre le micro destination ; relâché vite, le
+                // balayage garde son seul effet GPS.
+                swipeHold.arm(lastX, lastY)
+                onSwipeDown?.invoke()
+            }
             override fun onSwipeRight() = onSwipeRight?.invoke() ?: Unit
         },
     )
@@ -176,7 +218,7 @@ class IseeRootLayout(context: Context) : FrameLayout(context) {
 
     override fun onTouchEvent(ev: MotionEvent): Boolean {
         if (!gesturesEnabled()) return super.onTouchEvent(ev)
-        if (capturing) feedHeld(ev) else feed(ev)
+        if (capturing || swipeCapturing) feedHeld(ev) else feed(ev)
         return true
     }
 
@@ -187,17 +229,23 @@ class IseeRootLayout(context: Context) : FrameLayout(context) {
      */
     fun cancelGesture() {
         trigger.reset()
+        swipeHold.reset()
         brain.reset()
         if (capturing) {
             capturing = false
             onHoldCancel?.invoke()
+        }
+        if (swipeCapturing) {
+            swipeCapturing = false
+            onSwipeHoldCancel?.invoke()
         }
     }
 
     /** Pendant une tenue : l'appui long fait tout arrêt/relance sur relâchement. */
     private fun feedHeld(ev: MotionEvent) {
         when (ev.actionMasked) {
-            MotionEvent.ACTION_UP, MotionEvent.ACTION_CANCEL -> trigger.onUp()
+            // Une seule des deux machines tient à la fois, l'autre est Idle : sans effet sur elle.
+            MotionEvent.ACTION_UP, MotionEvent.ACTION_CANCEL -> { trigger.onUp(); swipeHold.onUp() }
             else -> Unit
         }
     }
@@ -206,27 +254,37 @@ class IseeRootLayout(context: Context) : FrameLayout(context) {
     private fun feed(ev: MotionEvent) {
         if (!gesturesEnabled()) {
             trigger.reset()
+            swipeHold.reset()
             return
         }
         val now = System.currentTimeMillis()
         when (ev.actionMasked) {
             MotionEvent.ACTION_DOWN -> {
+                lastX = ev.x
+                lastY = ev.y
                 trigger.onDown(ev.x, ev.y)
                 brain.onDown(now, ev.x, ev.y)
             }
 
             MotionEvent.ACTION_MOVE -> {
+                // Position mémorisée avant le brain : sa confirmation de
+                // balayage vers le bas arme le maintien dessus aussitôt.
+                lastX = ev.x
+                lastY = ev.y
                 trigger.onMove(ev.x, ev.y)
                 brain.onMove(now, ev.x, ev.y)
+                swipeHold.onMove(ev.x, ev.y)
             }
 
             MotionEvent.ACTION_POINTER_DOWN -> {
                 trigger.onPointerDown()
+                swipeHold.onPointerDown()
                 brain.onCancel()
             }
 
             MotionEvent.ACTION_UP, MotionEvent.ACTION_CANCEL -> {
                 trigger.onUp()
+                swipeHold.onUp()
                 if (ev.actionMasked == MotionEvent.ACTION_CANCEL) brain.onCancel() else brain.onUp(now, ev.x, ev.y)
             }
         }
@@ -251,6 +309,7 @@ class IseeRootLayout(context: Context) : FrameLayout(context) {
 
     override fun onDetachedFromWindow() {
         trigger.reset()
+        swipeHold.reset()
         brain.reset()
         handler.removeCallbacksAndMessages(null)
         super.onDetachedFromWindow()

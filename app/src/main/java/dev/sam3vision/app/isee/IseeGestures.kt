@@ -5,7 +5,8 @@ import dev.sam3vision.app.isee.vm.IseeSwipeOrders
 /**
  * Les gestes de la surface iSee, en un seul relais : appui long (question), tap
  * (vidéo et quadruple tap pour le lieu), et les trois balayages — vers le haut
- * (Traversée), vers le bas (fonction GPS), vers la droite (« Quoi chercher ? »).
+ * (Traversée), vers le bas (fonction GPS, + maintien : dicter la destination),
+ * vers la droite (« Quoi chercher ? »).
  *
  * Extrait d'`IseeViewModel` (garde 500 lignes) et des extensions de
  * `IseeSteeringOrders` : l'appelant n'a qu'un point d'entrée
@@ -31,6 +32,15 @@ class IseeGestures internal constructor(
 
     /** Balayage vers le bas : « active le GPS », comme l'ordre vocal. */
     fun onSwipeDown() = swipe.gpsOn()
+
+    /** Maintien après balayage vers le bas : ouvrir le micro destination. */
+    fun onSwipeHoldStart() = swipe.askDestination()
+
+    /** Relâchement du maintien : envoyer l'endroit dicté en destination. */
+    fun onSwipeHoldEnd() = swipe.sendDestination()
+
+    /** Maintien annulé : micro relâché, rien de transcrit. */
+    fun onSwipeHoldCancel() = swipe.cancelDestination()
 
     /** Balayage vers la droite : iSee demande l'objet, puis chasse. */
     fun onSwipeRight() = swipe.askToFind()
