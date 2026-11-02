@@ -5,9 +5,11 @@ import org.junit.Assert.assertTrue
 import org.junit.Test
 
 /**
- * Politique du voile : le décor suivi (mur) garde pastille et voix mais ne
- * voile pas la caméra — non-régression du 01/11 (voile bleu à mi-écran, rue
- * « coupée en deux »). Tout le reste voile, par défaut aussi.
+ * Politique du voile : le décor suivi (mur, sol dehors) garde pastille et
+ * voix mais ne voile pas la caméra — non-régression du 01/11 (voile bleu à
+ * mi-écran, rue « coupée en deux »), étendue au sol plein-champ le 02/11
+ * (trottoir, bordure, passage piéton : même trait horizontal persistant).
+ * Tout le reste voile, par défaut aussi.
  */
 class VeilPolicyTest {
 
@@ -33,10 +35,28 @@ class VeilPolicyTest {
     }
 
     @Test
+    fun `le sol dehors ne voile pas`() {
+        assertFalse(VeilPolicy.showsVeil("curb"))
+        assertFalse(VeilPolicy.showsVeil("curbs"))
+        assertFalse(VeilPolicy.showsVeil("bordure"))
+        assertFalse(VeilPolicy.showsVeil("bordures"))
+        assertFalse(VeilPolicy.showsVeil("sidewalk"))
+        assertFalse(VeilPolicy.showsVeil("sidewalks"))
+        assertFalse(VeilPolicy.showsVeil("trottoir"))
+        assertFalse(VeilPolicy.showsVeil("trottoirs"))
+        assertFalse(VeilPolicy.showsVeil("crosswalk"))
+        assertFalse(VeilPolicy.showsVeil("crosswalks"))
+        assertFalse(VeilPolicy.showsVeil("passage piéton"))
+        assertFalse(VeilPolicy.showsVeil("passages piétons"))
+        assertFalse(VeilPolicy.showsVeil("passage pieton"))
+        assertFalse(VeilPolicy.showsVeil("passages pietons"))
+    }
+
+    @Test
     fun `les objets ordinaires voilent`() {
         assertTrue(VeilPolicy.showsVeil("person"))
         assertTrue(VeilPolicy.showsVeil("door"))
-        assertTrue(VeilPolicy.showsVeil("sidewalk"))
+        assertTrue(VeilPolicy.showsVeil("fence"))
     }
 
     @Test
