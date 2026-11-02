@@ -141,9 +141,7 @@ class PedLightGateTest {
     fun `verdict - micro bonhomme bas accepte (fraction 0,0052)`() {
         // 48x48, barre 3x4 en bas : fraction 0,0052, dans l'ancienne bande
         // (rouge aux seuils 0,0035 et 0,0048) — miroir Python en vis-à-vis.
-        // 3 px de large depuis le 02/11 : la barre de 2 px de la version
-        // d'origine (5 % de 48 = 2,4 px) tombe sous le plancher de largeur,
-        // voir le test suivant — c'est le seul cas de rappel perdu ici.
+        // Plancher de largeur 0,04 depuis le 02/11 (W12 §1) : 1,92 px sur 48.
         val pixels = IntArray(48 * 48) { BLACK }
         for (y in 44 until 48) {
             for (x in 23..25) pixels[y * 48 + x] = GREEN
@@ -152,20 +150,23 @@ class PedLightGateTest {
     }
 
     @Test
-    fun `largeur - micro bonhomme de 2 px sur 48 - refuse (plancher 2,4 px)`() {
+    fun `largeur - micro bonhomme de 2 px sur 48 - accepte (plancher 1,92 px)`() {
+        // À 0,05 (2,4 px) cette barre tombait ; c'est la même taille que l'ancre
+        // `feuxfr3/tel_g02` (composante verte de 2 px sur 18 x 48, vraie lampe
+        // lointaine) que les 33 ancres interdisent de perdre. La borne haute
+        // compatible avec les ancres est 2/48 = 0,0417 : d'où 0,04.
         val pixels = IntArray(48 * 48) { BLACK }
         for (y in 44 until 48) {
             for (x in 23..24) pixels[y * 48 + x] = GREEN
         }
-        assertEquals(CrossingState.Red, PedLightGate.verdict(pixels, 48, 48))
+        assertEquals(CrossingState.Green, PedLightGate.verdict(pixels, 48, 48))
     }
 
     @Test
-    fun `largeur - bandes vertes de 1 a 4 px sur crop 96 - refusees`() {
-        // 5 % de 96 = 4,8 px : ce sont les bandes de 1 à 4 px du feu voisin
-        // ou du panneau cycliste entré dans le crop — 22 faux verts sur 40
-        // rouges à l'échelle de production (96 px) avant cette règle.
-        for (widthPx in 1..4) {
+    fun `largeur - bandes vertes de 1 a 3 px sur crop 96 - refusees`() {
+        // 0,04 de 96 = 3,84 px : ce sont les bandes de 1 à 3 px du feu voisin
+        // ou du panneau cycliste entré dans le crop à l'échelle de production.
+        for (widthPx in 1..3) {
             val pixels = band(96, widthPx, 20)
             assertFalse("acceptGreen, bande $widthPx px", PedLightGate.acceptGreen(pixels, 96, 96))
             assertEquals("verdict, bande $widthPx px", CrossingState.Red, PedLightGate.verdict(pixels, 96, 96))
@@ -173,9 +174,29 @@ class PedLightGateTest {
     }
 
     @Test
-    fun `largeur - 4 px refuse, 5 px accepte sur crop 96 (frontiere 4,8)`() {
-        assertFalse(PedLightGate.acceptGreen(band(96, 4, 20), 96, 96))
-        assertTrue(PedLightGate.acceptGreen(band(96, 5, 20), 96, 96))
+    fun `largeur - deux bandes de 1 px opposees sur 96 - refusees (composante, pas etendue)`() {
+        // Le défaut d'origine (audit W12 §1) : l'étendue X valait 86 px et la
+        // règle passait alors que chaque tache fait 1 px de large. C'est le cas
+        // visé — un feu voisin entré de l'autre côté du crop.
+        val pixels = band(96, 1, 40)
+        for (y in 30 until 70) pixels[y * 96 + 90] = GREEN
+        assertFalse(PedLightGate.acceptGreen(pixels, 96, 96))
+        assertEquals(CrossingState.Red, PedLightGate.verdict(pixels, 96, 96))
+    }
+
+    @Test
+    fun `largeur - deux taches dont une large - acceptee (la plus large decide)`() {
+        // Bande large de 6 px en bas + bande de 1 px de l'autre côté : la
+        // composante de 6 px décide, l'étendue (88 px) ne sert plus de largeur.
+        val pixels = band(96, 6, 40)
+        for (y in 30 until 70) pixels[y * 96 + 90] = GREEN
+        assertTrue(PedLightGate.acceptGreen(pixels, 96, 96))
+    }
+
+    @Test
+    fun `largeur - 3 px refuse, 4 px accepte sur crop 96 (frontiere 3,84)`() {
+        assertFalse(PedLightGate.acceptGreen(band(96, 3, 20), 96, 96))
+        assertTrue(PedLightGate.acceptGreen(band(96, 4, 20), 96, 96))
     }
 
     @Test
@@ -189,10 +210,10 @@ class PedLightGateTest {
     }
 
     @Test
-    fun `largeur - fraction, pas pixels - 4 px refuse a 96, accepte a 48`() {
-        // Même bande, deux échelles : la règle suit le crop (5 % de 48 = 2,4).
-        assertFalse(PedLightGate.acceptGreen(band(96, 4, 20), 96, 96))
-        assertTrue(PedLightGate.acceptGreen(band(48, 4, 12), 48, 48))
+    fun `largeur - fraction, pas pixels - 3 px refuse a 96, accepte a 48`() {
+        // Même bande, deux échelles : la règle suit le crop (0,04 de 48 = 1,92).
+        assertFalse(PedLightGate.acceptGreen(band(96, 3, 20), 96, 96))
+        assertTrue(PedLightGate.acceptGreen(band(48, 3, 12), 48, 48))
     }
 
     @Test
@@ -200,6 +221,14 @@ class PedLightGateTest {
         assertFalse(PedLightGate.acceptGreen(IntArray(1) { GREEN }, 1, 1))
         assertFalse(PedLightGate.acceptGreen(IntArray(1) { BLACK }, 1, 1))
         assertEquals(CrossingState.Red, PedLightGate.verdict(IntArray(1) { GREEN }, 1, 1))
+    }
+
+    @Test
+    fun `largeur - crop 1x1 vert par la forme - pas de crash ni d invention`() {
+        // Un seul pixel vert ne peut pas être une tache (BBOX_MIN_PX) ; le
+        // balayage de composantes doit rendre 1 sans déborder.
+        assertFalse(PedLightGate.acceptGreen(IntArray(1) { CYAN_GREEN }, 1, 1))
+        assertEquals(CrossingState.Red, PedLightGate.verdict(IntArray(1) { CYAN_GREEN }, 1, 1))
     }
 
     @Test

@@ -25,10 +25,12 @@ package dev.sam3vision.core.crossing
  * 100 voiture, 6 éteints), seuils existants intacts.
  * 01/11 : bande élargie 20-35 % → 15-35 % (même ordre, jitter ±1 px).
  *
- * Largeur du nuage (02/11/2026, lot W5) : la tache verte retenue doit faire
- * au moins [GREEN_MIN_WIDTH_FRACTION] du plus grand côté du crop — exprimée
- * en **fraction** et non en pixels, seule forme invariante au
- * rééchantillonnage (voir la KDoc de la constante).
+ * Largeur d'une tache (02/11/2026, lot W5 ; mesure corrigée W12 §1) : la
+ * **plus large composante verte** doit faire au moins
+ * [GREEN_MIN_WIDTH_FRACTION] du plus grand côté du crop — exprimée en
+ * **fraction** et non en pixels, seule forme invariante au rééchantillonnage
+ * (voir la KDoc de la constante), et mesurée sur la composante, pas sur
+ * l'étendue de tous les pixels verts.
  *
  * **Dette assumée, non corrigée ici : des règles en pixels.** [BBOX_MIN_PX]
  * raisonne en pixels bruts (3 px de haut) et les autres seuils en fractions
@@ -85,8 +87,8 @@ object PedLightGate {
     private const val WIDE_FILL_MAX = 0.35f
 
     /**
-     * Largeur minimale du nuage vert : **fraction du plus grand côté du
-     * crop**, jamais des pixels. 0,05 depuis le 02/11/2026 (lot W5).
+     * Largeur minimale d'**une tache** verte : **fraction du plus grand côté du
+     * crop**, jamais des pixels. 0,04 depuis le 02/11/2026 (correctif W12 §1).
      *
      * Pourquoi une fraction : tout le corpus étiqueté est rendu à **48 px**
      * alors que la production tourne à **96 px**, et une règle en pixels
@@ -95,18 +97,34 @@ object PedLightGate {
      * 40** pour les mêmes boîtes — sous forme de **bandes vertes de 1 à
      * 4 px de large** (feu voisin ou panneau cycliste entré dans le crop),
      * alors qu'un vrai vert porte une tache d'au moins **7 px** à la même
-     * échelle. Exprimée en fraction, la règle vaut 4,8 px sur un crop de 96
-     * et 2,4 px sur un crop de 48 : elle suit l'échelle au lieu de la subir
-     * (à 48 px les mêmes bandes font 1-2 px parce que le rééchantillonnage
-     * délave le vert, la tache de 96 px y tombe à 1 px).
+     * échelle. Exprimée en fraction, la règle vaut 3,8 px sur un crop de 96
+     * et 1,9 px sur un crop de 48.
      *
-     * Mesuré (miroir `tools/light_features.py`, 02/11/2026) : à 96 px
-     * **22/22 faux verts supprimés, rappel inchangé 201/240** ; FR jour
-     * 133 → **132** verts sur 183 (1 perdu, 0 faux vert) ; téléphone
-     * **20/20 et 0 faux vert** sur 49 ; PTL 12 → 11 faux verts (127 → 126
-     * verts sur 238) ; **33 ancres intactes** (22 verts / 11 rouges).
+     * **Ce que la règle mesure (02/11, W12 §1)** : la largeur de la **plus
+     * large composante 8-connexe** du masque vert ([widestComponent]) et non
+     * l'étendue X de tous les pixels verts. L'ancienne mesure était
+     * contournée par son propre cas cible : deux bandes de 1 px aux deux
+     * bords d'un crop de 96 px donnaient `boxWidth = 86` et passaient.
+     *
+     * **Valeur 0,04, et non 0,05** : à 0,05 le plancher vaut 2,4 px sur un
+     * crop de 48 et refuse l'ancre `feuxfr3/tel_g02` (tache verte de 2 px de
+     * large sur 18 × 48, 4 pixels — vraie lampe lointaine). La borne haute
+     * compatible avec les 33 ancres est `2/48 = 0,0417` ; 0,04 garde 4 % de
+     * marge sous elle. Conséquence mesurée et assumée : sur un crop de 96 px
+     * le plancher vaut 3,84 px, donc une bande **unique** de 4 px passe
+     * encore le plancher (1 crop rouge sur 40 à 96 px, `ru_moscow_03_28`) —
+     * aucune fraction ne peut refuser 4 px à 96 px et accepter 2 px à 48 px,
+     * c'est le même objet à deux échelles. Les deux bandes de 1 px, elles,
+     * sont refusées à toutes les échelles (largeur de composante = 1).
+     *
+     * Mesuré (miroir `tools/light_features.py`, 02/11/2026) : les 40 crops
+     * rouges jitterés à 96 px restent à 1 faux vert au lieu de 0 à 0,05 ;
+     * jitter 198/240 verts (205 avant, −7 taches fragmentées de 2-3 px) ;
+     * téléphone 20/20 et 0 faux vert sur 49 ; FR jour 130/183 verts ;
+     * PTL 99/184 et 13 faux verts (inchangés) ; **33 ancres intactes**
+     * (22 verts / 11 rouges). Détail et arbitrage : `fixa/RAPPORT.md`.
      */
-    const val GREEN_MIN_WIDTH_FRACTION = 0.05f
+    const val GREEN_MIN_WIDTH_FRACTION = 0.04f
 
     /** Hauteur minimale de la tache verte, en pixels (pas un point). */
     const val BBOX_MIN_PX = 3
@@ -163,7 +181,8 @@ object PedLightGate {
     /** Vrai si le vert du crop a la position et la forme d'un bonhomme. */
     fun acceptGreen(argb: IntArray, width: Int, height: Int): Boolean {
         if (width <= 0 || height <= 0 || argb.size != width * height) return false
-        val scan = scan(argb, width, height)
+        val mask = BooleanArray(width * height)
+        val scan = scan(argb, width, height, mask)
         val total = argb.size.toFloat()
         if (scan.green / total < GREEN_MIN_FRACTION) return false
         if (scan.red / total >= RED_MAX_FRACTION) return false
@@ -172,8 +191,11 @@ object PedLightGate {
         if (boxHeight < BBOX_MIN_PX) return false
         val wide = boxHeight.toFloat() < boxWidth * ELONGATION_MIN
         if (wide && scan.green.toFloat() > boxWidth * boxHeight * WIDE_FILL_MAX) return false
-        // Invariance d'échelle : plancher de largeur en fraction du crop, pas en pixels.
-        if (boxWidth < GREEN_MIN_WIDTH_FRACTION * maxOf(width, height)) return false
+        // Invariance d'échelle : plancher de largeur en fraction du crop, pas en pixels,
+        // et portant sur **une tache** ([widestComponent]) — pas sur leur étendue.
+        if (widestComponent(mask, width, height) < GREEN_MIN_WIDTH_FRACTION * maxOf(width, height)) {
+            return false
+        }
         val bottomFraction = scan.greenBottom.toFloat() / scan.green
         if (bottomFraction >= GREEN_BOTTOM_MIN) return true
         if (bottomFraction <= R1B_BOTTOM_FLOOR) return false
@@ -248,7 +270,7 @@ object PedLightGate {
     }
 
     /** Balayage du crop : compteurs de couleur et boîte englobante du vert. */
-    private fun scan(argb: IntArray, width: Int, height: Int): Scan {
+    private fun scan(argb: IntArray, width: Int, height: Int, mask: BooleanArray? = null): Scan {
         val scan = Scan()
         val half = height / 2
         for (index in argb.indices) {
@@ -259,6 +281,7 @@ object PedLightGate {
                 scan.red += 1
             } else if (isGreenSide(projection)) {
                 scan.green += 1
+                if (mask != null) mask[index] = true
                 if (index / width >= half) scan.greenBottom += 1
                 scan.minX = minOf(scan.minX, index % width)
                 scan.maxX = maxOf(scan.maxX, index % width)
@@ -281,6 +304,78 @@ object PedLightGate {
 
     /** Côté vert de la projection signée (même seuil que la décision). */
     private fun isGreenSide(projection: Float): Boolean = projection >= PedLightColor.GREEN_PROJECTION_MIN
+
+    /**
+     * Largeur de la plus large tache verte du crop, en pixels — la mesure
+     * exacte que compare [GREEN_MIN_WIDTH_FRACTION]. `internal` pour que le
+     * test JVM verrouille **les mêmes nombres** que le miroir
+     * `tools/light_features.py` (`widest_component(_green_mask(...))`).
+     */
+    internal fun greenWidthPx(argb: IntArray, width: Int, height: Int): Int {
+        if (width <= 0 || height <= 0 || argb.size != width * height) return 0
+        val mask = BooleanArray(width * height)
+        scan(argb, width, height, mask)
+        return widestComponent(mask, width, height)
+    }
+
+    /**
+     * Largeur (étendue X) de la **plus large composante 8-connexe** du masque
+     * vert : c'est ce que mesure [GREEN_MIN_WIDTH_FRACTION], et non l'étendue
+     * de tous les pixels verts (deux bandes de 1 px aux deux bords du crop
+     * donnaient 86 px d'étendue pour 1 px d'épaisseur — le cas même que la
+     * règle doit refuser, audit W12 §1). Un balayage itératif, une seule
+     * allocation de la taille du crop, aucune récursion.
+     */
+    private fun widestComponent(mask: BooleanArray, width: Int, height: Int): Int {
+        val seen = BooleanArray(mask.size)
+        val stack = IntArray(mask.size)
+        var widest = 0
+        for (start in mask.indices) {
+            if (!mask[start] || seen[start]) continue
+            var top = 1
+            stack[0] = start
+            seen[start] = true
+            var minX = start % width
+            var maxX = minX
+            while (top > 0) {
+                val index = stack[--top]
+                val x = index % width
+                if (x < minX) minX = x
+                if (x > maxX) maxX = x
+                top = pushNeighbours(mask, seen, stack, top, index, width, height)
+            }
+            widest = maxOf(widest, maxX - minX + 1)
+        }
+        return widest
+    }
+
+    /** Empile les voisins 8-connexes pas encore vus de [index] ; rend la pile remplie. */
+    private fun pushNeighbours(
+        mask: BooleanArray,
+        seen: BooleanArray,
+        stack: IntArray,
+        top: Int,
+        index: Int,
+        width: Int,
+        height: Int,
+    ): Int {
+        val x = index % width
+        val y = index / width
+        var cursor = top
+        for (dy in -1..1) {
+            val ny = y + dy
+            if (ny !in 0 until height) continue
+            for (dx in -1..1) {
+                val nx = x + dx
+                if (nx !in 0 until width) continue
+                val next = ny * width + nx
+                if (!mask[next] || seen[next]) continue
+                seen[next] = true
+                stack[cursor++] = next
+            }
+        }
+        return cursor
+    }
 
     /** Compteurs du balayage, boîte du vert en coordonnées pixels. */
     private class Scan(
