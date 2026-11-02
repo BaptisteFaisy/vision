@@ -3,6 +3,32 @@
 Le journal part du 2026-10-26 après 19 h : le commit de départ, puis une entrée par fait
 livré et ses preuves (tâche, fichiers, chiffres) dans l'arbre.
 
+## 2026-11-02 — iSee : escaliers détectés + jalons 2/1/0,5 m prioritaires sur le guidage (branche `isee-escaliers-2-1-05`)
+
+- **Demande** : « isee ne detecte plus les escalier […] il doit me dire qu'il y a un
+  escalier 2m 1m et 0,5m avant et c'est top prioriter devant right ou left et pas coupable
+  la phrase doit etre courte » (+ murs non reconnus, test rue du 02/11 : dehors, autres
+  objets OK, ni pastille ni voix pour escaliers et murs).
+- **Cause pastilles** : tri serveur au seul score (`segmentation.finalize`) — les familles
+  sans slot réservé (escaliers, murs) sont évincées en scène chargée, comme la bordure
+  avant sa garde. **Correctif serveur** : familles escalier + mur dans `feux_guard`
+  (déjà sur le chemin `/live`), 5 slots réservés (`ObjectLimits.GUARDED_SLOTS`), tests
+  `feux_guard_tests` étendus.
+- **Voix** (`StairWatcher`, miroir §24 bordure) : paliers 4/2/1 → 2/1/0,5 m, phrases
+  courtes FR/EN (« Escalier 2 m. » / « Stairs 2 m. »), niveau 6 incoupable qui coupe
+  désormais les mots de guidage (`VoiceBus` : fin du respect mutuel GPS pour les
+  escaliers), clés `stairs:<palier>` (chaînage < 2 s), jalon 0,5 m avant la dernière
+  marche par profondeur, 3 clips EN (`stairs_2m/1m/half_m`, MP3 Laure à générer :
+  `ELEVENLABS_API_KEY=… python3 tools/gen-isee-clips-en.py`), 6 clips 4/2/1 Up/Down
+  retirés (catalogue + MP3 + consts).
+- **Preuves** : `StairAnnounceTest` + `StairsGuidancePriorityTest` nouveaux,
+  `StairWatcherTest`/`SeuilsDehorsV4Test`/`IseeClipsEnTest` rebasés 2/1/0,5,
+  `StairsUncuttableTest` (escaliers coupent le guidage), backend 843 OK / 0 KO,
+  `check-kotlin-limits` OK, `check-voicepack` + `check-isee-clips-en --allow-missing` OK
+  (strict : 3 MP3 en attente de génération).
+- **Non-vérifié ici** (r630 down : ni build serveur, ni tests gradle, ni téléphone)
+  : `:core`/`:app` JVM par la CI de la PR, recette voix rue par le user.
+
 ## 2026-11-02 — iSee : stabilité (crash du service de guidage, pertes de connexion) (branche `feat/isee-stabilite`)
 
 - **Demande** : « pour isee parfois l'app crash ou perds la connexion je veux que ca soit le

@@ -20,7 +20,8 @@ package dev.sam3vision.core.live
  * - `gps-reminder` = sans antirépétition (niveau 3, rappel aux 15 s de silence) ;
  * - `fence` = 4 s (niveau 4, grillages + murs + barrières < 6 m) ;
  * - `curb` = 2 s (niveau 5, bordures < 6 m) ;
- * - `stairs` = 2 s (niveau 6, escaliers : annonce, jalons, montée) ;
+ * - `stairs` = 2 s (niveau 6, escaliers : annonce, montée ; jalons :
+ *   `stairs:<palier>`, même durée, mémoire par palier) ;
  * - `stairs-count` = 1 s (niveau 6, compte des marches — ordre user du
  *   02/11, VOIX-DANGER § 42) ;
  * - `pole` = 2 s (niveau 7, poteaux + mobilier vertical < 6 m) ;
@@ -81,7 +82,11 @@ object AntiRepeat {
     /** Niveau 5 : bordures < 6 m — 2 s. */
     const val KEY_CURB = "curb"
 
-    /** Niveau 6 : escaliers (annonce, jalons 4/2/1, montée — le compte a sa clé) — 2 s. */
+    /**
+     * Niveau 6 : escaliers (annonce, montée — le compte a sa clé) — 2 s.
+     * Jalons : clé paramétrée `stairs:<palier>` (2, 1, 0.5), même durée,
+     * mémoire par palier (ils s'enchaînent en ~2 s à pied).
+     */
     const val KEY_STAIRS = "stairs"
 
     /**

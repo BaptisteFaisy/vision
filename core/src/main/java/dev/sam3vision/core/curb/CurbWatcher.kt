@@ -1,5 +1,6 @@
 package dev.sam3vision.core.curb
 
+import dev.sam3vision.core.distance.DistanceText
 import dev.sam3vision.core.live.PositionText
 import dev.sam3vision.core.speech.SpeechLanguage
 
@@ -84,20 +85,8 @@ object CurbText {
      * dit quand même (virgule FR), jamais d'exception.
      */
     fun distancePhrase(palier: Float, language: SpeechLanguage): String = when (language) {
-        SpeechLanguage.Fr -> "Bordure ${frenchMeters(palier)}."
-        SpeechLanguage.En -> "Curb ${englishMeters(palier)}."
-    }
-
-    /** « 2 m », « 1,5 m » (abréviation invariable, virgule décimale). */
-    private fun frenchMeters(meters: Float): String = "${digits(meters).replace('.', ',')} m"
-
-    /** « 2 m », « 1.5 m » (abréviation invariable, point décimal). */
-    private fun englishMeters(meters: Float): String = "${digits(meters)} m"
-
-    /** « 2 », « 1.5 » : l'entier sans décimale, le reste brut (point, la virgule est FR). */
-    private fun digits(meters: Float): String {
-        val whole = meters.toInt()
-        return if (meters == whole.toFloat()) whole.toString() else meters.toString()
+        SpeechLanguage.Fr -> "Bordure ${DistanceText.shortMeters(palier, language)}."
+        SpeechLanguage.En -> "Curb ${DistanceText.shortMeters(palier, language)}."
     }
 
     /** Marche imminente, sans heure : « Step up now. » en montée, « Step down now. » en descente, « Attention bordure. » si le sens est incertain. */

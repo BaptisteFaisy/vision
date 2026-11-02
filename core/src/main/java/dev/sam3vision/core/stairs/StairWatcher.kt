@@ -12,7 +12,8 @@ import dev.sam3vision.core.speech.SpeechLanguage
  * En montée, [lineCount] est le compte **lissé** (médiane de la tendance, voir
  * [StairWatcher]) ; [meters] porte la profondeur quand elle est connue
  * (dernière marche à moins d'un mètre). [level] est le niveau VoiceBus v4
- * (6, escaliers) et [antiRepeatKey] sa clé AntiRepeat v4 (`stairs`, 2 s).
+ * (6, escaliers) et [antiRepeatKey] sa clé AntiRepeat v4 (`stairs`, 2 s ;
+ * jalons : `stairs:<palier>`).
  */
 data class StairCue(
     val phrase: String,
@@ -42,20 +43,19 @@ object StairText {
     ): String = PositionText.withHour(base(language, direction), centerX, language)
 
     /**
-     * « Escalier montant à 4 mètres. » / « Stairs up at 4 meters. » — jalon
-     * d'approche (miroir `CurbText.distancePhrase`, §24) : la distance
-     * entière remplace le cadran, sans heure (miroir §5 positions).
+     * « Escalier 2 m. » / « Stairs 2 m. » — jalon d'approche, court et sans
+     * sens ni heure (ordre user du 02/11 : top priorité sur le guidage,
+     * incoupable) : le sens est dit par la détection, le jalon ne dit que
+     * la distance ([tierMeters] vaut toujours un [StairWatcher.COUNTDOWN_METERS]).
      */
     fun distancePhrase(
         language: SpeechLanguage,
-        direction: StairDirection = StairDirection.Unknown,
         tierMeters: Float,
     ): String {
-        val base = base(language, direction)
-        val spoken = DistanceText.spokenShort(tierMeters, language)
+        val spoken = DistanceText.shortMeters(tierMeters, language)
         return when (language) {
-            SpeechLanguage.Fr -> "$base à $spoken."
-            SpeechLanguage.En -> "$base at $spoken."
+            SpeechLanguage.Fr -> "Escalier $spoken."
+            SpeechLanguage.En -> "Stairs $spoken."
         }
     }
 
@@ -125,7 +125,7 @@ object StairText {
 
 /**
  * Lissage temporel du [StairSignal] (SPEC v4 : escaliers niveau 6, jalons
- * 4/2/1 m, nombre de marches dit, silence 2 s) : un positif isolé ne parle
+ * 2/1/0,5 m, nombre de marches dit, silence 2 s) : un positif isolé ne parle
  * pas, il faut [confirmFrames] positifs consécutifs, puis silence pendant
  * [cooldownMs].
  *
@@ -139,7 +139,7 @@ object StairText {
  * encore la descente vers la dernière marche).
  *
  * Compte à rebours d'approche (miroir §24 bordure) : quand la profondeur est
- * connue, l'escalier traversé se redit à 4 m, 2 m puis 1 m ([COUNTDOWN_METERS]),
+ * connue, l'escalier traversé se redit à 2 m, 1 m puis 0,5 m ([COUNTDOWN_METERS]),
  * une fois par palier et par approche, sans cooldown entre paliers (l'approche
  * à pied les enchaîne). Hystérésis [REARM_MARGIN_METERS] (recul au-delà = le
  * palier reparle), palier survolé = sauté sans rattrapage, signal perdu =
@@ -244,26 +244,26 @@ class StairWatcher(
             peakSmoothed = maxOf(peakSmoothed ?: 0, smoothed)
         }
         val nearDepth = meters != null && meters.isFinite() && meters < LAST_STEP_METERS
-        val announced = climbCount
-        // Dernière marche verrouillée : jamais en première rencontre (l'annonce
-        // standard ouvre toujours), jamais sur un compte bas sans montée vue
-        // (vu du haut ou occulté n'est pas arrivé), profondeur seule quand le
-        // compteur est indisponible (proche n'est pas fini quand il reste des marches).
+        // Dernière marche verrouillée : jamais en première rencontre, jamais
+        // sans montée vue, profondeur seule sans compteur (verrou `StairLastStepGateTest`).
         val countLast = opened && !lastStepSaid && smoothed != null &&
             smoothed <= LAST_STEP_LINES && (peakSmoothed ?: 0) > LAST_STEP_LINES
         val depthLast = opened && !lastStepSaid && nearDepth && smoothed == null
         val lastStep = countLast || depthLast
-        val countdown = !lastStep && smoothed != null && announced != null &&
-            smoothed < announced && smoothed > LAST_STEP_LINES
+        val countdown = !lastStep && smoothed != null && climbCount != null &&
+            smoothed < climbCount && smoothed > LAST_STEP_LINES
+        // Jalon dû : il parle avant la montée — sans compteur, la fin par
+        // profondeur préempterait le 0,5 m en approche (jamais de jalon sur un trou).
+        val tier = if (signal.detected) onCountdown(signal, nowMs, language, direction, meters) else null
+        if (tier != null) return tier
         if (lastStep || countdown) {
-            return climbCue(signal, lastStep, depthLast, smoothed, announced, nowMs, language, direction, meters)
+            return climbCue(signal, lastStep, depthLast, smoothed, climbCount, nowMs, language, direction, meters)
         }
         if (!signal.detected) {
             hits = 0
             resetTiers()
             return null
         }
-        onCountdown(signal, nowMs, language, direction, meters)?.let { return it }
         if (hits < confirmFrames) return null
         if (tiersOwnVoice(meters)) return null
         if (!cooldownOk(nowMs, cooldownMs)) return null
@@ -363,11 +363,21 @@ class StairWatcher(
         spokenTiers.add(target)
         markApproach(nowMs)
         return StairCue(
-            StairText.distancePhrase(language, direction, target),
+            StairText.distancePhrase(language, target),
             signal.confidence, signal.lineCount, direction, meters,
-            level = LEVEL, antiRepeatKey = KEY_STAIRS,
+            level = LEVEL, antiRepeatKey = tierKey(target),
         )
     }
+
+    /**
+     * Clé d'antirépétition d'un palier (`stairs:2`, `stairs:1`,
+     * `stairs:0.5`) : à pied, les jalons s'enchaînent en ~2 s — avec la clé
+     * unique `stairs` (2 s), le 1 m mangerait le tour du 2 m. Clé paramétrée
+     * (miroir `stairs-count:<compte>`, `verdict:<état>`) : chaque palier
+     * parle aussitôt, le même palier ré-armé attend 2 s.
+     */
+    private fun tierKey(target: Float): String =
+        "$KEY_STAIRS:${target.toString().removeSuffix(".0")}"
 
     /**
      * L'annonce d'approche (détection ou jalon) ouvre la montée : le compte
@@ -464,8 +474,8 @@ class StairWatcher(
         /** Profondeur du palier de la dernière marche (mètres). */
         const val LAST_STEP_METERS = 1f
 
-        /** Paliers du compte à rebours d'approche (m), du plus loin au plus proche (SPEC v4 : 4/2/1). */
-        val COUNTDOWN_METERS = listOf(4f, 2f, 1f)
+        /** Paliers du compte à rebours d'approche (m), du plus loin au plus proche (ordre user du 02/11 : 2/1/0,5). */
+        val COUNTDOWN_METERS = listOf(2f, 1f, 0.5f)
 
         /**
          * Hystérésis : un palier dit se ré-arme quand on recule au-delà de
@@ -473,10 +483,10 @@ class StairWatcher(
          */
         const val REARM_MARGIN_METERS = 0.2f
 
-        /** Niveau VoiceBus v4 : escaliers (jalons 4/2/1 + nombre de marches dit). */
+        /** Niveau VoiceBus v4 : escaliers (jalons 2/1/0,5 + nombre de marches dit). */
         const val LEVEL = 6
 
-        /** Clé AntiRepeat v4 : escaliers (2 s). */
+        /** Clé AntiRepeat v4 : escaliers (2 s ; jalons : clé paramétrée `stairs:<palier>`). */
         const val KEY_STAIRS = "stairs"
 
         /** Aucune annonce émise encore. */

@@ -96,6 +96,24 @@ object DistanceText {
         return "$rounded ${if (rounded == 1) "meter" else "meters"}"
     }
 
+    /**
+     * Palier de compte à rebours (« 2 m », « 0,5 m » / « 0.5 m ») :
+     * l'abréviation invariable, l'entier sans décimale, la virgule FR et le
+     * point EN — une seule implémentation pour la bordure et les escaliers
+     * (jalons courts voix, miroir §24). Toute autre distance se dit quand
+     * même, jamais d'exception.
+     */
+    fun shortMeters(meters: Float, language: SpeechLanguage): String = when (language) {
+        SpeechLanguage.Fr -> "${digits(meters).replace('.', ',')} m"
+        SpeechLanguage.En -> "${digits(meters)} m"
+    }
+
+    /** « 2 », « 0.5 » : l'entier sans décimale, le reste brut (point, la virgule est FR). */
+    private fun digits(meters: Float): String {
+        val whole = meters.toInt()
+        return if (meters == whole.toFloat()) whole.toString() else meters.toString()
+    }
+
     /** L'objet le plus proche de la frame, `null` si rien n'est mesuré. */
     fun nearest(readings: List<DistanceReading>): DistanceReading? =
         readings.minByOrNull { it.meters }
