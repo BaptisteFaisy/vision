@@ -11,7 +11,7 @@ import kotlin.math.hypot
  *   a plus de fenêtre de confirmation (le tap répondait 450 ms après le doigt).
  * - Balayage vers le **haut** : [Listener.onSwipeUp] (bascule du mode Traversée).
  * - Balayage vers le **bas** : [Listener.onSwipeDown] (mode GPS).
- * - Balayage vers la **droite** : [Listener.onSwipeRight] (« quoi chercher ? »).
+ * - Balayage vers la **droite** : [Listener.onSwipeRight] (session lunettes si joignable, sinon « quoi chercher ? »).
  *
  * Le balayage vers la gauche est reconnu puis **muet** : iSee n'a qu'une page, il
  * n'y a rien à feuilleter — mais le geste reste un glissement, jamais un tap.

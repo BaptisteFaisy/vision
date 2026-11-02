@@ -45,7 +45,7 @@ class IseeRootLayout(context: Context) : FrameLayout(context) {
     /** Balayage vers le bas confirmé : active la fonction GPS (ordre « active le GPS »). */
     var onSwipeDown: (() -> Unit)? = null
 
-    /** Balayage vers la droite confirmé : iSee demande « Quoi chercher ? ». */
+    /** Balayage vers la droite confirmé : session lunettes si joignable, sinon « Quoi chercher ? ». */
     var onSwipeRight: (() -> Unit)? = null
 
     /** Geste actif seulement quand les panneaux iSee sont à l'écran, sinon à l'ancienne UI. */

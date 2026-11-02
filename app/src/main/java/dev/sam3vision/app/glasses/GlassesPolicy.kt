@@ -286,3 +286,11 @@ fun connectLabel(state: GlassesUiState): String = when {
     !state.registered -> "Register the app first"
     else -> "Start the session"
 }
+
+/**
+ * Balayage vers la droite sur iSee : ouvre la session exactement quand le bouton le
+ * pourrait (`canConnect`) — session active ou en démarrage : rien, le geste ne coupe
+ * jamais un direct ni ne rejoue une ouverture. Le lien Bluetooth est attendu par
+ * l'ouvreur (`awaitLinkedDevice`, 30 s) : sans paire `CONNECTED`, pas de session.
+ */
+fun shouldSwipeConnect(state: GlassesUiState): Boolean = state.canConnect
