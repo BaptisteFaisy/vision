@@ -46,8 +46,10 @@ object TimingsText {
 
     /**
      * Ligne d'état **unique** : « latency 348 · capt 22 · up 61 · srv 92 · rtt 153 ·
-     * mask 37 · pixel 8 ». Chaîne vide avant la première frame mesurée ; `—` pour un
-     * poste que le build déployé ne permet pas encore de mesurer.
+     * mask 37 · pixel 8 », plus « · seq 12 » quand la frame vient des lunettes
+     * (jointure E2E ; `parse_isee_lat.py` ignore les tokens inconnus, verdict
+     * intact). Chaîne vide avant la première frame mesurée ; `—` pour un poste
+     * que le build déployé ne permet pas encore de mesurer.
      */
     fun compact(t: FrameTimings): String {
         if (t.isEmpty) return ""
@@ -59,6 +61,7 @@ object TimingsText {
         for (poste in POSTES) {
             out.append(SEPARATOR).append(poste.short).append(' ').append(ms(poste.value(t)))
         }
+        if (t.seq >= 0L) out.append(SEPARATOR).append("seq ").append(t.seq)
         return out.toString()
     }
 
@@ -186,8 +189,8 @@ object TimingsText {
 
     /**
      * Capacité du `StringBuilder` de [compact] : « latency 348 » plus sept postes font
-     * une centaine de caractères, jamais davantage — pré-dimensionner évite les
-     * recopies de croissance.
+     * une centaine de caractères, plus « · seq N » sur le chemin lunettes —
+     * pré-dimensionner évite les recopies de croissance.
      */
-    private const val COMPACT_CAPACITY = 160
+    private const val COMPACT_CAPACITY = 176
 }

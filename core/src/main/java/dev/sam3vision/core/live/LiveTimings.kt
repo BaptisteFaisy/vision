@@ -53,6 +53,12 @@ data class FrameTimings(
      * poste parent la couvre déjà — la compter serait la payer deux fois.
      */
     val decode: DecodeSplit = DecodeSplit.EMPTY,
+    /**
+     * Séquence lunettes de la frame (`-1` = téléphone, sans jointure) : elle relie
+     * la ligne `ISEE_LAT` à la ligne `GlassesLink` de même `seq` (jointure E2E
+     * hors ligne). Identifiant, pas mesure : hors [known], [totalMs] et [localMs].
+     */
+    val seq: Long = -1,
 ) {
     /** Encodage sur le téléphone. */
     val encodeMs: Long get() = captureToJpegMs
@@ -156,6 +162,14 @@ class LiveTimings(private val clock: () -> Long = System::nanoTime) {
 
     private val marks = LongArray(LiveStage.entries.size) { UNSET }
 
+    /**
+     * Séquence lunettes de la frame (`-1` = téléphone) : posée par `beginFrame`,
+     * relue par [snapshot] — la frame détachée garde la sienne après le
+     * `beginFrame` de la suivante. Écrite une fois, lue sous verrou ou en volatile.
+     */
+    @Volatile
+    var seq: Long = -1L
+
     /** Pose un poste ; [atNs] sert quand l'horodatage est déjà connu (capteur caméra). */
     @Synchronized
     fun mark(stage: LiveStage, atNs: Long = clock()) {
@@ -184,12 +198,17 @@ class LiveTimings(private val clock: () -> Long = System::nanoTime) {
         return (end - start + NS_PER_MS / 2) / NS_PER_MS
     }
 
-    /** Instantané immuable pour l'UI (aucune lecture concurrente des marques). */
+    /**
+     * Instantané immuable pour l'UI (aucune lecture concurrente des marques).
+     * [seq] explicite gagne ; sinon la séquence posée par `beginFrame` survit —
+     * c'est elle qui joint la ligne à la frame lunettes de même `seq`.
+     */
     @Synchronized
     fun snapshot(
         serverTotalMs: Long = -1,
         server: Map<String, Double> = emptyMap(),
         decode: DecodeSplit = DecodeSplit.EMPTY,
+        seq: Long = -1,
     ): FrameTimings =
         FrameTimings(
             captureToJpegMs = betweenLocked(LiveStage.CAPTURE, LiveStage.ENCODED),
@@ -204,6 +223,7 @@ class LiveTimings(private val clock: () -> Long = System::nanoTime) {
             serverTotalMs = serverTotalMs,
             server = server,
             decode = decode,
+            seq = if (seq >= 0L) seq else this.seq,
         )
 
     private companion object {

@@ -120,4 +120,17 @@ class TimingsTextTest {
             assertFalse(line.contains("latency "))
         }
     }
+
+    @Test
+    fun `compact ajoute seq en queue quand la frame vient des lunettes`() {
+        val line = TimingsText.compact(FrameTimings(captureToPixelMs = 348L, seq = 12L))
+        assertTrue(line.startsWith("latency 348"))
+        assertTrue("jointure E2E en queue : $line", line.endsWith(" · seq 12"))
+    }
+
+    @Test
+    fun `compact tait seq sur le chemin telephone`() {
+        val line = TimingsText.compact(FrameTimings(captureToPixelMs = 348L))
+        assertFalse(line.contains("seq"))
+    }
 }

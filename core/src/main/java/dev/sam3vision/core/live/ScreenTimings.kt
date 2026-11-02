@@ -28,9 +28,10 @@ class ScreenTimings(private val clock: () -> Long = System::nanoTime) : WireMark
     @Volatile
     private var drawn: LiveTimings? = null
 
-    /** Nouvelle frame : les postes de tête sont posés d'un coup ([encodedAtNs] = 0 = maintenant). */
-    fun beginFrame(captureAtNs: Long = 0L, encodedAtNs: Long = 0L) {
+    /** Nouvelle frame : les postes de tête sont posés d'un coup ([encodedAtNs] = 0 = maintenant). [seq] = séquence lunettes (`-1` = téléphone, sans jointure). */
+    fun beginFrame(captureAtNs: Long = 0L, encodedAtNs: Long = 0L, seq: Long = -1L) {
         val fresh = LiveTimings(clock)
+        fresh.seq = seq
         if (captureAtNs > 0L) fresh.mark(LiveStage.CAPTURE, captureAtNs)
         fresh.mark(LiveStage.ENCODED, if (encodedAtNs > 0L) encodedAtNs else clock())
         fresh.mark(LiveStage.SENT)
