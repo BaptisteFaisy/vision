@@ -24,6 +24,7 @@ import dev.sam3vision.core.nav.NavRoute
 import dev.sam3vision.core.nav.NavState
 import dev.sam3vision.core.nav.PeriodicGuidance
 import dev.sam3vision.core.nav.PeriodicTuning
+import dev.sam3vision.core.nav.PreloadedRoute
 import dev.sam3vision.core.nav.WalkDirective
 import dev.sam3vision.core.nav.toNavRoute
 import dev.sam3vision.core.net.HttpRouteClient
@@ -125,8 +126,15 @@ class VoiceNavEngineDriver(
      * Démarre le guidage vers [destination] : `true` si le moteur tourne
      * (voix « Navigation vers X » dite), `false` si un maillon manque
      * (adresse, position, réseau, itinéraire) — sinon repos + annonce.
+     *
+     * [preloaded] frais court-circuite origine → géocode → `/route` (zéro appel
+     * réseau) ; périmé ou autre destination → recalcul complet, comme avant.
      */
-    suspend fun start(destination: String): Boolean {
+    suspend fun start(destination: String, preloaded: PreloadedRoute? = null): Boolean {
+        if (preloaded != null && preloaded.isReusableFor(destination, System.currentTimeMillis())) {
+            val nav = preloaded.trip.toNavRoute(preloaded.destLabel).getOrNull() ?: return false
+            return guideLoaded(nav, preloaded.dest, destination)
+        }
         // Origine lue tôt : elle trie les candidats du géocodage par proximité.
         val origin = try {
             originNow()
@@ -149,6 +157,11 @@ class VoiceNavEngineDriver(
             null
         }?.getOrNull() ?: return false
         val nav = trip.toNavRoute(place.label).getOrNull() ?: return false
+        return guideLoaded(nav, RoutePoint(place.latitude, place.longitude), destination)
+    }
+
+    /** Itinéraire connu → tracker guidé + écoute GPS + voix (`false` = replié). */
+    private fun guideLoaded(nav: NavRoute, dest: RoutePoint, destination: String): Boolean {
         if (runCatching { tracker.guide(nav) }.getOrNull()?.isSuccess != true) return false
         // Écoute GPS réellement démarrée : sinon aucun écran de guidage muet,
         // sinon repos + annonce (voir `VoiceNavTracker.start`).
@@ -156,7 +169,7 @@ class VoiceNavEngineDriver(
             stop()
             return false
         }
-        legs = GuidingLegs(nav, tailDistances(nav.maneuvers), RoutePoint(place.latitude, place.longitude))
+        legs = GuidingLegs(nav, tailDistances(nav.maneuvers), dest)
         lastInstruction = null
         detourReroute.reset()
         periodic.reset()
