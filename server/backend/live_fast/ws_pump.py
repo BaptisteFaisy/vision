@@ -16,8 +16,6 @@ from __future__ import annotations
 import asyncio
 import json
 
-from live_ws import frame_id
-
 # Cohérence keep-alive (O2) : le client ping à 30 s (WsTransport pingInterval),
 # le serveur tue à 45 s — marge 15 s pour un aller-retour lent. Les pings sont
 # protocole (pong auto, jamais livrés à la boucle) : une connexion sans frame
@@ -40,6 +38,10 @@ def classify(raw) -> tuple:
     Pur (sans GPU, sans I/O) : le binaire et le JSON invalide restent des frames —
     ``ws_frame`` leur répondra 400 comme avant, jamais de changement de contrat.
     """
+    # Paresseux : `modal deploy` importe ce module dans le runner CI, sans
+    # pydantic (service.py faisait déjà ainsi avant l'extraction).
+    from live_ws import frame_id
+
     if not isinstance(raw, str):
         return ("frame", -1)
     try:
