@@ -331,3 +331,33 @@ Verrouillé par `VoiceSliceTest` (tranche, plafond, verdict entier) et
 
 Recette téléphone : oreille — mots ×2-3 intelligibles, verdicts entiers,
 aucune coupure mid-mot — **non mesuré**, exige un APK sur appareil réel.
+
+## 40. Escaliers incoupables : le niveau 0 et la Traversée attendent (ordre user du 02/11)
+
+Le user marche : l'annonce des marches (« Escalier montant. »,
+« 5 marches. », « Plus que N marches. », « Dernière marche. ») est coupée
+en pleine phrase par « Car. » — le niveau 0, re-posté à chaque frame,
+écrase le niveau 6 (écrasement pur du bus). Incompréhensible. Nouveau
+contrat : des escaliers en cours vont au bout.
+
+- **bus** : `VoiceBus.post` jette le niveau 0 pendant un niveau 6
+  (`app/.../isee/VoiceBus.kt`) — seule exception à l'écrasement pur ;
+  la Traversée (100+, déjà non préemptive sur 6 : `100 > 6`) attend
+  aussi (chevauchement d'armement seul — en Traversée, les escaliers
+  ne postent plus) ;
+- **amont** : le vœu véhicule se tait avant l'antirépétition
+  (`obstacleFrame`, `VoiceBus.stairsSpeaking`) — tour `car-moving`
+  non consommé, la voiture reparle dès la fin des marches, côté bus
+  (le cooldown du guetteur, 4 s, peut retarder d'un cycle : le suivi
+  ne s'interrompt pas, seule la parole attend) ;
+- **inchangé** : humains (2), GPS (3, 11), grillages (4), bordures (5)
+  et escaliers re-détectés (6, dernier gagnant — le compte reste
+  frais) coupent toujours ; parole du user (1), chat (9) et sécurité
+  inchangés.
+
+Verrouillé par `StairsUncuttableTest` (+5, nouveau : 0 attend, verdict
+attend, 2/5 coupent, 6 dernier gagnant, voiture tue sans tour mangé).
+
+Recette téléphone : escalier + voiture qui passe — la phrase des marches
+entière, « Car. » juste après — **non mesuré**, exige un APK sur appareil
+réel (preuves par `logcat`, jamais à l'oreille côté agent).

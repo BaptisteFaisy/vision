@@ -36,6 +36,13 @@ interface VoiceBusSpeaker {
  * (seul 0 la coupe) ; la lecture du chat ([chatSpeaking]) tient le niveau 9
  * (un niveau 12 ne coupe jamais une réponse en cours). L'antirépétition vit
  * en amont ([dev.sam3vision.core.live.AntiRepeat], côté producteurs) : le bus n'arbitre que l'instant.
+ *
+ * Exception (ordre user du 02/11/2026) : des escaliers en cours (niveau 6)
+ * vont au bout — le niveau 0 (voitures en mouvement, re-posté à chaque
+ * frame) attend la fin de la phrase au lieu de la couper, et la Traversée
+ * (100+, déjà non préemptive sur 6) attend aussi. Les autres niveaux
+ * gardent l'écrasement pur : humains, GPS, grillages, bordures et
+ * escaliers re-détectés (dernier gagnant) coupent toujours.
  */
 object VoiceBus {
     /** Aucune parole en cours : tout niveau parle. */
@@ -79,11 +86,20 @@ object VoiceBus {
         if (text.isBlank()) return
         val target = speaker ?: return
         if (userHoldsMic && level != OutdoorLevel.CAR_MOVING) return
+        if (activeLevel == OutdoorLevel.STAIRS && level == OutdoorLevel.CAR_MOVING) return
         if (activeLevel != IDLE_LEVEL && level > activeLevel) return
         activeLevel = level
         lastSayMs = System.currentTimeMillis()
         target.say(level, text, clipId, clips)
     }
+
+    /**
+     * Vrai quand des escaliers parlent (niveau 6 en cours) : les producteurs
+     * de niveau 0 s'y taisent en amont (sans consommer leur tour
+     * d'antirépétition) au lieu d'être jetés par [post].
+     */
+    @Synchronized
+    fun stairsSpeaking(): Boolean = activeLevel == OutdoorLevel.STAIRS
 
     /**
      * Silence écoulé depuis la dernière parole acceptée (repli 12 : parler
