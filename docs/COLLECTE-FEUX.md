@@ -1,9 +1,19 @@
-# Collecte et réentraînement des feux piétons (31/10/2026)
+# Collecte et réentraînement des feux piétons (31/10/2026, revu le 02/11/2026)
 
-Pourquoi : le rappel vert est à 1/6 sur crops SAM réels
-(`docs/MESURES-SAM3-FEUX.md` §6) et aucun seuil ne le répare — il faut des
-données du domaine production (crops téléphone). Cette page décrit la boucle
-complète : collecte → étiquetage → réentraînement → barrière GO → PR.
+État au 02/11/2026 (voir `docs/MESURES-FEU-ROUGE-VERT.md`) : sur les crops
+téléphone FR le classifieur est à **20/20 verts et 0 faux vert sur 29 rouges**,
+et **6/7** sur les photos réelles. Le besoin a donc changé de nature : il n'y a
+plus de rappel à gagner *sur ce corpus* (quatre calibrations différentes y
+donnent le même 20/20, il ne discrimine plus rien), mais deux choses restent :
+
+1. **certifier le taux de faux vert** — c'est la seule métrique qui compte pour
+   une personne malvoyante, et 0 échec sur 29 rouges ne borne que « ≤ 10,3 % » ;
+2. **couvrir le domaine réel** — jour surexposé, nuit, pluie, LED cyan,
+   pictogrammes ; le seul faux vert observé à l'échelle de production (96 px)
+   est un rouge **de jour surexposé**.
+
+Cette page décrit la boucle complète : collecte → étiquetage → réentraînement →
+barrière GO → PR.
 
 ## 1. Collecte (terrain, ~30 min)
 
@@ -11,7 +21,8 @@ complète : collecte → étiquetage → réentraînement → barrière GO → P
    (coupé par défaut, `Settings.collectLightCrops`).
 2. Marcher 5+ carrefours variés (centre dense, résidentiel, LED + lampes,
    jour + tombée de nuit si possible), mode Traversée actif face aux feux.
-3. Chaque crop classifié (≤ 48 px, PNG exact vu par le classifieur) part dans
+3. Chaque crop classifié (96 px, PNG exact vu par le classifieur — `MAX_EDGE`
+   depuis le 31/10) part dans
    `lightcrops-<session>.jsonl` (fichiers privés, 2000/session max, avec boîte
    + verdict + version). **Crops seuls, jamais la scène : pas de visages,
    pas de plaques.**
@@ -22,6 +33,28 @@ complète : collecte → étiquetage → réentraînement → barrière GO → P
 Cible : **200–400 crops étiquetables** (le harnais accepte dès 50,
 10/classe ; viser 200+ pour un hold-out qui veut dire quelque chose,
 400 si le terrain s'y prête — au-delà, le gain est marginal).
+
+### 1bis. Ce qu'il faut collecter MAINTENANT : des ROUGES de jour
+
+Le vert est appris (transfert Ampel-Pilot → FR : un arbre entraîné uniquement
+en allemand passe 20/20 sur les crops FR et 31/31 ancres, `w10`). Ce qui manque
+est de la **preuve**, et elle ne peut venir que de rouges français :
+
+| rouges FR cumulés | borne supérieure du taux de faux vert (Wilson 95 %, 0 échec) |
+|---|---|
+| 29 (aujourd'hui) | 10,3 % |
+| 150 | **2,50 %** |
+| 300 | **1,26 %** |
+| 600 | 0,64 % |
+
+Le jeu actuel ne contient que **4 rouges de jour sur 29** — et c'est en jour que
+la mesure de couleur se dégrade. Une session de rue utile = **beaucoup de feux
+rouges piétons en plein jour**, pas de nouveaux verts.
+
+Pendant la session, noter pour chaque carrefour (3 informations suffisent) :
+l'heure, ce que le feu faisait vraiment, et ce que l'app a dit (ou n'a pas dit).
+Le crop exact et le verdict machine sont déjà dans le `jsonl` : le croisement des
+deux donne l'étiquette sans revoir l'image.
 
 ## 2. Étiquetage (PC, ~20 min)
 
