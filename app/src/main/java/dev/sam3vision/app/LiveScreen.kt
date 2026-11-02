@@ -95,7 +95,10 @@ fun LiveScreen(
     onOpenSettings: () -> Unit,
 ) {
     val context = LocalContext.current
-    val state by viewModel.state.collectAsState()
+    // Tranches scopées (voir LiveSlices) : l'étage caméra ne recompose pas sur la
+    // voix, la mémoire ou la narration, ni les bandeaux sur les seuls masques.
+    val pixels = viewModel.collectLivePixels()
+    val rest = viewModel.collectLiveRest()
     var attached by remember { mutableStateOf(false) }
     var failure by remember { mutableStateOf<String?>(null) }
     var draft by rememberSaveable { mutableStateOf("") }
@@ -109,10 +112,11 @@ fun LiveScreen(
     // Dernier poste de la chronologie : la frame n'est comptée dessinée qu'après compose.
     // La clé est la liste de masques (neuve à chaque frame), pas la frame : deux scènes
     // identiques donnent deux `LiveFrame` égales.
-    FirstPixelWatcher(state.overlays, state.overlays.isNotEmpty()) { viewModel.noteDrawn() }
+    FirstPixelWatcher(pixels.overlays, pixels.overlays.isNotEmpty()) { viewModel.noteDrawn() }
 
     LiveStage(
-        state = state,
+        pixels = pixels,
+        rest = rest,
         pixel = viewModel.pixel.stages.collectAsState().value,
         previewView = previewView,
         draft = draft,
@@ -131,7 +135,7 @@ fun LiveScreen(
         onVoiceStop = viewModel::stopVoice,
         onToggleSam = viewModel::toggleSam,
         onToggleTracker = viewModel::toggleTracker,
-        onToggleTraverse = { viewModel.setTraverseActive(!state.traverseActive) },
+        onToggleTraverse = { viewModel.setTraverseActive(!rest.traverseActive) },
         onToggleLocal = { scope.launch { viewModel.local.toggle() } },
         localFrame = viewModel.local.frame,
         pictoPng = viewModel.asker::pngOf,
@@ -223,7 +227,8 @@ private fun LiveCameraHost(
 /** Scène : aperçu, masques superposés, barre haute (état + concepts) et barre basse (question). */
 @Composable
 private fun LiveStage(
-    state: LiveUiState,
+    pixels: LiveUiState,
+    rest: LiveUiState,
     pixel: FrameTimings,
     previewView: PreviewView,
     draft: String,
@@ -243,9 +248,9 @@ private fun LiveStage(
     onToggleLocal: () -> Unit, localFrame: StateFlow<Bitmap?>, pictoPng: (String) -> ByteArray?,
 ) {
     Box(Modifier.fillMaxSize()) {
-        LiveCameraStage(state, previewView, localFrame, onRecover, pictoPng)
+        LiveCameraStage(pixels, previewView, localFrame, onRecover, pictoPng)
         LiveTopBar(
-            state = state,
+            state = rest,
             pixel = pixel,
             draft = draft,
             onDraftChange = onDraftChange,
@@ -259,7 +264,7 @@ private fun LiveStage(
             modifier = Modifier.align(Alignment.TopCenter),
         )
         LiveFooter(
-            state = state,
+            state = rest,
             memoryOpen = memoryOpen,
             onToggleMemory = onToggleMemory,
             onOpenChat = onAsk,
