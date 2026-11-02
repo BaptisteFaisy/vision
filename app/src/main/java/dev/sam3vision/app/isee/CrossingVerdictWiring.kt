@@ -12,6 +12,7 @@ import dev.sam3vision.core.crossing.CrossingVerdictRule
 import dev.sam3vision.core.distance.DistanceReading
 import dev.sam3vision.core.model.LiveFrame
 import dev.sam3vision.core.model.toDetections
+import dev.sam3vision.core.traverse.FrameMotion
 import dev.sam3vision.core.traverse.VehicleStateWatcher
 
 /**
@@ -49,8 +50,8 @@ data class CrossingVerdictFrame(
 /**
  * Moteur du verdict traversée (SPEC v4) : feu piéton ([readLight], boîte nulle =
  * absent) puis voitures en mouvement (voiture uniquement, [VehicleStateWatcher]
- * nourri de voitures seules) → [CrossingVerdictRule] → annonce (2 s,
- * changement immédiat) → [posts][CrossingPriority] → [poster].
+ * nourri de voitures seules, jugées par le fond) → [CrossingVerdictRule]
+ * → annonce (2 s, changement immédiat) → [posts][CrossingPriority] → [poster].
  *
  * [human] et [curb] sont les posts des missions humains/bordures (niveaux 101 et
  * 102, `null` = silence) : le moteur les ordonne après le verdict et les publie
@@ -70,7 +71,9 @@ class CrossingVerdictEngine(
     /**
      * Traite une frame à [atMs] : verdict, posts ordonnés publiés ([poster]),
      * overlay rouge-vert et front haptique. [readings] porte les distances
-     * affinées (filtrées voiture comme les détections).
+     * affinées (filtrées voiture comme les détections). [motion] (`null` =
+     * pas de signal fond) juge les pistes voitures par le fond : une boîte
+     * qui suit la caméra (pan sur une garée) ne conclut plus le mouvement.
      */
     fun onFrame(
         frame: LiveFrame,
@@ -79,12 +82,13 @@ class CrossingVerdictEngine(
         atMs: Long,
         human: CrossingPost? = null,
         curb: CrossingPost? = null,
+        motion: FrameMotion? = null,
     ): CrossingVerdictFrame {
         val light = verdictLightOf(readLight(frame, jpegB64))
         val carDetections = frame.objects.toDetections(frame.width, frame.height)
             .filter { CrossingVerdictRule.isCarLabel(it.label) }
         val carReadings = readings.filter { CrossingVerdictRule.isCarLabel(it.label) }
-        cars.update(carDetections, carReadings, atMs)
+        cars.update(carDetections, carReadings, atMs, motion = motion)
         val moving = cars.movingThisFrame
         val verdict = CrossingVerdictRule.decide(light, moving)
         val cue = announcer.onFrame(atMs, verdict)
