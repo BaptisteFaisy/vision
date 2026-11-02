@@ -46,6 +46,22 @@ class CrossingVerdictWiringTest {
         return out
     }
 
+    /** Feu scriptable : la lecture change d'une frame à l'autre (perte, clignotant). */
+    private class LightScript {
+        var light: CrossingLight = CrossingLight(null, CrossingState.Red)
+    }
+
+    /** Moteur branché sur un [script] de lectures et sur une liste de posts publiés. */
+    private fun scripted(
+        script: LightScript,
+        posted: MutableList<CrossingPost>,
+    ): CrossingVerdictEngine = CrossingVerdictEngine(
+        readLight = { _, _ -> script.light },
+        poster = CrossingVerdictPoster { level, text, clipId ->
+            posted.add(CrossingPost(level, text, clipId))
+        },
+    )
+
     @Test
     fun `le rouge publie don't cross niveau 100 avec overlay rouge`() {
         val posted = mutableListOf<CrossingPost>()
@@ -185,6 +201,73 @@ class CrossingVerdictWiringTest {
         assertEquals(CrossingLevels.HUMAN, out.posts[1].level)
         assertEquals(CrossingLevels.CURB, out.posts[2].level)
         assertEquals(out.posts, posted)
+    }
+
+    @Test
+    fun `un intrus rouge isole ne vide plus la fenetre verte`() {
+        // Trou D5 : `redProven = seen == Red` vidait la fenêtre du vote à CHAQUE
+        // frame non verte (`seen` est binaire : lampe éteinte, blanche, floue,
+        // bleue valent `Red`), donc l'accord 3/5 **glissant** mesuré en A5
+        // (371/400 verts, 16 faux verts) ne tenait jamais en production.
+        // Vert, vert, rouge, vert : 3 verts sur les 5 dernières frames.
+        val script = LightScript()
+        val posted = mutableListOf<CrossingPost>()
+        val engine = scripted(script, posted)
+        val green = CrossingLight(listOf(0.1f, 0.1f, 0.2f, 0.3f), CrossingState.Green)
+        val red = CrossingLight(listOf(0.1f, 0.1f, 0.2f, 0.3f), CrossingState.Red)
+        val lights = listOf(green, green, red, green)
+        var out: CrossingVerdictFrame? = null
+        lights.forEachIndexed { i, light ->
+            script.light = light
+            out = engine.onFrame(frame(), emptyList(), "", i * 200L)
+        }
+        assertEquals(CrossingVerdictLight.Green, out?.light)
+        assertEquals(CrossingVerdict.Cross, out?.verdict)
+    }
+
+    @Test
+    fun `feu vu puis perdu - la preuve tombe et la phrase parle`() {
+        // Trous D3/D4 : un feu aperçu puis masqué laissait la porte muette à
+        // vie (`Absent` inatteignable) — plus aucune phrase, ni vibration, pour
+        // une personne aveugle. Après la borne de ré-armement (8 frames), le
+        // verdict parle, et la perte d'un feu vu ne vaut JAMAIS « Cross. ».
+        val script = LightScript()
+        val posted = mutableListOf<CrossingPost>()
+        val engine = scripted(script, posted)
+        script.light = CrossingLight(listOf(0.1f, 0.1f, 0.2f, 0.3f), CrossingState.Green)
+        engine.warm(3)
+        assertEquals(listOf("Cross."), posted.map { it.text })
+        posted.clear()
+        script.light = CrossingLight(null, CrossingState.Red)
+        var out = engine.onFrame(frame(), emptyList(), "", 0L)
+        repeat(11) { out = engine.onFrame(frame(), emptyList(), "", (it + 1) * 200L) }
+        assertFalse("un feu perdu ne redevient jamais vert", out.light == CrossingVerdictLight.Green)
+        assertEquals(CrossingVerdict.DontCross, out.verdict)
+        assertTrue("la phrase est prononcée après la borne", posted.isNotEmpty())
+        assertEquals("Don't cross.", posted.last().text)
+        assertTrue("plus de silence : ni « Cross. » ni traversée", posted.none { it.text == "Cross." })
+    }
+
+    @Test
+    fun `un vert intermittent ne laisse pas le verdict muet a vie`() {
+        // Trou D4 : détection intermittente (2 boîtes vertes sur 5 frames)
+        // n'atteint jamais 3 verts sur 5, et la porte ne conclut jamais à
+        // l'absence puisqu'une boîte revient ⇒ `Unknown` éternel, donc silence
+        // éternel. Le silence est borné : à 8 frames sans preuve, le verdict parle.
+        val script = LightScript()
+        val posted = mutableListOf<CrossingPost>()
+        val engine = scripted(script, posted)
+        val green = CrossingLight(listOf(0.1f, 0.1f, 0.2f, 0.3f), CrossingState.Green)
+        val missing = CrossingLight(null, CrossingState.Red)
+        script.light = green
+        var out = engine.onFrame(frame(), emptyList(), "", 0L)
+        repeat(11) { i ->
+            script.light = if (i == 3) green else missing
+            out = engine.onFrame(frame(), emptyList(), "", (i + 1) * 200L)
+        }
+        assertTrue("le verdict parle dans la borne", posted.isNotEmpty())
+        assertEquals("Don't cross.", posted.first().text)
+        assertFalse(out.light == CrossingVerdictLight.Green)
     }
 
     @Test

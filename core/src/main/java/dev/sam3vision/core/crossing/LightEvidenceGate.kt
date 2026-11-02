@@ -37,19 +37,21 @@ enum class Evidence {
 
 /**
  * Traduction vers le contrat du verdict ([CrossingVerdictRule.decide]) :
- * [Evidence.Unknown] **et** [Evidence.Absent] deviennent
- * [CrossingVerdictLight.Unknown], qui impose « Don't cross. ».
+ * [Evidence.Unknown] devient [CrossingVerdictLight.Unknown], qui impose
+ * « Don't cross. » : c'est le seul cas où l'on ne sait rien.
  *
- * Pourquoi [Evidence.Absent] aussi : le chemin du feu ne sait rien prouver
- * d'autre que « je ne vois pas de feu vert ». Une traversée **sans feu** reste
- * possible, mais par une autre porte (`NoLightGate` / `NoLightAnnouncer`), qui
- * exige sa propre preuve (aucun feu depuis plusieurs frames, calme continu) et
- * parle sa propre phrase — jamais un vert emprunté.
+ * [Evidence.Absent], lui, garde le sens historique de la SPEC v4 : **absence
+ * prouvée** (assez de frames sans aucune boîte, contexte de passage) ⇒ aucun
+ * feu à cet endroit, donc les voitures tranchent ([CrossingVerdictLight.Absent],
+ * `carMoving` et le veto décident). La différence avec [Evidence.Unknown] est
+ * exactement celle que ce module existe pour porter : une frame ratée n'est pas
+ * une absence, quatre frames concordantes en sont une.
  */
 fun Evidence.toVerdictLight(): CrossingVerdictLight = when (this) {
     Evidence.Green -> CrossingVerdictLight.Green
     Evidence.Red -> CrossingVerdictLight.Red
-    Evidence.Unknown, Evidence.Absent -> CrossingVerdictLight.Unknown
+    Evidence.Absent -> CrossingVerdictLight.Absent
+    Evidence.Unknown -> CrossingVerdictLight.Unknown
 }
 
 /**
@@ -62,13 +64,22 @@ fun Evidence.toVerdictLight(): CrossingVerdictLight = when (this) {
  * ne conclut donc [Evidence.Absent] qu'après [ABSENT_MIN_FRAMES] frames de
  * suite sans aucune boîte, **et** si le contexte autorise la conclusion
  * ([facingCrossing]), **et** si aucun feu n'a été vu depuis le dernier
- * [reset] — un feu aperçu puis perdu reste [Evidence.Unknown], jamais « pas de
- * feu ».
+ * [reset] — un feu aperçu puis perdu reste [Evidence.Unknown] jusqu'à la borne
+ * de ré-armement ci-dessous, jamais « pas de feu ».
  *
- * Côté couleur, [Evidence.Green] exige deux preuves indépendantes, comme la
- * mesure l'impose : [MIN_GREEN_EVIDENCE_FRAMES] crops concordants **et**
- * [GREEN_HOLD_MS] de vert continu. Un vert d'une frame est un artefact de
- * clignotant ou de scène ; un feu piéton vert dure ≥ 5 s en France.
+ * **Ré-armement (02/11/2026, trou D3)** : la condition « aucun feu vu depuis
+ * [reset] » rendait [Evidence.Absent] **inatteignable à vie** dès la première
+ * boîte de la session — un feu masqué ou dépassé laissait donc
+ * [Evidence.Unknown] pour toujours, d'où un verdict muet pour toujours côté
+ * `:app`. L'absence redevient donc **prouvable** après une perte durable :
+ * [ABSENT_REARM_FRAMES] frames de suite sans boîte (2 × [ABSENT_MIN_FRAMES] =
+ * 8, soit 0,7 à 1,6 s à 5-12 ips) rouvrent la conclusion. Rien ne se conclut
+ * plus vite qu'avant ; on cesse seulement de se taire à vie.
+ *
+ * Côté couleur, [Evidence.Green] exige [MIN_GREEN_EVIDENCE_FRAMES] crops
+ * concordants **et** [GREEN_HOLD_MS] de vert continu. Ces deux preuves sont
+ * **neutralisées par le câblage de production** : la confirmation du vert est
+ * le vote 3/5 mesuré A5 (voir les KDoc des deux constantes).
  *
  * Invariant tenu par construction et vérifié par les tests :
  * **`Unknown` et `Absent` ne sont jamais `Green`**. En particulier, un
@@ -78,10 +89,26 @@ fun Evidence.toVerdictLight(): CrossingVerdictLight = when (this) {
  * lentille), aucune horloge implicite, aucun état global.
  */
 class LightEvidenceGate(
+    /**
+     * Crops verts concordants exigés : **neutralisée par le câblage de
+     * production** (`CrossingVerdictWiring` construit la porte avec `1`), où la
+     * confirmation du vert est le vote 3/5 de `LightTemporalVote` (mesure A5 :
+     * 371/400 verts, 16 faux verts, +180 ms p50). Deux confirmations
+     * empileraient deux délais (A9 : +0,8 à 1,5 s). Voir
+     * [MIN_GREEN_EVIDENCE_FRAMES].
+     */
     private val minGreenFrames: Int = MIN_GREEN_EVIDENCE_FRAMES,
+    /**
+     * Tenue minimale du vert en ms : même statut que [minGreenFrames], le
+     * câblage de production passe `0L` et la tenue vient du vote (3 verts sur
+     * les 5 dernières frames à boîte). Voir [GREEN_HOLD_MS].
+     */
     private val greenHoldMs: Long = GREEN_HOLD_MS,
     private val absentMinFrames: Int = ABSENT_MIN_FRAMES,
 ) {
+
+    /** Frames de suite sans boîte qui rouvrent la conclusion d'absence (2 × [absentMinFrames]). */
+    private val absentRearmFrames: Int = absentMinFrames * ABSENT_REARM_FACTOR
 
     /** Vert continu du segment courant, en frames concordantes. */
     private var greenFrames = 0
@@ -92,7 +119,7 @@ class LightEvidenceGate(
     /** Frames de suite sans aucune boîte (remis à zéro dès qu'une boîte revient). */
     private var absentFrames = 0
 
-    /** Un feu a-t-il déjà été vu depuis le dernier [reset] ? */
+    /** Un feu a-t-il déjà été vu depuis le dernier [reset] ? Remis à faux par [ABSENT_REARM_FRAMES] frames de perte durable. */
     private var sawAnyBox = false
 
     /** Dernière preuve rendue ([Evidence.Unknown] avant la première frame). */
@@ -132,6 +159,9 @@ class LightEvidenceGate(
     private fun withoutBox(facingCrossing: Boolean): Evidence {
         forgetGreen()
         absentFrames += 1
+        // Perte durable : l'absence redevient prouvable, sinon elle ne l'est
+        // plus jamais après la première boîte de la session (trou D3).
+        if (absentFrames >= absentRearmFrames) sawAnyBox = false
         val proven = absentFrames >= absentMinFrames && facingCrossing && !sawAnyBox
         return if (proven) Evidence.Absent else Evidence.Unknown
     }
@@ -180,17 +210,26 @@ class LightEvidenceGate(
         /**
          * Crops verts **concordants** exigés avant de croire au vert (2, comme
          * `NoLightAnnouncer.CROSS_MIN_FRAMES`) : un état isolé est du bruit.
+         *
+         * **Neutralisé par le câblage de production** (`CrossingVerdictWiring`
+         * construit la porte avec `minGreenFrames = 1`) : la confirmation du
+         * vert y est le **vote 3/5** de `LightTemporalVote` (mesure A5 :
+         * 371/400 verts trouvés, 16 faux verts sur 980 séquences, +180 ms p50).
+         * Garder les deux aurait additionné deux délais de confirmation, dont
+         * +0,8 à 1,5 s mesurés en A9. La constante ne sert donc qu'aux appelants
+         * sans vote (bancs, tests du contrat de la porte).
          */
         const val MIN_GREEN_EVIDENCE_FRAMES = 2
 
         /**
          * Vert **continu** exigé avant de croire au vert : 700 ms.
          *
-         * **Provisoire, à calibrer en rue.** Un vert piéton dure ≥ 5 s en
-         * France ; un vert de 200 ms est un artefact de clignotant ou de scène
-         * (le mode lunettes tourne à 24 ips, donc 200 ms y font 5 frames : le
-         * seul compte de frames ne suffit pas à écarter l'artefact). Coût
-         * mesuré sur les ancres (A9) : 0,8 à 1,5 s de délai sur « Cross. ».
+         * **Neutralisé par le câblage de production** (`greenHoldMs = 0L`, même
+         * appel que [MIN_GREEN_EVIDENCE_FRAMES]) : la tenue est portée par le
+         * vote 3/5 (3 frames vertes sur les 5 dernières à boîte, soit 300-400 ms
+         * à 12-15 fps, mesure A5) puis par l'anti-clignotant du vote
+         * (`EXIT_FRAMES = 2`). Un vert piéton dure ≥ 5 s en France ; le
+         * clignotant, lui, ne passe pas 3 frames sur 5.
          */
         const val GREEN_HOLD_MS = 700L
 
@@ -201,5 +240,21 @@ class LightEvidenceGate(
          * la chaussée, il se prouve comme un vert).
          */
         const val ABSENT_MIN_FRAMES = 4
+
+        /**
+         * Facteur de **ré-armement** de la preuve d'absence : une boîte vue ne
+         * condamne plus la porte au silence, [ABSENT_REARM_FRAMES] frames sans
+         * boîte rendent [Evidence.Absent] de nouveau concluable (trou D3 :
+         * `Absent` inatteignable à vie ⇒ verdict muet à vie).
+         */
+        const val ABSENT_REARM_FACTOR = 2
+
+        /**
+         * Frames de suite sans boîte qui rouvrent la conclusion d'absence :
+         * 2 × [ABSENT_MIN_FRAMES] = **8** frames, soit 0,7 à 1,6 s à 5-12 ips.
+         * C'est la borne de silence du verdict (`:app` l'utilise aussi comme
+         * délai de déblocage) : au-delà, on ne se tait plus, on parle.
+         */
+        const val ABSENT_REARM_FRAMES = ABSENT_MIN_FRAMES * ABSENT_REARM_FACTOR
     }
 }

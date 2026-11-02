@@ -192,8 +192,11 @@ internal fun crossingPatchOf(
     if (noLightGate?.onFrame(light.box) == true) {
         // Sans feu confirmé : le feu se tait (pas de « Rouge, attendez. »
         // pour un feu absent), l'état publié reste rouge (aucun vert lu —
-        // pastille, bouton et vibrations inchangés).
-        return CrossingPatch(null, CrossingState.Red, null, decision.state, true)
+        // pastille, bouton et vibrations inchangés). Le **veto trafic est
+        // conservé** : c'est lui qui empêche la voix de dire « Cross. » quand
+        // un bus arrive (A9 § 3 D7) ; le laisser à sa valeur par défaut
+        // (`false`) rouvrait exactement ce trou.
+        return CrossingPatch(null, CrossingState.Red, null, decision.state, noLight = true, veto = decision.veto)
     }
     val vetoed = decision.crossingState()
     val cue = crossingCueOf(announcer.onFrame(atMs, vetoed, language), decision.state, language, contradiction)
