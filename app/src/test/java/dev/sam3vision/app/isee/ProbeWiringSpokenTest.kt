@@ -11,10 +11,12 @@ import kotlinx.coroutines.test.advanceUntilIdle
 import kotlinx.coroutines.test.runTest
 import org.junit.After
 import org.junit.Assert.assertEquals
+import org.junit.Assert.assertFalse
 import org.junit.Assert.assertNull
 import org.junit.Assert.assertTrue
 import org.junit.Before
 import org.junit.Test
+import dev.sam3vision.core.speech.SpeechLanguage
 
 /**
  * La voix de la sonde (SPEC v4) : le stop part au bus niveau 4, les mots
@@ -39,15 +41,22 @@ class ProbeWiringSpokenTest {
 
     private val speaker = FakeBusSpeaker()
 
+    /** Journal capturé (jamais de logcat sous test). */
+    private val journal = mutableListOf<String>()
+    private val defaultSink = SpeechLog.sink
+
     @Before
     fun brancher() {
         AntiRepeat.reset()
         VoiceBus.reset()
         VoiceBus.speaker = speaker
+        journal.clear()
+        SpeechLog.sink = { _, line -> journal += line }
     }
 
     @After
     fun debrancher() {
+        SpeechLog.sink = defaultSink
         VoiceBus.speaker = null
         VoiceBus.reset()
         AntiRepeat.reset()
@@ -105,6 +114,88 @@ class ProbeWiringSpokenTest {
         assertEquals(1, speaker.said.size)
         assertEquals(OutdoorLevel.FALLBACK, speaker.said.single().level)
         assertEquals("Gauche.", speaker.said.single().text)
+    }
+
+    @Test
+    fun `avis de reveil sans-frame - silence sans EXPECT orphelin`() = runTest {
+        val scope = CoroutineScope(SupervisorJob() + StandardTestDispatcher(testScheduler))
+        try {
+            val probe = LiveProbe(scope = this, clock = { 0L }, background = StandardTestDispatcher(testScheduler))
+            probe.observeSpoken(scope)
+            probe._state.value = LiveProbeState(spoken = WARM_SPOKEN, spokenUrgent = false, spokenSeq = 1)
+            advanceUntilIdle()
+            probe._state.value = LiveProbeState(spoken = COLD_TIMEOUT_SPOKEN, spokenUrgent = false, spokenSeq = 2)
+            advanceUntilIdle()
+        } finally {
+            scope.cancel()
+        }
+
+        assertTrue(speaker.said.isEmpty())
+        assertTrue(journal.none { it.startsWith("EXPECT") })
+    }
+
+    @Test
+    fun `mot doux retenu - EXPECT repli emis`() = runTest {
+        val scope = CoroutineScope(SupervisorJob() + StandardTestDispatcher(testScheduler))
+        try {
+            val probe = LiveProbe(scope = this, clock = { 0L }, background = StandardTestDispatcher(testScheduler))
+            probe.observeSpoken(scope)
+            probe._state.value = LiveProbeState(spoken = "Gauche.", spokenUrgent = false, spokenSeq = 1)
+            advanceUntilIdle()
+        } finally {
+            scope.cancel()
+        }
+
+        assertEquals(1, speaker.said.size)
+        assertEquals(listOf("EXPECT voie=repli phrase=[Gauche.]"), journal)
+    }
+
+    @Test
+    fun `mot doux nourrit le keepalive (dernier etat connu)`() = runTest {
+        KeepaliveVoice.reset()
+        try {
+            val scope = CoroutineScope(SupervisorJob() + StandardTestDispatcher(testScheduler))
+            try {
+                val probe = LiveProbe(scope = this, clock = { 0L }, background = StandardTestDispatcher(testScheduler))
+                probe.observeSpoken(scope)
+                probe._state.value = LiveProbeState(spoken = "Gauche.", spokenUrgent = false, spokenSeq = 1)
+                advanceUntilIdle()
+            } finally {
+                scope.cancel()
+            }
+            // Le keepalive redit le dernier mot connu (ici en EN) : pas le tout-droit par défaut.
+            VoiceBus.reset()
+            VoiceBus.speaker = speaker
+            assertTrue(KeepaliveVoice.offer(SpeechLanguage.En))
+            assertEquals("Left.", speaker.said.last().text)
+        } finally {
+            KeepaliveVoice.reset()
+        }
+    }
+
+    @Test
+    fun `mot doux refuse par le bus - pas de EXPECT`() = runTest {
+        val scope = CoroutineScope(SupervisorJob() + StandardTestDispatcher(testScheduler))
+        try {
+            VoiceBus.userSpeaking(true)
+            val probe = LiveProbe(scope = this, clock = { 0L }, background = StandardTestDispatcher(testScheduler))
+            probe.observeSpoken(scope)
+            probe._state.value = LiveProbeState(spoken = "Gauche.", spokenUrgent = false, spokenSeq = 1)
+            advanceUntilIdle()
+        } finally {
+            scope.cancel()
+        }
+
+        assertTrue(speaker.said.isEmpty())
+        assertTrue(journal.none { it.startsWith("EXPECT") })
+    }
+
+    @Test
+    fun `repli rend le verdict du bus`() {
+        VoiceBus.userSpeaking(true)
+        assertFalse(FallbackVoice.offer("Gauche."))
+        VoiceBus.userSpeaking(false)
+        assertTrue(FallbackVoice.offer("Gauche."))
     }
 
     @Test
