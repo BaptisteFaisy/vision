@@ -111,22 +111,16 @@ object GlassesVideoLink {
     /** Dernière poussée (conflaté : l'UI prend toujours la plus récente, jamais deux fois la même). */
     val frames: StateFlow<GlassesFrameBox?> = _frames.asStateFlow()
 
-    @Volatile
-    private var snapshot: (() -> android.graphics.Bitmap?)? = null
-
-    /** La rue fournit ses pixels pour la sonde SAM (photo de ce qui s'affiche). */
-    fun attachSnapshot(provider: () -> android.graphics.Bitmap?) {
-        snapshot = provider
-    }
-
-    /** La rue ne regarde plus : plus de photo pour la sonde. */
+    /**
+     * La rue ne regarde plus : la géométrie de la dernière photo est oubliée.
+     *
+     * ⚠️ Il n'y a plus de `takeSnapshot` : photographier la `TextureView`
+     * (`getBitmap`) coûtait 3 à 15 ms de fil UI par poussée. La sonde décode
+     * désormais la poussée elle-même (`GlassesBackgroundFrames`), hors fil UI.
+     */
     fun detachSnapshot() {
-        snapshot = null
         snapshotGeometryField = null
     }
-
-    /** Photographie la rue des lunettes, ou `null` si elle ne regarde pas. */
-    fun takeSnapshot(): android.graphics.Bitmap? = runCatching { snapshot?.invoke() }.getOrNull()
 
     @Volatile
     private var snapshotGeometryField: SnapshotGeometry? = null
@@ -277,6 +271,14 @@ object GlassesVideoLink {
 
     /** Cadence du résumé [LINK_TAG] : 1 Hz au plus, comme la recette l'exige. */
     private const val SUMMARY_NS = 1_000_000_000L
+
+    /**
+     * Une ligne détaillée [TimingsText.link] toutes les N frames : à 24 i/s, une
+     * par seconde. Le format ne bouge pas (`scripts/parse_glasses_link.py` lit
+     * toujours `link seq … · lien … · dec … · aff … · percu …`) ; seule la
+     * fréquence change — formatage + I/O logcat ne vivaient que par frame.
+     */
+    private const val LINK_LINE_EVERY = 24L
     private val clockOffset = GlassesClockOffset()
     private val linkStats = GlassesLinkStats()
     private var awaitingNote = false
@@ -284,6 +286,9 @@ object GlassesVideoLink {
     private var lastLinkUs = -1L
     private var pending: PendingLink? = null
     private var lastSummaryNs = 0L
+
+    /** Frames mesurées depuis la remise à zéro : cadence la ligne détaillée. */
+    private var linkLineTicks = 0L
 
     /**
      * Arrivée d'une poussée : alimente le décalage pts ↔ téléphone (B1) et compte
@@ -335,9 +340,10 @@ object GlassesVideoLink {
     /**
      * Pixel affiché (`onSurfaceTextureUpdated`) : ferme la frame en attente —
      * `aff` = pixel − sortie décodeur — et journalise sous [LINK_TAG] la ligne
-     * per-frame ([TimingsText.link]) plus le résumé à 1 Hz au plus
-     * ([GlassesLinkStats.line]). [atNs] = 0 = maintenant (même idiome que
-     * `ScreenTimings.beginFrame`) ; sans rendu en attente, ne fait rien.
+     * détaillée ([TimingsText.link]) une frame sur [LINK_LINE_EVERY] plus le
+     * résumé à 1 Hz au plus ([GlassesLinkStats.line]), qui porte la mesure.
+     * [atNs] = 0 = maintenant (même idiome que `ScreenTimings.beginFrame`) ;
+     * sans rendu en attente, ne fait rien.
      */
     fun markPixel(atNs: Long = 0L) {
         val nowNs = if (atNs > 0L) atNs else SystemClock.elapsedRealtimeNanos()
@@ -347,8 +353,14 @@ object GlassesVideoLink {
             if (nowNs < done.decodeEndNs) return
             val displayUs = (nowNs - done.decodeEndNs + NS_PER_US / 2L) / NS_PER_US
             linkStats.record(done.linkUs, done.decodeUs, displayUs)
-            val perceivedUs = done.linkUs + done.decodeUs + displayUs
-            Log.i(LINK_TAG, TimingsText.link(done.seq, done.linkUs, done.decodeUs, displayUs, perceivedUs))
+            // La ligne par frame ne servait qu'au parseur : une sur N suffit, et
+            // `perceivedUs` ne se calcule donc plus à chaque frame (il ne nourrit
+            // que ce journal-là).
+            if (linkLineTicks % LINK_LINE_EVERY == 0L) {
+                val perceivedUs = done.linkUs + done.decodeUs + displayUs
+                Log.i(LINK_TAG, TimingsText.link(done.seq, done.linkUs, done.decodeUs, displayUs, perceivedUs))
+            }
+            linkLineTicks += 1L
             if (nowNs - lastSummaryNs >= SUMMARY_NS) {
                 lastSummaryNs = nowNs
                 Log.i(LINK_TAG, linkStats.line())
@@ -379,6 +391,8 @@ object GlassesVideoLink {
         lastLinkUs = -1L
         pending = null
         lastSummaryNs = 0L
+        // Nouvelle session : la première frame rendue redonne une ligne détaillée.
+        linkLineTicks = 0L
     }
 
     /**
