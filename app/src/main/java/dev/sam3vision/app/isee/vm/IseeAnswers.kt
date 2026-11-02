@@ -9,7 +9,7 @@ import dev.sam3vision.core.model.ChatTurn
 import dev.sam3vision.core.nav.GpsDestinationText
 import dev.sam3vision.core.settings.Settings
 import dev.sam3vision.core.usecase.AskUseCase
-import java.util.concurrent.atomic.AtomicBoolean
+import java.util.concurrent.atomic.AtomicReference
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.currentCoroutineContext
@@ -46,7 +46,7 @@ class IseeAnswers(
     /** Destination GPS en cours (`null` hors guidage) : rejoint la question en contexte. */
     private val destination: () -> String? = { GpsDestinationMemory.destination.value },
     private val askTimeoutMs: Long = ASK_TIMEOUT_MS,
-    /** Attente maximale de la réponse préemptée avant de renoncer (repli, voir [acquireAsking]). */
+    /** Attente maximale de la réponse préemptée avant de voler sa place (voir [acquireAsking]). */
     private val preemptTimeoutMs: Long = PREEMPT_TIMEOUT_MS,
     /** Traversée active : le chat y est muet (texte seul, SPEC v4). */
     private val crossingActive: () -> Boolean = { false },
@@ -54,10 +54,14 @@ class IseeAnswers(
 
     /**
      * Une seule question à la fois : le backend refuse deux appels LLM simultanés
-     * (409 « limite atteinte »). Une nouvelle parole ne part donc qu'une fois la
-     * précédente annulée et rendue ([acquireAsking]) — écrasée, jamais en parallèle.
+     * (409 « limite atteinte »). Le porteur est la réponse en vol (`null` =
+     * libre) : une nouvelle parole l'annule et attend qu'elle rende
+     * ([acquireAsking]) — écrasée, jamais en parallèle. Passé le plafond, elle
+     * vole la place quand même (overwrite forcé, ordre user) : seule la
+     * libération du porteur actuel compte, une libération tardive de l'ancienne
+     * ne rend ni le drapeau ni le « … ».
      */
-    private val asking = AtomicBoolean(false)
+    private val asking = AtomicReference<Any?>(null)
 
     /**
      * Job de la réponse en vol, posé après le drapeau et rendu dans le `finally` :
@@ -82,13 +86,10 @@ class IseeAnswers(
 
     /** Question → réponse LLM (image = photo-contexte) → texte Room → voix. */
     suspend fun answer(row: MessageMultimedia, question: String) {
-        if (!acquireAsking()) {
-            // La réponse précédente refuse de mourir (repli pathologique) : cette
-            // question-ci reste sans réponse, photo relâchée, et dit pourquoi.
-            photo.releaseContext()
-            update { it.copy(status = IseeStatusText.ANSWER_PENDING) }
-            return
-        }
+        // Porteur du drapeau : le job courant (un jeton frais sans job — jamais
+        // `null`, qui veut dire libre).
+        val owner: Any = currentCoroutineContext()[Job] ?: Any()
+        acquireAsking(owner)
         // Posé avant le premier point de suspension : l'écran montre le « … » tout de
         // suite et le ViewModel sait qu'une question est en vol.
         val self = currentCoroutineContext()[Job]
@@ -110,31 +111,33 @@ class IseeAnswers(
             }
         } finally {
             // Garanti sur tous les chemins (clé absente, échec, annulation) : le gel de
-            // la photo ne reste jamais à vie et le « … » ne reste jamais affiché.
+            // la photo ne reste jamais à vie. Le drapeau et le « … » ne sont rendus
+            // que par le porteur actuel : une réponse volée qui meurt tard ne coupe
+            // pas le « … » de la question qui a pris sa place.
             photo.releaseContext()
-            update { it.copy(thinking = false) }
-            asking.set(false)
+            if (asking.compareAndSet(owner, null)) update { it.copy(thinking = false) }
             if (inFlight === self) inFlight = null
         }
     }
 
     /**
      * Prend le drapeau d'appel LLM, en écrasant la réponse en vol si besoin :
-     * une nouvelle parole coupe la précédente (ordre user) au lieu d'être jetée
-     * avec une erreur « busy » ou « en train de réfléchir ». La précédente est
-     * annulée puis attendue — son `finally` rend le drapeau (et le « … ») avant
-     * que la nouvelle ne parte, donc deux appels LLM ne se chevauchent jamais
-     * (409 « limite atteinte »). `false` passé [preemptTimeoutMs] (la précédente
-     * ignore l'annulation) : l'appelant dit pourquoi, sans lancer un second appel.
+     * une nouvelle parole coupe la précédente (ordre user) au lieu d'être jetée.
+     * La précédente est annulée puis attendue — son `finally` rend le drapeau
+     * (et le « … ») avant que la nouvelle ne parte, donc deux appels LLM ne se
+     * chevauchent jamais (409 « limite atteinte »). Passé [preemptTimeoutMs]
+     * (la précédente ignore l'annulation), la nouvelle vole la place quand même
+     * (overwrite forcé) : le chevauchement passager peut rendre un 409, dit à
+     * l'écran comme tout échec de question — jamais une question jetée.
      */
-    private suspend fun acquireAsking(): Boolean {
-        if (asking.compareAndSet(false, true)) return true
-        val self = currentCoroutineContext()[Job]
-        inFlight?.takeIf { it !== self }?.cancel()
+    private suspend fun acquireAsking(owner: Any) {
+        if (asking.compareAndSet(null, owner)) return
+        if (asking.get() === owner) return
+        (asking.get() as? Job)?.cancel()
         withTimeoutOrNull(preemptTimeoutMs) {
-            while (asking.get()) delay(PREEMPT_POLL_MS)
+            while (asking.get() != null) delay(PREEMPT_POLL_MS)
         }
-        return asking.compareAndSet(false, true)
+        if (!asking.compareAndSet(null, owner)) asking.set(owner)
     }
 
     /**
@@ -187,7 +190,7 @@ class IseeAnswers(
         /**
          * Attente maximale de la réponse préemptée : une annulation se rend en
          * millisecondes (appel HTTP, lecture) ; au-delà, la précédente est coincée
-         * et la nouvelle renonce plutôt que de lancer un second appel (409).
+         * et la nouvelle vole sa place quand même (overwrite forcé, ordre user).
          */
         const val PREEMPT_TIMEOUT_MS = 10_000L
 
