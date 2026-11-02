@@ -53,6 +53,9 @@ object CrossingGuidance {
     /** Frames positives de suite avant « Sur le passage. ». */
     const val ARRIVAL_CONFIRM_FRAMES = 2
 
+    /** Absence du passage avant « No crosswalk. » en Traversée (ms, ordre user du 02/11). */
+    const val LOST_DELAY_MS = 3_000L
+
     /** Allongement minimal d'un passage (largeur / hauteur) : jamais vertical. */
     const val CROSSWALK_MIN_ASPECT = 0.8f
 
@@ -323,6 +326,50 @@ class CrossingArrivalWatcher(
     /** Nouvelle session : compte et annonce oubliés. */
     fun reset() {
         hits = 0
+        announced = false
+        lastCue = null
+    }
+}
+
+/** Perte du passage à prononcer : phrase seule (le niveau du bus porte la priorité). */
+data class CrossingLostCue(val phrase: String)
+
+/**
+ * Guetteur de perte : le passage suivi invisible depuis [lostDelayMs] parle
+ * une fois (« No crosswalk. »), puis silence jusqu'à son retour (changement
+ * seul, miroir de [CrossingArrivalWatcher]). Le retour ré-arme aussitôt : un
+ * passage qui clignote ne fait pas parler. Pur JVM.
+ */
+class CrossingLostWatcher(
+    private val lostDelayMs: Long = CrossingGuidance.LOST_DELAY_MS,
+) {
+
+    /** Début de l'absence en cours (`null` = passage vu ou session neuve). */
+    private var lostSinceMs: Long? = null
+    private var announced = false
+
+    /** Dernier signal produit (`null` tant que rien n'a été annoncé). */
+    var lastCue: CrossingLostCue? = null
+        private set
+
+    /** Passage suivi [visible] à [atMs] : le signal à prononcer, ou `null` (silence). */
+    fun onFrame(visible: Boolean, atMs: Long, language: SpeechLanguage = SpeechLanguage.DEFAULT): CrossingLostCue? {
+        if (visible) {
+            lostSinceMs = null
+            announced = false
+            return null
+        }
+        val since = lostSinceMs ?: atMs.also { lostSinceMs = it }
+        if (announced || atMs - since < lostDelayMs) return null
+        announced = true
+        val cue = CrossingLostCue(CrossingText.lost(language))
+        lastCue = cue
+        return cue
+    }
+
+    /** Nouvelle session : absence et annonce oubliées. */
+    fun reset() {
+        lostSinceMs = null
         announced = false
         lastCue = null
     }
