@@ -278,12 +278,12 @@ object GlassesVideoLink {
     private const val SUMMARY_NS = 1_000_000_000L
 
     /**
-     * Une ligne détaillée [TimingsText.link] toutes les N frames : à 24 i/s, une
+     * Une ligne détaillée [TimingsText.link] toutes les N frames : à 15 i/s, une
      * par seconde. Le format ne bouge pas (`scripts/parse_glasses_link.py` lit
      * toujours `link seq … · lien … · dec … · aff … · percu …`) ; seule la
      * fréquence change — formatage + I/O logcat ne vivaient que par frame.
      */
-    private const val LINK_LINE_EVERY = 24L
+    private const val LINK_LINE_EVERY = 15L
     private val clockOffset = GlassesClockOffset()
     private val linkStats = GlassesLinkStats()
     private var awaitingNote = false
