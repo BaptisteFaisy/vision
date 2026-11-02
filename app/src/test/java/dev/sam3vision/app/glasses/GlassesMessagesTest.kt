@@ -25,7 +25,7 @@ class GlassesMessagesTest {
         GlassesMessages.noActivity(),
         GlassesMessages.mockUnavailable(),
         GlassesMessages.mockConnectTimeout(),
-        GlassesMessages.sessionRefusedByGlasses(),
+        sessionRefusedByGlasses(),
     )
 
     @Test
@@ -50,7 +50,7 @@ class GlassesMessagesTest {
         assertEquals(MessageKind.INFO, GlassesMessages.registrationConfirmed().kind)
         assertEquals(MessageKind.INFO, GlassesMessages.mockReady().kind)
         assertEquals(MessageKind.INFO, GlassesMessages.framesVoiceRoute().kind)
-        assertEquals(MessageKind.INFO, GlassesMessages.sessionRetrying(1, 3).kind)
+        assertEquals(MessageKind.INFO, sessionRetrying(1, 3).kind)
     }
 
     @Test
@@ -98,9 +98,9 @@ class GlassesMessagesTest {
 
     @Test
     fun `le nouvel essai annonce son rang et le refus guide le force-restart`() {
-        val retrying = GlassesMessages.sessionRetrying(2, 3).text
+        val retrying = sessionRetrying(2, 3).text
         assertTrue(retrying, retrying.contains("2/3"))
-        val refused = GlassesMessages.sessionRefusedByGlasses().text
+        val refused = sessionRefusedByGlasses().text
         assertTrue(refused, refused.contains("force-restart"))
         assertTrue(refused, refused.contains("power + capture"))
     }

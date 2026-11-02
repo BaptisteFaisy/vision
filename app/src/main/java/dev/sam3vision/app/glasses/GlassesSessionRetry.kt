@@ -48,3 +48,14 @@ internal fun quickDeathDelayMs(used: Int): Long = when {
     used == 2 -> 3_000L
     else -> 5_000L
 }
+
+/** La session meurt avant de servir : l'app réessaie seule, l'utilisateur patiente. */
+fun sessionRetrying(attempt: Int, max: Int) = GlassesMessage(
+    MessageKind.INFO,
+    "Glasses cut the session instantly, retrying ($attempt/$max)…",
+)
+/** Refus en boucle : le geste qui répare est sur les lunettes, pas dans l'app. */
+fun sessionRefusedByGlasses() = GlassesMessage(
+    MessageKind.ERROR,
+    "The glasses keep refusing: force-restart them (worn, hold power + capture), then start again.",
+)

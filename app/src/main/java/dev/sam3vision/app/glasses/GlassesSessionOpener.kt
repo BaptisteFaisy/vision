@@ -81,11 +81,11 @@ internal class GlassesSessionOpener(
         }
         if (quickDeaths >= QUICK_DEATH_MAX_RETRIES) {
             quickDeaths = 0
-            note(GlassesMessages.sessionRefusedByGlasses())
+            note(sessionRefusedByGlasses())
             return
         }
         quickDeaths += 1
-        note(GlassesMessages.sessionRetrying(quickDeaths, QUICK_DEATH_MAX_RETRIES))
+        note(sessionRetrying(quickDeaths, QUICK_DEATH_MAX_RETRIES))
         retryJob?.cancel()
         val waitMs = quickDeathDelayMs(quickDeaths)
         retryJob = scope.launch {
