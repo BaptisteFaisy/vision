@@ -293,7 +293,15 @@ class GlassesController(
         // Une session oubliée ne parle plus : sinon elle réécrit l'état de la nouvelle.
         if (created !== session) return
         Log.i(TAG, "session : $state")
-        _state.update { it.copy(phase = state.toPhase()) }
+        val previous = _state.value.phase
+        val next = state.toPhase()
+        _state.update { it.copy(phase = next) }
+        if (shouldAnnounceSessionConnected(previous, next)) {
+            scope.launch {
+                frameVoice.announceConnected()
+                    .onFailure { Log.w(TAG, "annonce connected : ${it.message}") }
+            }
+        }
         when (state) {
             DeviceSessionState.STARTED -> scope.launch { attachCapabilities(created) }
             DeviceSessionState.STOPPED -> releaseCapabilities()

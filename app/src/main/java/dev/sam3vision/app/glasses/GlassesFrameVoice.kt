@@ -56,6 +56,14 @@ internal class GlassesFrameVoice(
         Log.d(FRAME_LOG_TAG, line)
     }
 
+    /**
+     * Session ouverte : dit « connected » sur la sortie voix (les lunettes en
+     * session, le haut-parleur en repli). Clé TTS absente = échec silencieux,
+     * comme les descriptions collectées.
+     */
+    suspend fun announceConnected(): Result<Unit> =
+        voice.say(settings(), SESSION_CONNECTED_ANNOUNCEMENT)
+
     /** Fin de session : la voix en cours se tait. */
     fun stop() {
         voice.stop()
