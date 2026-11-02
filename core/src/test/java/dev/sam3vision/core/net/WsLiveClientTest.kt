@@ -110,6 +110,8 @@ class WsLiveClientTest {
 
         client.live("QQ==", null, 640, 4)
 
+        // Timeout (1 s) puis reopen immédiat (FIX-16) : deux handshakes, mais le
+        // handshake ne date plus rien (SPEC-7) et l'orphelin ne date aucun corps.
         assertEquals(emptyList<String>(), seen)
     }
 
