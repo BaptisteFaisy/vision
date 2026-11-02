@@ -3,15 +3,26 @@ package dev.sam3vision.app.isee
 import android.graphics.Bitmap
 import android.graphics.BitmapFactory
 import android.util.Base64
+import dev.sam3vision.core.crossing.CrossingCropScale
 import dev.sam3vision.core.crossing.PedLightColor
+import dev.sam3vision.core.exposure.ClipStats
+import dev.sam3vision.core.exposure.Clipping
 import kotlin.math.roundToInt
 
 /**
  * Pixels d'un feu cadré, prêts pour
  * [dev.sam3vision.core.crossing.PedLightColor] : [width] × [height], ARGB
- * 32 bits, ligne majeure.
+ * 32 bits, ligne majeure. [clip] est l'écrêtage mesuré **sur ces mêmes pixels**
+ * (voir [Clipping]) : il distingue « feu éteint » de « lampe blanche par
+ * surexposition », sans décodage ni passe supplémentaire.
  */
-data class CrossingFrame(val width: Int, val height: Int, val argb: IntArray)
+data class CrossingFrame(
+    val width: Int,
+    val height: Int,
+    val argb: IntArray,
+    /** Écrêtage du crop, [ClipStats.NONE] quand il n'a pas été mesuré (faux des tests). */
+    val clip: ClipStats = ClipStats.NONE,
+)
 
 /**
  * Extracteur de pixels du mode Traversée : décode la frame JPEG envoyée à SAM
@@ -22,7 +33,7 @@ data class CrossingFrame(val width: Int, val height: Int, val argb: IntArray)
 object CrossingPixels {
 
     /** Plus grand côté du crop classifié (96 px depuis le 31/10 : la lampe y garde sa forme). */
-    const val MAX_EDGE = 96
+    const val MAX_EDGE = CrossingCropScale.MAX_EDGE
 
     /**
      * Seuil de recentrage : tant que le centroïde lampe reste dans
@@ -52,6 +63,12 @@ object CrossingPixels {
      * Crop [normBox] de [bitmap], recentré lampe, réduit, pixels ARGB
      * extraits. Coût borné (une passe pixels + un recrop au plus, pas de
      * second décodage), à valider sur appareil.
+     *
+     * Réduction sur le plus grand côté ([CrossingCropScale]) : plafonner chaque
+     * axe séparément transformait 200×100 en 96×96, cassait le rapport
+     * d'aspect et faussait l'élongation/remplissage dont dépend
+     * [dev.sam3vision.core.crossing.PedLightGate] (mesure A4 : 1/7 verts au
+     * lieu de 5/7 sur 9 photos).
      */
     fun crop(bitmap: Bitmap, normBox: List<Float>): CrossingFrame? {
         val w = bitmap.width
@@ -64,15 +81,22 @@ object CrossingPixels {
         val box = recenteredBox(bitmap, left, top, right, bottom)
         val boxWidth = box[2] - box[0]
         val boxHeight = box[3] - box[1]
+        val (cropWidth, cropHeight) = CrossingCropScale.scaledSize(boxWidth, boxHeight)
+        if (cropWidth <= 0 || cropHeight <= 0) return null
         val scaled = Bitmap.createScaledBitmap(
             Bitmap.createBitmap(bitmap, box[0], box[1], boxWidth, boxHeight),
-            MAX_EDGE.coerceAtMost(boxWidth),
-            MAX_EDGE.coerceAtMost(boxHeight),
+            cropWidth,
+            cropHeight,
             false,
         )
         val pixels = IntArray(scaled.width * scaled.height)
         scaled.getPixels(pixels, 0, scaled.width, 0, 0, scaled.width, scaled.height)
-        return CrossingFrame(scaled.width, scaled.height, pixels)
+        return CrossingFrame(
+            scaled.width,
+            scaled.height,
+            pixels,
+            Clipping.stats(pixels, scaled.width, scaled.height),
+        )
     }
 
     /**
