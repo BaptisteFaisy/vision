@@ -4,6 +4,7 @@ import android.content.Context
 import android.os.Bundle
 import android.speech.tts.TextToSpeech
 import android.speech.tts.UtteranceProgressListener
+import dev.sam3vision.app.isee.SpeechLog
 import dev.sam3vision.core.settings.Settings
 import dev.sam3vision.core.speech.SpeechLanguage
 import java.util.Locale
@@ -57,8 +58,17 @@ interface TtsDriver {
  * quand le pilote refuse ou jette. Une phrase acceptée est silencieuse ici :
  * sa fin (`done`, `error` en échec) arrive du pilote Android, sur un fil du
  * moteur — [onEvent] doit donc rester non bloquant.
+ *
+ * Journal voix ([onLog], défaut : puits `ISEE_VOIX`) : `TTS error …` à tout
+ * échec (parole refusée ou jetée avec la phrase, init condamnée avec les
+ * phrases jetées, stop/shutdown tombés) — les morts TTS ne sont plus
+ * invisibles. Ne lève jamais, pas même par le journal.
  */
-class SystemTtsEngine(private val driver: TtsDriver, private val onEvent: (String) -> Unit = {}) {
+class SystemTtsEngine(
+    private val driver: TtsDriver,
+    private val onEvent: (String) -> Unit = {},
+    private val onLog: (String) -> Unit = { line -> runCatching { SpeechLog.sink(SpeechLog.TAG, line) } },
+) {
 
     @Volatile
     private var closed = false
@@ -73,9 +83,13 @@ class SystemTtsEngine(private val driver: TtsDriver, private val onEvent: (Strin
         if (text.isBlank()) return refused("blank")
         val clean = text.trim()
         if (clean.isEmpty()) return false
-        val ok = runCatching { driver.speak(clean, urgent, locale, Settings.clampTtsSpeed(rate), clampPitch(pitch)) }
-            .getOrDefault(false)
-        if (!ok) onEvent("driver-false")
+        val tried = runCatching { driver.speak(clean, urgent, locale, Settings.clampTtsSpeed(rate), clampPitch(pitch)) }
+        val ok = tried.getOrDefault(false)
+        if (!ok) {
+            onEvent("driver-false")
+            val cause = tried.exceptionOrNull()?.let { " cause=[${ttsCause(it)}]" } ?: ""
+            ttsErrorLog(onLog, "speak refuse phrase=[$clean]$cause")
+        }
         return ok
     }
 
@@ -88,7 +102,7 @@ class SystemTtsEngine(private val driver: TtsDriver, private val onEvent: (Strin
     /** Coupe la parole en cours (écran quitté, nouvel ordre). Sans effet si fermé. */
     fun stop() {
         if (closed) return
-        runCatching { driver.stop() }
+        runCatching { driver.stop() }.onFailure { ttsErrorLog(onLog, "stop refuse cause=[${ttsCause(it)}]") }
     }
 
     /**
@@ -98,12 +112,17 @@ class SystemTtsEngine(private val driver: TtsDriver, private val onEvent: (Strin
     fun close() {
         if (closed) return
         closed = true
-        runCatching { driver.shutdown() }
+        runCatching { driver.shutdown() }.onFailure { ttsErrorLog(onLog, "shutdown refuse cause=[${ttsCause(it)}]") }
     }
 
     /** Vrai si une phrase est en cours de lecture (faux si fermé ou en échec). */
     val speaking: Boolean
-        get() = !closed && runCatching { driver.speaking }.getOrDefault(false)
+        get() {
+            if (closed) return false
+            return runCatching { driver.speaking }
+                .onFailure { ttsErrorLog(onLog, "speaking refuse cause=[${ttsCause(it)}]") }
+                .getOrDefault(false)
+        }
 
     companion object {
         /**
@@ -189,13 +208,18 @@ class TtsInitBuffer(private val max: Int = PENDING_MAX) {
  * uniquement sur Android, donc sans test JVM — le tampon ([TtsInitBuffer]),
  * la file et le cycle de vie sont testés dans [SystemTtsEngine] derrière un faux.
  */
-class AndroidTtsDriver(appContext: Context, private val onEvent: (String) -> Unit = {}) : TtsDriver, TextToSpeech.OnInitListener {
+class AndroidTtsDriver(
+    appContext: Context,
+    private val onEvent: (String) -> Unit = {},
+    private val onLog: (String) -> Unit = { line -> runCatching { SpeechLog.sink(SpeechLog.TAG, line) } },
+) : TtsDriver, TextToSpeech.OnInitListener {
 
     private val tts = TextToSpeech(appContext, this)
     private val lock = Any()
 
     init {
-        runCatching { tts.setOnUtteranceProgressListener(TtsTraceListener(onEvent)) }
+        runCatching { tts.setOnUtteranceProgressListener(TtsTraceListener(onEvent, onLog)) }
+            .onFailure { ttsErrorLog(onLog, "listener refuse cause=[${ttsCause(it)}]") }
     }
 
     @Volatile
@@ -213,7 +237,12 @@ class AndroidTtsDriver(appContext: Context, private val onEvent: (String) -> Uni
             if (ok) ready = true else down = true
             backlog = pending.drain()
         }
-        if (ok) backlog.forEach { utter(it.text, it.flush, it.locale, it.rate, it.pitch) }
+        if (!ok) {
+            ttsErrorLog(onLog, "onInit refuse status=$status phrases-jetees=${backlog.size}")
+            return
+        }
+        if (backlog.isNotEmpty()) runCatching { onLog("TTS init rejouées=${backlog.size}") }
+        backlog.forEach { utter(it.text, it.flush, it.locale, it.rate, it.pitch) }
     }
 
     override fun speak(text: String, flush: Boolean, locale: Locale, rate: Float, pitch: Float): Boolean {
@@ -229,29 +258,50 @@ class AndroidTtsDriver(appContext: Context, private val onEvent: (String) -> Uni
 
     override fun stop() {
         synchronized(lock) { pending.clear() }
-        runCatching { tts.stop() }
+        runCatching { tts.stop() }.onFailure { ttsErrorLog(onLog, "stop refuse cause=[${ttsCause(it)}]") }
     }
 
     override fun shutdown() {
         down = true
         synchronized(lock) { pending.clear() }
-        runCatching { tts.stop() }
-        runCatching { tts.shutdown() }
+        runCatching { tts.stop() }.onFailure { ttsErrorLog(onLog, "stop refuse cause=[${ttsCause(it)}]") }
+        runCatching { tts.shutdown() }.onFailure { ttsErrorLog(onLog, "shutdown refuse cause=[${ttsCause(it)}]") }
     }
 
     override val speaking: Boolean
-        get() = !down && runCatching { tts.isSpeaking }.getOrDefault(false)
+        get() {
+            if (down) return false
+            return runCatching { tts.isSpeaking }
+                .onFailure { ttsErrorLog(onLog, "speaking refuse cause=[${ttsCause(it)}]") }
+                .getOrDefault(false)
+        }
 
     /** Parole immédiate : langue + débit + pitch appliqués, puis file ou coupe. */
-    private fun utter(text: String, flush: Boolean, locale: Locale, rate: Float, pitch: Float): Boolean =
-        runCatching {
-            runCatching { tts.language = locale }
-            runCatching { tts.setSpeechRate(Settings.clampTtsSpeed(rate)) }
-            runCatching { tts.setPitch(SystemTtsEngine.clampPitch(pitch)) }
-            val mode = if (flush) TextToSpeech.QUEUE_FLUSH else TextToSpeech.QUEUE_ADD
-            tts.speak(text, mode, Bundle(), UUID.randomUUID().toString()) == TextToSpeech.SUCCESS
-        }.getOrDefault(false)
+    private fun utter(text: String, flush: Boolean, locale: Locale, rate: Float, pitch: Float): Boolean {
+        traced("langue", text) { tts.language = locale }
+        traced("debit", text) { tts.setSpeechRate(Settings.clampTtsSpeed(rate)) }
+        traced("pitch", text) { tts.setPitch(SystemTtsEngine.clampPitch(pitch)) }
+        val mode = if (flush) TextToSpeech.QUEUE_FLUSH else TextToSpeech.QUEUE_ADD
+        val accepted = runCatching { tts.speak(text, mode, Bundle(), UUID.randomUUID().toString()) }
+            .onFailure { ttsErrorLog(onLog, "parole jette phrase=[$text] cause=[${ttsCause(it)}]") }
+            .getOrDefault(TextToSpeech.ERROR)
+        if (accepted != TextToSpeech.SUCCESS) ttsErrorLog(onLog, "parole refusee phrase=[$text] retour=$accepted")
+        return accepted == TextToSpeech.SUCCESS
+    }
+
+    /** Réglage avalé-tracé : l'échec part au journal voix, jamais silencieux. */
+    private inline fun traced(quoi: String, phrase: String, block: () -> Unit) {
+        runCatching(block).onFailure { ttsErrorLog(onLog, "$quoi refuse phrase=[$phrase] cause=[${ttsCause(it)}]") }
+    }
 }
+
+/** Une ligne d'échec TTS vers le journal voix (`TTS error …`). Ne lève jamais. */
+private fun ttsErrorLog(onLog: (String) -> Unit, detail: String) {
+    runCatching { onLog("TTS error $detail") }
+}
+
+/** Cause courte pour le journal : classe + message. */
+private fun ttsCause(t: Throwable): String = "${t.javaClass.simpleName}: ${t.message ?: "?"}"
 
 /**
  * Fins de phrases système vers la trace : `done` jouée jusqu'au bout, `error`
@@ -259,7 +309,10 @@ class AndroidTtsDriver(appContext: Context, private val onEvent: (String) -> Uni
  * le `TraverseUtteranceListener` du rendu hors-ligne, sans corrélation par
  * `utteranceId` (la parole enchaînée n'a pas d'attente à réveiller).
  */
-private class TtsTraceListener(private val onEvent: (String) -> Unit) : UtteranceProgressListener() {
+private class TtsTraceListener(
+    private val onEvent: (String) -> Unit,
+    private val onLog: (String) -> Unit,
+) : UtteranceProgressListener() {
 
     override fun onStart(utteranceId: String) = Unit
 
@@ -269,5 +322,6 @@ private class TtsTraceListener(private val onEvent: (String) -> Unit) : Utteranc
 
     override fun onError(utteranceId: String) {
         onEvent("error")
+        ttsErrorLog(onLog, "utterance id=[$utteranceId]")
     }
 }
