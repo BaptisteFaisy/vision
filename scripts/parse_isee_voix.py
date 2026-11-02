@@ -1,19 +1,25 @@
 #!/usr/bin/env python3
-"""parse_isee_voix.py — EXPECT sans PLAY ni DONE par phrase, sur un dump ISEE_VOIX.
+"""parse_isee_voix.py — orphelins par phrase + verdict COUPE/PROPRE, sur un dump voix.
 
-Entrée : un dump `adb logcat -s ISEE_VOIX` (fichier ou stdin), lignes
-écrites par `SpeechLog` (`app/isee/`, étape 1a) — une ligne par étape
-de vie d'une phrase parlée :
+Entrée : un dump `adb logcat -s ISEE_VOIX,VoiceMute` (fichier ou stdin),
+lignes écrites par `SpeechLog` (`app/isee/`, étape 1a) — une ligne par
+étape de vie d'une phrase parlée :
 
     EXPECT voie=FENCE phrase=[Stop.]
     PLAY source=clip detail=[Stop.]
     DONE phrase=[Stop.]
     FAIL ou=bus cause=[écrasé]
+    PLAYER play | done | stop | cut
+    TTS done | error | driver-false | closed | blank
+    bus-parole level=2 texte=[Stop.] ... (tag VoiceMute)
+    PAROLE JETEE level=2 texte=[Stop.] ... (tag VoiceMute)
 
 Sortie : par phrase, le nombre d'EXPECT, de PLAY, de DONE et d'orphelins
 (EXPECT sans PLAY ni DONE : `max(0, EXPECT - PLAY - DONE)` — un PLAY ou
-un DONE couvre un EXPECT), puis le verdict (`aucun orphelin` par défaut).
-Code 0 si tenu, 1 sinon, 2 si aucun EXPECT (tag filtré ? voix muette ?).
+un DONE couvre un EXPECT), puis le verdict orphelins, puis la section
+coupes et le verdict-coupe (`COUPE` si un son a été interrompu, `PROPRE`
+sinon — les `stop` à vide sont ignorés). Code 0 si tenu et propre,
+1 sinon, 2 si rien de reconnu (tag filtré ? voix muette ?).
 
 Appariement : DONE couvre à phrase égale ; PLAY couvre à détail égal,
 ou quand la phrase est contenue dans le détail (`detail` est la phrase
@@ -21,21 +27,49 @@ jouée, la tolérance couvre un détail verbeux). Les FAIL sont informatifs
 (compteur par lieu, jamais dans le verdict : un raté expliqué reste un
 EXPECT sans PLAY ni DONE).
 
+Coupes : `PLAYER cut` prouve un son interrompu (`SpeechPlayer.stop` ne
+l'émet que sur lecture en vol ou file en attente) ; `stop` sans `cut`
+= stop à vide, ignoré. Seule source TTS : `repli-système` (fin = `TTS
+done`, `error` et refus = fin expliquée) ; `clip` et `synthèse` passent
+par le lecteur (fin = `PLAYER done`). Les deltas demandent l'horodatage
+logcat (`MM-DD HH:MM:SS.mmm`) ; sans lui, l'ordre seul parle (durées
+`?`, ni rafale ni rapprochement temporel).
+
 Usage :
     python3 scripts/parse_isee_voix.py voix.txt
-    adb -s <tel> logcat -d -s ISEE_VOIX | python3 scripts/parse_isee_voix.py
+    adb -s <tel> logcat -d -s ISEE_VOIX,VoiceMute | python3 scripts/parse_isee_voix.py
     python3 scripts/parse_isee_voix.py --selftest
 
 Bibliothèque standard seule ; aucun réseau, aucun fichier temporaire, aucun appareil.
 """
 
+import math
 import re
+import statistics
 import sys
 
 LIGNE_EXPECT = re.compile(r"ISEE_VOIX:\s*EXPECT\s+voie=(\S+)\s+phrase=\[(.*)\]\s*$")
 LIGNE_PLAY = re.compile(r"ISEE_VOIX:\s*PLAY\s+source=(\S+)\s+detail=\[(.*)\]\s*$")
 LIGNE_DONE = re.compile(r"ISEE_VOIX:\s*DONE\s+phrase=\[(.*)\]\s*$")
 LIGNE_FAIL = re.compile(r"ISEE_VOIX:\s*FAIL\s+ou=(\S+)\s+cause=\[(.*)\]\s*$")
+LIGNE_PLAYER = re.compile(r"ISEE_VOIX:\s*PLAYER\s+(\w+)\s*$")
+LIGNE_TTS = re.compile(r"ISEE_VOIX:\s*TTS\s+(\S+)\s*$")
+LIGNE_BUS_PAROLE = re.compile(r"VoiceMute:\s*bus-parole\s+level=(\S+)\s+texte=\[(.*?)\]")
+LIGNE_PAROLE_JETEE = re.compile(r"VoiceMute:\s*PAROLE JETEE\s+level=(\S+)\s+texte=\[(.*?)\]")
+HORODATAGE = re.compile(r"(\d{2})-(\d{2})\s+(\d{2}):(\d{2}):(\d{2})\.(\d{3})")
+
+#: Seule source PLAY parlée par le moteur TTS (fin = `TTS done`).
+SOURCE_TTS = "repli-système"
+#: Cuts consécutifs sous ce délai = une rafale.
+SEUIL_RAFALE_S = 1.0
+#: Deux `bus-parole` même niveau sous ce délai = recoupe à niveau égal.
+SEUIL_RAPPROCHES_S = 2.0
+#: `PAROLE JETEE` sous ce délai après un cut = coupe + silence (M5).
+FENETRE_M5_S = 2.0
+#: Mots d'événement qui portent l'analyse coupe (hors orphelins).
+MOTS_COUPE = frozenset({"PLAYER", "TTS", "BUS-PAROLE", "PAROLE-JETEE"})
+#: Cadences typiques des rafales : 300 ms = mots continus, 1 s = compte, 2 s = verdict.
+SUSPECTS_CADENCE = ((0.3, "mots continus"), (1.0, "compte"), (2.0, "verdict"))
 
 
 def parse_ligne(brute):
@@ -52,6 +86,18 @@ def parse_ligne(brute):
     trouve = LIGNE_FAIL.search(brute)
     if trouve:
         return ("FAIL", trouve.group(1), trouve.group(2))
+    trouve = LIGNE_PLAYER.search(brute)
+    if trouve:
+        return ("PLAYER", trouve.group(1), "")
+    trouve = LIGNE_TTS.search(brute)
+    if trouve:
+        return ("TTS", trouve.group(1), "")
+    trouve = LIGNE_BUS_PAROLE.search(brute)
+    if trouve:
+        return ("BUS-PAROLE", trouve.group(1), trouve.group(2))
+    trouve = LIGNE_PAROLE_JETEE.search(brute)
+    if trouve:
+        return ("PAROLE-JETEE", trouve.group(1), trouve.group(2))
     return None
 
 
@@ -74,8 +120,9 @@ def parse_texte(texte):
             plays.append(second)
         elif mot == "DONE":
             dones.append(second)
-        else:
+        elif mot == "FAIL":
             fails.append(premier)
+        # PLAYER, TTS, BUS-PAROLE, PAROLE-JETEE : analyse coupe, hors orphelins.
     return expects, plays, dones, fails
 
 
@@ -114,6 +161,247 @@ def verdict(expects, plays, dones, fails):
     return lignes, total == 0
 
 
+def horodatage(brute):
+    """Secondes du jour lues sur la ligne (`MM-DD HH:MM:SS.mmm`), ou None."""
+    trouve = HORODATAGE.search(brute)
+    if not trouve:
+        return None
+    heure, minute, seconde, milli = (int(trouve.group(n)) for n in (3, 4, 5, 6))
+    return heure * 3600 + minute * 60 + seconde + milli / 1000
+
+
+def ecart(avant, apres):
+    """`apres - avant` en secondes (wrap minuit), ou None sans horodatage."""
+    if avant is None or apres is None:
+        return None
+    delta = apres - avant
+    return delta + 86400 if delta < 0 else delta
+
+
+def fmt_duree(delta):
+    """`0.42s`, ou `?` sans horodatage."""
+    return f"{delta:.2f}s" if delta is not None else "?"
+
+
+def evenements(texte):
+    """Tous les événements reconnus, dans l'ordre : (ts, mot, champ1, champ2)."""
+    trouves = []
+    for ligne in texte.splitlines():
+        trouve = parse_ligne(ligne)
+        if trouve is not None:
+            trouves.append((horodatage(ligne),) + trouve)
+    return trouves
+
+
+def fini_entre(evs, debut, fin, phrase):
+    """Fin normale entre deux positions : `DONE phrase` ou `PLAYER done`."""
+    for ts, mot, premier, second in evs[debut + 1:fin]:
+        if (mot == "DONE" and second == phrase) or (mot == "PLAYER" and premier == "done"):
+            return True
+    return False
+
+
+def coupe_attribuee(evs, position):
+    """(coupé, remplaçant, parlé-avant, délai) du cut en [position].
+
+    Coupé = PLAY (hors TTS) le plus récent sans fin entre lui et le cut
+    (`""` si fini ou inconnu : chat, intro, hors trace) ; remplaçant =
+    premier PLAY derrière le cut (aucun `PLAYER done` entre, sinon la
+    lecture coupée n'a pas de successeur direct).
+    """
+    plays_avant = [i for i in range(position) if evs[i][1] == "PLAY"]
+    coupe, parle = "", None
+    for i in reversed(plays_avant):
+        if evs[i][2] == SOURCE_TTS:
+            continue
+        if not fini_entre(evs, i, position, evs[i][3]):
+            coupe, parle = evs[i][3], ecart(evs[i][0], evs[position][0])
+        break
+    plays_apres = [i for i in range(position + 1, len(evs)) if evs[i][1] == "PLAY"]
+    remplacant, delai = "", None
+    if plays_apres and not fini_entre(evs, position, plays_apres[0], coupe):
+        suivant = plays_apres[0]
+        remplacant, delai = evs[suivant][3], ecart(evs[position][0], evs[suivant][0])
+    return coupe, remplacant, parle, delai
+
+
+def coupes_player(evs):
+    """(auto-coupes, sèches) : chaque `PLAYER cut` classé par son contexte.
+
+    Cut avec PLAY derrière (sans fin entre) = auto-coupe (couple
+    coupé/remplaçant + deltas) ; sans PLAY derrière = coupe sèche.
+    """
+    autos, seches = [], []
+    for position, (ts, mot, premier, second) in enumerate(evs):
+        if mot != "PLAYER" or premier != "cut":
+            continue
+        coupe, remplacant, parle, delai = coupe_attribuee(evs, position)
+        if remplacant:
+            autos.append((coupe, remplacant, parle, delai))
+        else:
+            seches.append((coupe, parle))
+    return autos, seches
+
+
+def suspect_cadence(mediane):
+    """Suspect le plus proche de la cadence (écart relatif au log)."""
+    return min(SUSPECTS_CADENCE, key=lambda s: abs(math.log(mediane / s[0])))[1]
+
+
+def rafales_coupe(evs):
+    """Groupes de cuts rapprochés : (nombre, cadence médiane, suspect).
+
+    Groupe maximal de cuts consécutifs espacés de moins de
+    [SEUIL_RAFALE_S] (horodatage requis : sans lui, pas de rafale).
+    """
+    horodates = [evs[i][0] for i in range(len(evs))
+                 if evs[i][1] == "PLAYER" and evs[i][2] == "cut" and evs[i][0] is not None]
+    groupes, groupe = [], []
+    for ts in horodates:
+        if groupe and ecart(groupe[-1], ts) >= SEUIL_RAFALE_S:
+            groupes.append(groupe)
+            groupe = []
+        groupe.append(ts)
+    if groupe:
+        groupes.append(groupe)
+    rafales = []
+    for coupe_ts in groupes:
+        if len(coupe_ts) < 2:
+            continue
+        cadence = statistics.median(ecart(a, b) for a, b in zip(coupe_ts, coupe_ts[1:]))
+        rafales.append((len(coupe_ts), cadence, suspect_cadence(cadence)))
+    return rafales
+
+
+def recoups_niveau(evs):
+    """`bus-parole` même niveau re-posté : (niveau, delta, cut-entre).
+
+    Chaque `say()` accepté stoppe le lecteur : deux posts rapprochés du
+    même niveau, c'est la première parole recoupée par la seconde. `cut
+    entre les deux` confirme (sinon la première a pu finir à temps).
+    """
+    posts = [(i, evs[i][0], evs[i][2], evs[i][3]) for i in range(len(evs))
+             if evs[i][1] == "BUS-PAROLE"]
+    recoups = []
+    for (i1, t1, niveau, _), (i2, t2, niveau2, _) in zip(posts, posts[1:]):
+        if niveau != niveau2:
+            continue
+        delta = ecart(t1, t2)
+        if delta is not None and delta >= SEUIL_RAPPROCHES_S:
+            continue
+        coupe = any(evs[i][1] == "PLAYER" and evs[i][2] == "cut" for i in range(i1 + 1, i2))
+        recoups.append((niveau, delta, coupe))
+    return recoups
+
+
+def silences_m5(evs):
+    """`PAROLE JETEE` après un cut : (delta, niveau, texte) — coupe + silence.
+
+    Le cut a tué le son en vol, la remplaçante ne dit rien (clip +
+    synthèse KO) : le pire cas (M5). Fenêtre [FENETRE_M5_S] avec
+    horodatage, sinon aucun PLAY entre le cut et le jet.
+    """
+    jets = [(i, evs[i][0], evs[i][2], evs[i][3]) for i in range(len(evs))
+            if evs[i][1] == "PAROLE-JETEE"]
+    cuts = [(i, evs[i][0]) for i in range(len(evs))
+            if evs[i][1] == "PLAYER" and evs[i][2] == "cut"]
+    coupes = []
+    for j, tj, niveau, texte in jets:
+        avants = [(i, t) for i, t in cuts if i < j]
+        if not avants:
+            continue
+        i, t = avants[-1]
+        delta = ecart(t, tj)
+        if delta is not None:
+            if delta <= FENETRE_M5_S:
+                coupes.append((delta, niveau, texte))
+        elif not any(evs[k][1] == "PLAY" for k in range(i + 1, j)):
+            coupes.append((None, niveau, texte))
+    return coupes
+
+
+def coupes_tts(evs):
+    """Phrases TTS annoncées sans `TTS done` avant la suivante : (avant, après).
+
+    Seule `source=repli-système` parle via le moteur TTS ; `done`, `error`
+    et les refus (`driver-false`, `closed`, `blank`) closent l'attente —
+    limite connue : le canal TTS est partagé (repli + navigation), un
+    `done` de l'autre voix peut clore à tort.
+    """
+    en_vol, coupes = None, []
+    for ts, mot, premier, second in evs:
+        if mot == "PLAY" and premier == SOURCE_TTS:
+            if en_vol is not None:
+                coupes.append((en_vol, second))
+            en_vol = second
+        elif mot == "TTS":
+            en_vol = None
+    return coupes
+
+
+def lignes_autos(autos):
+    """Une ligne par auto-coupe : couple coupé/remplaçant + deltas."""
+    lignes = []
+    for coupe, remplacant, parle, delai in autos:
+        lignes.append(f"auto-coupe [{coupe or '?'}] → [{remplacant}] "
+                      f"(parlait depuis {fmt_duree(parle)}, remplaçant +{fmt_duree(delai)})")
+    return lignes
+
+
+def lignes_motifs(seches, rafales, recoups, silences, tts):
+    """Une ligne par motif secondaire (sèches, rafales, recoups, M5, TTS)."""
+    lignes = []
+    for coupe, parle in seches:
+        lignes.append(f"coupe sèche [{coupe or '?'}] (parlait depuis {fmt_duree(parle)})")
+    for nombre, cadence, suspect in rafales:
+        lignes.append(f"rafale : {nombre} cut(s), cadence {cadence:.2f}s → suspect {suspect}")
+    for niveau, delta, coupe in recoups:
+        confirme = "cut entre les deux" if coupe else "sans cut entre"
+        lignes.append(f"recoupe niveau {niveau} (+{fmt_duree(delta)}, {confirme})")
+    for delta, niveau, texte in silences:
+        lignes.append(f"coupe+silence M5 : PAROLE JETEE level={niveau} [{texte}] "
+                      f"+{fmt_duree(delta)} après cut")
+    for avant, apres in tts:
+        lignes.append(f"coupe-TTS probable : [{avant}] sans TTS done avant [{apres}]")
+    return lignes
+
+
+def verdict_coupe(evs):
+    """(lignes, propre) : section coupes + verdict binaire COUPE/PROPRE.
+
+    COUPE dès qu'un son a été interrompu (auto-coupe, sèche, M5, TTS) ;
+    PROPRE sinon — `stop` à vide ignorés, recoups seules informatives
+    (un re-post sans cut n'a rien interrompu).
+    """
+    autos, seches = coupes_player(evs)
+    rafales = rafales_coupe(evs)
+    recoups = recoups_niveau(evs)
+    silences = silences_m5(evs)
+    tts = coupes_tts(evs)
+    stops = sum(1 for e in evs if e[1] == "PLAYER" and e[2] == "stop")
+    cuts = len(autos) + len(seches)
+    lignes = []
+    if cuts or stops or any(e[1] in MOTS_COUPE for e in evs):
+        lignes.append(f"coupes : {len(autos)} auto-coupe(s), {len(seches)} sèche(s), "
+                      f"{max(0, stops - cuts)} stop(s) à vide ignoré(s)")
+    else:
+        lignes.append("coupes : aucune trace PLAYER/TTS/VoiceMute")
+    lignes += lignes_autos(autos)
+    lignes += lignes_motifs(seches, rafales, recoups, silences, tts)
+    motifs = [("auto-coupe", len(autos)), ("coupe-sèche", len(seches)),
+              ("rafale", len(rafales)), ("recoupe-niveau", len(recoups)),
+              ("coupe+silence-M5", len(silences)), ("coupe-TTS", len(tts))]
+    dus = sorted(((nom, n) for nom, n in motifs if n), key=lambda m: (-m[1], m[0]))
+    propre = not autos and not seches and not silences and not tts
+    if propre:
+        lignes.append(f"verdict-coupe : PROPRE (0 cut avec son interrompu ; "
+                      f"{max(0, stops - cuts)} stop(s) à vide ignoré(s))")
+    else:
+        lignes.append(f"verdict-coupe : COUPE ({len(autos)} auto-coupe(s) ; top : " +
+                      ", ".join(f"{nom}×{n}" for nom, n in dus[:3]) + ")")
+    return lignes, propre
+
+
 def lit_entree(chemin):
     """Contenu du dump : fichier UTF-8, ou stdin quand aucun chemin n'est donné."""
     if chemin is None:
@@ -123,31 +411,9 @@ def lit_entree(chemin):
 
 
 def selftest():
-    """Cycle complet, orphelin, détail verbeux, bruit : 0 si tout passe, 1 sinon."""
-    tenu = """I ISEE_VOIX: EXPECT voie=FENCE phrase=[Stop.]
-I ISEE_VOIX: PLAY source=clip detail=[Stop.]
-I ISEE_VOIX: DONE phrase=[Stop.]
-I sam3vision: bruit hors tag
-ISEE_VOIX: EXPECT voie=repli phrase=[Gauche.]
-ISEE_VOIX: PLAY source=synthèse detail=[joue : Gauche.]
-ISEE_VOIX: FAIL ou=bus cause=[écrasé]
-"""
-    expects, plays, dones, fails = parse_texte(tenu)
-    assert expects == ["Stop.", "Gauche."], expects
-    assert plays == ["Stop.", "joue : Gauche."], plays
-    assert dones == ["Stop."], dones
-    assert fails == ["bus"], fails
-    assert couvre_play("Gauche.", plays) == 1
-    assert couvre_play("absente.", plays) == 0
-    lignes, ok = verdict(expects, plays, dones, fails)
-    assert ok, lignes
-    perdu = "ISEE_VOIX: EXPECT voie=FENCE phrase=[Stop.]\n"
-    lignes, ok = verdict(*parse_texte(perdu)[:3], [])
-    assert not ok and "1 orphelin(s)" in lignes[-1], lignes
-    assert orphelins_par_phrase(["a", "a"], ["a"], []) == [("a", 2, 1, 0, 1)]
-    assert parse_ligne("ISEE_VOIX: EXPECT voie=FENCE") is None
-    print("selftest voix : 10 assertions OK")
-    return 0
+    """Délègue à parse_isee_voix_selftest (limite maison < 500 lignes)."""
+    import parse_isee_voix_selftest
+    return parse_isee_voix_selftest.selftest()
 
 
 def main(argv):
@@ -161,13 +427,17 @@ def main(argv):
     if chemin is None and sys.stdin.isatty():
         print("usage : parse_isee_voix.py [fichier] | --selftest", file=sys.stderr)
         return 2
-    expects, plays, dones, fails = parse_texte(lit_entree(chemin))
-    if not expects:
-        print("aucun EXPECT ISEE_VOIX (tag filtré ? voix muette ?)", file=sys.stderr)
+    texte = lit_entree(chemin)
+    expects, plays, dones, fails = parse_texte(texte)
+    evs = evenements(texte)
+    if not expects and not any(e[1] in MOTS_COUPE for e in evs):
+        print("aucun EXPECT ni trace coupe ISEE_VOIX/VoiceMute (tag filtré ? voix muette ?)",
+              file=sys.stderr)
         return 2
-    lignes, ok = verdict(expects, plays, dones, fails)
-    print("\n".join(lignes))
-    return 0 if ok else 1
+    lignes, ok = verdict(expects, plays, dones, fails) if expects else ([], True)
+    coupe_lignes, propre = verdict_coupe(evs)
+    print("\n".join(lignes + coupe_lignes))
+    return 0 if ok and propre else 1
 
 
 if __name__ == "__main__":
