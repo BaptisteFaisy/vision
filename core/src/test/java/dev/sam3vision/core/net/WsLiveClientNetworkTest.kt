@@ -67,4 +67,24 @@ class WsLiveClientNetworkTest {
             assertTrue(health.wsBinary)
         }
     }
+
+    @Test
+    fun `le cancel one-way porte l id de la frame abandonnee`() {
+        assertEquals("""{"id":7,"cancel":true}""", cancelMessage(7))
+    }
+
+    @Test
+    fun `le timeout envoie le cancel de la frame avant de rouvrir`() = runBlocking {
+        val transport = ContractWsTransport()
+        val client = WsLiveClient(base, transport, timeoutMs = 100, http = RecordingLiveClient(), binaryWs = false)
+
+        val failure = client.live("QQ==", listOf("person"), 640, 4).exceptionOrNull()
+
+        assertTrue("attendu Timeout, obtenu $failure", failure is ApiError.Timeout)
+        assertEquals(listOf("frame", "cancel"), transport.sent.map { if ("\"cancel\"" in it) "cancel" else "frame" })
+        val cancel = JSONObject(transport.sent.last())
+        assertEquals(1, cancel.getInt("id"))
+        assertTrue(cancel.getBoolean("cancel"))
+        client.close()
+    }
 }

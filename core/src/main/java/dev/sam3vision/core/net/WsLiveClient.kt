@@ -196,7 +196,7 @@ class WsLiveClient(
             return Result.failure(ApiError.Network("WebSocket /live/ws: send refused"))
         }
         return try {
-            awaitReply(reply, gen)
+            awaitReply(id, reply, gen)
         } finally {
             synchronized(lock) { pending.remove(id) }
         }
@@ -385,12 +385,14 @@ class WsLiveClient(
         waiting.forEach { frame -> frame.reply.completeExceptionally(failure) }
     }
 
-    private suspend fun awaitReply(reply: CompletableDeferred<String>, gen: Int): Result<String> {
+    private suspend fun awaitReply(id: Int, reply: CompletableDeferred<String>, gen: Int): Result<String> {
         // Budget lu à chaque frame : la bascule chaud (FIX-18) le fait retomber sans rouvrir.
         val budget = synchronized(lock) { timeoutMs }
         return try {
             val raw = withTimeoutOrNull(budget) { reply.await() }
             if (raw == null) {
+                // Le serveur annule l'inférence abandonnée (one-way, sans réponse).
+                runCatching { transport.send(cancelMessage(id)) }
                 dropDeadSocket(gen)
                 Result.failure(ApiError.Timeout())
             } else Result.success(raw)
@@ -432,3 +434,9 @@ class WsLiveClient(
         const val ERROR_MARK = "\"error\""
     }
 }
+
+/**
+ * Annulation one-way (FIX-8) : au timeout, le client prévient — le serveur annule
+ * l'inférence abandonnée **sans répondre**, et le GPU passe à la frame suivante.
+ */
+internal fun cancelMessage(id: Int): String = "{\"id\":$id,\"cancel\":true}"
