@@ -185,7 +185,7 @@ class IseeSwipeOrdersTest {
     }
 
     @Test
-    fun `destination blanche : « Say again. » et rien n'est envoye`() = runTest {
+    fun `destination blanche, « Say again » et rien n'est envoye`() = runTest {
         val listening = FakeListening(text = "  ", finishBlank = true)
         val orders = swipe(listening)
 
@@ -200,7 +200,7 @@ class IseeSwipeOrdersTest {
     }
 
     @Test
-    fun `relachement sans maintien : aucun envoi`() = runTest {
+    fun `relachement sans maintien, aucun envoi`() = runTest {
         val listening = FakeListening(text = "gare de Lyon")
         val orders = swipe(listening)
 
@@ -213,7 +213,7 @@ class IseeSwipeOrdersTest {
     }
 
     @Test
-    fun `destination, micro indisponible : motif pose et pas d'ecoute`() = runTest {
+    fun `destination, micro indisponible, motif pose et pas d'ecoute`() = runTest {
         val listening = FakeListening(available = false)
         val orders = swipe(listening)
 
