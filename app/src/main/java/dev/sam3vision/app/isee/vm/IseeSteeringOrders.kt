@@ -2,6 +2,7 @@ package dev.sam3vision.app.isee.vm
 
 import dev.sam3vision.app.isee.CrossingLateralWatch
 import dev.sam3vision.app.isee.IseeUiState
+import dev.sam3vision.app.isee.IseeViewModel
 import dev.sam3vision.app.isee.LiveProbe
 import dev.sam3vision.app.isee.setCrossingActive
 import dev.sam3vision.core.crossing.CrossingGuidance
@@ -94,3 +95,10 @@ private fun liveAhead(): CrossingAhead? {
     val centerX = patch?.centerX ?: return null
     return CrossingAhead(centerX, patch.meters)
 }
+
+/**
+ * Balayage vers le haut : même bascule Traversée que la puce (voix traversée ou retour).
+ * Extension hors [IseeViewModel] (limite 500 lignes) : [IseeViewModel.modeChips] est public,
+ * l'appelant garde la même syntaxe (`isee::onSwipeUp`, un import en plus).
+ */
+fun IseeViewModel.onSwipeUp() = modeChips.toggleCrossing()
