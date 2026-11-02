@@ -3,6 +3,25 @@
 Le journal part du 2026-10-26 après 19 h : le commit de départ, puis une entrée par fait
 livré et ses preuves (tâche, fichiers, chiffres) dans l'arbre.
 
+## 2026-11-02 — iSee : le décalage des humains parle avec de la distance (branche `decalage-humains-distance`)
+
+- **Demande** : « il prend pas assez de distance pour se décaler des humains,
+  actuellement il fonce quasiment dessus ».
+- **Cause** : (1) `PersonTracker` appariait à porte de distance fixe (1,2 m) —
+  à 0,65 s entre deux décisions, un face-à-face (2,8 m/s) ferme 1,8 m et
+  reprenait un nouvel id à chaque frame, sans fermeture : pas de TTC, le
+  décalage ne parlait qu'à 1,5 m ; (2) ce repli de 1,5 m valait aussi pour les
+  humains au mouvement inconnu — à 2,8 m/s de fermeture, 1,5 m c'est le contact.
+- **Fait** (`:core`) : la porte de distance suit le temps écoulé
+  (`MAX_CLOSING_MPS` 3,5 m/s, plancher 1,2 m — le croisement se départage comme
+  avant) ; un humain au mouvement inconnu conseille dès `PERSON_CLOSE_METERS`
+  (3 m), l'humain au mouvement connu et les objets gardent 1,5 m. Mêmes côtés
+  conseillés qu'avant, dits plus tôt (mot SAM du décalage devant la voix
+  TwinLite du couloir).
+- **Preuve** : `:core` 3 253 tests, `:app` 1 900 tests, 0 échec ;
+  `check-kotlin-limits.py` OK. Nouveaux : `LateralNudgePersonTest` (4),
+  face-à-face + bond impossible (`PersonTrackTest`).
+
 ## 2026-11-02 — iSee : annonces des marches incoupables, niveau 0 et Traversée attendent (branche `fix/isee-marches-incoupables`)
 
 - **Demande** : l'annonce des marches dans un escalier (« Escalier montant. »,
