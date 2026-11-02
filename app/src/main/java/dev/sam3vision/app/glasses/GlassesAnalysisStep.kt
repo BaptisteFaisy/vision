@@ -1,5 +1,6 @@
 package dev.sam3vision.app.glasses
 
+import android.os.SystemClock
 import dev.sam3vision.core.model.Analysis
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
@@ -31,23 +32,40 @@ sealed interface FrameOutcome {
 class GlassesAnalysisStep(
     private val analyze: suspend (String) -> Result<Analysis>,
     private val say: suspend (String) -> String? = { null },
+    /** Horloge ms monotone (analyse + voix) ; injectable en test. */
+    private val clockMs: () -> Long = { SystemClock.elapsedRealtime() },
 ) {
 
     /**
      * Analyse [frame] hors du main et annonce la description. Aucune exception ne
      * remonte : un échec réseau devient [FrameOutcome.Muet] avec un message court.
+     * Chaque passage journalise son E2E (`analyse`, `say`, `total`) via [log].
      */
     suspend fun onFrame(frame: JpegFrame, log: (String) -> Unit): FrameOutcome {
         log("frame ${frame.width}x${frame.height} — ${frame.base64.length / 1024} KB base64")
+        val startMs = clockMs()
         val outcome = withContext(Dispatchers.IO) { analyze(frame.base64) }
+        val analyzedMs = clockMs()
         val analysis = outcome.getOrNull()
         if (analysis == null || analysis.description.isBlank()) {
+            log(glassesE2eLine(analyzedMs - startMs, -1L, analyzedMs - startMs))
             return FrameOutcome.Muet(logCause(outcome.exceptionOrNull(), log))
         }
         log("objects: ${analysis.objects.map { it.label }.distinct().take(6)}")
         say(analysis.description)?.let { log("voice: $it") }
+        val saidMs = clockMs()
+        log(glassesE2eLine(analyzedMs - startMs, saidMs - analyzedMs, saidMs - startMs))
         return FrameOutcome.Dit(analysis.description)
     }
+}
+
+/**
+ * Ligne E2E du chemin lunettes → SAM → voix : « glasses-e2e analyse 812 ms ·
+ * say 3 ms · total 815 ms » (`say —` quand rien n'est dit). Pure, testée en JVM.
+ */
+internal fun glassesE2eLine(analyseMs: Long, sayMs: Long, totalMs: Long): String {
+    val say = if (sayMs >= 0L) "$sayMs ms" else "—"
+    return "glasses-e2e analyse $analyseMs ms · say $say · total $totalMs ms"
 }
 
 /**
