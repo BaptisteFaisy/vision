@@ -223,6 +223,17 @@ class WsLiveClient(
     /** Budget courant, exposé aux tests : la preuve de la décroissance froid → normal. */
     internal val currentTimeoutMs: Long get() = synchronized(lock) { timeoutMs }
 
+    /**
+     * Jambe imposée par le bit `ws_binary` du `/health` (FIX-4) : le serveur annonce
+     * s'il lit le binaire M1, sans aller-retour de sonde. `false` = JSON direct.
+     */
+    fun useBinaryWs(binary: Boolean) {
+        synchronized(lock) {
+            binaryRefused = !binary
+            if (legNoted) onBinaryChange?.invoke(binaryWs && !binaryRefused)
+        }
+    }
+
     /** Le WebSocket ne sert pas au health : un seul appel `/health`, celui du client HTTP. */
     override suspend fun health(): Result<LiveHealth> = http.health()
 

@@ -116,4 +116,9 @@ data class LiveHealth(
     val model: String,
     val device: String,
     val gpu: String,
+    /**
+     * Le serveur lit-il les trames WS binaires M1 (FIX-4) ? Absent = `true` (ancien
+     * serveur : on tente le binaire, repli JSON à la sonde `id: -1` comme avant).
+     */
+    val wsBinary: Boolean = true,
 )
