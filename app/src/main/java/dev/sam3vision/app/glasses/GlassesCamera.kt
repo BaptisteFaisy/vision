@@ -23,6 +23,17 @@ import kotlinx.coroutines.launch
 /** Journal de la chaîne lunettes (recette : `logcat -s GlassesChain`). */
 private const val TAG = "GlassesChain"
 
+/**
+ * Raison du refus de photo (`null` = autorisée) : flux arrêté d'abord, direct
+ * ensuite — `capturePhoto` + décodage HEIC disputeraient la radio au H.265 du
+ * chemin chaud (1 RT radio + dizaines de ms évités). Pure, testée en JVM.
+ */
+internal fun photoRefusal(hasStream: Boolean, live: Boolean): GlassesMessage? = when {
+    !hasStream -> GlassesMessages.streamStopped()
+    live -> GlassesMessages.photoDuringLive()
+    else -> null
+}
+
 /** Un essai de cadence refusé : le refus SDK et sa phrase, pour le verdict final. */
 private data class RateRefusal(val error: DeviceSessionError?, val reason: String)
 
@@ -212,11 +223,14 @@ internal class GlassesCamera(
     }
 
     /**
-     * Photo des lunettes ; `null` si le flux est arrêté ou si la capture échoue — et dans
-     * ce cas l'utilisateur l'apprend : un `null` muet laissait l'app sans photo et sans
-     * explication (flux arrêté, photo HEIC non décodable).
+     * Photo des lunettes ; `null` si le flux est arrêté, si le direct tourne ou
+     * si la capture échoue — et dans ce cas l'utilisateur l'apprend : un `null`
+     * muet laissait l'app sans photo et sans explication (flux arrêté, direct
+     * en cours, photo HEIC non décodable).
      */
     suspend fun capture(): Bitmap? {
+        photoRefusal(stream != null, GlassesVideoLink.live.value)?.let { return fail(it) }
+        // Garde de course : le flux a pu s'arrêter entre le verdict et sa lecture.
         val active = stream ?: return fail(GlassesMessages.streamStopped())
         return active.capturePhoto().fold(
             onSuccess = { data -> data.toBitmapOrNull() ?: fail(GlassesMessages.photoUndecodable()) },
