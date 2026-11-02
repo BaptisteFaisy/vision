@@ -11,7 +11,7 @@ import java.io.File
 
 /**
  * [SpeechPlayer] vu comme [ClipSink] : lecture simple (fin au rappel),
- * tranche 350 ms ([playSlice], verdicts exceptés — dits entiers) ou tranche
+ * tranche 700 ms ([playSlice], verdicts exceptés — dits entiers) ou tranche
  * en file (fin rendue, sans rappel — sans libération du bus entre tranches).
  */
 internal class SpeechPlayerClipSink(private val player: SpeechPlayer) : ClipSink {

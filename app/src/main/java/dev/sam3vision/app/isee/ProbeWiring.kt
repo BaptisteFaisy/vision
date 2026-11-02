@@ -187,7 +187,7 @@ internal fun LiveProbe.observeSpoken(
 
 /**
  * Guetteur grillage de la sonde (SPEC v4, niveau 4) : les pans suivis lus
- * dans l'état, postés au bus avec le niveau et la clé du signalement, et rapportés au battement 350 ms ([VoiceTick]).
+ * dans l'état, postés au bus avec le niveau et la clé du signalement, et rapportés au battement 700 ms ([VoiceTick]).
  * Coupé en mode Traversée (le verdict y est propriétaire du son).
  */
 internal fun LiveProbe.observeFenceOpening(
@@ -351,7 +351,7 @@ internal fun LiveProbe.phraseOf(
 /**
  * Guetteur trottoir-nommé de la sonde (SPEC v4, niveau 10) : la position lue
  * dans la voix guidée (rien dans l'état ne porte le plan du trottoir, non
- * mesuré), postée au bus avec le niveau et la clé du signalement, et au battement 350 ms ([VoiceTick]). Coupé en
+ * mesuré), postée au bus avec le niveau et la clé du signalement, et au battement 700 ms ([VoiceTick]). Coupé en
  * mode Traversée (le verdict y est propriétaire du son).
  */
 internal fun LiveProbe.observeSidewalk(
@@ -407,7 +407,7 @@ internal class ProbeHazards(
  * Les sept guetteurs en un appel : le ViewModel n'y tient qu'une ligne
  * (plafond 500 — voir `observeSpoken`, même contrat). Véhicules, bordure et
  * mobilier partagent le guetteur obstacles (une frame, un seul gagnant au
- * bus). Tous postent au bus ([VoiceBus]) : plus de voix directe ici. Le battement voix 350 ms ([observeVoiceTick]) démarre avec eux.
+ * bus). Tous postent au bus ([VoiceBus]) : plus de voix directe ici. Le battement voix 700 ms ([observeVoiceTick]) démarre avec eux.
  */
 internal fun LiveProbe.observeHazards(
     scope: CoroutineScope,

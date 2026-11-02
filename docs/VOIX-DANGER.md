@@ -262,11 +262,11 @@ par fenêtre), `ProbeHazardsTest` (silence à 499 ms) et
 Recette téléphone : escalier nommé → « N marches. » puis répétition
 toutes les 0,5 s — **non mesuré**, exige un APK sur appareil réel.
 
-## 38. Battement voix 350 ms : la priorité du moment, toutes les 350 ms (ordre user du 01/11)
+## 38. Battement voix 700 ms : la priorité du moment, toutes les 700 ms (ordre user du 01/11)
 
-Le user veut une voix qui parle toutes les 350 ms pour dire la chose
+Le user veut une voix qui parle toutes les 700 ms pour dire la chose
 la plus prioritaire du moment. Nouveau contrat : les producteurs
-continus rapportent leur vœu courant, et un battement toutes les 350 ms
+continus rapportent leur vœu courant, et un battement toutes les 700 ms
 propose le plus prioritaire au bus — l'écrasé n'est plus perdu dans sa
 fenêtre de fraîcheur, il est re-proposé au battement suivant.
 
@@ -276,7 +276,7 @@ fenêtre de fraîcheur, il est re-proposé au battement suivant.
   (la première détection parle sans attendre le battement) ;
 - **battement** (`observeVoiceTick`, démarré par `observeHazards`,
   coupé en Traversée — le verdict y est propriétaire du son) : toutes
-  les 350 ms (`TICK_MS`), le plus petit niveau frais est proposé via
+  les 700 ms (`TICK_MS`), le plus petit niveau frais est proposé via
   `offer` (antirépétition puis bus) — ex æquo au plus récent ;
 - **anti-bégaiement** : le même (niveau, texte) ne repart pas avant 1 s
   (`SAME_MS` — les clés sans antirépétition n'ont pas d'autre borne) ;
@@ -289,22 +289,22 @@ fenêtre de fraîcheur, il est re-proposé au battement suivant.
   un double chemin bégayerait le mot).
 
 Verrouillé par `VoiceTickTest` (8 : ordre, ex æquo, fraîcheur, offre
-au bus, anti-bégaiement 1 s, retentative après refus, boucle 350 ms
+au bus, anti-bégaiement 1 s, retentative après refus, boucle 700 ms
 au temps virtuel + silence en Traversée). `check-kotlin-limits.py`
 vert, suite `:app` isee 775 tests verts.
 
 Recette téléphone : alerte écrasée par une parole plus prioritaire →
-re-dite au battement suivant (≤ 350 ms après le silence) — **non
+re-dite au battement suivant (≤ 700 ms après le silence) — **non
 mesuré**, exige un APK sur appareil réel.
 
-## 39. Tranche 350 ms : chaque phrase tient dans un tick (ordre user du 01/11)
+## 39. Tranche 700 ms : chaque phrase tient dans un tick (ordre user du 01/11)
 
-Un tick, une phrase : toute parole du bus tient dans 350 ms, dehors comme
+Un tick, une phrase : toute parole du bus tient dans 700 ms, dehors comme
 dedans (même battement, chaîne du mode courant — §3 dedans, §1 dehors).
 Deux leviers :
 
 - **vitesse adaptative** (`sliceRateFor`, pitch conservé) : chaque clip et
-  chaque synthèse GPS/confirmation joue à `max(réglage, durée/350)`
+  chaque synthèse GPS/confirmation joue à `max(réglage, durée/700)`
   plafonné à ×3 (`MAX_SLICE_RATE`) — au-delà, la phrase dépasse ;
   un refus plateforme rejoue à ×1,9 (prior à valider oreille et appareil) ;
 - **formes minimales** (~15 caractères) : manœuvres GPS (`Turn left.`,

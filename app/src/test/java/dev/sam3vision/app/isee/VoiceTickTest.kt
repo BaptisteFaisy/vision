@@ -30,7 +30,7 @@ private class TickFakeSpeaker : VoiceBusSpeaker {
 }
 
 /**
- * Battement vocal 350 ms : les producteurs continus rapportent leur vœu
+ * Battement vocal 700 ms : les producteurs continus rapportent leur vœu
  * courant, le battement propose le plus prioritaire au bus — une fois par
  * fenêtre d'antirépétition, jamais deux fois le même dans la seconde, et
  * silence en Traversée (le verdict y est propriétaire du son).
@@ -56,8 +56,8 @@ class VoiceTickTest {
     }
 
     @Test
-    fun `battement 350 ms`() {
-        assertEquals(350L, VoiceTick.TICK_MS)
+    fun `battement 700 ms`() {
+        assertEquals(700L, VoiceTick.TICK_MS)
     }
 
     @Test
@@ -127,7 +127,7 @@ class VoiceTickTest {
         VoiceTick.report(VoiceTick.SRC_FENCE, VoiceWish(4, "grillage", "test-voicetick-dedup"), 0L)
 
         assertTrue(VoiceTick.tick(0L) { _, at -> calls += at; true })
-        assertFalse(VoiceTick.tick(350L) { _, at -> calls += at; true })
+        assertFalse(VoiceTick.tick(700L) { _, at -> calls += at; true })
         assertTrue(VoiceTick.tick(1_000L) { _, at -> calls += at; true })
 
         assertEquals(listOf(0L, 1_000L), calls)
@@ -163,7 +163,7 @@ class VoiceTickTest {
     }
 
     @Test
-    fun `boucle propose toutes les 350 ms, tait en traversee`() = runTest {
+    fun `boucle propose toutes les 700 ms, tait en traversee`() = runTest {
         val scope = CoroutineScope(SupervisorJob() + StandardTestDispatcher(testScheduler))
         try {
             val calls = mutableListOf<Long>()
@@ -178,25 +178,25 @@ class VoiceTickTest {
                 offer = { _, at -> calls += at; true },
             )
 
-            advanceTimeBy(350)
+            advanceTimeBy(700)
             runCurrent()
-            assertEquals(listOf(350L), calls)
+            assertEquals(listOf(700L), calls)
 
             // Battement suivant : même vœu dans la seconde → l'offre n'est pas rappelée.
-            advanceTimeBy(350)
+            advanceTimeBy(700)
             runCurrent()
             assertEquals(1, calls.size)
 
             // Vœu plus prioritaire : parlé au battement suivant.
             say(VoiceTick.SRC_FENCE, OutdoorLevel.FENCE, "Passage au milieu.")
-            advanceTimeBy(350)
+            advanceTimeBy(700)
             runCurrent()
             assertEquals(2, calls.size)
 
             // Traversée : silence, même un vœu nouveau.
             crossing = true
             say(VoiceTick.SRC_STAIRS, OutdoorLevel.STAIRS, "Escalier devant.")
-            advanceTimeBy(1_050)
+            advanceTimeBy(2_100)
             runCurrent()
             assertEquals(2, calls.size)
         } finally {

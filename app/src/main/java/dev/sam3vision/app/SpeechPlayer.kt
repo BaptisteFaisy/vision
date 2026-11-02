@@ -14,8 +14,8 @@ import kotlinx.coroutines.withContext
 /** Fin d'une lecture en file : jouée jusqu'au bout, ou coupée par [SpeechPlayer.stop]. */
 enum class PlaybackEnd { Done, Stopped }
 
-/** Tranche voix : chaque parole tient dans 350 ms (ordre user du 01/11 — un tick, une phrase). */
-internal const val VOICE_SLICE_MS = 350L
+/** Tranche voix : chaque parole tient dans 700 ms (ordre user du 01/11 — un tick, une phrase). */
+internal const val VOICE_SLICE_MS = 700L
 
 /** Plafond d'accélération d'une tranche (pitch conservé ; au-delà, refus plateforme possible). */
 internal const val MAX_SLICE_RATE = 3f
@@ -107,7 +107,7 @@ class SpeechPlayer(
      * état lui-même, tranche par tranche.
      */
     /**
-     * Joue un fichier en tranche ([sliceMs], 350 ms voix) : la vitesse monte
+     * Joue un fichier en tranche ([sliceMs], 700 ms voix) : la vitesse monte
      * pour tenir la durée réelle dans la tranche ([sliceRateFor], pitch conservé,
      * plafond [MAX_SLICE_RATE]). Verdicts et chat : hors tranche (entiers).
      */
