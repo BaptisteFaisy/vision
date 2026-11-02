@@ -309,4 +309,18 @@ class TraverseWiringTest {
         assertFalse("feu tricolore" in prompts)
         assertFalse("traffic light" in prompts)
     }
+
+    @Test
+    fun `fond - le facteur reduit au plus petit cote sur 96`() {
+        assertEquals(1, backgroundSampleSize(96, 96))
+        assertEquals(1, backgroundSampleSize(48, 800))
+        assertEquals(3, backgroundSampleSize(320, 320))
+        assertEquals(5, backgroundSampleSize(960, 540))
+    }
+
+    @Test
+    fun `fond - dimensions folles, facteur 1, jamais 0`() {
+        assertEquals(1, backgroundSampleSize(0, 480))
+        assertEquals(1, backgroundSampleSize(-12, 480))
+    }
 }

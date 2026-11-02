@@ -259,12 +259,20 @@ internal const val BACKGROUND_EDGE = 96
 /**
  * Luminance d'une frame JPEG (base64) réduite à [BACKGROUND_EDGE] px, pour la
  * sonde fond V1 (prev/cur comparés par `decide()`). `null` = image illisible.
- * Wrapper plateforme (Bitmap), non testé en JVM comme `CrossingPixels.frame`.
+ * Le JPEG est décodé déjà réduit ([backgroundSampleSize]) : ~25× moins de
+ * pixels qu'en pleine taille pour 96 px utiles. Wrapper plateforme (Bitmap),
+ * non testé en JVM comme `CrossingPixels.frame` — seul le facteur est pur.
  */
 internal fun backgroundOf(jpegB64: String): BackgroundFrame? {
     if (jpegB64.isBlank()) return null
     val bytes = runCatching { Base64.decode(jpegB64, Base64.DEFAULT) }.getOrNull() ?: return null
-    val bitmap = BitmapFactory.decodeByteArray(bytes, 0, bytes.size) ?: return null
+    val bounds = BitmapFactory.Options().apply { inJustDecodeBounds = true }
+    BitmapFactory.decodeByteArray(bytes, 0, bytes.size, bounds)
+    if (bounds.outWidth <= 0 || bounds.outHeight <= 0) return null
+    val options = BitmapFactory.Options().apply {
+        inSampleSize = backgroundSampleSize(bounds.outWidth, bounds.outHeight)
+    }
+    val bitmap = BitmapFactory.decodeByteArray(bytes, 0, bytes.size, options) ?: return null
     if (bitmap.width <= 0 || bitmap.height <= 0) return null
     val scale = BACKGROUND_EDGE.toFloat() / maxOf(bitmap.width, bitmap.height)
     val w = (bitmap.width * scale).roundToInt().coerceAtLeast(1)
@@ -274,6 +282,14 @@ internal fun backgroundOf(jpegB64: String): BackgroundFrame? {
     small.getPixels(argb, 0, w, 0, 0, w, h)
     return BackgroundFrame(w, h, ByteArray(w * h) { i -> lumaOf(argb[i]) })
 }
+
+/**
+ * Facteur de sous-échantillonnage JPEG pour une image [width]×[height] dont on
+ * ne garde que [BACKGROUND_EDGE] px : le décodeur saute les pixels au lieu de
+ * les décoder puis de les jeter au redimensionnement. Pur, testé en JVM.
+ */
+internal fun backgroundSampleSize(width: Int, height: Int): Int =
+    maxOf(1, minOf(width, height) / BACKGROUND_EDGE)
 
 /** Luminance Rec.601 d'un pixel ARGB, 0..255. */
 private fun lumaOf(argb: Int): Byte {
