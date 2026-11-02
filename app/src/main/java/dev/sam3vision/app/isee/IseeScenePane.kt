@@ -20,7 +20,6 @@ import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
-import androidx.compose.runtime.withFrameNanos
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.geometry.Offset
@@ -39,6 +38,7 @@ import dev.sam3vision.core.iseedesign.PortraitGeometry
 import dev.sam3vision.core.iseedesign.SpeechPosition
 import dev.sam3vision.core.iseedesign.portraitGeometry
 import dev.sam3vision.core.iseedesign.voiceEnvelope
+import kotlinx.coroutines.delay
 
 /**
  * L'écran iSee au design « Portrait » : fond blanc, une seule boule de verre au liquide marbré
@@ -184,23 +184,15 @@ internal const val SCENE_LOOP_MS = 600_000L
 internal fun sceneTimeSeconds(startMs: Long, nowMs: Long): Float =
     ((nowMs - startMs) % SCENE_LOOP_MS).toFloat() / 1000f
 
-/**
- * Le temps de la scène en secondes, pour le marbre et la voix (boucle de 10 min).
- * Calé sur la vsync (`withFrameNanos`, un tick par frame affichée au plus) ; gelé
- * quand la scène est sans voix (`amp == 0` : ni écoute ni parole) — le décor ne
- * bouge plus, aucune recompose tant que personne ne parle.
- */
+/** Le temps de la scène en secondes, pour le marbre et la voix (boucle de 10 min). */
 @Composable
-private fun rememberSceneTime(scene: IseeScene): Float {
+private fun rememberSceneTime(): Float {
     var time by remember { mutableStateOf(0f) }
-    val voiceActive = scene == IseeScene.LISTENING || scene == IseeScene.VOICE
-    LaunchedEffect(voiceActive) {
-        if (!voiceActive) return@LaunchedEffect
-        // Reprise en douceur : l'horloge repart du temps figé, sans saut.
-        val start = SystemClock.elapsedRealtime() - (time * 1000f).toLong()
+    LaunchedEffect(Unit) {
+        val start = SystemClock.elapsedRealtime()
         while (true) {
-            withFrameNanos { }
             time = sceneTimeSeconds(start, SystemClock.elapsedRealtime())
+            delay(16)
         }
     }
     return time
@@ -214,7 +206,7 @@ private fun rememberSceneTime(scene: IseeScene): Float {
  */
 @Composable
 private fun OrbClockLayer(scene: IseeScene, geo: PortraitGeometry, open: Float) {
-    OrbLayer(scene, geo, rememberSceneTime(scene), open)
+    OrbLayer(scene, geo, rememberSceneTime(), open)
 }
 
 /** La boule, et la couronne de barres ambre quand iSee parle. */
