@@ -63,6 +63,31 @@ class GlassesFrameCollectorTest {
         onDrop = { drops += it },
     )
 
+    /**
+     * Frames admises par l'étranglement : « frame forwarded » est journalisé
+     * une fois l'admission décidée, avant tout envoi.
+     *
+     * C'est le décompte que le throttle promet (2 frames dues sur 3). [frames],
+     * lui, compte les **livraisons** : une frame admise peut être supplantée
+     * par une plus fraîche avant même que son envoi ait démarré (latest-wins,
+     * `upload?.cancel()`), et ne jamais partir. Compter `frames.size` mêlait
+     * donc deux contrats et rendait ces deux tests instables (~1 passe sur 4 en
+     * échec, toujours « expected:<2> but was:<1> »).
+     */
+    private fun forwarded(): Int = journal.count { it.startsWith("frame forwarded") }
+
+    /** Numérote les frames admises : distingue la plus fraîche des deux. */
+    private var due = 0
+
+    private fun numberedCollector(decoder: FakeDecoder) = GlassesFrameCollector(
+        decoder = decoder,
+        onFrame = { frames += it },
+        onLog = { journal += it },
+        nowMs = { now },
+        encode = { image, _ -> JpegFrame("due-${++due}", image.width, image.height, 1L) },
+        onDrop = { drops += it },
+    )
+
     /** Frame brute 2×2 I420 valide (4 Y + 1 U + 1 V) : le vrai YUV la convertit. */
     private fun rawFrame(): VideoFrame = VideoFrame(
         ByteBuffer.wrap(byteArrayOf(16, 16, 16, 16, -128, -128)),
@@ -88,10 +113,13 @@ class GlassesFrameCollectorTest {
             emit(rawFrame())
         }
 
-        collector(FakeDecoder()).run(video)
+        numberedCollector(FakeDecoder()).run(video)
 
-        assertEquals("2 frames dues sur 3", 2, frames.size)
-        assertTrue(journal.any { it.startsWith("frame forwarded") })
+        assertEquals("2 frames dues sur 3", 2, forwarded())
+        assertEquals("un seul rejet, et c'est l'étranglement", listOf(LinkDrop.THROTTLE), drops)
+        assertTrue("au moins la dernière admise part", frames.isNotEmpty())
+        assertTrue("seules les admises partent", frames.all { it.base64 in setOf("due-1", "due-2") })
+        assertEquals("la plus fraîche des deux admises est celle qui part", "due-2", frames.last().base64)
     }
 
     @Test
@@ -191,10 +219,13 @@ class GlassesFrameCollectorTest {
             emit(rawFrame())
         }
 
-        collector(FakeDecoder()).run(video)
+        numberedCollector(FakeDecoder()).run(video)
 
-        assertEquals("2 frames dues sur 3", 2, frames.size)
+        assertEquals("2 frames dues sur 3", 2, forwarded())
         assertEquals(listOf(LinkDrop.THROTTLE), drops)
+        assertTrue("au moins la dernière admise part", frames.isNotEmpty())
+        assertTrue("seules les admises partent", frames.all { it.base64 in setOf("due-1", "due-2") })
+        assertEquals("la plus fraîche des deux admises est celle qui part", "due-2", frames.last().base64)
     }
 
     @Test
