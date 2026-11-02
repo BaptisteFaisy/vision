@@ -223,6 +223,7 @@ fun AppNav(
         state.dictation.overlay?.let { overlay ->
             DictationOverlay(overlay = overlay, onDismiss = viewModel::dismissOverlay)
         }
+        WhiteTopBar(route)
     }
 }
 
