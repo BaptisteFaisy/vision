@@ -91,6 +91,9 @@ class CrossingVerdictEngine(
     /** Frames de suite sans preuve de verdict (ni vert ni rouge lu) : borne le silence. */
     private var unprovenFrames = 0
 
+    /** [atMs] de la première frame du silence sans preuve courant (`null` = preuve lue). */
+    private var unprovenSinceMs: Long? = null
+
     /** Une boîte de feu a-t-elle été vue depuis le dernier [reset] ? */
     private var sawBox = false
 
@@ -125,7 +128,7 @@ class CrossingVerdictEngine(
         if (read.box != null) sawBox = true
         val light = lightOf(read, evidence)
         val proven = light != CrossingVerdictLight.Unknown
-        if (proven) unprovenFrames = 0 else trackUnproven()
+        trackSilence(proven, atMs)
         val carDetections = frame.objects.toDetections(frame.width, frame.height)
             .filter { CrossingVerdictRule.isCarLabel(it.label) }
         val carReadings = readings.filter { CrossingVerdictRule.isCarLabel(it.label) }
@@ -133,14 +136,9 @@ class CrossingVerdictEngine(
         val moving = cars.movingThisFrame
         val verdict = CrossingVerdictRule.decide(light, moving, carVeto)
         val cue = announcer.onFrame(atMs, verdict)
-        // Rien de lisible (boîte manquante, couleur illisible, vert pas encore
-        // confirmé) : on ne PRONONCE rien. Parler « Don't cross. » sur les deux
-        // premières frames d'un vert ferait entendre « Don't cross. » puis
-        // « Cross. » 100 ms plus tard — pire que le silence. L'overlay et
-        // l'haptique restent au rouge (sûr), la phrase attend une preuve.
-        // Mais le silence est BORNÉ : au-delà de la borne de ré-armement de la
-        // porte (8 frames, 0,7 à 1,6 s) le verdict parle — jamais de silence à vie (D3).
-        val silent = !proven && unprovenFrames < LightEvidenceGate.ABSENT_REARM_FRAMES
+        // Sans preuve on ne PRONONCE rien (pas de « Don't cross. » puis
+        // « Cross. » 100 ms plus tard) — mais le silence est BORNÉ (D3/D4).
+        val silent = isSilent(proven, atMs)
         // Rien n'est prononcé sur une frame muette : la phrase reste DUE et part
         // dès la première frame qui a une preuve (sinon l'annonceur croyait
         // avoir parlé et le silence durait 2 s de plus).
@@ -221,6 +219,43 @@ class CrossingVerdictEngine(
         if (unprovenFrames == LightEvidenceGate.ABSENT_REARM_FRAMES) vote.reset()
     }
 
+    /**
+     * Tient le silence sans preuve : compteur de frames (borne 8, [trackUnproven])
+     * et départ horodaté (borne temps, [unprovenTimedOut]). Toute frame prouvée
+     * remet les deux à zéro.
+     */
+    private fun trackSilence(proven: Boolean, atMs: Long) {
+        if (proven) {
+            unprovenFrames = 0
+            unprovenSinceMs = null
+        } else {
+            if (unprovenSinceMs == null) unprovenSinceMs = atMs
+            trackUnproven()
+        }
+    }
+
+    /**
+     * Vrai si la frame reste muette : pas de preuve, sous la borne 8 frames ET
+     * sous le délai de cadence dégradée. L'overlay et l'haptique restent au
+     * rouge (sûr), la phrase attend une preuve — sans jamais se taire à vie.
+     */
+    private fun isSilent(proven: Boolean, atMs: Long): Boolean =
+        !proven && unprovenFrames < LightEvidenceGate.ABSENT_REARM_FRAMES && !unprovenTimedOut(atMs)
+
+    /**
+     * Silence sans preuve trop long : à cadence nominale (≥ 4 ips) la borne 8
+     * frames parle la première et ce délai ne change rien ; quand le GPU peine
+     * (< 4 ips), le silence est borné à une période de répétition (2 s) au lieu
+     * de s'étirer en secondes (8 frames à 1 ips = 8 s muettes). Le verdict parlé
+     * reste « Don't cross. » (l'inconnu attend, SPEC v4) ; un vert confirmé
+     * ensuite parle « Cross. » aussitôt (changement immédiat, jamais de spam :
+     * la suite suit la cadence normale de l'annonceur).
+     */
+    private fun unprovenTimedOut(atMs: Long): Boolean {
+        val since = unprovenSinceMs ?: return false
+        return atMs - since >= CrossingVerdictAnnouncer.REPEAT_MS
+    }
+
     /** Oublie annonce, suivi voitures et front haptique (nouvelle traversée). */
     fun reset() {
         announcer.reset()
@@ -229,6 +264,7 @@ class CrossingVerdictEngine(
         vote.reset()
         felt = null
         unprovenFrames = 0
+        unprovenSinceMs = null
         sawBox = false
     }
 }
