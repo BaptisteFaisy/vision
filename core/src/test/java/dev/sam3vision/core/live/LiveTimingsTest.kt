@@ -197,6 +197,17 @@ class LiveTimingsTest {
         assertFalse(FrameTimings(decode = decode).known)
     }
 
+    @Test
+    fun `snapshot garde le seq pose, l'explicite gagne`() {
+        val chronology = LiveTimings(FakeClock()::read)
+        chronology.seq = 12L
+        LiveStage.entries.forEach { chronology.mark(it) }
+
+        assertEquals(12L, chronology.snapshot().seq)
+        assertEquals(13L, chronology.snapshot(seq = 13L).seq)
+        assertFalse("un seq seul n'est pas une chronologie", FrameTimings(seq = 12L).known)
+    }
+
     /** Chronologie complète d'une frame, telle que les marques réelles la produisent. */
     private fun fullStages() = FrameTimings(
         captureToJpegMs = 22,

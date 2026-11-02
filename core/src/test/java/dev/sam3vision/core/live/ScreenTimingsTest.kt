@@ -91,6 +91,27 @@ class ScreenTimingsTest {
             decode, screen.snapshot(published).decode)
     }
 
+    @Test
+    fun `seq pose par beginFrame survit au beginFrame suivant`() {
+        at(BASE_MS)
+        screen.beginFrame(BASE_MS * MS, seq = 12L)
+        at(1100); screen.markReceived()
+        val published = screen.publishing()
+        at(1150); screen.markOverlays(published)
+        at(1200); screen.beginFrame(1200 * MS, seq = 13L)
+        assertTrue(screen.noteDrawn())
+
+        val snap = screen.snapshot(screen.snapshot(published, null))
+        assertEquals("la frame dessinée garde son seq, pas celui en cours",
+            12L, snap.seq)
+    }
+
+    @Test
+    fun `sans seq la jointure reste inactive`() {
+        publishFrame()
+        assertEquals(-1L, screen.snapshot().seq)
+    }
+
     private companion object {
         private const val MS = 1_000_000L
         private const val BASE_MS = 1_000L
