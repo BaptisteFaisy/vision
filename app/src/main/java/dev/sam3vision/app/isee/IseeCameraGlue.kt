@@ -130,6 +130,7 @@ private suspend fun bindWithRetry(
             return
         }
         state.failures += 1
+        android.util.Log.e("sam3vision", "isee: bind attempt ${state.failures} failed (host=${host.hashCode()}): $reason")
         state.failure = reason
         viewModel.setCameraActive(false)
         // Borné : `null` = MP4 en cours, ou plafond atteint (le retour au premier
