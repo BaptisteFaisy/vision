@@ -334,4 +334,64 @@ class CrossingVerdictWiringTest {
         assertTrue(second.carMoving)
         assertEquals(CrossingVerdict.DontCross, second.verdict)
     }
+
+    @Test
+    fun `le silence sans preuve est borne a 2s quand les frames rampent`() {
+        // Cadence dégradée (GPU qui peine, ~1 ips) : la borne 8 frames vaudrait
+        // 8 s muettes. Le silence est aussi borné en temps — une période de
+        // répétition — et le verdict parle « Don't cross. » (l'inconnu attend).
+        val script = LightScript()
+        val posted = mutableListOf<CrossingPost>()
+        val engine = scripted(script, posted)
+        val green = CrossingLight(listOf(0.1f, 0.1f, 0.2f, 0.3f), CrossingState.Green)
+        val missing = CrossingLight(null, CrossingState.Red)
+        script.light = green
+        engine.onFrame(frame(), emptyList(), "", 0L)
+        script.light = missing
+        engine.onFrame(frame(), emptyList(), "", 1_000L)
+        assertTrue("silence sous le délai", posted.isEmpty())
+        val out = engine.onFrame(frame(), emptyList(), "", 2_000L)
+        assertEquals(listOf("Don't cross."), posted.map { it.text })
+        assertEquals(CrossingVerdict.DontCross, out.verdict)
+    }
+
+    @Test
+    fun `a cadence nominale la borne 8 frames parle la premiere`() {
+        // 8 frames en 0,7 s (< 2 s) : le délai ne change rien — la borne frames
+        // parle à la 8e frame comme avant, et pas avant.
+        val script = LightScript()
+        val posted = mutableListOf<CrossingPost>()
+        val engine = scripted(script, posted)
+        script.light = CrossingLight(listOf(0.1f, 0.1f, 0.2f, 0.3f), CrossingState.Green)
+        engine.warm(3)
+        assertEquals(listOf("Cross."), posted.map { it.text })
+        posted.clear()
+        script.light = CrossingLight(null, CrossingState.Red)
+        repeat(7) { engine.onFrame(frame(), emptyList(), "", it * 100L) }
+        assertTrue("silence avant la borne", posted.isEmpty())
+        engine.onFrame(frame(), emptyList(), "", 700L)
+        assertEquals(listOf("Don't cross."), posted.map { it.text })
+    }
+
+    @Test
+    fun `apres la borne temps un vert confirme parle cross aussitot`() {
+        // Le « Don't cross. » de la borne temps ne bloque rien : un vert qui
+        // confirme ensuite parle « Cross. » aussitôt (changement immédiat).
+        val script = LightScript()
+        val posted = mutableListOf<CrossingPost>()
+        val engine = scripted(script, posted)
+        val green = CrossingLight(listOf(0.1f, 0.1f, 0.2f, 0.3f), CrossingState.Green)
+        val missing = CrossingLight(null, CrossingState.Red)
+        script.light = green
+        engine.onFrame(frame(), emptyList(), "", 0L)
+        script.light = missing
+        engine.onFrame(frame(), emptyList(), "", 1_000L)
+        engine.onFrame(frame(), emptyList(), "", 2_000L)
+        assertEquals(listOf("Don't cross."), posted.map { it.text })
+        script.light = green
+        engine.onFrame(frame(), emptyList(), "", 3_000L)
+        val out = engine.onFrame(frame(), emptyList(), "", 4_000L)
+        assertEquals(listOf("Don't cross.", "Cross."), posted.map { it.text })
+        assertEquals(CrossingVerdict.Cross, out.verdict)
+    }
 }
