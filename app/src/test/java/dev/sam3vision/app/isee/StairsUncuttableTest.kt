@@ -1,14 +1,7 @@
 package dev.sam3vision.app.isee
 
-import dev.sam3vision.app.DistanceLayer
 import dev.sam3vision.core.crossing.CrossingLevels
-import dev.sam3vision.core.curb.CurbWatcher
-import dev.sam3vision.core.distance.DistanceReading
-import dev.sam3vision.core.hazard.HazardWatcher
 import dev.sam3vision.core.live.AntiRepeat
-import dev.sam3vision.core.speech.SpeechLanguage
-import dev.sam3vision.core.traverse.VehicleStateWatcher
-import kotlinx.coroutines.test.runTest
 import org.junit.After
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
@@ -184,38 +177,4 @@ class StairsUncuttableTest {
         assertEquals(2, speaker.said.size)
     }
 
-    private fun rig(): ObstacleWatchers =
-        ObstacleWatchers(VehicleStateWatcher(), CurbWatcher(), HazardWatcher())
-
-    /** Lecture centrée 640×480 : boîte de [largeur] px à [meters] m. */
-    private fun lecture(label: String, largeur: Float, meters: Float): DistanceReading {
-        val hauteur = largeur * 0.6f
-        return DistanceReading(
-            -1, label, meters, meters,
-            listOf(320f - largeur / 2f, 240f - hauteur / 2f, 320f + largeur / 2f, 240f + hauteur / 2f),
-        )
-    }
-
-    private fun etat(frames: Int, reading: DistanceReading) = LiveProbeState(
-        frames = frames, width = 640, height = 480,
-        distanceLayer = DistanceLayer(640, 480, listOf(reading)),
-    )
-
-    @Test
-    fun `voiture tue pendant les escaliers sans consommer son tour`() = runTest {
-        VoiceBus.post(OutdoorLevel.STAIRS, "Escalier montant.")
-        val guetteurs = rig()
-        val t0 = System.currentTimeMillis()
-
-        obstacleFrame(etat(1, lecture("car", 100f, 8f)), { SpeechLanguage.Fr }, guetteurs)
-        obstacleFrame(etat(2, lecture("car", 120f, 7f)), { SpeechLanguage.Fr }, guetteurs)
-        obstacleFrame(etat(3, lecture("car", 145f, 6f)), { SpeechLanguage.Fr }, guetteurs)
-
-        // La 3e frame confirmerait (3 frames croissantes = mouvement parlé
-        // hors escaliers) : tue par les escaliers en cours, rien de posté.
-        assertEquals(1, speaker.said.size)
-        // Tour d'antirépétition intact (le bus jetterait le vœu, tour mangé) :
-        // la voiture reparle dès la fin des marches, côté bus.
-        assertTrue(AntiRepeat.allow(AntiRepeat.KEY_CAR_MOVING, t0))
-    }
 }

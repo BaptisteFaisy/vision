@@ -1,16 +1,12 @@
 package dev.sam3vision.app.isee
 
-import dev.sam3vision.app.live.MotionLog
 import dev.sam3vision.app.traverse.backgroundOf
 import dev.sam3vision.core.live.MotionGapStats
 import dev.sam3vision.core.traverse.BackgroundFrame
 import dev.sam3vision.core.traverse.FrameMotion
-import dev.sam3vision.core.traverse.MovingVerdict
-import dev.sam3vision.core.traverse.Verdict
 import dev.sam3vision.core.motion.BlockMotionSource
 import java.util.concurrent.Executor
 import java.util.concurrent.Executors
-import kotlin.math.hypot
 
 /**
  * Mouvement global fond côté sonde : `LiveProbe.onFrame` offre son JPEG ici,
@@ -182,28 +178,4 @@ internal object ProbeBackgroundMotion {
     private class PendingFrame(val jpegB64: String, val atMs: Long, val epoch: Long)
 }
 
-/**
- * Journalise les transitions mouvement du direct ([MotionLog]) : « caméra
- * bouge » quand le porteur bouge, « voiture bouge » quand une piste roule —
- * silence sinon (arrêt, doute, pas de piste). [frameWidth] et [dtMs]
- * convertissent l'écart boîte-fond (fractions/s) en px par frame ;
- * `bg=0` : le score de changement du fond n'est pas calculé en V1.
- */
-internal fun logMotionTransition(
-    cameraMoved: Boolean,
-    verdicts: Collection<MovingVerdict>,
-    frameWidth: Int,
-    dtMs: Long,
-) {
-    if (verdicts.isEmpty() || frameWidth <= 0 || dtMs <= 0L) return
-    val label = when {
-        cameraMoved -> "caméra bouge"
-        verdicts.any { it.verdict == Verdict.VEHICLE_MOVED } -> "voiture bouge"
-        else -> return
-    }
-    val dtSeconds = dtMs / 1000f
-    val gaps = verdicts.map { hypot(it.boxDx - it.globalDx, it.boxDy - it.globalDy) * frameWidth * dtSeconds }
-    val sorted = gaps.sorted()
-    MotionLog.logTransition(label, 0f, gaps.average().toFloat(), sorted[(sorted.size * 95 / 100).coerceIn(0, sorted.size - 1)])
-    ProbeBackgroundMotion.noteGaps(label, gaps)
-}
+

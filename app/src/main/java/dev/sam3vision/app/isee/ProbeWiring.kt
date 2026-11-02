@@ -28,7 +28,6 @@ import dev.sam3vision.core.live.SteeringCap
 import dev.sam3vision.core.live.SteeringCue
 import dev.sam3vision.core.live.Timing
 import dev.sam3vision.core.live.TwinLiteWord
-import dev.sam3vision.core.model.Detection
 import dev.sam3vision.core.model.LiveFrame
 import dev.sam3vision.core.model.SegObject
 import dev.sam3vision.core.picto.PictoPlaceMode
@@ -38,8 +37,6 @@ import dev.sam3vision.core.stairs.StairConcepts
 import dev.sam3vision.core.stairs.StairCountVoice
 import dev.sam3vision.core.stairs.StairWatcher
 import dev.sam3vision.core.settings.resolveSamEndpoint
-import dev.sam3vision.core.traverse.FrameMotion
-import dev.sam3vision.core.traverse.VehicleStateWatcher
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.cancelAndJoin
@@ -227,15 +224,6 @@ internal fun LiveProbe.observeFenceOpening(
 
 
 /**
- * Détections reconstruites des lectures de distance : boîtes pixels SAM déjà
- * confirmées (score 1 : le seuil 0,5 du veto garde les brutes, pas les
- * relues). Les boîtes illisibles sont filtrées (les guetteurs les ignorent
- * aussi). Pur, testé en JVM.
- */
-internal fun detectionsOf(readings: List<DistanceReading>, width: Int, height: Int): List<Detection> =
-    readings.filter { it.box.size >= 4 }.map { Detection(it.label, 1f, it.box, width, height) }
-
-/**
  * Détour obstacle de la sonde : le pilote GPS y lit le détour subi (recalcul
  * Valhalla depuis le GPS temps réel s'il dure — `VoiceNavEngineDriver`).
  * Changements seuls (`distinctUntilChanged`) : le détecteur compte le
@@ -389,24 +377,22 @@ internal fun LiveProbe.observeSidewalk(
     return watcher
 }
 
-/** Les sept guetteurs de la sonde (bordure + escaliers + compteur + mobilier + grillage + véhicules + trottoir), reset commun. */
+/** Les six guetteurs de la sonde (bordure + escaliers + compteur + mobilier + grillage + trottoir), reset commun. */
 internal class ProbeHazards(
     val curb: CurbWatcher,
     val stairs: StairWatcher,
     val count: StairCountVoice,
     val hazard: HazardWatcher,
     val fence: FenceOpeningWatcher,
-    val vehicle: VehicleStateWatcher,
     val sidewalk: SidewalkWatcher,
 ) {
-    /** Oublie les sept guetteurs, le compte caméra et les pistes de personnes (nouvelle séance). */
+    /** Oublie les six guetteurs, le compte caméra et les pistes de personnes (nouvelle séance). */
     fun reset() {
         curb.reset()
         stairs.reset()
         count.reset()
         hazard.reset()
         fence.reset()
-        vehicle.reset()
         sidewalk.reset()
         StairCannyCount.clear()
         ProbeTracks.reset()
@@ -414,10 +400,10 @@ internal class ProbeHazards(
 }
 
 /**
- * Les sept guetteurs en un appel : le ViewModel n'y tient qu'une ligne
- * (plafond 500 — voir `observeSpoken`, même contrat). Véhicules, bordure et
- * mobilier partagent le guetteur obstacles (une frame, un seul gagnant au
- * bus). Tous postent au bus ([VoiceBus]) : plus de voix directe ici. Le battement voix 700 ms ([observeVoiceTick]) démarre avec eux.
+ * Les six guetteurs en un appel : le ViewModel n'y tient qu'une ligne
+ * (plafond 500 — voir `observeSpoken`, même contrat). Bordure et mobilier
+ * partagent le guetteur obstacles (une frame, un seul gagnant au bus).
+ * Tous postent au bus ([VoiceBus]) : plus de voix directe ici. Le battement voix 700 ms ([observeVoiceTick]) démarre avec eux.
  */
 internal fun LiveProbe.observeHazards(
     scope: CoroutineScope,
@@ -432,7 +418,6 @@ internal fun LiveProbe.observeHazards(
         observeStairsCount(scope, language, placeMode = placeMode),
         obstacles.hazard,
         observeFenceOpening(scope, language, placeMode = placeMode),
-        obstacles.vehicle,
         observeSidewalk(scope, language, placeMode = placeMode),
     )
 }
