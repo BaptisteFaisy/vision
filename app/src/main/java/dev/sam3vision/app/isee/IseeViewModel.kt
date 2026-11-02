@@ -164,7 +164,7 @@ class IseeViewModel(app: Application) : AndroidViewModel(app) {
         scope = viewModelScope,
         onRecordingStarted = { probe.begin(); proximity.reset(); hazards?.reset(); VoiceBus.reset(); AntiRepeat.reset(); VoiceTick.reset() },
         prune = ::enforceFifo,
-    )
+        log = { android.util.Log.e("sam3vision", it) })
 
     /** Question dictée → réponse du LLM → texte et voix. */
     private val answers = IseeAnswers(

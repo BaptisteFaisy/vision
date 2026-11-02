@@ -226,7 +226,7 @@ private fun LiveCameraHost(
                 pushFrame(proxy, viewModel, encoder, sensor)
             }
         }.onSuccess { bound = true }
-            .onFailure { onFailure("Camera unavailable: ${it.message}") }
+            .onFailure { android.util.Log.e("sam3vision", "direct: camera bind failed", it); onFailure("Camera unavailable: ${it.message}") }
     }
     DisposableEffect(Unit) {
         onDispose {

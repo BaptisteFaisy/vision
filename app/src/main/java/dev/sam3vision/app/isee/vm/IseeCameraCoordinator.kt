@@ -19,6 +19,8 @@ class IseeCameraCoordinator(
     private val scope: CoroutineScope,
     private val onRecordingStarted: () -> Unit,
     private val prune: suspend () -> Unit,
+    /** Journal de l'anomalie « recording lost » (défaut muet : testable sur JVM). */
+    private val log: (String) -> Unit = {},
 ) {
 
     /** Tap simple : démarre la vidéo ; motif affiché si la caméra n'est pas prête. */
@@ -44,6 +46,7 @@ class IseeCameraCoordinator(
                 media.saveEnvironmentVideo(file)
                 prune()
             } else {
+                log("isee: recording lost (file=${file?.absolutePath}, exists=${file?.isFile}, size=${file?.length()})")
                 update { it.copy(status = IseeStatusText.RECORDING_LOST) }
             }
         }
