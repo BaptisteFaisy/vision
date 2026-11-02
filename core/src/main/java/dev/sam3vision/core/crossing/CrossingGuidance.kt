@@ -14,7 +14,8 @@ import dev.sam3vision.core.speech.SpeechLanguage
 /**
  * Guidage latéral vers le passage piéton, sur le trottoir (SPEC v4, niveau
  * 8, couches 2-3/3 : alignement au changement + arrivée une fois — la couche
- * 1, annonce une fois par vue, vit dans [CrossingApproachWatcher]) : le
+ * 1, annonce (une fois par vue, « devant » redit toutes les 2 s hors
+ * Traversée), vit dans [CrossingApproachWatcher]) : le
  * centre de la boîte dit où aller (couloir 0,34-0,66, miroir du guidage
  * obstacles), le mot seul (« Gauche. », « Droite. », « Tout droit. ») part
  * en clip local (< 100 ms, [GuidanceWord.clipId]) quand il change — miroir de

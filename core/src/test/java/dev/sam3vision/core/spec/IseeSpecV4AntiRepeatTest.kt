@@ -10,7 +10,8 @@ import org.junit.Test
  * Spec v4 — antirépétition ([AntiRepeat]) et bus voix ([VoiceBus]).
  *
  * Contrat pur : clés stables par niveau et objet, durées de la table v4.
- * Le passage piéton et le GPS sont événementiels (pas de durée fixe) ; le
+ * L'alignement et l'arrivée du passage piéton et le GPS sont événementiels
+ * (pas de durée fixe), l'annonce du passage est à 2 s ; le
  * chat n'a aucune antirépétition ; le verdict repart immédiatement quand
  * il change. La prod implémente `object AntiRepeat { fun allow(key:
  * String, nowMs: Long): Boolean }` et `fun VoiceBus.post(level: Int, text:
@@ -119,11 +120,21 @@ class IseeSpecV4AntiRepeatTest {
     }
 
     @Test
-    fun `passage et GPS = evenementiels, chat = aucune`() {
+    fun `annonce passage = 2s`() {
+        val gate = SpecAntiRepeat()
+
+        assertTrue(gate.allow("crosswalk-announce", 0L))
+        assertFalse(gate.allow("crosswalk-announce", 1_999L))
+        assertTrue(gate.allow("crosswalk-announce", 2_000L))
+    }
+
+    @Test
+    fun `passage alignement et arrivee = evenementiels, GPS et chat sans duree`() {
         assertEquals(
-            setOf("crosswalk-announce", "crosswalk-align", "crosswalk-arrival"),
+            setOf("crosswalk-align", "crosswalk-arrival"),
             CROSSWALK_KEYS,
         )
+        assertTrue("annonce passage : 2 s, pas événementielle", "crosswalk-announce" in TIMED_KEYS)
         assertTrue("rappel GPS : au silence de 15s, pas de durée AntiRepeat", "gps-reminder" !in TIMED_KEYS)
         assertTrue("chat : aucune antirépétition", TIMED_KEYS.none { it.startsWith("chat") })
     }
@@ -134,6 +145,7 @@ class IseeSpecV4AntiRepeatTest {
             setOf(
                 "car-moving", "human-soft", "human-imminent", "fence", "curb",
                 "stairs", "stairs-count", "pole", "pole-avoid", "sidewalk", "verdict",
+                "crosswalk-announce",
             ),
             TIMED_KEYS,
         )
@@ -167,6 +179,7 @@ class IseeSpecV4AntiRepeatTest {
             "pole" to 2_000L,
             "sidewalk" to 10_000L,
             "verdict" to 2_000L,
+            "crosswalk-announce" to 2_000L,
         )
 
         fun allow(key: String, nowMs: Long): Boolean {
@@ -207,7 +220,8 @@ class IseeSpecV4AntiRepeatTest {
         val TIMED_KEYS = setOf(
             "car-moving", "human-soft", "human-imminent", "fence", "curb",
             "stairs", "stairs-count", "pole", "pole-avoid", "sidewalk", "verdict",
+            "crosswalk-announce",
         )
-        val CROSSWALK_KEYS = setOf("crosswalk-announce", "crosswalk-align", "crosswalk-arrival")
+        val CROSSWALK_KEYS = setOf("crosswalk-align", "crosswalk-arrival")
     }
 }

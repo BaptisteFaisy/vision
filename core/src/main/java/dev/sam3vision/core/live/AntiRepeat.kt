@@ -26,7 +26,9 @@ package dev.sam3vision.core.live
  *   02/11, VOIX-DANGER § 42) ;
  * - `pole` = 2 s (niveau 7, poteaux + mobilier vertical < 6 m) ;
  * - `misc` = 2 s (niveau 7, divers : animal, poubelle, souvenirs < 6 m) ;
- * - `crosswalk-announce` = 1 fois par vue (niveau 8, annonce du passage) ;
+ * - `crosswalk-announce` = 2 s (niveau 8, annonce du passage — le
+ *   « Devant » se répète toutes les 2 s hors Traversée, ordre user du
+ *   02/11 ; les autres directions restent 1 fois par vue côté guetteur) ;
  * - `crosswalk-align` = au changement (niveau 8, alignement : pas de délai,
  *   l'appelant n'appelle que quand l'alignement change) ;
  * - `crosswalk-arrival` = 1 fois (niveau 8, arrivée sur le passage) ;
@@ -43,9 +45,9 @@ package dev.sam3vision.core.live
  * clé complète, donc un changement d'état parle immédiatement. Réservé aux
  * niveaux « changement immédiat » (verdict, alignement passage).
  *
- * Clés « 1 fois » (`crosswalk-announce`, `crosswalk-arrival`) : parlent une
- * fois puis se taisent jusqu'à [reset] (nouvelle séance) ou [forget]
- * (nouvelle vue) — il n'y a pas de délai, seulement l'oubli explicite.
+ * Clé « 1 fois » (`crosswalk-arrival`) : parle une fois puis se tait
+ * jusqu'à [reset] (nouvelle séance) ou [forget] (nouvelle vue) — il n'y a
+ * pas de délai, seulement l'oubli explicite.
  *
  * Clés inconnues : toujours autorisées (sans antirépétition) — une mission
  * qui invente une clé ne se fait jamais taire par une faute de frappe, et
@@ -115,8 +117,8 @@ object AntiRepeat {
     const val KEY_MISC = "misc"
 
     /**
-     * Niveau 8 : annonce du passage piéton — 1 fois par vue (parle une fois,
-     * puis silence jusqu'à [forget] ou [reset]).
+     * Niveau 8 : annonce du passage piéton — 2 s (le « Devant » se répète
+     * toutes les 2 s hors Traversée, ordre user du 02/11).
      */
     const val KEY_CROSSWALK_ANNOUNCE = "crosswalk-announce"
 
@@ -189,7 +191,8 @@ object AntiRepeat {
         KEY_VERDICT -> 2_000L
         KEY_FIND_FOUND -> 2_000L
         KEY_DOOR_WALL -> 4_000L
-        KEY_CROSSWALK_ANNOUNCE, KEY_CROSSWALK_ARRIVAL -> ONCE_MS
+        KEY_CROSSWALK_ANNOUNCE -> 2_000L
+        KEY_CROSSWALK_ARRIVAL -> ONCE_MS
         // Mots continus, rappel GPS, alignement : sans délai (toujours autorisés).
         KEY_HUMAN_IMMINENT, KEY_POLE_AVOID, KEY_WALL_AVOID, KEY_GPS_REMINDER, KEY_CROSSWALK_ALIGN -> 0L
         // Clés inconnues : sans antirépétition (jamais bloquantes).
@@ -204,7 +207,7 @@ object AntiRepeat {
 
     /**
      * Oublie [key] (clé complète, `base:état` compris) : la prochaine annonce
-     * parlera — « 1 fois par vue » (nouvelle vue) et « écrasé re-détecté
+     * parlera — « 1 fois » (nouvelle vue) et « écrasé re-détecté
      * actuel » (la re-détection parle, pas la redite).
      */
     @Synchronized

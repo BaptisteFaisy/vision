@@ -37,8 +37,9 @@ import org.junit.Test
  * mot immédiat), grillages/murs/barrières niveau 4 (< 6 m, 4 s), bordures
  * niveau 5 (< 6 m, 2 s), escaliers niveau 6 (jalons 2/1/0,5 + marches dites,
  * 2 s), poteaux/mobilier/divers niveau 7 (< 6 m, 2 s), passages niveau 8
- * (< 6 m, annonce 1 fois par vue + alignement au changement + arrivée
- * 1 fois), trottoirs niveau 10 (inchangés), textes EN voitures (présence
+ * (< 6 m, annonce 1 fois par vue + « devant » toutes les 2 s hors
+ * Traversée + alignement au changement + arrivée 1 fois), trottoirs
+ * niveau 10 (inchangés), textes EN voitures (présence
  * seule + pluriel). La détection voitures et la traversée sont d'autres
  * missions — ici seules les phrases voitures sont verrouillées.
  */
@@ -359,7 +360,7 @@ class SeuilsDehorsV4Test {
     // Passages piétons — niveau 8, 3 couches.
 
     @Test
-    fun `passage annonce 1 fois par vue sous 6m`() {
+    fun `passage annonce 1 fois par vue sans repetition sous 6m`() {
         val watcher = CrossingApproachWatcher()
         assertNull(watcher.onFrame(0.5f, 5.5f, En))
         assertEquals("Ahead, 6 meters.", watcher.onFrame(0.5f, 5.5f, En))

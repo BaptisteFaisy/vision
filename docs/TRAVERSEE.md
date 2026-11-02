@@ -78,9 +78,10 @@ qui **précède** le verdict (plus petit nombre = plus forte priorité, donc
 
 ## 5. Proposition du mode (niveau 8)
 
-Le passage piéton < 6 m s'annonce **1 fois par vue** (« Crosswalk ahead. »
-+ côté), l'alignement se dit **au changement** (« Aligned with the
-crosswalk. »), l'arrivée **1 fois** (« On the crosswalk. »). La pastille
+Le passage piéton < 6 m s'annonce (« Crosswalk ahead. » + côté — « ahead »
+redit toutes les 2 s hors Traversée, 1 fois par vue sinon), l'alignement
+se dit **au changement** (« Aligned with the crosswalk. »), l'arrivée
+**1 fois** (« On the crosswalk. »). La pastille
 de carte propose le mode (« Passage piéton — traversée ? », ambre, un tap
 = `crossing on`) ; un refus se tait une minute. Entrer en traversée ne se
 fait jamais seul : seuls la puce et l'ordre vocal arment le mode.

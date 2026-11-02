@@ -36,7 +36,7 @@ chat (9) et GPS (3, 11) en synthèse réseau.
 | 5 | Bordures < 6 m | Montée / descente | `curb_up`, `curb_down` |
 | 6 | Escaliers | **Jalons 4 / 2 / 1 m** + **nombre de marches dit** | `stairs_up/down_4/2/1`, `n_1..12` + `stairs_steps` |
 | 7 | Poteau ≤ 15 m droit devant : **mot continu** (§ 36) ; mobilier vertical + divers < 6 m : doux confirmé | `guide_left`, `guide_right` (poteau) ; `pole`, `lamp`, `sign`, `animal`, `bin`, `keepsake` (divers) |
-| 8 | Passages piétons < 6 m | Annonce **1 fois par vue** + alignement **au changement** + arrivée **1 fois** | `cross_approach_*`, `crosswalk_aligned`, `cross_arrived` |
+| 8 | Passages piétons < 6 m | Annonce (**« devant » toutes les 2 s** hors Traversée, 1 fois par vue sinon) + alignement **au changement** + arrivée **1 fois** | `cross_approach_*`, `crosswalk_aligned`, `cross_arrived` |
 | 9 | Réponses du chat | **Attente + reprise depuis la coupure** (tranche interrompue rejouée) ; **seule file restante** | Synthèse réseau (chat) |
 | 10 | Trottoirs | Comportement actuel (rail : ne parle que si dérive) | `sidewalk_*` (existants) |
 | 11 | GPS manœuvres et événements | Aux événements moteur | Synthèse réseau (GPS) |
@@ -102,7 +102,7 @@ une annonce avalée ne consomme pas son tour).
 | `stairs-count` | 6 compte des marches | 1 s (§ 42, amende § 37) |
 | `pole` | 7 poteaux + mobilier vertical | 2 s |
 | `misc` | 7 divers (animal, poubelle, souvenirs) | 2 s |
-| `crosswalk-announce` | 8 annonce | **1 fois par vue** (oubli explicite à la vue suivante) |
+| `crosswalk-announce` | 8 annonce | **2 s** (le « devant » se répète hors Traversée ; oubli explicite à la vue perdue) |
 | `crosswalk-align` | 8 alignement | **au changement** (l'appelant n'appelle que si ça change) |
 | `crosswalk-arrival` | 8 arrivée | **1 fois** |
 | `sidewalk` | 10 trottoirs | 10 s |
@@ -153,7 +153,7 @@ frappe ne fait jamais taire une annonce).
   `chatSpeaking` (niveau 9 tenu pendant la lecture) portent les états.
 - `AntiRepeat` : `object AntiRepeat` avec `fun allow(key: String, nowMs:
   Long): Boolean`, clés du § 5, durées du § 5. `reset()` en début de
-  séance ; `forget(key)` pour le « 1 fois par vue » et le « re-détecté
+  séance ; `forget(key)` pour le « 1 fois » (arrivée) et le « re-détecté
   actuel ».
 - Chaque guetteur pose `level` + `antiRepeatKey` sur son cue : le câblage
   les lit, il ne recalcule jamais le niveau depuis le type.
