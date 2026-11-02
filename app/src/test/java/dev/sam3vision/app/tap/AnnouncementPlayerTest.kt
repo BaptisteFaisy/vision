@@ -5,6 +5,7 @@ import java.io.File
 import java.nio.file.Files
 import kotlinx.coroutines.runBlocking
 import org.junit.Assert.assertEquals
+import org.junit.Assert.assertFalse
 import org.junit.Assert.assertTrue
 import org.junit.Test
 
@@ -27,17 +28,20 @@ class AnnouncementPlayerTest {
         }
     }
 
-    private fun player(dir: File, bundled: TapBundled, scope: kotlinx.coroutines.CoroutineScope) =
-        AnnouncementPlayer(dir, bundled, SpeechPlayer(dir), scope)
+    private fun player(dir: File, bundled: TapBundled) =
+        AnnouncementPlayer(dir, bundled, SpeechPlayer(dir))
 
     @Test
     fun `prewarm copie les mots manquants depuis l embarque`() = runBlocking {
         val dir = Files.createTempDirectory("annonces").toFile()
         val bundled = FakeBundled()
 
-        val report = player(dir, bundled, this).prewarm()
+        val report = player(dir, bundled).prewarm()
 
-        assertEquals(listOf(Announcement.LAUNCHED, Announcement.SENT, Announcement.FAILED), bundled.filled.sorted())
+        assertEquals(
+            listOf(Announcement.LAUNCHED, Announcement.SENT, Announcement.FAILED).sorted(),
+            bundled.filled.sorted(),
+        )
         assertEquals(0, report.ready)
         assertEquals(3, report.generated)
         assertTrue(report.missing.isEmpty())
@@ -47,7 +51,7 @@ class AnnouncementPlayerTest {
     fun `prewarm ne recopie pas les clips frais`() = runBlocking {
         val dir = Files.createTempDirectory("annonces-chaud").toFile()
         val bundled = FakeBundled()
-        val announcements = player(dir, bundled, this)
+        val announcements = player(dir, bundled)
 
         announcements.prewarm()
         val second = announcements.prewarm()
@@ -62,10 +66,18 @@ class AnnouncementPlayerTest {
         val dir = Files.createTempDirectory("annonces-manquant").toFile()
         val bundled = FakeBundled(failOn = setOf(Announcement.SENT))
 
-        val report = player(dir, bundled, this).prewarm()
+        val report = player(dir, bundled).prewarm()
 
         assertEquals(0, report.ready)
         assertEquals(2, report.generated)
-        assertEquals(listOf(Announcement.SENT), report.missing)
+        assertEquals(listOf("Sent"), report.missing)
+    }
+
+    @Test
+    fun `speak sans clip renvoie faux sans lecture`() = runBlocking {
+        val dir = Files.createTempDirectory("annonces-muet").toFile()
+        val bundled = FakeBundled(failOn = setOf(Announcement.FAILED))
+
+        assertFalse(player(dir, bundled).speak(Announcement.FAILED))
     }
 }

@@ -191,7 +191,6 @@ private fun rememberTapDependencies(
                 dir = TapConfig.clipDir(context, voice),
                 bundled = bundled,
                 player = speech,
-                scope = scope,
             ),
             speech = speech,
             videoClient = HttpSam31VideoClient(TapConfig.sam31Endpoint, TapConfig.ON_DEVICE_INFERENCE),

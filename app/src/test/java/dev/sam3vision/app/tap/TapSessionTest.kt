@@ -132,7 +132,6 @@ class TapSessionTest {
                 dir = File(tmp, "announcements"),
                 bundled = TapBundled { _, _ -> false },
                 player = player,
-                scope = scope,
             ),
             sender = { calls++.let { outcome } },
             onStatus = statuses::add,
