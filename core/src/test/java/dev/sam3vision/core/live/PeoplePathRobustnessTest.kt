@@ -30,15 +30,15 @@ class PeoplePathRobustnessTest {
         /** Tolérance sur l'écart : bord de bande + arrondis flottants. */
         private const val GAP_EPS = 0.005f
 
-        /** Personnes : clés de PersonLabels + variantes (casse, accent). */
+        /** Corps : personnes strictes + corps guidés (chien) + variantes. */
         private val PERSON_LABELS = arrayOf(
             "personne", "person", "personnes", "enfant", "homme", "femme",
-            "child", "pedestrian", "Piéton", "PERSON",
+            "child", "pedestrian", "Piéton", "PERSON", "chien",
         )
 
-        /** Objets : jamais des personnes (isPerson faux). */
+        /** Objets : jamais des corps (isBody faux). */
         private val OBJECT_LABELS = arrayOf(
-            "camion", "chaise", "chien", "table", "voiture", "arbre", "mur", "poteau",
+            "camion", "chaise", "table", "voiture", "arbre", "mur", "poteau",
         )
     }
 
@@ -236,7 +236,7 @@ class PeoplePathRobustnessTest {
     }
 
     /**
-     * Écart recalculé depuis le cap : chaque personne à portée tient son
+     * Écart recalculé depuis le cap : chaque corps à portée tient son
      * demi-mètre, chaque objet son quart de mètre — à GAP_EPS près. Seuls les
      * obstacles à portée comptent : le plan ignore les autres.
      */
@@ -245,7 +245,7 @@ class PeoplePathRobustnessTest {
         for (label in labels) {
             val depth = label.meters
             if (depth == null || !depth.isFinite() || depth <= 0f || depth > Guidance.RANGE_METERS) continue
-            val attendu = if (PersonLabels.isPerson(label.label)) {
+            val attendu = if (PersonLabels.isBody(label.label)) {
                 PeoplePath.MIN_CLEARANCE_M
             } else {
                 Guidance.RAY_HALF_WIDTH_M
@@ -269,7 +269,7 @@ class PeoplePathRobustnessTest {
         } else {
             null
         }
-        val corps = demieBoite ?: if (PersonLabels.isPerson(label.label)) {
+        val corps = demieBoite ?: if (PersonLabels.isBody(label.label)) {
             PeoplePath.BODY_HALF_WIDTH_M
         } else {
             0f

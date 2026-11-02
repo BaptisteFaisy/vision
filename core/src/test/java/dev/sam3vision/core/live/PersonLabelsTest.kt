@@ -45,11 +45,15 @@ class PersonLabelsTest {
         assertTrue(PersonLabels.isBody("stroller"))
         assertTrue(PersonLabels.isBody("wheelchair"))
         assertTrue(PersonLabels.isBody("fauteuil roulant"))
+        assertTrue(PersonLabels.isBody("dog"))
+        assertTrue(PersonLabels.isBody("chien"))
+        assertTrue(PersonLabels.isBody("chiens"))
         assertFalse("trottinette sortie v4", PersonLabels.isBody("trottinette"))
         assertFalse("trottinette sortie v4", PersonLabels.isBody("electric scooter"))
         assertFalse(PersonLabels.isPerson("poussette"))
         assertFalse(PersonLabels.isPerson("stroller"))
         assertFalse(PersonLabels.isPerson("wheelchair"))
+        assertFalse(PersonLabels.isPerson("dog"))
         assertFalse(PersonLabels.isPerson("trottinette"))
     }
 

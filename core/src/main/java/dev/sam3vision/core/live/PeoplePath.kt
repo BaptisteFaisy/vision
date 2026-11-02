@@ -65,11 +65,11 @@ data class PeoplePath(
             if (headingX < 0.5f) GuidanceSide.Left else GuidanceSide.Right
 
         /**
-         * Vrai si marcher côté [side] garantit 1 m à toute personne : aucune
-         * personne à portée avec un écart latéral < corps + 1 m
-         * ([MIN_CLEARANCE_M]), aucune personne non mesurée de ce côté
-         * (prudence : l'inconnu bloque le côté — une personne plein centre
-         * non mesurée bloque les deux). Les obstacles non humains ne comptent
+         * Vrai si marcher côté [side] garantit 1 m à tout corps : aucun
+         * corps à portée avec un écart latéral < corps + 1 m
+         * ([MIN_CLEARANCE_M]), aucun corps non mesuré de ce côté
+         * (prudence : l'inconnu bloque le côté — un corps plein centre
+         * non mesuré bloque les deux). Les obstacles non humains ne comptent
          * pas (le couloir les contourne déjà à 25 cm). Pur, testé en JVM.
          */
         fun clearsSide(
@@ -81,7 +81,7 @@ data class PeoplePath(
             val halfTangent = LensSpec.halfTangent(hfovDeg)
             if (!halfTangent.isFinite() || halfTangent <= 0f) return false
             for (label in labels) {
-                if (!PersonLabels.isPerson(label.label)) continue
+                if (!PersonLabels.isBody(label.label)) continue
                 if (!onSide(label.centerX, side)) continue
                 val meters = label.meters
                 if (meters == null || !meters.isFinite() || meters <= 0f) return false
@@ -94,9 +94,9 @@ data class PeoplePath(
         }
 
         /**
-         * Vrai si marcher dans l'axe garantit 1 m à toute personne : aucune
-         * personne à portée avec un écart latéral à l'axe < corps + 1 m,
-         * aucune personne non mesurée dans la bande centrale (miroir du
+         * Vrai si marcher dans l'axe garantit 1 m à tout corps : aucun
+         * corps à portée avec un écart latéral à l'axe < corps + 1 m,
+         * aucun corps non mesuré dans la bande centrale (miroir du
          * couloir : hors bande, l'inconnu passe au large).
          */
         fun clearsAhead(
@@ -107,7 +107,7 @@ data class PeoplePath(
             val halfTangent = LensSpec.halfTangent(hfovDeg)
             if (!halfTangent.isFinite() || halfTangent <= 0f) return false
             for (label in labels) {
-                if (!PersonLabels.isPerson(label.label)) continue
+                if (!PersonLabels.isBody(label.label)) continue
                 val meters = label.meters
                 if (meters == null || !meters.isFinite() || meters <= 0f) {
                     if (!label.centerX.isFinite() || label.centerX in PositionText.SIDE_EDGE..1f - PositionText.SIDE_EDGE) return false
@@ -142,12 +142,12 @@ internal fun halfBoxM(label: PlacedLabel, lateralPerX: Float): Float? {
 }
 
 /**
- * Demi-corps en mètres : boîte mesurée, sinon épaules par défaut pour une
- * personne, zéro pour le reste (un poteau ne déborde pas de sa mesure).
+ * Demi-corps en mètres : boîte mesurée, sinon épaules par défaut pour un
+ * corps, zéro pour le reste (un poteau ne déborde pas de sa mesure).
  */
 internal fun bodyHalfM(label: PlacedLabel, lateralPerX: Float): Float {
     val halfBox = halfBoxM(label, lateralPerX)
-    return if (PersonLabels.isPerson(label.label)) halfBox ?: PeoplePath.BODY_HALF_WIDTH_M else halfBox ?: 0f
+    return if (PersonLabels.isBody(label.label)) halfBox ?: PeoplePath.BODY_HALF_WIDTH_M else halfBox ?: 0f
 }
 
 /** Frontière de bande : en deçà, le cap est hors bande (le bord lui-même passe). */
@@ -191,7 +191,7 @@ private class ObstacleBands(size: Int) {
             val center = label.centerX
             if (!center.isFinite()) return false
             val lateralPerX = lateralPerX(depth, halfTangent)
-            val person = PersonLabels.isPerson(label.label)
+            val person = PersonLabels.isBody(label.label)
             val body = bodyHalfM(label, lateralPerX)
             val margin = if (person) PeoplePath.MIN_CLEARANCE_M else Guidance.RAY_HALF_WIDTH_M
             val half = (body + margin) / lateralPerX

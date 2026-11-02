@@ -267,6 +267,14 @@ class PeoplePathTest {
     }
 
     @Test
+    fun `clearsSide chien proche bloque son cote seul`() {
+        val proche = listOf(placed("chien", 0.3f, 2f))
+
+        assertFalse(PeoplePath.clearsSide(proche, GuidanceSide.Left))
+        assertTrue(PeoplePath.clearsSide(proche, GuidanceSide.Right))
+    }
+
+    @Test
     fun `clearsSide personne loin passe`() {
         val loin = listOf(placed("personne", 0.1f, 4f))
 

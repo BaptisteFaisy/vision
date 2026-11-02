@@ -390,9 +390,9 @@ object Guidance {
 
     /**
      * Côté le moins encombré : 1 m garantis d'abord (un seul côté dégagé :
-     * lui), sinon sans personne (on ne contourne jamais vers quelqu'un),
+     * lui), sinon sans corps (on ne contourne jamais vers quelqu'un),
      * sinon moins d'objets, sinon obstacle le plus loin, sinon décalage. À
-     * égalité de personnes des deux côtés, l'ancien départage s'applique :
+     * égalité de corps des deux côtés, l'ancien départage s'applique :
      * dans une foule on se faufile, on ne s'arrête pas.
      */
     private fun freerSide(
@@ -407,8 +407,8 @@ object Guidance {
         val edge = PositionText.SIDE_EDGE
         val left = labels.filter { it.centerX < edge && inRange(it, rangeMeters) }
         val right = labels.filter { it.centerX > 1f - edge && inRange(it, rangeMeters) }
-        val leftPeople = left.count { PersonLabels.isPerson(it.label) }
-        val rightPeople = right.count { PersonLabels.isPerson(it.label) }
+        val leftPeople = left.count { PersonLabels.isBody(it.label) }
+        val rightPeople = right.count { PersonLabels.isBody(it.label) }
         if (leftPeople != rightPeople) {
             return if (leftPeople < rightPeople) GuidanceSide.Left else GuidanceSide.Right
         }
@@ -464,9 +464,9 @@ object Guidance {
     private fun sectorCount(labels: List<PlacedLabel>, cap: SteeringCap, rangeMeters: Float): Int =
         labels.count { inSector(it.centerX, cap) && inRange(it, rangeMeters) }
 
-    /** Personnes du secteur [cap] à portée : le passage les évite en premier. */
+    /** Corps du secteur [cap] à portée : le passage les évite en premier. */
     private fun sectorPersons(labels: List<PlacedLabel>, cap: SteeringCap, rangeMeters: Float): Int =
-        labels.count { inSector(it.centerX, cap) && inRange(it, rangeMeters) && PersonLabels.isPerson(it.label) }
+        labels.count { inSector(it.centerX, cap) && inRange(it, rangeMeters) && PersonLabels.isBody(it.label) }
 
     /** Distance du plus proche objet mesuré du secteur, `null` si aucun. */
     private fun sectorNearest(labels: List<PlacedLabel>, cap: SteeringCap, rangeMeters: Float): Float? =

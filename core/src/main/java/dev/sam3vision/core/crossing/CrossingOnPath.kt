@@ -164,14 +164,14 @@ class CrossingOnPathTracker(
     }
 
     /**
-     * Personne côté [side], mesurée ou non (boîte seule suffit, prudence) :
-     * l'évitement n'envoie jamais vers elle — silence, le couloir parle
+     * Corps côté [side], mesuré ou non (boîte seule suffit, prudence) :
+     * l'évitement n'envoie jamais vers lui — silence, le couloir parle
      * s'il est bouché. Le centre pile bloque les deux côtés.
      */
     private fun personAside(objects: List<SegObject>, width: Int, side: SteeringCap): Boolean {
         if (width <= 0) return false
         return objects.any { obj ->
-            PersonLabels.isPerson(obj.label) && obj.score >= personMinScore && obj.box.size >= 4 &&
+            PersonLabels.isBody(obj.label) && obj.score >= personMinScore && obj.box.size >= 4 &&
                 aside(obj.box, width, side)
         }
     }
@@ -203,7 +203,7 @@ class CrossingOnPathTracker(
         cy1: Float,
         readings: List<DistanceReading>,
     ): SteeringCap? {
-        if (obj.score < personMinScore || !PersonLabels.isPerson(obj.label)) return null
+        if (obj.score < personMinScore || !PersonLabels.isBody(obj.label)) return null
         val box = obj.box
         if (box.size < 4) return null
         val px0 = box[0] / width

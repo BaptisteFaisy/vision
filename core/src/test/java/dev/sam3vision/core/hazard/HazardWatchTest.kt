@@ -146,6 +146,50 @@ class HazardWatchTest {
     }
 
     @Test
+    fun `poussette fauteuil chien = mot continu des la 1re frame, urgent`() {
+        listOf("stroller", "wheelchair", "dog").forEach { label ->
+            val watcher = HazardWatcher()
+            val signal = HazardSignal(detected = true, meters = 3.5f, label = label, centerX = 0.8f)
+
+            val cue = watcher.onSignal(signal, 1_000L, SpeechLanguage.Fr)
+
+            assertEquals(label, "Gauche.", cue!!.phrase)
+            assertTrue(label, cue.urgent)
+            assertEquals(label, HazardKind.PERSON, cue.kind)
+        }
+    }
+
+    @Test
+    fun `chien imminent au bord du cadre = detecte plein axe`() {
+        val signal = HazardSignal.of(
+            listOf(reading("dog", 1.5f, listOf(0f, 400f, 100f, 900f))),
+            512, 1138,
+        )
+
+        assertTrue(signal.detected)
+        assertEquals("dog", signal.label)
+    }
+
+    @Test
+    fun `poussette a 9 m droit devant = detectee, portee personne`() {
+        val signal = HazardSignal.of(listOf(danger("stroller", 9f)), 512, 1138)
+
+        assertTrue(signal.detected)
+        assertEquals("stroller", signal.label)
+    }
+
+    @Test
+    fun `fauteuil prime sur barriere proche`() {
+        val signal = HazardSignal.of(
+            listOf(danger("wheelchair", 3.5f), danger("barrier", 0.8f)),
+            512, 1138,
+        )
+
+        assertTrue(signal.detected)
+        assertEquals("wheelchair", signal.label)
+    }
+
+    @Test
     fun `mot continu = cote oppose, FR EN`() {
         val first = HazardWatcher()
         val second = HazardWatcher()

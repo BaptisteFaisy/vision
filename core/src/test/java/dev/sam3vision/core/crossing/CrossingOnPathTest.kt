@@ -50,6 +50,18 @@ class CrossingOnPathTest {
     }
 
     @Test
+    fun `chien statique a gauche sur passage conseille la droite`() {
+        // Corps guidé comme une personne (ordre user du 02/11).
+        val dog = obj("dog", box = listOf(350f, 400f, 450f, 800f))
+        val objects = listOf(crosswalk(), dog)
+        val readings = listOf(reading(dog.box, 2.0f))
+        val track = tracker()
+
+        assertNull(track.onFrame(0L, objects, width, height, readings))
+        assertEquals(SteeringCap.Right, track.onFrame(200L, objects, width, height, readings))
+    }
+
+    @Test
     fun `personne statique a droite sur passage conseille la gauche`() {
         val person = personOn(0.6f)
         val objects = listOf(crosswalk(), person)

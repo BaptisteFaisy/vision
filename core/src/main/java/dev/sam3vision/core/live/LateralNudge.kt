@@ -357,14 +357,14 @@ class LateralNudgeTracker {
         if (side == SteeringCap.Left) SteeringCap.Right else SteeringCap.Left
 
     /**
-     * Vrai si une personne se tient côté [side] : mesurée dans la fenêtre, ou
-     * non mesurée de ce côté (prudence : l'inconnu bloque le côté) — s'écarter
-     * vers elle serait foncer dedans.
+     * Vrai si un corps se tient côté [side] : mesuré dans la fenêtre, ou
+     * non mesuré de ce côté (prudence : l'inconnu bloque le côté) — s'écarter
+     * vers lui serait foncer dedans.
      */
     private fun personAhead(labels: List<PlacedLabel>, side: SteeringCap, hfovDeg: Float): Boolean =
-        labels.any { PersonLabels.isPerson(it.label) && (inFront(it, side, hfovDeg) || unmeasuredAside(it, side)) }
+        labels.any { PersonLabels.isBody(it.label) && (inFront(it, side, hfovDeg) || unmeasuredAside(it, side)) }
 
-    /** Personne non mesurée côté [side] (sans géométrie : bloque, prudence). */
+    /** Corps non mesuré côté [side] (sans géométrie : bloque, prudence). */
     private fun unmeasuredAside(label: PlacedLabel, side: SteeringCap): Boolean {
         if (label.meters != null && label.meters.isFinite() && label.meters > 0f) return false
         if (!label.centerX.isFinite()) return true

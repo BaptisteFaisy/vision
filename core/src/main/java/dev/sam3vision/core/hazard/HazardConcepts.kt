@@ -114,13 +114,21 @@ object HazardConcepts {
     /**
      * Vrai si [label] désigne une personne (le nom anglais fait foi, jamais
      * une table à part) : l'enfant en est une (il s'évite et se parle comme
-     * un adulte), la poussette, le fauteuil et le chien non — leur [kindOf]
-     * dira seulement qu'ils se contournent.
+     * un adulte), la poussette, le fauteuil et le chien non — voir
+     * [isGuidedBody] pour le guidage, qui les traite pareil.
      */
     fun isPerson(label: String): Boolean {
         val en = nameOf(label)?.en ?: return false
         return en == "person" || en == "child"
     }
+
+    /**
+     * Vrai si [label] se guide comme une personne (ordre user du 02/11) :
+     * personne, enfant, poussette, fauteuil roulant, chien ([kindOf] vaut
+     * alors [HazardKind.PERSON]) — mot d'évitement continu, portée et
+     * priorité personne. Le poteau n'y est pas (continu à part, niveau 7).
+     */
+    fun isGuidedBody(label: String): Boolean = kindOf(label) == HazardKind.PERSON
 
     /**
      * Vrai si [label] fait parler le guetteur : personne ou mobilier
