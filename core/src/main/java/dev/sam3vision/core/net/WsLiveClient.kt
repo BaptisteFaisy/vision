@@ -71,6 +71,13 @@ class WsLiveClient(
     private val pending = mutableMapOf<Int, PendingFrame>()
     private var nextId = 0
     private var connected = false
+    /**
+     * Génération du socket courant : chaque ouverture l'incrémente (appel sous [lock]).
+     * Un délai dépassé ou une fermeture arrivée **après** une réouverture (socket neuf
+     * déjà en service) est périmé et ignoré — sans ça, à deux créneaux, le timeout
+     * d'une frame tuait le socket rouvert par sa sœur (coupure fantôme).
+     */
+    private var socketGen = 0
 
     /**
      * Le serveur a déjà répondu `id: -1` : sans WS binaire, les frames suivantes partent
@@ -176,6 +183,9 @@ class WsLiveClient(
             }
         }
         if (!opened) return Result.failure(ApiError.Network(WS_UNREACHABLE))
+        // Génération servie par cette frame : si le socket est refermé puis rouvert
+        // pendant son attente, son propre délai ne tuera pas le socket neuf.
+        val gen = synchronized(lock) { socketGen }
         // Envoi **hors verrou** : pendant que la frame part sur le socket, le thread
         // lecteur (`onText`, même verrou) continue de réveiller les frames en vol —
         // sinon un envoi lent figeait toutes les réceptions. Si le socket meurt entre
@@ -186,7 +196,7 @@ class WsLiveClient(
             return Result.failure(ApiError.Network("WebSocket /live/ws: send refused"))
         }
         return try {
-            awaitReply(reply)
+            awaitReply(reply, gen)
         } finally {
             synchronized(lock) { pending.remove(id) }
         }
@@ -206,22 +216,32 @@ class WsLiveClient(
     override suspend fun health(): Result<LiveHealth> = http.health()
 
     override fun close() {
+        // Marqué d'abord : une fermeture tardive de l'ancien socket (ack du `close`)
+        // arrive après, périmée, et ne touche plus rien.
+        synchronized(lock) {
+            connected = false
+            socketGen++
+        }
         transport.close()
-        synchronized(lock) { connected = false }
         failPending(ApiError.Network(WS_CLOSED))
     }
 
     /** Ouvre la connexion si besoin (appel sous [lock]). */
     private fun openLocked(): Boolean {
         if (connected) return true
-        connected = transport.open(
+        val gen = socketGen + 1
+        val opened = transport.open(
             webSocketUrl(baseUrl, LIVE_WS_PATH),
             { text -> onText(text) },
-            { error -> onClosed(error) },
+            { error -> onClosed(error, gen) },
             // Handshake accepté : poste « en-têtes » de la session (absent en WebSocket
             // pour les frames suivantes — un socket déjà ouvert n'a plus d'en-têtes à lire).
             { marks?.onHeaders() },
         )
+        if (opened) {
+            connected = true
+            socketGen = gen
+        }
         return connected
     }
 
@@ -306,10 +326,35 @@ class WsLiveClient(
         pending.values.firstOrNull { it.binary }?.reply?.completeExceptionally(FallbackToJson)
     }
 
-    /** Socket fermé ou en panne : les frames en vol échouent tout de suite. */
-    private fun onClosed(error: Throwable?) {
-        synchronized(lock) { connected = false }
-        failPending(error?.toApiError() ?: ApiError.Network(WS_CLOSED))
+    /**
+     * Socket fermé ou en panne : les frames en vol échouent tout de suite — sauf si
+     * la fermeture vient d'un socket déjà remplacé (ack tardif, `close()` entre-temps).
+     * Seul [onText] reste sans garde : une réponse tardive portant le bon `id` est
+     * toujours la bonne réponse, quel que soit le socket qui la livre.
+     */
+    private fun onClosed(error: Throwable?, gen: Int) {
+        val stale = synchronized(lock) {
+            if (gen != socketGen) true else {
+                connected = false
+                false
+            }
+        }
+        if (stale) return
+        failPending(error?.let(::closeError) ?: ApiError.Network(WS_CLOSED))
+    }
+
+    /**
+     * Fermetures serveur de `/live/ws` : typées comme en dictée temps réel
+     * ([MetaRealtimeClient]), pour que l'écran dise le motif (idle, trop gros)
+     * au lieu d'un « réseau » générique.
+     */
+    private fun closeError(error: Throwable): ApiError = when (error) {
+        is WsClosedAbnormally -> when (error.code) {
+            1011 -> ApiError.Network("WebSocket /live/ws : idle 45 s (1011), la frame suivante rouvre")
+            1009 -> ApiError.Network("WebSocket /live/ws : réponse trop grosse (1009)")
+            else -> ApiError.Network("WebSocket /live/ws : fermé (${error.code})")
+        }
+        else -> error.toApiError()
     }
 
     private fun failPending(failure: Throwable) {
@@ -317,10 +362,10 @@ class WsLiveClient(
         waiting.forEach { frame -> frame.reply.completeExceptionally(failure) }
     }
 
-    private suspend fun awaitReply(reply: CompletableDeferred<String>): Result<String> = try {
+    private suspend fun awaitReply(reply: CompletableDeferred<String>, gen: Int): Result<String> = try {
         val raw = withTimeoutOrNull(timeoutMs) { reply.await() }
         if (raw == null) {
-            dropDeadSocket()
+            dropDeadSocket(gen)
             Result.failure(ApiError.Timeout())
         } else Result.success(raw)
     } catch (e: ApiError) {
@@ -334,15 +379,18 @@ class WsLiveClient(
      * attendrait son délai dans le vide — c'est ce qui figeait l'écran à
      * « réveil du GPU en cours » avec 0 masque, alors que `/health` répondait en 0,1 s.
      *
-     * On ferme et on marque fermé : la frame suivante **rouvre** le handshake.
+     * On ferme et on marque fermé : la frame suivante **rouvre** le handshake — mais
+     * seulement si aucune frame n'a rouvert entre-temps ([gen] périmé = on ne touche
+     * pas au socket neuf).
      */
-    private fun dropDeadSocket() {
-        val wasOpen = synchronized(lock) {
-            val open = connected
-            connected = false
-            open
+    private fun dropDeadSocket(gen: Int) {
+        val mine = synchronized(lock) {
+            if (connected && socketGen == gen) {
+                connected = false
+                true
+            } else false
         }
-        if (wasOpen) runCatching { transport.close() }
+        if (mine) runCatching { transport.close() }
     }
 
     private companion object {
