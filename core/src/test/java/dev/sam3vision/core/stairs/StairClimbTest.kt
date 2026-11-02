@@ -47,6 +47,7 @@ class StairClimbTest {
         assertNotNull(cue)
         assertEquals("4 steps left.", cue!!.phrase)
         assertEquals(4, cue.lineCount)
+        assertEquals(listOf("c_4", "c_steps_left"), cue.clips)
     }
 
     @Test

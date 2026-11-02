@@ -72,9 +72,9 @@ internal fun LiveProbe.observeStairs(
                 )
             }
             cue ?: return@collect
-            VoiceTick.report(VoiceTick.SRC_STAIRS, VoiceWish(cue.level, cue.phrase, cue.antiRepeatKey), System.currentTimeMillis())
+            VoiceTick.report(VoiceTick.SRC_STAIRS, VoiceWish(cue.level, cue.phrase, cue.antiRepeatKey, clips = cue.clips), System.currentTimeMillis())
             if (AntiRepeat.allow(cue.antiRepeatKey, System.currentTimeMillis())) {
-                VoiceBus.post(cue.level, cue.phrase, antiRepeatKey = cue.antiRepeatKey)
+                VoiceBus.post(cue.level, cue.phrase, antiRepeatKey = cue.antiRepeatKey, clips = cue.clips)
             }
         }
     }
@@ -146,18 +146,18 @@ internal fun LiveProbe.observeStairsCount(
             if (st.crossingActive) continue
             if (placeMode() != PictoPlaceMode.DEHORS) continue
             if (!stairsFoundOf(st).detected) continue
-            val phrase = counter.onTick(
+            val said = counter.onTick(
                 true, StairCannyCount.lineCount(), nowMs(), language(),
             ) ?: continue
             // Cle par compte (stairs-count:5 marches.) : le changement parle
             // aussitot, le meme compte attend 1 s (ordre user du 02/11).
             VoiceTick.report(
                 VoiceTick.SRC_STAIRS_COUNT,
-                VoiceWish(OutdoorLevel.STAIRS, phrase, AntiRepeat.KEY_STAIRS_COUNT + ":" + phrase),
+                VoiceWish(OutdoorLevel.STAIRS, said.phrase, AntiRepeat.KEY_STAIRS_COUNT + ":" + said.phrase, clips = said.clips),
                 nowMs(),
             )
-            if (AntiRepeat.allow(AntiRepeat.KEY_STAIRS_COUNT + ":" + phrase, nowMs())) {
-                VoiceBus.post(OutdoorLevel.STAIRS, phrase, antiRepeatKey = AntiRepeat.KEY_STAIRS_COUNT + ":" + phrase)
+            if (AntiRepeat.allow(AntiRepeat.KEY_STAIRS_COUNT + ":" + said.phrase, nowMs())) {
+                VoiceBus.post(OutdoorLevel.STAIRS, said.phrase, antiRepeatKey = AntiRepeat.KEY_STAIRS_COUNT + ":" + said.phrase, clips = said.clips)
             }
         }
     }

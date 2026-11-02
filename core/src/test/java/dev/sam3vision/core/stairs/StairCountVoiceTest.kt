@@ -16,49 +16,61 @@ class StairCountVoiceTest {
 
     @Test
     fun `premiere detection dit le compte`() {
-        assertEquals("5 marches.", StairCountVoice().onTick(true, 5, 1_000L))
+        assertEquals("5 marches.", StairCountVoice().onTick(true, 5, 1_000L)?.phrase)
     }
 
     @Test
     fun `meme compte se repete apres 1 s, pas avant`() {
         val voice = StairCountVoice()
-        assertEquals("5 marches.", voice.onTick(true, 5, 1_000L))
-        assertNull(voice.onTick(true, 5, 1_100L))
-        assertNull(voice.onTick(true, 5, 1_999L))
-        assertEquals("5 marches.", voice.onTick(true, 5, 2_000L))
-        assertNull(voice.onTick(true, 5, 2_100L))
-        assertEquals("5 marches.", voice.onTick(true, 5, 3_000L))
+        assertEquals("5 marches.", voice.onTick(true, 5, 1_000L)?.phrase)
+        assertNull(voice.onTick(true, 5, 1_100L)?.phrase)
+        assertNull(voice.onTick(true, 5, 1_999L)?.phrase)
+        assertEquals("5 marches.", voice.onTick(true, 5, 2_000L)?.phrase)
+        assertNull(voice.onTick(true, 5, 2_100L)?.phrase)
+        assertEquals("5 marches.", voice.onTick(true, 5, 3_000L)?.phrase)
     }
 
     @Test
     fun `compte change sous 300 ms attend son tour`() {
         val voice = StairCountVoice()
-        assertEquals("5 marches.", voice.onTick(true, 5, 1_000L))
-        assertNull(voice.onTick(true, 6, 1_299L))
-        assertEquals("6 marches.", voice.onTick(true, 6, 1_300L))
+        assertEquals("5 marches.", voice.onTick(true, 5, 1_000L)?.phrase)
+        assertNull(voice.onTick(true, 6, 1_299L)?.phrase)
+        assertEquals("6 marches.", voice.onTick(true, 6, 1_300L)?.phrase)
     }
 
     @Test
     fun `escalier perdu puis revu redit le compte`() {
         val voice = StairCountVoice()
-        assertEquals("5 marches.", voice.onTick(true, 5, 1_000L))
+        assertEquals("5 marches.", voice.onTick(true, 5, 1_000L)?.phrase)
         assertNull(voice.onTick(false, 0, 1_100L))
-        assertEquals("5 marches.", voice.onTick(true, 5, 1_400L))
+        assertEquals("5 marches.", voice.onTick(true, 5, 1_400L)?.phrase)
     }
 
     @Test
     fun `compte zero = non compte, silence`() {
         val voice = StairCountVoice()
-        assertNull(voice.onTick(true, 0, 1_000L))
-        assertEquals("4 marches.", voice.onTick(true, 4, 1_100L))
+        assertNull(voice.onTick(true, 0, 1_000L)?.phrase)
+        assertEquals("4 marches.", voice.onTick(true, 4, 1_100L)?.phrase)
     }
 
     @Test
     fun `reset oublie compte et instant`() {
         val voice = StairCountVoice()
-        assertEquals("5 marches.", voice.onTick(true, 5, 1_000L))
+        assertEquals("5 marches.", voice.onTick(true, 5, 1_000L)?.phrase)
         voice.reset()
-        assertEquals("5 marches.", voice.onTick(true, 5, 1_100L))
+        assertEquals("5 marches.", voice.onTick(true, 5, 1_100L)?.phrase)
+    }
+
+    @Test
+    fun `chaines en clips en, vides hors pack`() {
+        val en = StairCountVoice().onTick(true, 5, 1_000L, SpeechLanguage.En)
+        assertEquals("5 steps.", en?.phrase)
+        assertEquals(listOf("c_5", "c_steps"), en?.clips)
+        val one = StairCountVoice().onTick(true, 1, 1_000L, SpeechLanguage.En)
+        assertEquals(listOf("c_1", "c_step"), one?.clips)
+        val fr = StairCountVoice().onTick(true, 5, 1_000L, SpeechLanguage.Fr)
+        assertEquals("5 marches.", fr?.phrase)
+        assertEquals(emptyList<String>(), fr?.clips)
     }
 
     @Test

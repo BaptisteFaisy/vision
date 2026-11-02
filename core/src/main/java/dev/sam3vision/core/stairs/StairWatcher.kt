@@ -24,6 +24,8 @@ data class StairCue(
     val level: Int = StairWatcher.LEVEL,
     /** Clé AntiRepeat v4 : `stairs` (2 s). */
     val antiRepeatKey: String = StairWatcher.KEY_STAIRS,
+    /** Chaîne MP3 (comptes : [StairChain], vide = phrase seule). */
+    val clips: List<String> = emptyList(),
 )
 
 /**
@@ -318,6 +320,7 @@ class StairWatcher(
             StairText.countdown(remaining, language, direction), signal.confidence,
             remaining, direction, meters,
             level = LEVEL, antiRepeatKey = KEY_STAIRS,
+            clips = StairChain.countdownClips(remaining, language),
         )
     }
 
