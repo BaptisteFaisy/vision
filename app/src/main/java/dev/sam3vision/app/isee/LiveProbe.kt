@@ -26,9 +26,9 @@ import dev.sam3vision.core.live.PersonLabels
 import dev.sam3vision.core.live.SteeringCap
 import dev.sam3vision.app.LiveMaskTransport
 import dev.sam3vision.app.depth.DepthMeter
+import dev.sam3vision.app.live.DropCause
 import dev.sam3vision.app.live.LiveAdaptive
 import dev.sam3vision.app.live.LiveFrameCadence
-import dev.sam3vision.app.live.DropCause
 import dev.sam3vision.app.live.LiveLatencyLog
 import dev.sam3vision.core.model.LiveFrame
 import dev.sam3vision.core.traverse.TraverseVeto
