@@ -60,9 +60,11 @@ import org.maplibre.android.maps.Style
  * demande explicite) ; `true` par défaut partout ailleurs.
  *
  * Sans scintillement : le fond statique (tracé, pastilles) n'est redessiné
- * que quand il change ; à chaque tick, seule la position est rafraîchie et
- * la caméra ne bouge que si la cible a vraiment bougé (2 m) ou si le zoom
- * change — sinon le doigt de l'utilisateur serait arraché à chaque seconde.
+ * que quand il change ; à chaque tick, seule la position est rafraîchie —
+ * annotations déplacées (setPosition/setPoints), jamais supprimées puis
+ * recréées — et la caméra ne bouge que si la cible a vraiment bougé (2 m)
+ * ou si le zoom change — sinon le doigt de l'utilisateur serait arraché à
+ * chaque seconde.
  */
 @Composable
 fun GuidanceMapView(
@@ -177,11 +179,17 @@ private fun GuideAttribution(modifier: Modifier = Modifier) {
     )
 }
 
-/** Annotations vivantes (position + anneau), seules rafraîchies à chaque tick. */
+/**
+ * Annotations vivantes (position + anneau), seules rafraîchies à chaque
+ * tick : gardées d'un tick à l'autre pour être déplacées, pas recréées.
+ */
 private class GuideMarks(var position: Marker? = null, var ring: Polygon? = null)
 
 /** Seuil de recentrage : en dessous, la caméra ne bouge pas (pas de tremblement). */
 private const val CAMERA_MOVE_METERS = 2.0
+
+/** Opacité de l'anneau de précision (identique au rendu d'origine). */
+private const val RING_ALPHA = 0.25f
 
 /** Pastille des punaises : diamètre du bitmap, épaisseur du liseré blanc. */
 private const val PIN_SIZE_PX = 48
@@ -232,10 +240,10 @@ private fun applyGuideState(
             marks.position = null
             marks.ring = null
             drawGuideStatic(map, state.overlays, pins)
-        } else {
-            marks.position?.let { runCatching { map.removeMarker(it) } }
-            marks.ring?.let { runCatching { map.removePolygon(it) } }
         }
+        // Plus de removeMarker/removePolygon par tick : les annotations vivantes
+        // sont réutilisées telles quelles (setPosition/setPoints), donc aucun
+        // upload de texture d'icône ni de géométrie neuve à chaque seconde.
         drawGuidePosition(map, state.overlays, marks, pins)
     }
 }
@@ -321,7 +329,9 @@ private fun drawGuideStatic(map: MapLibreMap, overlays: MapOverlays, pins: Guide
 
 /**
  * Position vivante : punaise bleue + disque de précision (rayon invalide
- * = punaise seule), références gardées pour le tick suivant.
+ * = punaise seule). Les annotations du tick précédent sont déplacées sur
+ * place (voir [movePositionMarker] et [updateAccuracyRing]) au lieu d'être
+ * supprimées puis recréées.
  */
 @Suppress("DEPRECATION")
 private fun drawGuidePosition(
@@ -332,26 +342,86 @@ private fun drawGuidePosition(
 ) {
     val pos = overlays.position
     if (pos == null || !pos.isPlottable()) {
-        marks.position = null
-        marks.ring = null
+        dropPositionMarks(map, marks)
         return
     }
-    val blue = pins.icon(AppColors.primary)
-    marks.position = map.addMarker(MarkerOptions().position(pos.toLatLng()).title("Position").icon(blue))
-    val accuracyM = overlays.accuracyM
-    if (accuracyM == null || !accuracyM.isFinite() || accuracyM <= 0f) {
-        marks.ring = null
+    movePositionMarker(map, pos.toLatLng(), marks, pins)
+    updateAccuracyRing(map, pos, overlays.accuracyM, marks)
+}
+
+/**
+ * Punaise de position : si elle existe déjà, `Marker.setPosition(LatLng)`
+ * (présente en MapLibre 13.7.1, vérifiée dans l'AAR) réécrit la géométrie
+ * sans recréer l'annotation — l'icône n'est donc jamais re-téléversée.
+ * Créée seulement au premier tick. Titre et icône ne changent jamais.
+ */
+@Suppress("DEPRECATION")
+private fun movePositionMarker(
+    map: MapLibreMap,
+    latLng: LatLng,
+    marks: GuideMarks,
+    pins: GuidePinIcons,
+) {
+    val existing = marks.position
+    if (existing != null) {
+        existing.position = latLng
         return
     }
-    val ring = accuracyRing(pos, accuracyM).map { it.toLatLng() }
-    if (ring.size < 4) {
-        marks.ring = null
+    marks.position = map.addMarker(
+        MarkerOptions().position(latLng).title("Position").icon(pins.icon(AppColors.primary)),
+    )
+}
+
+/**
+ * Anneau de précision : `Polygon.setPoints(List<LatLng>)` (héritée de
+ * BasePointCollection, présente en 13.7.1) réécrit les points sur place.
+ * On ne recrée l'annotation que si le style change (fillColor/alpha
+ * différents de l'anneau courant), car ces setters relancent un update
+ * natif complet de l'annotation.
+ */
+@Suppress("DEPRECATION")
+private fun updateAccuracyRing(
+    map: MapLibreMap,
+    center: RoutePoint,
+    accuracyM: Float?,
+    marks: GuideMarks,
+) {
+    val points = accuracyRingPoints(center, accuracyM)
+    if (points == null) {
+        dropRing(map, marks)
         return
     }
     val fill = AppColors.primary.toArgb()
+    val ring = marks.ring
+    if (ring != null && ring.fillColor == fill && ring.alpha == RING_ALPHA) {
+        ring.points = points
+        return
+    }
+    if (ring != null) runCatching { map.removePolygon(ring) }
     marks.ring = map.addPolygon(
-        PolygonOptions().addAll(ring).fillColor(fill).alpha(0.25f).strokeColor(fill),
+        PolygonOptions().addAll(points).fillColor(fill).alpha(RING_ALPHA).strokeColor(fill),
     )
+}
+
+/** Points de l'anneau de précision, ou nul si le rayon est inutilisable. */
+private fun accuracyRingPoints(center: RoutePoint, accuracyM: Float?): List<LatLng>? {
+    if (accuracyM == null || !accuracyM.isFinite() || accuracyM <= 0f) return null
+    return accuracyRing(center, accuracyM).map { it.toLatLng() }.takeIf { it.size >= 4 }
+}
+
+/** Position perdue : les deux annotations vivantes quittent la carte. */
+@Suppress("DEPRECATION")
+private fun dropPositionMarks(map: MapLibreMap, marks: GuideMarks) {
+    marks.position?.let { runCatching { map.removeMarker(it) } }
+    marks.position = null
+    dropRing(map, marks)
+}
+
+/** Anneau retiré (rayon inutilisable) : rien à réutiliser au tick suivant. */
+@Suppress("DEPRECATION")
+private fun dropRing(map: MapLibreMap, marks: GuideMarks) {
+    marks.ring?.let { runCatching { map.removePolygon(it) } }
+    marks.ring = null
 }
 
 /** Tracé bleu de l'itinéraire (2 points minimum, sinon rien). */
