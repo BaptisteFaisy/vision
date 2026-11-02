@@ -56,7 +56,8 @@ data class LateralNudge(
  *    [Timing.ttcSeconds] — sous [Timing.URGENT_TTC_S] (1,2 s) la consigne sort
  *    **dès la première frame**, entre 1,2 s et [Timing.SOON_TTC_S] (2,2 s) dès
  *    que l'approche est confirmée ([CONFIRM_DECREASES] diminutions ou piste
- *    connue), au-delà seulement sous [CLOSE_METERS] (compatibilité) ;
+ *    connue), au-delà seulement sous [CLOSE_METERS] (compatibilité) — un
+ *    humain au mouvement inconnu parle lui dès [PERSON_CLOSE_METERS] ;
  * 4. **hystérésis** : un côté choisi est tenu au moins [MIN_HOLD_MS], on ne
  *    change que si l'autre côté offre [SWITCH_GAIN_M] de dégagement en plus ou
  *    si l'obstacle qui motivait la tenue a disparu ;
@@ -70,12 +71,13 @@ data class LateralNudge(
  */
 class LateralNudgeTracker {
 
-    /** Mesure d'un côté : distance brute, fermeture, piste, confirmations. */
+    /** Mesure d'un côté : distance brute, fermeture, piste, confirmations, humain ou non. */
     private class Reading(
         val meters: Float,
         val closing: Float?,
         val id: Int?,
         val hits: Int,
+        val person: Boolean,
     )
 
     /** Choix de la frame : direction, dégagement offert, marge suffisante ? */
@@ -194,7 +196,7 @@ class LateralNudgeTracker {
         val (label, meters) = found
         val seen = track.observe(atMs, meters)
         val closing = label.closingMps?.takeIf { it.isFinite() } ?: seen
-        return Reading(meters, closing, label.trackId, track.hits)
+        return Reading(meters, closing, label.trackId, track.hits, PersonLabels.isPerson(label.label))
     }
 
     /**
@@ -314,8 +316,19 @@ class LateralNudgeTracker {
         if (Timing.isUrgent(ttc)) return true
         val confirmed = reading.hits >= CONFIRM_DECREASES || reading.id != null
         if (ttc != null && ttc <= Timing.SOON_TTC_S && confirmed) return true
-        return distance <= CLOSE_METERS
+        return distance <= closeMetersOf(reading)
     }
+
+    /**
+     * Seuil de repli sans TTC ni approche confirmée : un humain dont on ignore
+     * le mouvement (première vue, sans piste) conseille dès
+     * [PERSON_CLOSE_METERS] — un humain bouge, un mur non (ordre user du
+     * 02/11 : prendre de la distance pour se décaler des humains). Un humain
+     * au mouvement connu (immobile, qui s'éloigne) et tout objet gardent
+     * [CLOSE_METERS] : seul l'inconnu parle tôt.
+     */
+    private fun closeMetersOf(reading: Reading): Float =
+        if (reading.person && reading.closing == null) PERSON_CLOSE_METERS else CLOSE_METERS
 
     /**
      * Dégagement offert par [side] (m) : distance de l'obstacle de ce côté, ou
@@ -399,6 +412,14 @@ class LateralNudgeTracker {
          * 01/11 (le calcul, lui, se fait sur la distance projetée).
          */
         const val CLOSE_METERS = 1.5f
+
+        /**
+         * Sous cette distance (m), un humain au mouvement inconnu conseille
+         * quand même, sans TTC ni approche confirmée — le double du repli
+         * objet (ordre user du 02/11 : à 2,8 m/s de fermeture, 1,5 m c'est le
+         * contact).
+         */
+        const val PERSON_CLOSE_METERS = 3f
 
         /** Diminutions consécutives pour confirmer (3e frame parle). */
         const val CONFIRM_DECREASES = 2

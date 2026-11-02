@@ -81,7 +81,7 @@ class PersonTracker(
     fun onFrame(atMs: Long, labels: List<PlacedLabel>): List<TrackedLabel> {
         frameIndex++
         sweep(atMs)
-        val owners = ownersOf(labels)
+        val owners = ownersOf(atMs, labels)
         val out = ArrayList<TrackedLabel>(labels.size)
         for (i in labels.indices) {
             val label = labels[i]
@@ -109,16 +109,17 @@ class PersonTracker(
     /**
      * Propriétaire de chaque label, par **coût croissant** : la meilleure paire
      * d'abord, sans réutiliser ni piste ni label (glouton). Les paires
-     * incomparables n'existent pas : hors des deux portes ([dxMax],
-     * [dmetersMax]), ce n'est pas la même personne.
+     * incomparables n'existent pas : hors des deux portes ([dxMax], la porte
+     * de distance qui suit le temps, [dmetersMax] au plancher), ce n'est pas
+     * la même personne.
      */
-    private fun ownersOf(labels: List<PlacedLabel>): IntArray {
+    private fun ownersOf(atMs: Long, labels: List<PlacedLabel>): IntArray {
         val owners = IntArray(labels.size) { NO_TRACK }
         if (tracks.isEmpty() || labels.isEmpty()) return owners
         val matches = ArrayList<Match>(tracks.size * labels.size)
         for (t in tracks.indices) {
             for (l in labels.indices) {
-                matches.add(Match(t, l, costOf(tracks[t], labels[l]) ?: continue))
+                matches.add(Match(t, l, costOf(tracks[t], labels[l], atMs) ?: continue))
             }
         }
         matches.sortWith(MATCH_ORDER)
@@ -138,7 +139,7 @@ class PersonTracker(
      * Une distance inconnue d'un côté (ou des deux) ne coûte rien : l'identité
      * tient alors au seul `centerX`, ce qui vaut mieux que pas d'identité.
      */
-    private fun costOf(track: Track, label: PlacedLabel): Float? {
+    private fun costOf(track: Track, label: PlacedLabel, atMs: Long): Float? {
         val dx = abs(label.centerX - track.centerX)
         if (!(dx <= dxMax)) return null
         var cost = dx / dxMax
@@ -146,10 +147,25 @@ class PersonTracker(
         val now = label.meters?.takeIf { it.isFinite() }
         if (before != null && now != null) {
             val dm = abs(now - before)
-            if (!(dm <= dmetersMax)) return null
+            if (!(dm <= depthGateM(track, atMs))) return null
             cost += dm / dmetersMax
         }
         return cost
+    }
+
+    /**
+     * Porte de distance à [atMs] : [dmetersMax] au plancher, élargie de ce
+     * qu'un face-à-face peut fermer depuis la dernière vue ([MAX_CLOSING_MPS]
+     * × temps écoulé, borné à la fenêtre) — à 0,65 s entre deux décisions, un
+     * piéton qui arrive de face ferme ~1,8 m et la porte fixe lui redonnait un
+     * nouvel id à chaque frame, sans fermeture (ordre user du 02/11 : prendre
+     * de la distance pour se décaler des humains). Le coût reste en
+     * [dmetersMax] : les vraies paires restent les moins chères, le croisement
+     * se départage comme avant.
+     */
+    private fun depthGateM(track: Track, atMs: Long): Float {
+        val dtS = ((atMs - track.lastMs) / 1_000f).coerceIn(0f, WINDOW_MS / 1_000f)
+        return maxOf(dmetersMax, MAX_CLOSING_MPS * dtS)
     }
 
     /** Une piste meurt quand sa dernière vue dépasse [maxGapMs] (horloge qui recule : on garde). */
@@ -269,6 +285,14 @@ class PersonTracker(
 
         /** Fenêtre d'estimation de la fermeture (ms) : 1,5 s, comme la veille des pistes. */
         const val WINDOW_MS = 1_500L
+
+        /**
+         * Fermeture maximale plausible (m/s) : deux marcheurs rapides l'un vers
+         * l'autre (2 × 1,4) plus le bruit de profondeur — la porte de distance
+         * suit le temps écoulé pour ne pas perdre un face-à-face entre deux
+         * décisions (~0,65 s à la cadence de l'audit foule).
+         */
+        const val MAX_CLOSING_MPS = 3.5f
 
         /** Mémoire du lissage exponentiel de la fermeture : moitié du neuf, moitié de l'acquis. */
         const val ALPHA = 0.5f
