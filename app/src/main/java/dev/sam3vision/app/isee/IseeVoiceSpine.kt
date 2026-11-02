@@ -3,8 +3,8 @@ package dev.sam3vision.app.isee
 import dev.sam3vision.core.distance.KnownSizes
 import dev.sam3vision.core.live.AntiRepeat
 import dev.sam3vision.core.picto.PictoPlaceMode
-import dev.sam3vision.core.picto.PictoVoiceText
 import dev.sam3vision.core.settings.Settings
+import dev.sam3vision.core.speech.IseeClipsEn
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.StateFlow
@@ -15,6 +15,11 @@ import kotlinx.coroutines.launch
  * Colonne vocale v4 du ViewModel iSee : câblage du bus, bascule Traversée,
  * parole GPS, reprise du chat en attente, trouvé de la chasse. Dépendances
  * injectées (le ViewModel reste sous la garde des 500 lignes).
+ *
+ * Le trouvé parle en clips ([speakClips], câblé sur la séquence du lecteur
+ * [IseeClipPlayer.speakSequence] en production) ; non câblé, chaque clip part
+ * en texte par [speak] et le dernier couvre les précédents (repli audible
+ * dégradé — chaque texte se résout en clip, jamais de silence).
  */
 internal class IseeVoiceSpine(
     private val scope: CoroutineScope,
@@ -25,6 +30,8 @@ internal class IseeVoiceSpine(
     private val speakPending: suspend () -> Unit,
     private val speak: suspend (String) -> Unit,
     private val settings: () -> Settings,
+    private val speakClips: suspend (List<String>) -> Unit =
+        { ids -> ids.mapNotNull { IseeClipsEn.all[it] }.forEach { speak(it) } },
 ) {
     /**
      * Bus vocal (SPEC v4) : le haut-parleur parle, la fin de parole reprend
@@ -78,15 +85,30 @@ internal class IseeVoiceSpine(
     }
 
     /**
-     * Trouvé de la chasse : « Mug at 9 o'clock. » — une fois par couple
-     * (objet, cadran), l'anti-répétition tait les re-détections. Parle par
-     * le chemin navigation ([speak], synthèse vocale) : aucun clip
-     * pré-enregistré ne peut couvrir un objet quelconque.
+     * Trouvé de la chasse, clips uniquement : atome de l'objet
+     * ([IseeClipsEn.findTarget] sur le label) sinon [IseeClipsEn.FOUND], puis
+     * le cadran ([IseeClipsEn.clock]) — « Keys. » + « 9 o'clock. », joué par
+     * [speakClips] (séquence [IseeClipPlayer.speakSequence], pattern verdict).
+     * Jamais de texte sans clips : le chemin navigation jette en silence tout
+     * texte sans clip (`VoiceMute nav-jet`). Le nom est perdu sauf objet
+     * catalogué (« Mug » → « Found. ») : assumé, documenté ici. Une fois par
+     * couple (objet, cadran), l'anti-répétition tait les re-détections.
      */
     suspend fun speakFound(label: String, clockHour: Int) {
         val key = AntiRepeat.KEY_FIND_FOUND + ":" + KnownSizes.canonical(label) + ":" + clockHour
         if (!AntiRepeat.allow(key, System.currentTimeMillis())) return
-        speak(PictoVoiceText.found(label, clockHour, settings().speechLanguage))
+        speakClips(foundClips(label, clockHour))
+    }
+
+    /**
+     * Clips du trouvé : atome de l'objet ([IseeClipsEn.findTarget], noms et
+     * alias normalisés) sinon [IseeClipsEn.FOUND], puis le cadran (omis hors
+     * 1..12 : un trouvé sans direction reste audible, jamais menteur).
+     */
+    private fun foundClips(label: String, clockHour: Int): List<String> {
+        val head = IseeClipsEn.findTarget(label) ?: IseeClipsEn.FOUND
+        val clock = IseeClipsEn.clock(clockHour)
+        return if (clock == null) listOf(head) else listOf(head, clock)
     }
 }
 

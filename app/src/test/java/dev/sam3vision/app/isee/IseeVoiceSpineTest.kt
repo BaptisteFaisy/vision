@@ -2,6 +2,7 @@ package dev.sam3vision.app.isee
 
 import dev.sam3vision.core.picto.PictoPlaceMode
 import dev.sam3vision.core.settings.Settings
+import dev.sam3vision.core.speech.IseeClipsEn
 import dev.sam3vision.core.speech.SpeechLanguage
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.test.advanceTimeBy
@@ -15,12 +16,14 @@ import org.junit.Before
 import org.junit.Test
 
 /**
- * Trouvé de la chasse : parlé une fois par couple (objet, cadran), dans la
- * langue de la voix.
+ * Trouvé de la chasse, clips uniquement : une fois par couple (objet,
+ * cadran), atome de l'objet sinon Found puis cadran (anglais, toute langue
+ * de voix) ; sans câblage séquence, chaque clip part en texte.
  */
 class IseeVoiceSpineTest {
 
     private val spoken = mutableListOf<String>()
+    private val clipSeqs = mutableListOf<List<String>>()
     private val posted = mutableListOf<Pair<Int, String>>()
 
     private fun spine(scope: CoroutineScope, language: SpeechLanguage = SpeechLanguage.En) = IseeVoiceSpine(
@@ -32,6 +35,18 @@ class IseeVoiceSpineTest {
         speakPending = {},
         speak = { spoken += it },
         settings = { Settings.Default.copy(speechLanguage = language) },
+        speakClips = { clipSeqs += it },
+    )
+
+    private fun spineUnwired(scope: CoroutineScope) = IseeVoiceSpine(
+        scope = scope,
+        crossingActive = { false },
+        placeMode = { PictoPlaceMode.DEDANS },
+        cutSpeech = {},
+        stopVoice = {},
+        speakPending = {},
+        speak = { spoken += it },
+        settings = { Settings.Default },
     )
 
     private fun spineDehors(scope: CoroutineScope, onResume: () -> Unit = {}) = IseeVoiceSpine(
@@ -66,21 +81,36 @@ class IseeVoiceSpineTest {
     }
 
     @Test
-    fun `trouve parle une fois par objet et cadran`() = runTest {
+    fun `trouve connu parle objet puis cadran, une fois par couple`() = runTest {
         val voice = spine(this)
-        voice.speakFound("tasse-spine", 9)
-        voice.speakFound("tasse-spine", 9)
-        voice.speakFound("tasse-spine", 3)
+        voice.speakFound("keys", 9)
+        voice.speakFound("keys", 9)
+        voice.speakFound("keys", 3)
         assertEquals(
-            listOf("Tasse-spine at 9 o'clock.", "Tasse-spine at 3 o'clock."),
-            spoken,
+            listOf(
+                listOf(IseeClipsEn.KEYS, IseeClipsEn.CLOCK_9),
+                listOf(IseeClipsEn.KEYS, IseeClipsEn.CLOCK_3),
+            ),
+            clipSeqs,
         )
     }
 
     @Test
-    fun `trouve parle la langue de la voix`() = runTest {
-        spine(this, SpeechLanguage.Fr).speakFound("mug-spine", 12)
-        assertEquals(listOf("Mug-spine à midi."), spoken)
+    fun `trouve inconnu parle found puis cadran`() = runTest {
+        spine(this).speakFound("mug", 9)
+        assertEquals(listOf(listOf(IseeClipsEn.FOUND, IseeClipsEn.CLOCK_9)), clipSeqs)
+    }
+
+    @Test
+    fun `trouve parle les clips anglais quelle que soit la langue`() = runTest {
+        spine(this, SpeechLanguage.Fr).speakFound("socks", 12)
+        assertEquals(listOf(listOf(IseeClipsEn.SOCKS, IseeClipsEn.CLOCK_12)), clipSeqs)
+    }
+
+    @Test
+    fun `trouve sans cablage parle chaque clip en texte`() = runTest {
+        spineUnwired(this).speakFound("phone", 5)
+        assertEquals(listOf(IseeClipsEn.PHONE_TEXT, IseeClipsEn.CLOCK_5_TEXT), spoken)
     }
 
     @Test

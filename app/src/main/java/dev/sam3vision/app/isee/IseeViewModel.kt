@@ -216,7 +216,7 @@ class IseeViewModel(app: Application) : AndroidViewModel(app) {
     private val modes = IseeModeOrders({ settings }, { navSpeaker.speakNavigation(it) }, ::update, { label -> runFindOrder(probe, settings, camera?.lensSpec, lensFeeds, picto, label) }, { _state.value.placeMode }, onFindOff = { picto.cancelHunt() }, onPlaceMode = (IseePlaceSync({ settings }, { settings = it }, viewModelScope, prefs::save, ::syncProbe))::onPlaceMode, post = { level, text, clip -> VoiceBus.post(level, text, clip) })
 
     /** Colonne vocale v4 : bus, bascule Traversée, parole GPS, reprise chat, trouvé (voir [IseeVoiceSpine]). */
-    private val spine: IseeVoiceSpine = IseeVoiceSpine(viewModelScope, { probe.state.value.crossingActive }, { _state.value.placeMode }, ::cutSpeech, voiceNav::stopVoice, { playback.speakPending() }, { navSpeaker.speakNavigation(it) }, { settings })
+    private val spine: IseeVoiceSpine = IseeVoiceSpine(viewModelScope, { probe.state.value.crossingActive }, { _state.value.placeMode }, ::cutSpeech, voiceNav::stopVoice, { playback.speakPending() }, { navSpeaker.speakNavigation(it) }, { settings }, speakClips = { ids -> clipPlayer.speakSequence(ids, urgent = false) })
 
     /** Routeur de la dictée (SPEC v4) : « mode … » ⇒ ordre exécuté ; le reste ⇒ question au LLM (voir [IseeDictationActions]). */
     private val dictationRouter = IseeDictationRouter(IseeDictationActions(
