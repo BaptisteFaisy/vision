@@ -41,6 +41,9 @@ class IseeModeOrders(
     private val find = FindIndoorVoice(update, onFind = onFind, onFindOff = onFindOff, placeMode = placeMode, post = post)
     private val picto = IseePictoVoice(pictoLabels, settings, speak, update, onFind = onFind, onCreate = onCreate, hits = pictoHits, placeMode = placeMode)
 
+    /** Bascule geste (quadruple tap) : même application que l'ordre vocal, annonce fournie. */
+    suspend fun applyPlace(mode: PictoPlaceMode, confirm: String) = place.apply(mode, confirm)
+
     /** Vrai si [text] portait un ordre de mode (texte consommé, rien d'autre à faire). */
     suspend fun run(text: String): Boolean =
         place.run(text) || find.run(text) || picto.run(text)

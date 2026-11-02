@@ -6,7 +6,9 @@ import dev.sam3vision.app.isee.vm.IseeDictation
 import dev.sam3vision.app.isee.vm.IseeLiveDictation
 import dev.sam3vision.app.isee.vm.IseePhotoShot
 import dev.sam3vision.app.isee.vm.IseeStreamDictation
+import dev.sam3vision.app.isee.vm.IseeWorldTapToggle
 import dev.sam3vision.core.glasses.CaptureAction
+import dev.sam3vision.core.picto.PictoPlaceMode
 import dev.sam3vision.core.settings.Settings
 import java.io.File
 import kotlinx.coroutines.CoroutineScope
@@ -33,10 +35,17 @@ internal class IseeHoldTalk(
     private val finishHold: suspend () -> Unit,
     /** Tap avec photo lunettes affichée : elle part, la caméra repart (`false` = rien). */
     private val onTapPhoto: () -> Boolean,
+    private val placeMode: () -> PictoPlaceMode,
+    private val applyPlace: suspend (PictoPlaceMode, String) -> Unit,
+    private val clock: () -> Long,
 ) {
+    /** Quadruple tap : 4 taps en 3 s inversent le lieu (voix de l'ordre vocal). */
+    private val worldTap = IseeWorldTapToggle(placeMode, applyPlace, clock = clock)
+
     /** Appui long : la frame courante devient le contexte (sauf photo gelée), puis le micro s'ouvre. */
     fun start() {
         if (!isActive()) return
+        worldTap.reset()
         // Parler coupe lecture et guidage (sinon la tenue est jetée, le micro reste pris).
         silence()
         // Ce qui est filmé devient le contexte de la question : une frame d'une
@@ -78,10 +87,11 @@ internal class IseeHoldTalk(
         update { it.copy(holding = false) }
     }
 
-    /** Tap : photo lunettes affichée → elle part et la caméra repart ; sinon la vidéo bascule. */
+    /** Tap : photo lunettes affichée → elle part et la caméra repart ; sinon la vidéo bascule (4 taps en 3 s = bascule du lieu). */
     fun singleTap() {
         if (!isActive()) return
         if (onTapPhoto()) return
+        worldTap.onTap()?.let { action -> scope.launch { action() } }
         if (snapshot().recordingVideo) cameraOps.stopVideo() else cameraOps.startVideo()
     }
 }
