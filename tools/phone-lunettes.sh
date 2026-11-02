@@ -1,19 +1,24 @@
 #!/usr/bin/env bash
-# Usage : tools/phone-lunettes.sh <apk> [--dry] [--no-launch]
+# Usage : tools/phone-lunettes.sh <apk> [--dry] [--no-launch] [--check]
 #  Installe et lance le banc d'essai lunettes, écran d'iSee (dev.sam3vision.app,
 #  .MainActivity : --ez mock/--ez analyze y poussent Route.Bench), sur le téléphone
 #  USB 2c6852ac via le verrou ~/bin/phone (jamais d'adb nu). --dry = diagnostic seul ;
-#  --no-launch = installe sans lancer ; preuve : ~/preuves/lunettes/. Code 0 = OK, 1 = échec.
+#  --no-launch = installe sans lancer ; --check = compare l'installé à origin/master
+#  sans rien installer (0 = à jour, 3 = en retard). Garde SHA : après install, la
+#  version posée doit être HEAD master, sinon refus de lancer (build périmée).
+#  Preuve : ~/preuves/lunettes/. Code 0 = OK, 1 = échec.
 set -euo pipefail
 PKG="dev.sam3vision.app"; ACT="$PKG/.MainActivity"
 SERIAL="${PHONE_SERIAL:-2c6852ac}"; PHONE="$HOME/bin/phone"; PROOF_ROOT="${PROOF_ROOT:-$HOME/preuves/lunettes}"
-APK=""; DRY=0; LAUNCH=1; WAIT=300; ADB=""; P_LISTED=""; P_PATHS=""; P_DUMP=""
+ROOT="$(cd -- "$(dirname -- "$0")/.." && pwd)"
+APK=""; DRY=0; LAUNCH=1; CHECK=0; WAIT=300; ADB=""; P_LISTED=""; P_PATHS=""; P_DUMP=""
 
 fail() { printf 'ECHEC : %s\n' "$1" >&2; exit 1; }
 while [ $# -gt 0 ]; do case "$1" in
   --dry) DRY=1; WAIT=60 ;;
   --no-launch) LAUNCH=0 ;;
-  -h|--help) sed -n '2,6p' "$0" | sed 's/^# \{0,1\}//'; exit 0 ;;
+  --check) CHECK=1 ;;
+  -h|--help) sed -n '2,8p' "$0" | sed 's/^# \{0,1\}//'; exit 0 ;;
   -*) fail "option inconnue : $1" ;;
   *) [ -z "$APK" ] || fail "un seul APK attendu"; APK="$1" ;;
 esac; shift; done
@@ -112,10 +117,47 @@ do_proof() {
   [ -s "$dir/ecran.png" ] || echo "(capture écran vide)"
 }
 
+# SHA court de master distant (miroir d'install-phone-latest.sh --check : une
+# campagne lunettes ne teste que HEAD, jamais une build périmée).
+master_short() {
+  local sha=""
+  sha="$(timeout 60 git -C "$ROOT" ls-remote origin refs/heads/master 2>/dev/null | cut -f1)" || sha=""
+  if [ -z "$sha" ]; then  # un DNS qui hoquette ne doit pas coûter la campagne
+    sleep 5
+    sha="$(timeout 60 git -C "$ROOT" ls-remote origin refs/heads/master 2>/dev/null | cut -f1)" || sha=""
+  fi
+  [ -n "$sha" ] || fail "GitHub injoignable (ls-remote origin master)"
+  printf '%s' "${sha:0:7}"
+}
+# Version réellement posée sur le téléphone (diagnostic déjà lu).
+installed_version() { grep -m1 versionName <<<"$P_DUMP" | sed -n 's/^ *versionName=//p'; }
+# --check : compare sans rien installer (codes miroir : 0 = à jour, 3 = en retard).
+do_check() {
+  local short="$1" on_phone
+  on_phone="$(installed_version)"
+  echo "GitHub master : $short   téléphone : ${on_phone:-absent}"
+  case "$on_phone" in
+    *-"$short") echo "→ à jour : ${on_phone} (master $short) — la campagne peut partir"; exit 0 ;;
+    *) echo "→ en retard : ${on_phone:-rien} (master $short) — rebuild depuis origin/master" >&2; exit 3 ;;
+  esac
+}
+# Garde SHA : après installation, la version posée doit être HEAD master —
+# sinon on refuse de lancer (une build périmée fausserait la campagne).
+guard_master_sha() {
+  local short on_phone
+  short="$(master_short)"
+  on_phone="$(installed_version)"
+  case "$on_phone" in
+    *-"$short") echo "→ SHA OK : ${on_phone} (master $short)" ;;
+    *) fail "build périmée : téléphone sur ${on_phone:-rien}, master sur $short — rebuild depuis origin/master avant la campagne" ;;
+  esac
+}
+
 resolve_adb
 ph "état appareils" devices | grep -q "^$SERIAL" ||
   fail "téléphone $SERIAL absent ou non autorisé (adb devices)"
 read_diag                                    # diagnostic, en lecture seule
+[ "$CHECK" = 1 ] && do_check "$(master_short)"
 is_ghost || echo "→ état : paquet normal ($(grep -m1 versionName <<<"$P_DUMP" | tr -s " " | sed "s/^ //"))"
 
 if [ "$DRY" = 1 ]; then
@@ -127,6 +169,7 @@ fi
 is_ghost && purge
 
 do_install
+guard_master_sha
 [ "$LAUNCH" = 1 ] || { echo "→ --no-launch : installé, non lancé"; exit 0; }
 do_launch
 do_proof
