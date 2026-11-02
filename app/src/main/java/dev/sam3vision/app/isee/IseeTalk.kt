@@ -38,13 +38,19 @@ internal class IseeHoldTalk(
     private val placeMode: () -> PictoPlaceMode,
     private val applyPlace: suspend (PictoPlaceMode, String) -> Unit,
     private val clock: () -> Long,
+    /**
+     * Un autre geste tient la surface (écoute « Quoi chercher ? » du balayage
+     * vers la droite) : la tenue et le tap se taisent, sinon deux gestes se
+     * disputeraient le même micro.
+     */
+    private val busy: () -> Boolean = { false },
 ) {
     /** Quadruple tap : 4 taps en 3 s inversent le lieu (voix de l'ordre vocal). */
     private val worldTap = IseeWorldTapToggle(placeMode, applyPlace, clock = clock)
 
     /** Appui long : la frame courante devient le contexte (sauf photo gelée), puis le micro s'ouvre. */
     fun start() {
-        if (!isActive()) return
+        if (!isActive() || busy()) return
         worldTap.reset()
         // Parler coupe lecture et guidage (sinon la tenue est jetée, le micro reste pris).
         silence()
@@ -89,7 +95,7 @@ internal class IseeHoldTalk(
 
     /** Tap : photo lunettes affichée → elle part et la caméra repart ; sinon la vidéo bascule (4 taps en 3 s = bascule du lieu). */
     fun singleTap() {
-        if (!isActive()) return
+        if (!isActive() || busy()) return
         if (onTapPhoto()) return
         worldTap.onTap()?.let { action -> scope.launch { action() } }
         if (snapshot().recordingVideo) cameraOps.stopVideo() else cameraOps.startVideo()
