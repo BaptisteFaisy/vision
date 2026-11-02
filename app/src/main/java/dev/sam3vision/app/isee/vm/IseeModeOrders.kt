@@ -19,6 +19,8 @@ import dev.sam3vision.core.settings.Settings
  * Spec v4 : « mode … » est le seul interrupteur (les anciens ordres sans
  * « mode » — maison, find, picto, where, où sont — partent au LLM).
  * [onFindOff] efface la chasse pendante (sortie de dedans).
+ * [post] porte le clip de confirmation du lieu (signature de VoiceBus :
+ * niveau, texte, clip), branché sur VoiceBus en production.
  */
 class IseeModeOrders(
     settings: () -> Settings,
@@ -28,10 +30,13 @@ class IseeModeOrders(
     placeMode: () -> PictoPlaceMode = { PictoPlaceMode.DEDANS },
     onFindOff: () -> Unit = {},
     onPlaceMode: (PictoPlaceMode) -> Unit = {},
+    post: (level: Int, text: String, clipId: String?) -> Unit = { _, _, _ -> },
 ) {
 
     private val find = ModeFindVoice(settings, speak, update, onFind = onFind, placeMode = placeMode)
-    private val place = PlaceModeOrder(settings, speak, update, onLeaveIndoor = onFindOff, onPlaceMode = onPlaceMode)
+    // Lieu : confirmation par clip hors-ligne ([post]) — la synthèse
+    // réseau ([speak]) est neutralisée pour ne pas doubler le clip.
+    private val place = PlaceModeOrder(settings, speak = { _ -> }, update, onLeaveIndoor = onFindOff, onPlaceMode = onPlaceMode, post = post)
 
     /** Bascule geste (quadruple tap) : même application que l'ordre vocal, annonce fournie. */
     suspend fun applyPlace(mode: PictoPlaceMode, confirm: String) = place.apply(mode, confirm)
