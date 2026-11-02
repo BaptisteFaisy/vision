@@ -43,7 +43,9 @@ internal class GlassesBackgroundFrames(
             runCatching { decoder.stashCsd(frame.asSdkFrame()) }
             return null
         }
-        runCatching { tryBitmap(frame) }.getOrNull()?.let { return it }
+        // Comme le direct : un bitstream déjà en Annex B y échoue à coup sûr
+        // après 1 à 3 ms — on ne sonde que ce qui peut être une image.
+        if (shouldProbeBitmap(frame)) runCatching { tryBitmap(frame) }.getOrNull()?.let { return it }
         if (!frame.compressed) return null
         val access = annexB(frame.bytes)
         val sdk = VideoFrame(

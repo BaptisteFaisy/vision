@@ -106,6 +106,18 @@ class GlassesBackgroundFramesTest {
     }
 
     @Test
+    fun `bitstream Annexe B = decodeur direct, sonde bitmap sautee`() {
+        // `00 00 00 01` en tête : `BitmapFactory` y échouerait à coup sûr
+        // après 1 à 3 ms — le pont saute la sonde, comme le direct.
+        val decoder = FakeDecoder()
+
+        assertNull(sampler(decoder).bitmapOf(box(bytes = byteArrayOf(0, 0, 0, 1, 0x65, 0x01, 0x02, 0x03))))
+
+        assertEquals(0, bitmapAttempts)
+        assertEquals(1, decoder.decoded)
+    }
+
+    @Test
     fun `vide ou dimensions nulles = rien sans rien toucher`() {
         val decoder = FakeDecoder()
         val pump = sampler(decoder)
