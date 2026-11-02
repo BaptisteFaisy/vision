@@ -4,13 +4,17 @@ import dev.sam3vision.core.crossing.CrossingAnnouncer
 import dev.sam3vision.core.crossing.CrossingCue
 import dev.sam3vision.core.crossing.CrossingState
 import dev.sam3vision.core.crossing.NoLightGate
+import dev.sam3vision.core.distance.DistanceReading
 import dev.sam3vision.core.distance.LensSpec
+import dev.sam3vision.core.live.AntiRepeat
+import dev.sam3vision.core.speech.IseeClipsEn
 import dev.sam3vision.core.model.LiveFrame
 import dev.sam3vision.core.model.SegObject
 import dev.sam3vision.core.settings.Settings
 import dev.sam3vision.core.speech.SpeechLanguage
 import dev.sam3vision.core.traverse.TraversePhase
 import dev.sam3vision.core.traverse.TraverseVeto
+import kotlinx.coroutines.test.runCurrent
 import kotlinx.coroutines.test.runTest
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
@@ -19,7 +23,27 @@ import org.junit.Assert.assertNull
 import org.junit.Assert.assertTrue
 import org.junit.Test
 
+/** Porte-parole faux : (clip, texte, séquence) enregistrés. */
+private class ApproachFakeSpeaker : VoiceBusSpeaker {
+    val calls = mutableListOf<Triple<String?, String, List<String>>>()
+
+    override fun idle(): Boolean = true
+
+    override fun say(level: Int, text: String, clipId: String?, clips: List<String>) {
+        calls += Triple(clipId, text, clips)
+    }
+
+    override fun cut() {
+    }
+}
+
 class CrossingWiringTest {
+
+    private fun obj(label: String, box: List<Float>, score: Float = 0.8f) =
+        SegObject(label = label, score = score, box = box, maskPngB64 = "")
+
+    private fun reading(label: String, meters: Float, box: List<Float>) =
+        DistanceReading(trackId = -1, label = label, meters = meters, rawMeters = meters, box = box)
 
     @Test
     fun `mode coupe libelle OFF`() {
@@ -258,5 +282,97 @@ class CrossingWiringTest {
         assertNull("le feu se tait", last.cue)
         assertEquals(CrossingState.Red, last.state)
         assertTrue("voiture proche : veto conservé hors branche feu", last.veto)
+    }
+
+    @Test
+    fun `repli approche avec distance parle la direction seule`() {
+        // R1 muette : "Left, 2 meters." ne matche aucun texte du catalogue
+        // (pas d'atome "mètre") et tombait en `sans-clip` — le repli parle
+        // l'atome direction avec les clips existants (arbitrage user).
+        assertEquals(listOf(IseeClipsEn.GO_LEFT), crossingApproachClips("Left, 2 meters."))
+        assertEquals(listOf(IseeClipsEn.GO_RIGHT), crossingApproachClips("Right, 1 meter."))
+        assertEquals(listOf(IseeClipsEn.AHEAD), crossingApproachClips("Ahead, 50 centimeters."))
+    }
+
+    @Test
+    fun `repli approche sans distance garde le comportement existant`() {
+        // Sans distance, la phrase se résout déjà au catalogue (clip parlé
+        // par la branche clip du bus) : le repli ne s'en mêle pas.
+        assertEquals(emptyList<String>(), crossingApproachClips("Left."))
+        assertEquals(emptyList<String>(), crossingApproachClips("Right."))
+        assertEquals(emptyList<String>(), crossingApproachClips("Ahead."))
+        assertEquals(IseeClipsEn.GO_LEFT, IseeClipsEn.idForText("Left."))
+        assertEquals(IseeClipsEn.AHEAD, IseeClipsEn.idForText("Ahead."))
+    }
+
+    @Test
+    fun `repli approche ignore le francais et l inconnu`() {
+        // Pack EN seul : le français reste muet (jamais de synthèse ici),
+        // l'inconnu aussi (jamais de mensonge, jamais de devinette).
+        assertEquals(emptyList<String>(), crossingApproachClips("Gauche, 2 mètres."))
+        assertEquals(emptyList<String>(), crossingApproachClips("Devant."))
+        assertEquals(emptyList<String>(), crossingApproachClips("Cross."))
+        assertEquals(emptyList<String>(), crossingApproachClips(""))
+    }
+
+    @Test
+    fun `voix annonce approche avec distance poste clips direction, texte inchange`() = runTest {
+        val speaker = ApproachFakeSpeaker()
+        AntiRepeat.reset()
+        VoiceBus.reset()
+        CrossingLateralWatch.reset()
+        VoiceBus.speaker = speaker
+        try {
+            observeCrossingVoice(backgroundScope)
+            val box = listOf(10f, 100f, 100f, 500f)
+            val objects = listOf(obj("crosswalk", box))
+            val readings = listOf(reading("crosswalk", 2.0f, box))
+            CrossingLateralWatch.update(objects, 512, 1138, readings, null, LensSpec.Default, 0L, SpeechLanguage.En)
+            runCurrent()
+            CrossingLateralWatch.update(objects, 512, 1138, readings, null, LensSpec.Default, 200L, SpeechLanguage.En)
+            runCurrent()
+
+            assertTrue(
+                "annonce audible avec [direction]",
+                speaker.calls.any { it == Triple(null, "Left, 2 meters.", listOf(IseeClipsEn.GO_LEFT)) },
+            )
+            assertTrue(
+                "jamais d'annonce avec distance sans clips (le bug R1)",
+                speaker.calls.none { it.second == "Left, 2 meters." && it.third.isEmpty() },
+            )
+        } finally {
+            VoiceBus.speaker = null
+            VoiceBus.reset()
+            AntiRepeat.reset()
+            CrossingLateralWatch.reset()
+        }
+    }
+
+    @Test
+    fun `voix annonce approche sans distance poste sans clips, existant`() = runTest {
+        val speaker = ApproachFakeSpeaker()
+        AntiRepeat.reset()
+        VoiceBus.reset()
+        CrossingLateralWatch.reset()
+        VoiceBus.speaker = speaker
+        try {
+            observeCrossingVoice(backgroundScope)
+            val box = listOf(10f, 100f, 100f, 500f)
+            val objects = listOf(obj("crosswalk", box))
+            CrossingLateralWatch.update(objects, 512, 1138, emptyList(), null, LensSpec.Default, 0L, SpeechLanguage.En)
+            runCurrent()
+            CrossingLateralWatch.update(objects, 512, 1138, emptyList(), null, LensSpec.Default, 200L, SpeechLanguage.En)
+            runCurrent()
+
+            assertTrue(
+                "direction seule postée sans séquence (branche clip, existant)",
+                speaker.calls.any { it == Triple(null, "Left.", emptyList<String>()) },
+            )
+        } finally {
+            VoiceBus.speaker = null
+            VoiceBus.reset()
+            AntiRepeat.reset()
+            CrossingLateralWatch.reset()
+        }
     }
 }
