@@ -5,15 +5,14 @@ import dev.sam3vision.core.crossing.CrossingPrompts
 import dev.sam3vision.core.crossing.CrossingState
 import dev.sam3vision.core.model.LiveFrame
 import dev.sam3vision.core.model.SegObject
-import dev.sam3vision.core.net.TtsClient
 import dev.sam3vision.core.settings.Settings
 import dev.sam3vision.core.speech.SpeechLanguage
+import dev.sam3vision.core.traverse.TraverseBundled
 import dev.sam3vision.core.traverse.TraverseClipStore
 import dev.sam3vision.core.traverse.TraverseDecision
 import dev.sam3vision.core.traverse.TraversePhase
 import dev.sam3vision.core.traverse.TraversePipeline
 import dev.sam3vision.core.traverse.TraversePlayer
-import dev.sam3vision.core.traverse.TraverseSystemTts
 import dev.sam3vision.core.traverse.TraverseVoice
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.runBlocking
@@ -184,12 +183,13 @@ class TraverseWiringTest {
 
     @Test
     fun `vert maintenu sans vehicule - annonce puis deux repetitions`() = runBlocking {
-        val tts = FakeTts()
-        val wiring = voicedWiring(tts)
+        val played = mutableListOf<String>()
+        val wiring = voicedWiring(played)
         wiring.updateLight(CrossingState.Green)
         repeat(5) { wiring.at(emptyList(), it + 1) }
 
-        assertEquals(listOf("Vert.", "Vert.", "Vert."), tts.asked)
+        assertEquals(3, played.size)
+        assertEquals(1, played.toSet().size)
     }
 
     @Test
@@ -211,11 +211,11 @@ class TraverseWiringTest {
 
     @Test
     fun `sans vert - traversez jamais parle`() = runBlocking {
-        val tts = FakeTts()
-        val wiring = voicedWiring(tts)
+        val played = mutableListOf<String>()
+        val wiring = voicedWiring(played)
         repeat(5) { wiring.at(emptyList(), it + 1) }
 
-        assertFalse(tts.asked.contains("Vert."))
+        assertTrue(played.isEmpty())
     }
 
     @Test
@@ -256,37 +256,28 @@ class TraverseWiringTest {
         assertEquals(listOf("traversee mode=OFF"), lines)
     }
 
-    private fun voicedWiring(tts: FakeTts): TraverseWiring {
+    private fun voicedWiring(played: MutableList<String>): TraverseWiring {
         val pipeline = TraversePipeline()
-        pipeline.voice = TraverseVoice(tts, FakePlayer(), FakeSystemTts(), FakeStore())
+        pipeline.voice = TraverseVoice(FakePlayer(played), FakeStore(), FakeBundled())
         return TraverseWiring(pipeline, log = {})
     }
 
-    private class FakeTts : TtsClient {
-        val asked = mutableListOf<String>()
-        override suspend fun synthesize(text: String): Result<ByteArray> {
-            asked += text
-            return Result.success(byteArrayOf(1))
+    private class FakePlayer(val played: MutableList<String>) : TraversePlayer {
+        override val isBusy: Boolean = false
+        override fun stop() = Unit
+        override suspend fun playFile(path: String): Boolean {
+            played += path
+            return true
         }
     }
 
-    private class FakePlayer : TraversePlayer {
-        override val isBusy: Boolean = false
-        override fun stop() = Unit
-        override suspend fun play(bytes: ByteArray): Boolean = true
-        override suspend fun playFile(path: String): Boolean = false
-    }
-
-    private class FakeSystemTts : TraverseSystemTts {
-        override suspend fun renderToFile(phrase: String, path: String): Result<String> =
-            Result.failure(IllegalStateException("no tts"))
-
-        override fun effectiveLanguage(): String = "fr-FR"
+    private class FakeBundled : TraverseBundled {
+        override fun fill(phrase: String, path: String): Boolean = true
     }
 
     private class FakeStore : TraverseClipStore {
         override fun pathFor(phrase: String): String = "/tmp/clip.wav"
-        override fun clipFor(phrase: String): String? = null
+        override fun clipFor(phrase: String): String? = "/tmp/${phrase.hashCode()}.wav"
     }
 
     private fun scope(): CoroutineScope = CoroutineScope(EmptyCoroutineContext)

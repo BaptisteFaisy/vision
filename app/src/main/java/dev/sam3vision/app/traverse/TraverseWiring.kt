@@ -13,7 +13,7 @@ import dev.sam3vision.app.isee.CrossingLight
 import dev.sam3vision.app.isee.LightCropLogger
 import dev.sam3vision.app.isee.crossingLightOf
 import dev.sam3vision.app.isee.greenForDecision
-import dev.sam3vision.app.ttsClient
+import dev.sam3vision.app.isee.guideVoicePack
 import dev.sam3vision.core.crossing.CarLightVeto
 import dev.sam3vision.core.crossing.CrossingPrompts
 import dev.sam3vision.core.crossing.CrossingState
@@ -69,9 +69,6 @@ class TraverseWiring(
     private val pipeline: TraversePipeline,
     private val log: (String) -> Unit = { Log.d("Traverse", it) },
 ) {
-
-    /** Moteur TTS du préchauffage hors-ligne, fermé à la coupure du mode. */
-    private var tts: TtsTraverseSystemTts? = null
 
     /** Mode actif : prompts véhicules + voix attachée (coupé par défaut). */
     var active: Boolean = false
@@ -192,13 +189,11 @@ class TraverseWiring(
         }
     }
 
-    /** Coupe le mode : voix détachée, moteur fermé, pipeline effacé. */
+    /** Coupe le mode : voix détachée, pipeline effacé. */
     fun deactivate() {
         active = false
         log("traversee mode=OFF")
         pipeline.voice = null
-        tts?.close()
-        tts = null
         pipeline.reset()
         lightGreen = false
         light = null
@@ -214,17 +209,9 @@ class TraverseWiring(
         lastBackgroundMoving = null
     }
 
-    /** Libération du moteur TTS, idempotente (appelée depuis `onCleared`). */
-    fun close() {
-        tts?.close()
-    }
-
-    /** Construit la voix, préchauffe, renvoie les prompts du mode. */
+    /** Construit la voix (clips Laure embarqués), préchauffe, renvoie les prompts du mode. */
     private fun attach(app: Application, settings: Settings, scope: CoroutineScope, prompts: List<String>): List<String> {
-        // Moteur EN : les clips pré-générés sont les phrases EN de TraversePhrases.
-        val engine = TtsTraverseSystemTts(app, Locale.ENGLISH)
         val voice = TraverseVoice(
-            ttsClient(settings),
             PlayerTraversePlayer(
                 SpeechPlayer(
                     dir = File(app.cacheDir, TRAVERSE_VOICE_DIR),
@@ -232,10 +219,9 @@ class TraverseWiring(
                     output = { GlassesVoiceRoute.current(app) },
                 ),
             ),
-            engine,
             DirTraverseClipStore(File(app.filesDir, TRAVERSE_CLIP_DIR)),
+            BundledTraverseFill(guideVoicePack(app)) { settings.ttsVoiceId },
         )
-        tts = engine
         pipeline.voice = voice
         scope.launch { voice.prewarm() }
         return traversePrompts(prompts)

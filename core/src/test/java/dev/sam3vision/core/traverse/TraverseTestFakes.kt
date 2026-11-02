@@ -1,38 +1,16 @@
 package dev.sam3vision.core.traverse
 
-import dev.sam3vision.core.net.TtsClient
-
-/** ElevenLabs factice : octets ou échec programmés, appels comptés. */
-internal class FakeTts(private val outcome: Result<ByteArray>) : TtsClient {
-    var calls = 0
-    var lastText: String? = null
-
-    override suspend fun synthesize(text: String): Result<ByteArray> {
-        calls++
-        lastText = text
-        return outcome
-    }
-}
-
 /** Lecteur factice : occupation programmable, ordre des événements rejouable. */
 internal class FakePlayer(
     override var isBusy: Boolean = false,
-    private val playOk: Boolean = true,
     private val playFileOk: Boolean = true,
 ) : TraversePlayer {
     val events = mutableListOf<String>()
-    var playedBytes: ByteArray? = null
     var playedPath: String? = null
 
     override fun stop() {
         events += "stop"
         isBusy = false
-    }
-
-    override suspend fun play(bytes: ByteArray): Boolean {
-        events += "play"
-        playedBytes = bytes
-        return playOk
     }
 
     override suspend fun playFile(path: String): Boolean {
@@ -42,22 +20,19 @@ internal class FakePlayer(
     }
 }
 
-/** TTS système factice : langue effective et rendus programmés. */
-internal class FakeSystemTts(
-    private val language: String = "en-US",
+/** MP3 embarqués factices : copies programmées vers le cache. */
+internal class FakeBundled(
     private val failOn: Set<String> = emptySet(),
     private val store: MutableMap<String, String>,
-) : TraverseSystemTts {
+) : TraverseBundled {
     var calls = 0
 
-    override suspend fun renderToFile(phrase: String, path: String): Result<String> {
+    override fun fill(phrase: String, path: String): Boolean {
         calls++
-        if (phrase in failOn) return Result.failure(RuntimeException("moteur indisponible"))
+        if (phrase in failOn) return false
         store[phrase] = path
-        return Result.success(path)
+        return true
     }
-
-    override fun effectiveLanguage(): String = language
 }
 
 /** Cache factice : présence = entrée non vide dans la carte. */

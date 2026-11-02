@@ -25,7 +25,6 @@ import org.junit.Test
 class TraversePipelineTest {
 
     private val focalPx = 1000f
-    private val mp3 = ByteArray(64) { 0xFF.toByte() }
     private val nearBox = listOf(0f, 0f, 200f, 200f)
     private val clips = mutableMapOf<String, String>()
 
@@ -34,15 +33,15 @@ class TraversePipelineTest {
 
     private fun pipeline(
         player: FakePlayer = FakePlayer(),
-        tts: FakeTts = FakeTts(Result.success(mp3)),
         withVoice: Boolean = true,
-    ): TraversePipeline = TraversePipeline(voice = traverseVoice(player, tts, withVoice))
+    ): TraversePipeline = TraversePipeline(voice = traverseVoice(player, withVoice))
 
-    private fun traverseVoice(player: FakePlayer, tts: FakeTts, withVoice: Boolean): TraverseVoice? =
+    private fun traverseVoice(player: FakePlayer, withVoice: Boolean): TraverseVoice? =
         if (!withVoice) {
             null
         } else {
-            TraverseVoice(tts, player, FakeSystemTts(store = clips), FakeStore(clips))
+            TraversePhrases.ALL.forEach { clips[it] = "/cache/${it.hashCode()}.wav" }
+            TraverseVoice(player, FakeStore(clips), FakeBundled(store = clips))
         }
 
     private suspend fun TraversePipeline.frame(
@@ -60,7 +59,7 @@ class TraversePipelineTest {
         assertEquals(TraversePhase.PRET, out.decision.state)
         assertFalse(out.decision.veto)
         assertEquals(CrossingText.phrase(CrossingState.Green), out.cue?.phrase)
-        assertEquals(TraverseVoiceOutcome.PRIMARY, out.voice)
+        assertEquals(TraverseVoiceOutcome.OFFLINE, out.voice)
     }
 
     @Test
@@ -107,11 +106,11 @@ class TraversePipelineTest {
                 cues++
                 assertEquals(CrossingText.phrase(CrossingState.Green), out.cue.phrase)
                 assertFalse(out.cue.urgent)
-                assertEquals(TraverseVoiceOutcome.PRIMARY, out.voice)
+                assertEquals(TraverseVoiceOutcome.OFFLINE, out.voice)
             }
         }
         assertEquals("annonce à 1 s, répétitions à 3 s et 5 s", 3, cues)
-        assertEquals(listOf("play", "play", "play"), player.events)
+        assertEquals(listOf("playFile", "playFile", "playFile"), player.events)
     }
 
     @Test
@@ -133,8 +132,8 @@ class TraversePipelineTest {
         assertNotNull(out.cue)
         assertTrue(out.cue!!.urgent)
         assertEquals(CrossingText.phrase(CrossingState.Red), out.cue.phrase)
-        assertEquals(TraverseVoiceOutcome.PRIMARY, out.voice)
-        assertEquals(listOf("play", "play", "play", "stop", "play"), player.events)
+        assertEquals(TraverseVoiceOutcome.OFFLINE, out.voice)
+        assertEquals(listOf("playFile", "playFile", "playFile", "stop", "playFile"), player.events)
     }
 
     @Test
@@ -148,11 +147,10 @@ class TraversePipelineTest {
     }
 
     @Test
-    fun `repli hors-ligne - clip rejoue quand elevenlabs echoue`() = runBlocking {
+    fun `clips uniquement - le vert rejoue son mp3 sans reseau`() = runBlocking {
         clips[CrossingText.phrase(CrossingState.Green)] = "/cache/vert.wav"
         val player = FakePlayer()
-        val tts = FakeTts(Result.failure(RuntimeException("402")))
-        val pipe = pipeline(player = player, tts = tts)
+        val pipe = pipeline(player = player)
         repeat(2) { i -> pipe.frame(emptyList(), green = true, index = i + 1) }
         val out = pipe.frame(emptyList(), green = true, index = 3)
 
