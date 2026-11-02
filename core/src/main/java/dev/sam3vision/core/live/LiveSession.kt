@@ -1,5 +1,6 @@
 package dev.sam3vision.core.live
 
+import android.os.SystemClock
 import dev.sam3vision.core.model.LiveFrame
 import dev.sam3vision.core.model.ObjectLimits
 import dev.sam3vision.core.net.LiveClient
@@ -96,7 +97,8 @@ class LiveSession(
     private val workEdge: Int = DEFAULT_WORK_EDGE,
     private val maxObjects: Int = DEFAULT_MAX_OBJECTS,
     private var cadence: Cadence = Cadence.Direct,
-    private val clock: () -> Long = System::currentTimeMillis,
+    /** Horloge monotone (ms) : stats et régulateur insensibles aux sauts NTP. */
+    private val clock: () -> Long = { SystemClock.elapsedRealtimeNanos() / 1_000_000 },
 ) : FramePipeline {
     /** Créneaux d'envoi : 1 par défaut, [Cadence.concurrency] pour la cadence rapide. */
     private val gate: FrameGate = gate ?: FrameGate(cadence.concurrency)

@@ -26,6 +26,11 @@ class RollingStat(private val maxSamples: Int = DEFAULT_WINDOW) {
     private var count = 0
     private var sum = 0L
 
+    /** Maximum de la session (jamais fenêtré) : le pire cas, embarqué. */
+    @Volatile
+    var max: Long = 0L
+        private set
+
     /** Copie de travail des percentiles : la fenêtre n'est jamais réordonnée. */
     private val scratch = LongArray(size)
 
@@ -41,6 +46,7 @@ class RollingStat(private val maxSamples: Int = DEFAULT_WINDOW) {
             count += 1
         }
         sum += value
+        if (value > max) max = value
     }
 
     /** Nombre de mesures valides dans la fenêtre. */
@@ -69,6 +75,7 @@ class RollingStat(private val maxSamples: Int = DEFAULT_WINDOW) {
         head = 0
         count = 0
         sum = 0L
+        max = 0L
     }
 
     companion object {
