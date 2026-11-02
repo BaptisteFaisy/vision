@@ -41,7 +41,7 @@ EOF
 PKG="dev.sam3vision.app"
 ACT="${PKG}/.MainActivity"
 SYSIMG="system-images;android-35;google_apis;x86_64"
-TAGS="sam3vision iSeeLive iSeeMotion Traverse"
+TAGS="sam3vision iSeeLive iSeeMotion Traverse ISEE_VOIX"
 
 VIDEO="" ROUTE="" RECORD="" AVD="isee-sim"
 SECONDS_REC=30
@@ -127,8 +127,7 @@ ensure_apk() {
   echo "→ APK : $APK_PATH ($(du -h "$APK_PATH" | cut -f1))"
 }
 
-# prepare_video : transcode la vidéo en profil caméra stable, avec cache par
-# empreinte (source + profil + version de ffmpeg). Renseigne SIM_VIDEO.
+# prepare_video : transcode en profil caméra stable, cache par empreinte ; renseigne SIM_VIDEO.
 prepare_video() {
   local size="${ISEESIM_SIZE:-640x480}" w h digest key cache_dir part
   case "$size" in
@@ -158,9 +157,8 @@ prepare_video() {
   echo "→ vidéo normalisée : $SIM_VIDEO ($(du -h "$SIM_VIDEO" | cut -f1))"
 }
 
-# sdk_root : racine du SDK, déduite de ANDROID_HOME, de l'émulateur ou d'avdmanager.
-# avdmanager ne trouve les images système que si la racine est celle de son SDK ;
-# sinon il répond « Package path is not valid ».
+# sdk_root : racine du SDK (ANDROID_HOME, émulateur ou avdmanager) — avdmanager
+# n'y trouve les images système que si c'est celle de son SDK.
 sdk_root() {
   if [[ -n "${ANDROID_HOME:-${ANDROID_SDK_ROOT:-}}" ]]; then
     printf '%s' "${ANDROID_HOME:-${ANDROID_SDK_ROOT:-}}"
@@ -453,14 +451,16 @@ cleanup() {
 
 # summary : compte les lignes utiles et rend le verdict (code 0 si la preuve existe).
 summary() {
-  local tags_line fatals
-  tags_line="$(grep -cE ' (sam3vision|iSeeLive|iSeeMotion|Traverse) *:' "$OUT_DIR/logcat.txt" 2>/dev/null || true)"
+  local tags_line fatals phrases
+  tags_line="$(grep -cE ' (sam3vision|iSeeLive|iSeeMotion|Traverse|ISEE_VOIX) *:' "$OUT_DIR/logcat.txt" 2>/dev/null || true)"
   fatals="$(grep -cE 'FATAL EXCEPTION|Fatal signal' "$OUT_DIR/crash.txt" 2>/dev/null || true)"
+  phrases="$(grep -cE ' ISEE_VOIX *: *EXPECT ' "$OUT_DIR/logcat.txt" 2>/dev/null || true)"
   printf '\nOK : harnais terminé\n'
   printf '  vidéo caméra    : %s (source : %s)\n' "$SIM_VIDEO" "$VIDEO"
   printf '  trajet GPS      : %s\n' "${ROUTE:-aucun}"
   printf '  enregistrement  : %s (%s)\n' "$RECORD" "$(du -h "$RECORD" | cut -f1)"
   printf '  logcat iSee     : %s ligne(s) de tags — %s\n' "${tags_line:-0}" "$OUT_DIR/logcat.txt"
+  printf '  phrases voix    : %s attente(s) EXPECT — %s\n' "${phrases:-0}" "$OUT_DIR/logcat.txt"
   printf '  crash           : %s ligne(s) fatale(s) — %s\n' "${fatals:-0}" "$OUT_DIR/crash.txt"
   printf '  boot            : %ss, série %s (%s)\n' "$BOOT_SECONDS" "$SERIAL" \
     "$( ((KEEP == 1)) && echo 'laissé allumé' || echo 'éteint')"
