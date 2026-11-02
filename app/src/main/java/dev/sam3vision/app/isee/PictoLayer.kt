@@ -21,11 +21,16 @@ import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.key
+import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.ImageBitmap
 import androidx.compose.ui.graphics.asImageBitmap
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.layout.onGloballyPositioned
@@ -37,6 +42,8 @@ import dev.sam3vision.app.isee.vm.PictoUiState
 import dev.sam3vision.core.picto.PictoHit
 import dev.sam3vision.core.picto.PictoSize
 import dev.sam3vision.core.picto.withFixedSize
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.withContext
 
 /** Le jaune des pictogrammes : le cadre reprend leur palette. */
 private val PICTO_YELLOW = Color(0xFFFFD600)
@@ -61,11 +68,7 @@ internal fun PictoLayer(hits: List<PictoHit>, pngOf: (String) -> ByteArray?, mod
         hits.forEach { raw ->
             val hit = raw.withFixedSize(PictoSize.DEFAULT, aspect)
             key(hit.pictoId) {
-                val image = remember(hit.pictoId) {
-                    runCatching {
-                        pngOf(hit.pictoId)?.let { BitmapFactory.decodeByteArray(it, 0, it.size) }
-                    }.getOrNull()?.asImageBitmap()
-                }
+                val image = rememberPictoImage(hit.pictoId, pngOf)
                 // `?.let`, jamais `?: return@key` : le retour étiqueté émet une
                 // classe synthétique que D8 refuse (« NON_LOCAL_RETURN », vu au dex).
                 val left = fullW * hit.x
@@ -87,6 +90,27 @@ internal fun PictoLayer(hits: List<PictoHit>, pngOf: (String) -> ByteArray?, mod
             }
         }
     }
+}
+
+/**
+ * Le PNG d'un pictogramme, décodé **hors du thread principal**.
+ *
+ * Il était décodé dans un `remember`, donc pendant la composition, sur le fil
+ * principal : un `BitmapFactory.decodeByteArray` par pictogramme affiché, à
+ * chaque nouveau repère. Le nom seul s'affiche en attendant le bitmap, et
+ * `null` (PNG absent, démo, décodage raté) laisse le repli texte de l'appelant.
+ */
+@Composable
+private fun rememberPictoImage(pictoId: String, pngOf: (String) -> ByteArray?): ImageBitmap? {
+    var image by remember(pictoId) { mutableStateOf<ImageBitmap?>(null) }
+    LaunchedEffect(pictoId) {
+        image = withContext(Dispatchers.IO) {
+            runCatching {
+                pngOf(pictoId)?.let { BitmapFactory.decodeByteArray(it, 0, it.size) }
+            }.getOrNull()?.asImageBitmap()
+        }
+    }
+    return image
 }
 
 /**

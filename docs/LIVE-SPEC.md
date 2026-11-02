@@ -21,9 +21,9 @@ qu'elles entourent le direct (réveil, photo, vidéo, extinction).
 | `http://` | devient `ws://` | `WsTransport.kt:42` |
 | User-Agent du handshake | `sam3vision-android/1.0 live` | `HttpLiveClient.kt:24`, posé par `WsTransport.kt:68` |
 | Fermeture | code `1000`, raison `fin du direct` | `WsTransport.kt:80`, `:101-103` |
-| Fermeture idle | code `1011`, raison `idle` : **45 s sans frame** (les pings 30 s ne réarment pas) | `server/backend/live_fast/service.py:350-353` |
-| Fermeture trop gros | code `1009` : réponse > 4 Mo, rien n'est envoyé | `server/backend/live_fast/service.py:310-314` |
-| Frame trop lente | **erreur `503` dans la trame**, connexion gardée (budget serveur 180 s) | `server/backend/live_fast/service.py:300-304` |
+| Fermeture idle | code `1001`, raison `idle` : **120 s sans message applicatif** (4 pings client — le ping protocole ne réarme rien, §9.2) | `server/backend/live_fast/ws_pump.py` (`WS_IDLE_SECONDS`) |
+| Fermeture trop gros | code `1009` **en dernier recours** : réponse > 4 Mo même dégradée ; sinon la réponse part dégradée (moitié des objets, masques retirés, §9.1) | `server/backend/live_fast/ws_pump.py` (`WS_MAX_REPLY_BYTES`) |
+| Frame trop lente | **erreur `503` dans la trame**, connexion gardée (budget serveur 75 s) ; `429` = occupé, backoff (§9.3) | `server/backend/live_fast/ws_pump.py` (`WS_FRAME_SECONDS`) |
 | Socket | **un seul par session**, réutilisé pour toutes les frames | `WsLiveClient.kt:91-102` |
 
 - Le handshake réutilise le pool de connexions du direct (`newBuilder()` sur le client
@@ -350,3 +350,85 @@ identités dans le cas courant, et le serveur seulement quand le tracker est act
 - **La troncature des concepts côté serveur.** `PROMPT_LIMIT = 18`, affirmé par le commentaire
   (`LivePrompts.kt`) **et** le code du tracker (`server/backend/tracking.py:54`) — mais
   le plafond du déploiement `/live` ne se lit que sur le serveur.
+
+## 9. Reprise après coupure — le contrat (ajouté le 02/11/2026)
+
+Le direct n'est pas une session éternelle : le serveur ferme, le réseau tombe, Modal
+replace le conteneur. Ce qui manquait n'était pas la reconnexion, c'était **la règle**.
+La voici, côté serveur (`server/backend/live_fast/ws_pump.py`) et côté client.
+
+### 9.1 Codes de fermeture — ce qu'ils veulent dire, ce que le client en fait
+
+| Code | `reason` | Sens côté serveur | Action client attendue |
+|---|---|---|---|
+| `1000` | `fin du direct` | fermeture demandée par le client | rien, ne pas rouvrir |
+| `1001` | `idle` | aucun message **applicatif** depuis 120 s | rouvrir au prochain envoi, **sans backoff** |
+| `1009` | `response too large: lower max_objects or use mask_format=rle` | réponse > 4 Mo **même dégradée** | baisser `max_objects` et/ou passer `mask_format: "rle"`, réessayer la frame |
+| `1011` | `internal` | erreur interne réelle | backoff 250 / 500 / 1000 ms, 3 essais |
+| `1006` / aucun code | — | réseau coupé ou conteneur tué (crash, `timeout` Modal) | backoff puis session **froide** (budget 60 s) |
+
+- `1009` est un **dernier recours** : avant de fermer, le serveur renvoie la même frame
+  **dégradée** — moitié des objets, `mask_b64` retirés, `mask_encoding: "none"`, plus un
+  champ additif `degraded` (`{"reason", "max_objects", "mask_encoding"}`) que le client
+  peut afficher ou ignorer. Une réponse dégradée est une réponse valide : elle se corrèle
+  à son `id` comme les autres.
+- `1011` ne sert plus à dire « idle » : un client qui lit les codes comme
+  `MetaRealtimeClient` en déduisait « serveur cassé » et backoffait pour rien.
+- Aucune fermeture n'est un motif d'abandon du direct : le socket se rouvre
+  **paresseusement**, à la frame suivante (`WsLiveClient.openLocked`), et l'`id` d'une
+  frame perdue en vol n'est jamais réutilisé.
+
+### 9.2 Keepalive — deux horloges distinctes
+
+| Horloge | Qui | Effet |
+|---|---|---|
+| ping **protocole** (30 s, `WsTransport` `pingInterval`) | OkHttp | garde le NAT et détecte une paire morte ; **n'atteint jamais la boucle serveur** (pong automatique) |
+| keepalive **applicatif** (`{"id":0,"ping":1}`) | le client, quand aucune frame ne part | réarme l'idle serveur ; réponse `{"id":0,"pong":true}`, jamais corrélée à une frame |
+| idle serveur (120 s sans message applicatif) | serveur | ferme en `1001 idle` |
+
+Le client **doit** envoyer `{"id":0,"ping":1}` dès qu'il reste plus de 20 s sans frame
+(dictée, réglages, caméra re-liée) : sans lui, une pause de 2 min coûte une fermeture
+`1001` et un handshake. La forme longue `{"type":"ping","id":N}` reste acceptée.
+
+### 9.3 Budget d'ack (par frame)
+
+| Étape | Valeur | Conséquence |
+|---|---|---|
+| budget client, session chaude | 10 s | au-delà : frame abandonnée, créneau du `FrameGate` libéré |
+| budget client, session froide / 1re frame | 60 s | couvre le thaw (5,5-10,9 s) et le GPU froid |
+| budget serveur par frame | 75 s | au-delà : `{"id":N,"error":{"status":503}}`, **connexion gardée** |
+| attente au verrou GPU | 15 s | au-delà : `429` dans la trame — « occupé », backoff 250 ms |
+
+- Une frame peut donc être répondue `503` (« trop tard, retente ») ou `429`
+  (« occupé, attends ») **sans** fermeture : le client ne doit ni rouvrir le socket ni
+  renvoyer la même frame deux fois pour un `503`.
+- Une frame dont le client a abandonné l'attente (10 s) mais qui aboutit côté serveur est
+  perdue : le serveur ne renvoie plus rien d'utile pour un `id` que le client n'attend
+  plus, et le renvoi paierait une seconde inférence.
+- Le serveur ne garde jamais un créneau occupé par une frame abandonnée : le créneau est
+  rendu au plus tard 2 s après le départ du client, et le verrou GPU est rendu par le
+  thread lui-même (`try/finally`) ; trois frames muettes consécutives redémarrent le
+  conteneur plutôt que de laisser un verrou fou.
+- `429` et `503` sont déjà dans le barème (`Json.kt`) : aucun nouveau code d'erreur.
+
+### 9.4 Ce que le client doit faire, dans l'ordre
+
+1. ne pas sonder `/health` pour savoir si la carte est chaude : `ok`/`ws_ready` disent
+   « la carte peut servir », `warm` dit « une frame a déjà été servie ». Tant que `warm`
+   est faux, garder le budget froid (60 s) ;
+2. envoyer le keepalive de §9.2 quand aucune frame ne part ;
+3. sur `1001 idle` : rouvrir sans backoff, à la frame suivante ;
+4. sur `1009` : dégrader la requête (`max_objects`, `mask_format: "rle"`), réessayer une
+   fois ;
+5. sur `1011` / `1006` : backoff 250 / 500 / 1000 ms, 3 essais maximum, puis erreur
+   affichée — jamais de boucle à 350 ms contre un conteneur en boot (27,6 s) ;
+6. ne jamais renvoyer une frame en vol après réouverture : sa réponse est perdue de toute
+   façon (corrélation par `id`) et un renvoi facture une seconde inférence.
+
+### 9.5 Ce qui mesure cette politique
+
+`GET /health` publie `ws` : `sessions`, `open`, `frames`, `errors`, `timeouts`,
+`degraded`, `close_idle`, `close_oversize`, `close_client`, `last_frame_age_s`,
+`active` (créneaux tenus), `threads` (calculs vivants), `abandoned`. Une ligne est écrite
+par ouverture (`ws: open …`) et par fermeture (`ws: close reason=… dur=… frames=…`).
+Sans ces compteurs, « pas de reprise automatique » n'était pas mesurable.

@@ -33,12 +33,15 @@ fun liveClient(
      * serveur déployé lit le binaire, avec repli JSON si le serveur le refuse.
      */
     binaryWs: Boolean = true,
-    /**
-     * Annonce du transport (`true` = binaire) : une fois à la première frame, puis
-     * au repli texte. `null` = silencieuse ; non bloquante (thread réseau).
-     */
+    /** Annonce du transport (`true` = binaire) : première frame, puis au repli texte. */
     onBinaryChange: ((Boolean) -> Unit)? = null,
-): LiveClient = liveClientWith(baseUrl, timeoutSeconds, marks, maskFormat, maskEdge, withDepth, masks, binaryWs, onBinaryChange) { milliseconds ->
+    /** Réseau poussé par la plateforme (défaut : inconnu, rien n'est bloqué). */
+    net: NetworkState = NetworkState.Always,
+    /** Budget de reprise du lien (backoff, jitter, silence toléré). */
+    budget: LinkBudget = LinkBudget(),
+): LiveClient = liveClientWith(
+    baseUrl, timeoutSeconds, marks, maskFormat, maskEdge, withDepth, masks, binaryWs, onBinaryChange, net, budget,
+) { milliseconds ->
     OkHttpWsTransport(liveWsClient(milliseconds / 1000))
 }
 
@@ -53,6 +56,8 @@ internal fun liveClientWith(
     masks: Boolean = true,
     binaryWs: Boolean = true,
     onBinaryChange: ((Boolean) -> Unit)? = null,
+    net: NetworkState = NetworkState.Always,
+    budget: LinkBudget = LinkBudget(),
     transportFor: (Long) -> WsTransport,
 ): LiveClient = WsLiveClient(
     baseUrl,
@@ -67,4 +72,6 @@ internal fun liveClientWith(
     masks = masks,
     binaryWs = binaryWs,
     onBinaryChange = onBinaryChange,
+    net = net,
+    link = WsLink(budget),
 )

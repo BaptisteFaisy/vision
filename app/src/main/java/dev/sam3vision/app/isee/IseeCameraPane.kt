@@ -3,14 +3,11 @@ package dev.sam3vision.app.isee
 import android.content.Context
 import android.os.SystemClock
 import android.util.Size
-import androidx.camera.core.CameraSelector
 import androidx.camera.core.ImageAnalysis
 import androidx.camera.core.ImageProxy
 import androidx.camera.core.resolutionselector.ResolutionSelector
 import androidx.camera.core.resolutionselector.ResolutionStrategy
 import androidx.camera.core.ImageCapture
-import androidx.camera.core.Preview
-import androidx.camera.lifecycle.ProcessCameraProvider
 import androidx.camera.view.PreviewView
 import androidx.lifecycle.LifecycleOwner
 import androidx.compose.ui.graphics.toArgb
@@ -19,7 +16,6 @@ import dev.sam3vision.app.bitmapToJpeg
 import dev.sam3vision.app.lensSpecOf
 import dev.sam3vision.app.media.Nv21JpegEncoder
 import dev.sam3vision.app.media.jpegBytesToBase64
-import dev.sam3vision.app.previewResolutionSelector
 import dev.sam3vision.app.uprightScaled
 import dev.sam3vision.core.distance.LensSpec
 import dev.sam3vision.core.live.captureStamp
@@ -65,9 +61,15 @@ const val SHARE_FRAME_QUALITY = 70
  * L'analyseur ne sert qu'à SAM : [onFrame] est branché par la fenêtre, et l'appelant
  * décide quand envoyer (caméra active — sinon le GPU se réveillerait pour rien).
  */
-class IseeCameraHost(private val context: Context) {
+internal class IseeCameraHost(private val context: Context) : CameraBindHost {
 
     private val executor: ExecutorService = Executors.newSingleThreadExecutor()
+
+    /** La liaison CameraX elle-même : provider, plans de repli, états, déliement. */
+    private val binder = IseeCameraBinder(context, this).also { it.onClosed = { onCameraClosed?.invoke() } }
+
+    /** Caméra fermée par le système (autre app, veille) : la carte décide de relier. */
+    var onCameraClosed: (() -> Unit)? = null
 
     /** Enregistrement et photo de la fenêtre : la liaison lui confie ses captures. */
     private val recorder = IseeCameraRecorder(context, executor)
@@ -189,44 +191,13 @@ class IseeCameraHost(private val context: Context) {
      * « Camera not ready » au premier tap (mesuré sur le téléphone, build 1.0.139).
      * Lier à l'activité retire cette dépendance d'ordre ; l'aperçu se montre quand la
      * bulle apparaît.
+     *
+     * Le travail réel (provider, plans de repli, `bindToLifecycle`, `CameraState`) est
+     * dans [IseeCameraBinder] : rien de ce qu'il fait ne peut lever, sinon l'exception
+     * sortirait dans la `LaunchedEffect` de la carte et tuerait le process.
      */
-    suspend fun bind(owner: LifecycleOwner): String? {
-        val provider = withContext(Dispatchers.IO) { ProcessCameraProvider.getInstance(context).get() }
-        val view = boundPreview ?: return "Preview not attached yet"
-        val halBare = withContext(Dispatchers.IO) { readHalFlag() }
-        // L'aperçu prend **sa** résolution : sans `ResolutionSelector` propre, CameraX le
-        // faisait descendre dans la famille de l'analyse (320 px) et la carte l'étirait
-        // ~3× — aplats de couleur de ~3 px mesurés sur le téléphone.
-        val preview = Preview.Builder()
-            .setResolutionSelector(previewResolutionSelector())
-            .build()
-            .also { it.setSurfaceProvider(view.surfaceProvider) }
-        val image = ImageCapture.Builder().build()
-        val analysis = newAnalysis()
-        val video = androidx.camera.video.VideoCapture.withOutput(
-            androidx.camera.video.Recorder.Builder()
-                .setQualitySelector(
-                    androidx.camera.video.QualitySelector.from(androidx.camera.video.Quality.HD),
-                )
-                .build(),
-        )
-        return runCatching {
-            provider.unbindAll()
-            val camera = provider.bindToLifecycle(
-                owner,
-                CameraSelector.DEFAULT_BACK_CAMERA,
-                preview,
-                image,
-                video,
-                analysis,
-            )
-            boundCamera = camera
-            CameraHalProcessing.resolveAndApply(halBare, camera)
-            exposure.init(camera)
-            recorder.attach(image, video)
-            null
-        }.getOrElse { "Camera binding failed: ${it.message}" }
-    }
+    suspend fun bind(owner: LifecycleOwner): String? =
+        boundPreview?.let { binder.bind(owner, it) } ?: "Preview not attached yet"
 
     /** Drapeau HAL dépouillé des Réglages, `false` si illisible (jamais d'exception). */
     private suspend fun readHalFlag(): Boolean = runCatching {
@@ -234,7 +205,7 @@ class IseeCameraHost(private val context: Context) {
     }.getOrDefault(false)
 
     /** Analyseur de frames 480 px, une frame à la fois (les anciennes sont jetées). */
-    private fun newAnalysis(): ImageAnalysis = ImageAnalysis.Builder()
+    override fun newAnalysis(): ImageAnalysis = ImageAnalysis.Builder()
         .setBackpressureStrategy(ImageAnalysis.STRATEGY_KEEP_ONLY_LATEST)
         .setResolutionSelector(
             ResolutionSelector.Builder()
@@ -282,54 +253,68 @@ class IseeCameraHost(private val context: Context) {
         return intervalMs
     }
 
+    /**
+     * Entrée de l'analyseur. **Rien ne doit sortir d'ici** : CameraX soumet
+     * [analyseOrDrop] à son exécuteur sans table d'exceptions, une exception
+     * remonterait donc au handler du fil et tuerait le process.
+     *
+     * La « porte frame inutile » a longtemps vécu **hors** du `try` : toute
+     * exception de `sampleMeanLuma` sur une frame déjà rendue (proxy remplacé
+     * pendant l'analyse) sortait au fil de l'analyseur. Elle est maintenant dans
+     * [analyseOrDrop], et la fermeture de l'image est unique, ici, quoi qu'il arrive.
+     */
     private fun analyse(proxy: ImageProxy) {
-        // Cadence du pipeline, avant toute décision : une frame jetée par `wantsFrame`
-        // compte aussi, sinon on mesurerait la consommation de SAM.
-        lastIntervalMs = noteCadence(SystemClock.elapsedRealtimeNanos())
+        try {
+            // Cadence du pipeline, avant toute décision : une frame jetée par
+            // `wantsFrame` compte aussi, sinon on mesurerait la consommation de SAM.
+            lastIntervalMs = noteCadence(SystemClock.elapsedRealtimeNanos())
+            analyseOrDrop(proxy)
+        } catch (_: Throwable) {
+            // frame illisible ou tampon déjà fermé : la suivante arrive tout de suite
+        } finally {
+            runCatching { proxy.close() }
+        }
+    }
+
+    /** Corps de l'analyse, sans `close()` : la fermeture est unique, dans [analyse]. */
+    private fun analyseOrDrop(proxy: ImageProxy) {
         if (wantsFrame?.invoke() == false) {
             // Même jetée, la frame nourrit le gouverneur : l'aperçu reste exposé
             // juste quand SAM ne consomme rien (échantillon Y, pas de pack NV21).
             exposure.govern(encoder.sampleMeanLuma(proxy)?.toDouble(), boundCamera)
             noteDropped()
-            proxy.close()
             return
         }
         val enteredAtNs = SystemClock.elapsedRealtimeNanos()
         val startedAt = SystemClock.elapsedRealtime()
-        try {
-            // Single pass: one NV21 pack (or one fallback Bitmap) for SAM
-            // and the caregiver live stream — plus one JPEG encode per consumer.
-            val quality = jpegQuality?.invoke() ?: ISEE_FRAME_QUALITY
-            val shareDue = SharedCameraFrame.audience && startedAt - lastShareEncodeMs >= STREAM_FRAME_MS
-            val encStart = SystemClock.elapsedRealtime()
-            val encoded = encodeSinglePass(proxy, quality, shareDue)
-            exposure.govern(encoded.mean, boundCamera)
-            val encMs = SystemClock.elapsedRealtime() - encStart
-            val ageMs = (enteredAtNs - captureStamp(proxy.imageInfo.timestamp, enteredAtNs)) / NS_PER_MS
-            encoded.luma?.also { onLuma?.invoke(it) }?.let(::noteSharpness)
-            val shareBytes = offerEncodedShare(encoded, startedAt)
-            if (lightVerdict(encoded.mean) == LightVerdict.LOW_LIGHT) {
-                noteLowLight()
-                // Veto nuit : pas de b64 ni de rappel — capsplit honnête (b64/cb à zéro).
-                countConversion(++conversionFrames, SystemClock.elapsedRealtime() - startedAt,
-                    proxy.width to proxy.height, encoded.sam.size, shareBytes, ageMs, encMs, 0, 0)
-                return
-            }
-            wasDark = false
-            val b64Start = SystemClock.elapsedRealtime()
-            val b64 = jpegBytesToBase64(encoded.sam)
-            val stamp = captureStamp(proxy.imageInfo.timestamp, SystemClock.elapsedRealtimeNanos())
-            val b64Ms = SystemClock.elapsedRealtime() - b64Start
-            val cbStart = SystemClock.elapsedRealtime()
-            onFrame?.invoke(b64, stamp)
-            val cbMs = SystemClock.elapsedRealtime() - cbStart
+        // Single pass: one NV21 pack (or one fallback Bitmap) for SAM
+        // and the caregiver live stream — plus one JPEG encode per consumer.
+        val quality = jpegQuality?.invoke() ?: ISEE_FRAME_QUALITY
+        val shareDue = SharedCameraFrame.audience && startedAt - lastShareEncodeMs >= STREAM_FRAME_MS
+        val encStart = SystemClock.elapsedRealtime()
+        val encoded = encodeSinglePass(proxy, quality, shareDue)
+        exposure.govern(encoded.mean, boundCamera)
+        val encMs = SystemClock.elapsedRealtime() - encStart
+        val ageMs = (enteredAtNs - captureStamp(proxy.imageInfo.timestamp, enteredAtNs)) / NS_PER_MS
+        encoded.luma?.also { onLuma?.invoke(it) }?.let(::noteSharpness)
+        val shareBytes = offerEncodedShare(encoded, startedAt)
+        if (lightVerdict(encoded.mean) == LightVerdict.LOW_LIGHT) {
+            noteLowLight()
+            // Veto nuit : pas de b64 ni de rappel — capsplit honnête (b64/cb à zéro).
             countConversion(++conversionFrames, SystemClock.elapsedRealtime() - startedAt,
-                proxy.width to proxy.height, encoded.sam.size, shareBytes, ageMs, encMs, b64Ms, cbMs)
-        } catch (_: Throwable) {
-            // frame illisible : la suivante arrive tout de suite
-        } finally {
-            proxy.close()
+                proxy.width to proxy.height, encoded.sam.size, shareBytes, ageMs, encMs, 0, 0)
+            return
         }
+        wasDark = false
+        val b64Start = SystemClock.elapsedRealtime()
+        val b64 = jpegBytesToBase64(encoded.sam)
+        val stamp = captureStamp(proxy.imageInfo.timestamp, SystemClock.elapsedRealtimeNanos())
+        val b64Ms = SystemClock.elapsedRealtime() - b64Start
+        val cbStart = SystemClock.elapsedRealtime()
+        onFrame?.invoke(b64, stamp)
+        val cbMs = SystemClock.elapsedRealtime() - cbStart
+        countConversion(++conversionFrames, SystemClock.elapsedRealtime() - startedAt,
+            proxy.width to proxy.height, encoded.sam.size, shareBytes, ageMs, encMs, b64Ms, cbMs)
     }
 
     /**
@@ -398,10 +383,10 @@ class IseeCameraHost(private val context: Context) {
     )
 
     /** Démarre l'enregistrement du MP4 dans [file] ; `false` si non prêt ou déjà lancé. */
-    fun startVideo(file: File): Boolean = recorder.startVideo(file)
+    fun startVideo(file: File): Boolean = recorder.startVideo(file).also { if (it) recording = true }
 
     /** Stoppe puis attend la finalisation du MP4 (fichier non vide) ou `null`. */
-    suspend fun stopVideo(): File? = recorder.stopVideo()
+    suspend fun stopVideo(): File? = recorder.stopVideo().also { recording = false }
 
     /**
      * Photo de la frame filmée (appui long) ; `true` = demande acceptée (écriture
@@ -410,11 +395,62 @@ class IseeCameraHost(private val context: Context) {
     fun takePhotoNow(target: File, onSaved: (Boolean) -> Unit): Boolean =
         recorder.takePhotoNow(target, onSaved)
 
-    /** Libère l'executor ; la caméra est déliée par le dispose de la fenêtre. */
+    /**
+     * Quitte l'écran : délie l'analyseur **puis** libère le fil.
+     *
+     * L'analyseur est lié au cycle de vie de l'**activité**, pas à la composition :
+     * sans `unbindAll`, naviguer vers les Réglages laissait l'analyse liée et
+     * l'activité vivante, donc CameraX continuait de livrer des images à un
+     * exécuteur arrêté — image jamais fermée, analyseur mort, caméra allumée pour
+     * rien. L'ordre compte, comme dans [dev.sam3vision.app.LiveScreen].
+     */
     fun release() {
+        binder.unbind()
+        recording = false
         recorder.cancelRecording()
         executor.shutdown()
     }
+
+    /**
+     * Permission perdue (ou caméra rendue) : on délie et on rend le capteur, mais
+     * on garde le fil vivant — la permission peut revenir depuis les Réglages
+     * pendant que l'écran vit.
+     */
+    fun unbind() {
+        binder.unbind()
+        recording = false
+        recorder.cancelRecording()
+    }
+
+    /** Vrai quand une caméra est liée et utilisable (réglages, reprise). */
+    val bound: Boolean get() = binder.bound
+
+    /** Vrai si CameraX a rapporté `CLOSED` depuis le dernier lien (autre app, veille). */
+    val closed: Boolean get() = binder.closed
+
+    /** Vrai pendant l'écriture d'un MP4 : on ne délie jamais sous lui (fichier perdu). */
+    @Volatile
+    var recording: Boolean = false
+        private set
+
+    override fun attachRecorder(image: ImageCapture, video: androidx.camera.video.VideoCapture<androidx.camera.video.Recorder>) =
+        recorder.attach(image, video)
+
+    override fun publishCamera(camera: androidx.camera.core.Camera?) {
+        boundCamera = camera
+    }
+
+    /**
+     * Réglages capteur facultatifs : chacun a son propre `runCatching`. Un HAL qui
+     * refuse la configuration ne doit pas annuler une caméra déjà liée — c'est
+     * exactement ce qui laissait une caméra allumée sous un état « échec ».
+     */
+    override fun tuneCamera(camera: androidx.camera.core.Camera, halBare: Boolean) {
+        runCatching { CameraHalProcessing.resolveAndApply(halBare, camera) }
+        runCatching { exposure.init(camera) }
+    }
+
+    override suspend fun readHalBare(): Boolean = withContext(Dispatchers.IO) { readHalFlag() }
 
     /**
      * SAM + direct aidant issus d'une seule passe : [sam] part à SAM (sauf veto

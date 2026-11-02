@@ -450,9 +450,10 @@ def test_o2_warm_server(_module) -> None:
     check("o2 : work_edge défaut ≥ plancher 512",
           service.WORK_EDGE_DEFAULT >= service.WORK_EDGE_MIN,
           f"{service.WORK_EDGE_DEFAULT} < {service.WORK_EDGE_MIN}")
-    check("o2 : idle WS 45 s > ping client 30 s (WsTransport)",
-          service.WS_IDLE_SECONDS == 45.0 and service.WS_IDLE_SECONDS > 30,
-          str(service.WS_IDLE_SECONDS))
+    check("o2 : idle WS 120 s ≥ 4 pings client (30 s) — le ping protocole ne réarme rien",
+          service.WS_IDLE_SECONDS == 120.0
+          and service.WS_IDLE_SECONDS >= 4 * service.WS_CLIENT_PING_SECONDS,
+          f"{service.WS_IDLE_SECONDS} vs ping {service.WS_CLIENT_PING_SECONDS}")
 
     previous = os.environ.pop("FAST_BATCH_PROMPTS", None)
     try:

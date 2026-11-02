@@ -24,6 +24,7 @@ class _ScriptSocket:
         self._script = list(script)
         self.sent: list[str] = []
         self.closes: list[int] = []
+        self.reasons: list[str] = []
 
     async def receive(self):
         if not self._script:
@@ -42,27 +43,41 @@ class _ScriptSocket:
 
     async def close(self, code=1000, reason=None) -> None:
         self.closes.append(code)
+        self.reasons.append(reason or "")
 
 
 class _Service:
-    """Doublure de ``Sam3LiveService`` : réponse fixe, appels comptés, barrière optionnelle."""
+    """Doublure de ``Sam3LiveService`` : réponse fixe, appels comptés, barrière optionnelle.
 
-    def __init__(self, gate=None) -> None:
+    ``slots``/``frame_timeouts``/``ws`` sont ceux du vrai service (``__init__``) : les
+    garde-fous (créneau rendu, chien de garde, compteurs) sont donc exercés pour de vrai.
+    """
+
+    def __init__(self, gate=None, reply=None, stuck=False) -> None:
+        from gpu_guard import Slots
+
         self.calls: list = []
         self._gate = gate
+        self._stuck = stuck
+        self.reply = dict(reply or {"width": 64, "height": 40, "elapsed_ms": 1,
+                                    "objects": []})
+        self.slots = Slots()
+        self.frame_timeouts = 0
 
     async def _run_live(self, request) -> dict:
         self.calls.append(request)
-        if self._gate is not None:
+        if self._stuck:  # inférence qui ne finit jamais (aucune horloge de boucle liée)
+            await asyncio.sleep(3600)
+        elif self._gate is not None:
             await self._gate.wait()
-        return {"width": 64, "height": 40, "elapsed_ms": 1, "objects": []}
+        return dict(self.reply)
 
     async def _run_live_binary_ws(self, request, _jpeg) -> dict:
         return await self._run_live(request)
 
 
-def _fresh_pump():
-    """``live_fast/ws_pump.py`` exécuté à neuf (aucune copie racine, cache intact)."""
+def _fresh(name: str):
+    """Un module de ``live_fast/`` exécuté à neuf (aucune copie racine, cache intact)."""
     import importlib.util
 
     from test_units import BACKEND_DIR
@@ -70,13 +85,34 @@ def _fresh_pump():
     live_fast = BACKEND_DIR / "live_fast"
     sys.path.insert(0, str(live_fast))
     try:
-        spec = importlib.util.spec_from_file_location("live_fast_ws_pump_probe",
-                                                      live_fast / "ws_pump.py")
+        spec = importlib.util.spec_from_file_location(f"live_fast_{name}_probe",
+                                                      live_fast / f"{name}.py")
         module = importlib.util.module_from_spec(spec)
         spec.loader.exec_module(module)
     finally:
         sys.path.remove(str(live_fast))
     return module
+
+
+def _fresh_pump():
+    """``live_fast/ws_pump.py`` exécuté à neuf (aucune copie racine, cache intact)."""
+    return _fresh("ws_pump")
+
+
+class _KeepAliveSocket(_ScriptSocket):
+    """Socket qui ping toutes les ``gap`` s : prouve que le keepalive réarme l'idle."""
+
+    def __init__(self, gap, pings) -> None:
+        super().__init__([])
+        self._gap = gap
+        self._pings = pings
+
+    async def receive(self):
+        if self._pings <= 0:
+            return {"type": "websocket.disconnect"}
+        self._pings -= 1
+        await asyncio.sleep(self._gap)
+        return {"type": "websocket.receive", "text": '{"id":0,"ping":1}'}
 
 
 def _gated(pump, first, raw):
@@ -128,7 +164,7 @@ def test_ping_no_gpu(pump) -> None:
 
 
 def test_loop_ping_idle(pump) -> None:
-    """Ping servi puis silence : pong envoyé, idle 1011 ensuite (reset puis feu)."""
+    """Ping servi puis silence : pong envoyé, idle 1001 ensuite (reset puis feu)."""
     from test_units import check
 
     service = _Service()
@@ -138,7 +174,8 @@ def test_loop_ping_idle(pump) -> None:
           [json.loads(text) for text in socket.sent] == [{"id": 3, "pong": True}],
           str(socket.sent)[:120])
     check("ping: GPU intact", service.calls == [], str(service.calls))
-    check("idle après ping → 1011", socket.closes[:1] == [1011], str(socket.closes))
+    check("idle après ping → 1001 (going away, pas 1011)",
+          socket.closes[:1] == [1001], str(socket.closes))
 
 
 def test_loop_two_frames_order(pump) -> None:
@@ -245,6 +282,195 @@ def test_mixed_ping_binary(_pump) -> None:
           answers[1].get("id") == 1 and "error" not in answers[1], str(answers[1])[:160])
 
 
+def test_health_ws_fields(_pump) -> None:
+    """P1-3/P1-4 : ``/health`` cesse de mentir — ``ws_ready``, ``warm`` et compteurs."""
+    from tests_units.ws_binary_tests import _live_fast_service
+    from test_units import asgi_call, check
+
+    service, api = _live_fast_service()
+    service.ctx = {}
+    _status, cold = asyncio.run(asgi_call(api, "GET", "/health", b""))
+    check("health: modèle chargé → ok + ws_ready vrais",
+          cold.get("ok") is True and cold.get("ws_ready") is True, str(cold)[:200])
+    check("health: warm faux tant qu'aucune frame n'a été servie (P1-4)",
+          cold.get("warm") is False, str(cold.get("warm")))
+    check("health: compteurs du direct publiés (P1-3)",
+          isinstance(cold.get("ws"), dict)
+          and {"sessions", "open", "frames", "last_frame_age_s"} <= set(cold["ws"]),
+          str(cold.get("ws"))[:200])
+
+    service.warm = True
+    service.frame_timeouts = 3  # chien de garde armé : la carte ne répond plus
+    _status, stuck = asyncio.run(asgi_call(api, "GET", "/health", b""))
+    check("health: carte bloquée → ok faux (fin du littéral)",
+          stuck.get("ok") is False and stuck.get("ws_ready") is False, str(stuck)[:200])
+    check("health: warm reste vrai (une frame a bien été servie)",
+          stuck.get("warm") is True, str(stuck.get("warm")))
+
+
+def test_keepalive_rearms_idle(pump) -> None:
+    """P1-1 : le keepalive applicatif réarme le chrono — le ping protocole, lui, ne le fait pas."""
+    from test_units import check
+
+    service = _Service()
+    socket = _KeepAliveSocket(gap=0.02, pings=5)
+    asyncio.run(pump.ws_loop(service, socket, 0.05, 5.0, 8))
+    check("keepalive: 5 pings à 20 ms sous un idle de 50 ms → aucune fermeture",
+          socket.closes == [1000], str(socket.closes))
+    check("keepalive: un pong par ping, forme courte acceptée",
+          [json.loads(text) for text in socket.sent] == [{"id": 0, "pong": True}] * 5,
+          str(socket.sent)[:160])
+    check("keepalive: aucune inférence déclenchée", service.calls == [], str(service.calls))
+
+    spaced = _KeepAliveSocket(gap=0.08, pings=5)
+    asyncio.run(pump.ws_loop(_Service(), spaced, 0.05, 5.0, 8))
+    check("keepalive: ping espacé au-delà de l'idle → fermeture 1001",
+          spaced.closes[:1] == [1001], str(spaced.closes))
+    check("keepalive: {'id':0,'ping':1} classé ping",
+          pump.classify('{"id":0,"ping":1}') == ("ping", 0)
+          and pump.classify('{"id":0,"ping":0}') == ("frame", 0))
+
+
+def test_slots_released_all_paths(pump) -> None:
+    """P0-1 : timeout, cancel, client parti — le créneau est rendu, jamais le slot."""
+    from test_live_ws import frame
+    from test_units import check, sample_png
+
+    png = sample_png()
+    cases = {
+        "timeout": ([frame(1, png), _HANG], 0.02),
+        "cancel": ([frame(1, png), '{"id":1,"cancel":true}'], 5.0),
+        "client parti": ([frame(1, png), None], 5.0),
+    }
+    saved = pump.WS_ABANDON_SECONDS
+    pump.WS_ABANDON_SECONDS = 0.01  # un pair parti n'attend pas 2 s pour rien
+    try:
+        for name, (script, frame_seconds) in cases.items():
+            service = _Service(stuck=True)  # inférence qui ne finit jamais
+            asyncio.run(pump.ws_loop(service, _ScriptSocket(script), 0.02,
+                                     frame_seconds, 8))
+            slots = service.slots.snapshot()
+            check(f"P0-1 {name}: créneau rendu (active=0)", slots["active"] == 0, str(slots))
+            check(f"P0-1 {name}: abandon compté", slots["abandoned"] == 1, str(slots))
+    finally:
+        pump.WS_ABANDON_SECONDS = saved
+
+
+def test_busy_maps_429(_module) -> None:
+    """P0-1/P2-2 : attente au verrou bornée → 429 « occupé », pas 503 « lent »."""
+    import threading
+
+    import gpu_guard
+    from fastapi import HTTPException
+    from test_units import check
+
+    pipe = _fresh("pipe_compat")
+    core = _fresh("fast_core")
+
+    def busy():
+        raise gpu_guard.GpuBusy("gpu busy > 15 s")
+
+    try:
+        asyncio.run(pipe.call(busy))
+    except HTTPException as exc:
+        check("busy → 429 borné", exc.status_code == 429 and len(exc.detail) <= 300,
+              f"{exc.status_code} {exc.detail}")
+    else:
+        check("busy → 429 borné", False, "aucune exception")
+
+    lock = threading.Lock()
+    lock.acquire()  # une frame tient la carte
+    try:
+        with core._locked(lock, {}, timeout=0.01):
+            check("verrou pris: GpuBusy levée", False, "verrou obtenu")
+    except gpu_guard.GpuBusy:
+        check("verrou pris au-delà du budget → GpuBusy", True)
+    finally:
+        lock.release()
+    with core._locked(lock, {}, timeout=0.5):
+        pass
+    check("verrou rendu: ré-acquérable", True)
+    check("budget d'attente par défaut = 15 s", gpu_guard.GPU_QUEUE_SECONDS == 15.0,
+          str(gpu_guard.GPU_QUEUE_SECONDS))
+
+
+def test_ws_oversize_degrades(pump) -> None:
+    """P2-1 : réponse trop grosse → réponse dégradée ; 1009 seulement en dernier recours."""
+    from test_live_ws import frame
+    from test_units import check, sample_png
+
+    png = sample_png()
+    fat = [{"label": "person", "score": 0.9, "box": [1, 2, 3, 4], "mask_b64": "x" * 400}
+           for _ in range(4)]
+    saved = pump.WS_MAX_REPLY_BYTES
+    pump.WS_MAX_REPLY_BYTES = 600
+    try:
+        service = _Service(reply={"width": 64, "height": 40, "elapsed_ms": 1,
+                                  "objects": fat})
+        socket = _ScriptSocket([frame(9, png), None])
+        asyncio.run(pump.ws_loop(service, socket, 5.0, 5.0, 8))
+        answers = [json.loads(text) for text in socket.sent]
+        check("1009: la session survit (aucune fermeture 1009)",
+              socket.closes == [1000], str(socket.closes))
+        check("1009: réponse dégradée envoyée (moitié des objets)",
+              len(answers) == 1 and len(answers[0]["objects"]) == 2, str(answers)[:200])
+        check("1009: masques retirés + mode d'emploi dans la trame",
+              all("mask_b64" not in obj for obj in answers[0]["objects"])
+              and answers[0]["mask_encoding"] == "none"
+              and answers[0]["degraded"]["max_objects"] == 2,
+              str(answers[0])[:200])
+        check("1009: compteur de dégradation", service.ws["degraded"] == 1,
+              str(service.ws))
+
+        blocked = [{"label": "x" * 800, "score": 0.9, "box": [1, 2, 3, 4]}]
+        service = _Service(reply={"width": 64, "height": 40, "elapsed_ms": 1,
+                                  "objects": blocked})
+        socket = _ScriptSocket([frame(10, png), None])
+        asyncio.run(pump.ws_loop(service, socket, 5.0, 5.0, 8))
+        check("1009: indégradable → fermeture 1009",
+              socket.closes[:1] == [1009], str(socket.closes))
+        check("1009: reason exploitable par le client",
+              "max_objects" in (socket.reasons[0] if socket.reasons else ""),
+              str(socket.reasons))
+        check("1009: rien d'envoyé pour une réponse indégradable",
+              socket.sent == [], str(socket.sent)[:120])
+    finally:
+        pump.WS_MAX_REPLY_BYTES = saved
+
+
+def test_watchdog_restarts(pump) -> None:
+    """Chien de garde : 3 frames muettes consécutives → redémarrage ; 2 → simple 503."""
+    import gpu_guard
+    from test_live_ws import frame
+    from test_units import check, sample_png
+
+    png = sample_png()
+    restarts: list = []
+    saved = gpu_guard.restart_later
+    gpu_guard.restart_later = lambda *args, **kwargs: restarts.append(1)
+    try:
+        service = _Service(stuck=True)  # l'inférence ne finit jamais
+        for _ in range(2):
+            socket = _ScriptSocket([frame(1, png), _HANG])
+            asyncio.run(pump.ws_loop(service, socket, 0.02, 0.02, 8))
+            check("timeout: 503 servi, connexion gardée",
+                  json.loads(socket.sent[0])["error"]["status"] == 503,
+                  str(socket.sent)[:160])
+        check("chien de garde: 2 timeouts → pas de redémarrage",
+              restarts == [] and service.frame_timeouts == 2, str(service.frame_timeouts))
+        asyncio.run(pump.ws_loop(service, _ScriptSocket([frame(2, png), _HANG]),
+                                 0.02, 0.02, 8))
+        check("chien de garde: 3e timeout → redémarrage planifié",
+              restarts == [1] and service.frame_timeouts == 3, str(restarts))
+        gpu_guard.note_success(service)
+        check("chien de garde: une frame servie remet le compteur à zéro",
+              service.frame_timeouts == 0, str(service.frame_timeouts))
+        check("chien de garde: 3 = seuil", gpu_guard.WEDGE_RESTART_TIMEOUTS == 3,
+              str(gpu_guard.WEDGE_RESTART_TIMEOUTS))
+    finally:
+        gpu_guard.restart_later = saved
+
+
 def test_ws_pump(_module) -> None:
     """Pompe WS déployée : routage, ping sans GPU, cancel, double-buffer, health."""
     pump = _fresh_pump()
@@ -257,4 +483,10 @@ def test_ws_pump(_module) -> None:
     test_cancel_stale_ignored(pump)
     test_ping_during_inflight(pump)
     test_health_ws_binary_sha(pump)
+    test_health_ws_fields(pump)
     test_mixed_ping_binary(pump)
+    test_keepalive_rearms_idle(pump)
+    test_slots_released_all_paths(pump)
+    test_busy_maps_429(pump)
+    test_ws_oversize_degrades(pump)
+    test_watchdog_restarts(pump)

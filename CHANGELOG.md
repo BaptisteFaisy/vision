@@ -3,6 +3,32 @@
 Le journal part du 2026-10-26 après 19 h : le commit de départ, puis une entrée par fait
 livré et ses preuves (tâche, fichiers, chiffres) dans l'arbre.
 
+## 2026-11-02 — iSee : stabilité (crash du service de guidage, pertes de connexion) (branche `feat/isee-stabilite`)
+
+- **Demande** : « pour isee parfois l'app crash ou perds la connexion je veux que ca soit le
+  cas le moins possible […] regler completement au maximum ce probleme ».
+- **Preuve** : un seul crash applicatif dans le journal du téléphone (48 h) —
+  `ForegroundServiceDidNotStartInTimeException` sur `.voicenav.GuidanceTrackingService`,
+  `Crash-Tag: window_resize`. Aucun ANR, aucun tombstone : les autres causes sont latentes.
+- **Crash** (`:app`) : premier plan tenu dès `onCreate` (`GuidanceServiceRunner`, gardé,
+  idempotent, canal de secours), plus de branche `ACTION_STOP` sans premier plan, rotations
+  hors du démarrage du service, `stopWithTask="false"` sur les trois services longs ;
+  `CrashGuard` (handler global + journal borné), parole et caméra incapables de tuer le
+  process (`CameraBindPlan`, `IseeCameraBinder`).
+- **Connexion** (`:core`, `:app`) : état réseau poussé au client (`AndroidNetworkState`,
+  `NetMonitor`, `ACCESS_NETWORK_STATE`), machine à états du lien (`WsLink` : backoff plafonné
+  + jitter, `Degraded` observable), watchdog de silence, échec local hors ligne, budget froid
+  payé une seule fois (`ProbeLink`).
+- **Panne dite** (`:core`, `:app`) : `OutageWatch` + `OutageWord` — un mot par palier et par
+  épisode (6 s / 15 s / 60 s / retour), ligne de statut **aussi en guidage**, clips déjà
+  embarqués (`gps_unavailable`, `nav_stopped`), aucun nouvel audio.
+- **Serveur** : une inférence abandonnée ne garde plus le verrou GPU ni le slot ; contrat de
+  reprise dans `docs/LIVE-SPEC.md` § 8.
+- **Preuves** : `:core` + `:app` verts (2 171 `@Test` exécutés), gardes kotlin-limits /
+  voicepack / isee-design / clips-en / voice-nav-doc / globaux OK, `assembleDebug` OK,
+  recette émulateur `scripts/isee-sim.sh` 30 s : caméra reliée, 0 ligne fatale.
+- **Doc** : `docs/STABILITE-ISEE.md` (causes, correctifs, protocole de vérification, reste).
+
 ## 2026-11-02 — iSee : le compte des marches ne se coupe plus lui-même (branche `fix/isee-marches-incoupables`)
 
 - **Demande** : « quand il détecte un escalier et qu'il doit dire le nombre de
