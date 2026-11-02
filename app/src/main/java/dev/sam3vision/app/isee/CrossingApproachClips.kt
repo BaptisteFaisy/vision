@@ -13,7 +13,7 @@ import dev.sam3vision.core.speech.IseeClipsEn
  * séquence parle à la place du texte.
  *
  * Devant, le mot dit quoi, pas où (ordre user du 02/11) : « Ahead » (avec ou
- * sans distance) parle `crosswalk` (« Crosswalk. », clip < 500 ms, redit
+ * sans distance) parle `crosswalk` (« Crosswalk. », joué < 500 ms, redit
  * toutes les 2 s hors Traversée).
  *
  * Règle d'or : jamais de mensonge — pas d'arrondi vers les paliers ronds

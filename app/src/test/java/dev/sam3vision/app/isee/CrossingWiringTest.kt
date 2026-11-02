@@ -296,7 +296,7 @@ class CrossingWiringTest {
     @Test
     fun `repli approche devant dit Crosswalk, avec ou sans distance`() {
         // Ordre user du 02/11 : devant, le mot dit quoi, pas où —
-        // « Crosswalk. », clip < 500 ms, redit toutes les 2 s hors Traversée.
+        // « Crosswalk. », joué < 500 ms à vitesse de base, redit toutes les 2 s hors Traversée.
         assertEquals(listOf(IseeClipsEn.CROSSWALK), crossingApproachClips("Ahead, 50 centimeters."))
         assertEquals(listOf(IseeClipsEn.CROSSWALK), crossingApproachClips("Ahead."))
         assertEquals(IseeClipsEn.CROSSWALK, IseeClipsEn.idForText("Crosswalk."))
