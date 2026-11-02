@@ -63,16 +63,24 @@ Gestes, tous câblés dans `MainActivity.buildRoot` :
 
 | Geste | Effet | Code |
 |---|---|---|
-| tap simple | démarre / arrête l'enregistrement vidéo | `IseeViewModel.onSingleTap` (`app/isee/IseeViewModel.kt:363`) |
+| tap simple | démarre / arrête l'enregistrement vidéo | `IseeGestures.onSingleTap` → `IseeHoldTalk.singleTap` (`app/isee/IseeGestures.kt`) |
 | appui long (300 ms, tolérance 24 px) | dictée micro maintenu + photo filmée jointe | `core/gesture/LongPressTrigger.kt:102,105`, `IseePhotoShot` |
-| balayage vers le haut | bascule du mode Traversée (marche/arrêt, comme la puce) | `IseeViewModel.onSwipeUp` → `modeChips.toggleCrossing()` |
-| balayage horizontal | **reconnu mais sans effet** : `onHorizontalSwipe = Unit` | `app/IseeRootLayout.kt` |
+| balayage vers le haut | bascule du mode Traversée (marche/arrêt, comme la puce) | `IseeGestures.onSwipeUp` → `modeChips.toggleCrossing()` |
+| balayage vers le bas | active la fonction GPS : ordre « active le GPS » (réglage persisté) + accusé parlé | `IseeGestures.onSwipeDown` → `IseeSwipeOrders.gpsOn()` |
+| balayage vers la droite | iSee demande « What are you looking for? », ouvre le micro, puis chasse `mode find my X` avec le mot entendu | `IseeGestures.onSwipeRight` → `IseeSwipeOrders.askToFind()` |
+| balayage vers la gauche | **reconnu mais sans effet** (une seule page, rien à feuilleter) | `core/gesture/IseeGestureBrain.kt` |
 
-Le **balayage vers le bas** (ex-changement de bulle) et le **double tap** (photo) ont
-été supprimés : `IseeViewModel` n'a plus `onVerticalDrag*` ni `onDoubleTap`, le
-rail vertical de `core/gesture/IseeGestureBrain.kt` verrouille le geste et n'émet
-que vers le haut (un glissement ne peut donc jamais passer pour un tap), et il n'y
-a aucun moyen de revenir à un message antérieur.
+Les **gestes passent tous par `IseeGestures`** (`app/isee/IseeGestures.kt`), relais
+posé dans `MainActivity.buildRoot` — le ViewModel garde ses exécutants, l'appelant
+n'a qu'un point d'entrée. Pendant l'écoute « Quoi chercher ? », la surface lui
+appartient (`IseeSwipeOrders.asking`) : tenue et tap sont ignorés, deux gestes ne
+se disputent jamais le micro.
+
+Le **double tap** (photo) reste supprimé, et le vertical n'a plus de changement de
+bulle : `IseeViewModel` n'a ni `onVerticalDrag*` ni `onDoubleTap`, et il n'y a aucun
+moyen de revenir à un message antérieur. Le rail vertical de
+`core/gesture/IseeGestureBrain.kt` n'émet qu'une fois, vers le haut ou vers le bas
+(un glissement ne peut donc jamais passer pour un tap).
 
 ### 2.1 Photo-contexte (appui long pendant qu'on filme)
 

@@ -19,15 +19,16 @@ import dev.sam3vision.core.gesture.LongPressTrigger
  * - [LongPressTrigger] : appui maintenu ~300 ms → [onHoldStart] (micro ouvert) ; la
  *   vue intercepte alors tout (les enfants reçoivent un ACTION_CANCEL) jusqu'au
  *   relâchement qui émet [onHoldEnd] ;
- * - [IseeGestureBrain] : tap simple (vidéo, dès le relâchement) et balayage vers
- *   le haut (bascule Traversée). Ni double tap, ni balayage vers le bas, ni page
- *   horizontale : iSee n'a plus qu'une page ni qu'une bulle à parcourir.
+ * - [IseeGestureBrain] : tap simple (vidéo, dès le relâchement), balayage vers
+ *   le haut (bascule Traversée), vers le bas (mode GPS) et vers la droite
+ *   (« quoi chercher ? »). Ni double tap, ni page horizontale vers la gauche :
+ *   iSee n'a qu'une page ni qu'une bulle à parcourir.
  *
  * Les taps ne sont jamais consommés en-dehors d'une tenue : ce sont des observations
  * posées sur les événements, les écrans iSee restent libres de leur rendu. Les deux
  * bords latéraux restent exclus du geste système « retour » ; le balayage vers le
- * bas n'est pas utilisé (il verrouille seulement le geste), le balayage vers le
- * haut bascule le mode Traversée.
+ * haut bascule le mode Traversée, vers le bas la fonction GPS, et vers la droite
+ * iSee demande l'objet à chercher (balayage vers la gauche : rien).
  */
 class IseeRootLayout(context: Context) : FrameLayout(context) {
 
@@ -40,6 +41,12 @@ class IseeRootLayout(context: Context) : FrameLayout(context) {
 
     /** Balayage vers le haut confirmé : bascule du mode Traversée. */
     var onSwipeUp: (() -> Unit)? = null
+
+    /** Balayage vers le bas confirmé : active la fonction GPS (ordre « active le GPS »). */
+    var onSwipeDown: (() -> Unit)? = null
+
+    /** Balayage vers la droite confirmé : iSee demande « Quoi chercher ? ». */
+    var onSwipeRight: (() -> Unit)? = null
 
     /** Geste actif seulement quand les panneaux iSee sont à l'écran, sinon à l'ancienne UI. */
     var gesturesEnabled: () -> Boolean = { true }
@@ -94,8 +101,9 @@ class IseeRootLayout(context: Context) : FrameLayout(context) {
     private val brain = IseeGestureBrain(
         listener = object : IseeGestureBrain.Listener {
             override fun onSingleTap() = onSingleTap?.invoke() ?: Unit
-            override fun onHorizontalSwipe(rightToLeft: Boolean) = Unit // aucune page à changer
             override fun onSwipeUp() = onSwipeUp?.invoke() ?: Unit
+            override fun onSwipeDown() = onSwipeDown?.invoke() ?: Unit
+            override fun onSwipeRight() = onSwipeRight?.invoke() ?: Unit
         },
     )
 
