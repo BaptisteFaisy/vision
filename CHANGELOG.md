@@ -42,17 +42,18 @@ livré et ses preuves (tâche, fichiers, chiffres) dans l'arbre.
 - **Demande** : escalier reconnu → dire le nombre de marches vues toutes
   les 1 s, prioritaire sur tout ; au milieu de chaque seconde, dire
   « gauche » / « droite » pour esquiver les gens.
-- **Cause** : le compte se taisait dès qu'une esquive commençait, les
-  niveaux 0 à 5 le coupaient en pleine phrase, et sans clip le niveau 6
-  restait muet (synthèse réservée au GPS depuis D-04).
+- **Cause** : le compte se taisait dès qu'une esquive commençait, et
+  les niveaux 0 à 5 le coupaient en pleine phrase (synthèse sans clip
+  rouverte pour tous le matin même — le compte parle).
 - **Fait** : cadence 1 s (`StairCountVoice`, `AntiRepeat stairs-count`) ;
   niveau 6 prioritaire au bus (coupe tout, personne ne coupe — parole
   user et GPS en cours exceptés, manœuvre reportée au silence) ;
   le compte traverse l'esquive (mots continus + repli dans
-  l'intervalle) ; niveau 6 synthétisé (amende D-04) ; chat en
-  attente sous des marches ; vœux non escaliers en attente sans
-  tour mangé (`offer`, stop, grillage, trottoir) ; garde
-  anti-blocage 4 s. Doc `VOIX-DANGER.md` § 41 (amende § 37, § 40).
+  l'intervalle) ; compte verrouillé audible ; chat en attente
+  sous des marches ; manœuvre GPS reportée au silence ; vœux non
+  escaliers en attente sans tour mangé (`offer`, stop, grillage,
+  trottoir) ; garde anti-blocage 4 s. Doc `VOIX-DANGER.md` § 42
+  (amende § 37, § 40).
 - **Preuve** : `:core` + `:app` 5 161 tests, 0 échec (r630) ;
   `check-kotlin-limits.py` + `check-test-globals.py` verts ; recette
   rue **non mesurée** (preuves par `logcat`).

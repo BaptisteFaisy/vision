@@ -32,7 +32,7 @@ private class StairsFakeSpeaker : VoiceBusSpeaker {
 }
 
 /**
- * Escaliers prioritaires (ordre user du 02/11/2026, VOIX-DANGER § 41 —
+ * Escaliers prioritaires (ordre user du 02/11/2026, VOIX-DANGER § 42 —
  * amende l'ordre du matin, § 40) : des escaliers en cours (niveau 6)
  * vont au bout — tout le monde attend (niveau 0, humains, GPS,
  * grillages, bordures, chat, repli, Traversée) ; en retour les

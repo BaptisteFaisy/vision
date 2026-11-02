@@ -181,7 +181,7 @@ internal fun LiveProbe.observeSpoken(
         if (placeMode() != PictoPlaceMode.DEHORS) return@observeSpokenEmissions
         if (urgent || GuidanceWord.isStopPhrase(text)) {
             // Sous un compte : le stop attend le silence sans manger son
-            // tour (§ 41 — ré-émis à chaque frame, il parle dans l'intervalle).
+            // tour (§ 42 — ré-émis à chaque frame, il parle dans l'intervalle).
             if (!VoiceBus.stairsSpeaking() &&
                 AntiRepeat.allow(AntiRepeat.KEY_FENCE, System.currentTimeMillis())
             ) {

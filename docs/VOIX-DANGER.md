@@ -98,7 +98,7 @@ une annonce avalée ne consomme pas son tour).
 | `fence` | 4 grillages/murs/barrières | 4 s |
 | `curb` | 5 bordures | 2 s |
 | `stairs` | 6 escaliers (annonce, jalons, montée) | 2 s |
-| `stairs-count` | 6 compte des marches | 1 s (§ 41, amende § 37) |
+| `stairs-count` | 6 compte des marches | 1 s (§ 42, amende § 37) |
 | `pole` | 7 poteaux + mobilier vertical | 2 s |
 | `misc` | 7 divers (animal, poubelle, souvenirs) | 2 s |
 | `crosswalk-announce` | 8 annonce | **1 fois par vue** (oubli explicite à la vue suivante) |
@@ -265,7 +265,7 @@ par fenêtre), `ProbeHazardsTest` (silence à 499 ms) et
 Recette téléphone : escalier nommé → « N marches. » puis répétition
 toutes les 0,5 s — **non mesuré**, exige un APK sur appareil réel.
 
-> Amendé par le § 41 (ordre user du 02/11) : le même compte se répète
+> Amendé par le § 42 (ordre user du 02/11) : le même compte se répète
 > toutes les 1 s, et le compte est prioritaire sur tout (l'esquive
 > parle entre deux comptes).
 
@@ -431,9 +431,10 @@ bordures coupaient le niveau 6 en pleine phrase.
   humains (niveau 2, sans antirépétition) et repli 12, re-postés
   en continu, parlent dans le silence entre deux comptes, jamais
   par-dessus ;
-- **audible** : le niveau 6 synthétise comme le GPS (amende D-04 :
-  sans clip, le compte restait muet — le cache voix absorbe les
-  répétitions, une synthèse par compte et par session au plus) ;
+- **audible** : synthèse rouverte pour tous sans clip (porte D-04
+  tombée le matin même — le compte parle, cache voix : une synthèse
+  par compte et par session au plus), verrouillée pour le niveau 6
+  par `MortsVoixV4Test` ;
 - **GPS mutuel** : une parole GPS en cours (rappel 3, manœuvre 11,
   jamais re-proposée) va au bout, le compte reprenant après — en
   retour une manœuvre sous un compte est reportée au silence (un

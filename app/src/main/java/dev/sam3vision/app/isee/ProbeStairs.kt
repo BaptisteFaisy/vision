@@ -123,7 +123,7 @@ internal fun LiveProbe.stairsYieldToAvoidance(): Boolean {
  * un escalier et que la caméra voit des marches fraîches, dit combien
  * (« 5 marches. ») — changements aussitôt, même compte répété toutes les
  * 1 s ([StairCountVoice]), au niveau escaliers du bus (SPEC v4 : prioritaire
- * sur tout, parole du user exceptée — VOIX-DANGER § 41), coupé en Traversée
+ * sur tout, parole du user exceptée — VOIX-DANGER § 42), coupé en Traversée
  * seul : le compte traverse l'esquive (l'évitement parle entre deux comptes,
  * mots continus et repli re-postés dans le silence). Le battement ne
  * s'arrête jamais pour une synthèse lente (le bus écrase, dernier gagnant).

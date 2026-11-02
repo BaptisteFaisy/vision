@@ -25,7 +25,7 @@ import org.junit.Test
  * Priorité du compteur de marches : il parle toutes les secondes devant les
  * positions et le guidage normal — l'évitement (décalage humain, couloir
  * bouché, stop) est émis devant le compteur et parle au bus entre deux
- * comptes (plus par-dessus, § 41) ; l'annonce seule cède à l'esquive.
+ * comptes (plus par-dessus, § 42) ; l'annonce seule cède à l'esquive.
  */
 @OptIn(ExperimentalCoroutinesApi::class)
 class ProbeStairsPriorityTest {

@@ -22,7 +22,7 @@ package dev.sam3vision.core.live
  * - `curb` = 2 s (niveau 5, bordures < 6 m) ;
  * - `stairs` = 2 s (niveau 6, escaliers : annonce, jalons, montée) ;
  * - `stairs-count` = 1 s (niveau 6, compte des marches — ordre user du
- *   02/11, VOIX-DANGER § 41) ;
+ *   02/11, VOIX-DANGER § 42) ;
  * - `pole` = 2 s (niveau 7, poteaux + mobilier vertical < 6 m) ;
  * - `misc` = 2 s (niveau 7, divers : animal, poubelle, souvenirs < 6 m) ;
  * - `crosswalk-announce` = 1 fois par vue (niveau 8, annonce du passage) ;
