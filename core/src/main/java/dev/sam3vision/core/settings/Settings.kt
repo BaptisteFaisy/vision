@@ -70,6 +70,17 @@ data class Settings(
      */
     val collectLightCrops: Boolean = false,
     /**
+     * Compensation d'exposition **bornée** sur la boîte du feu pendant la traversée
+     * (TECHNICAL SETTINGS, `app/isee/LightExposureSignal` → `ClipGovernor`).
+     * **Désactivée par défaut** : elle ne fait rien sans mesure de feu, ne descend que
+     * deux crans au plus sous 0, remonte dès que le crop redevient sain ou que sa
+     * médiane passe sous `ClipGovernor.DARK_MEDIAN`, et rend la main à l'automatisme
+     * après 3 s sans feu. **Aucun verrou AE** (mesuré nuisible le 01/11/2026), aucun
+     * verrou AWB, aucune région de mesure : c'est le seul levier exposé, et il est
+     * plafonné. Voir `docs/RECETTE-FEU-EXPOSITION.md`.
+     */
+    val fireExposureCompensation: Boolean = false,
+    /**
      * Direct avec détecteur : les frames partent à SAM `/live` sur Modal pendant que la
      * caméra tourne (masques, objets, distances, journal), comme demandé par le user le
      * 2026-10-26. Les **questions** partent quand même directement au LLM, sans attendre
@@ -357,7 +368,7 @@ data class Settings(
             "museRealtime=$museRealtime, " +
         "introEnabled=$introEnabled, introPlayed=$introPlayed, " +
         "distanceOverlayEnabled=$distanceOverlayEnabled, liveSamEnabled=$liveSamEnabled, " +
-        "collectLightCrops=$collectLightCrops, " +
+        "collectLightCrops=$collectLightCrops, fireExposureCompensation=$fireExposureCompensation, " +
         "boxPredictionEnabled=$boxPredictionEnabled, " +
         "localOverlayEnabled=$localOverlayEnabled, continuousCadenceEnabled=$continuousCadenceEnabled, " +
         "adaptiveUploadEnabled=$adaptiveUploadEnabled, keyframeSchedulerEnabled=$keyframeSchedulerEnabled, " +

@@ -93,6 +93,8 @@ fun LiveScreen(
     onBack: () -> Unit,
     onAsk: () -> Unit,
     onOpenSettings: () -> Unit,
+    /** `Settings.fireExposureCompensation` : coupé par défaut, borné (voir `LiveSensorControl`). */
+    fireExposureCompensation: Boolean = false,
 ) {
     val context = LocalContext.current
     // Tranches scopées (voir LiveSlices) : l'étage caméra ne recompose pas sur la
@@ -106,7 +108,7 @@ fun LiveScreen(
     val scope = rememberCoroutineScope()
     val previewView = rememberLivePreview(context) { attached = it }
 
-    LiveEffects(viewModel, pixels, previewView, attached) { failure = it }
+    LiveEffects(viewModel, pixels, previewView, attached, fireExposureCompensation) { failure = it }
 
     LiveStage(
         pixels = pixels,
@@ -143,11 +145,11 @@ fun LiveScreen(
 @Composable
 private fun LiveEffects(
     viewModel: LiveViewModel, pixels: LiveUiState, previewView: PreviewView,
-    attached: Boolean, onFailure: (String) -> Unit,
+    attached: Boolean, fireExposureCompensation: Boolean, onFailure: (String) -> Unit,
 ) {
     LaunchedEffect(Unit) { viewModel.startFromSettings(HomePresetRequest.consume()) }
     ForegroundGate(viewModel)
-    LiveCameraHost(viewModel, previewView, attached, onFailure)
+    LiveCameraHost(viewModel, previewView, attached, fireExposureCompensation, onFailure)
     // Dernier poste de la chronologie : la frame n'est comptée dessinée qu'après compose.
     // La clé est la liste de masques (neuve à chaque frame), pas la frame : deux scènes
     // identiques donnent deux `LiveFrame` égales.
@@ -205,6 +207,7 @@ private fun LiveCameraHost(
     viewModel: LiveViewModel,
     previewView: PreviewView,
     attached: Boolean,
+    fireExposureCompensation: Boolean,
     onFailure: (String) -> Unit,
 ) {
     val context = LocalContext.current
@@ -213,6 +216,8 @@ private fun LiveCameraHost(
     // Pilotage capteur de la traversée (EV sur la boîte du feu, verrou AWB, région AE) :
     // un seul objet par liaison, inerte tant que rien n'est mesuré (voir LiveSensorControl).
     val sensor = remember { LiveSensorControl() }
+    // Réglage utilisateur (désactivé par défaut) : appliqué à la frame suivante, sans rebind.
+    LaunchedEffect(fireExposureCompensation) { sensor.enabled = fireExposureCompensation }
     var bound by remember { mutableStateOf(false) }
     LaunchedEffect(attached) {
         if (!attached) return@LaunchedEffect

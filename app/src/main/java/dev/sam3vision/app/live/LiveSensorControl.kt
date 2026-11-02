@@ -20,38 +20,15 @@ import dev.sam3vision.core.exposure.MeterPoint
 import java.util.Locale
 
 /**
- * Drapeaux runtime du pilotage capteur de la traversée, **non persistés** (remis à leur
- * défaut à chaque lancement) : le protocole de `docs/RECETTE-FEU-EXPOSITION.md` compare
- * deux passes sur le même téléphone, sans rebuild.
- */
-internal object FireSensorFlags {
-
-    /**
-     * Gouverneur EV sur la boîte du feu (étape 2). **Allumé par défaut** : il ne fait
-     * rien sans boîte mesurée, ne descend que de deux crans au plus, et rend la main à
-     * l'automatisme après 3 s sans feu — le risque de régression est borné par
-     * construction. Coupé, l'app se comporte exactement comme avant.
-     */
-    @Volatile
-    var evOnLightBox: Boolean = true
-
-    /**
-     * Verrou AWB temporisé + région AE à deux points (étape 3). **Éteint par défaut** :
-     * c'est le seul endroit où un HAL peut ignorer la requête *ou* figer la teinte, et son
-     * gain n'est pas mesuré sur appareil. À n'allumer que pendant la recette.
-     */
-    @Volatile
-    var awbLockAndMetering: Boolean = false
-}
-
-/**
  * Pilotage capteur du chemin du feu (Direct + sonde) : lit la mesure d'écrêtage publiée
  * par `crossingLightOf` ([LightExposureSignal]) et agit sur **la caméra en cours**, sans
  * toucher au reste de l'app.
  *
- * Trois leviers, chacun né d'un constat mesuré (audit A6 du 2026-11-02) :
+ * Trois leviers, chacun né d'un constat mesuré (audit A6 du 2026-11-02). **Un seul est
+ * exposé** (réglage utilisateur, coupé par défaut) :
  * 1. **EV sur la boîte** ([ClipGovernor]) : la moyenne globale (`BRIGHT_MEAN = 190`) ne
- *    voit pas une lampe à 1-10 % des pixels ; le crop de lampe, si.
+ *    voit pas une lampe à 1-10 % des pixels ; le crop de lampe, si. Borné à deux crans,
+ *    avec retour sur crop sain **et** sur crop trop sombre.
  * 2. **Verrou AWB temporisé** ([AwbLockPolicy]) : la teinte ne dérive plus d'une frame à
  *    l'autre quand un bus ou une façade traverse la scène. Jamais de verrou AE (mesuré
  *    nuisible le 2026-11-01, voir `IseeCameraExposure`).
@@ -67,6 +44,14 @@ internal class LiveSensorControl {
     /** Caméra liée : écrite au binding (fil principal), lue à chaque frame (fil d'analyse). */
     @Volatile
     private var camera: Camera? = null
+
+    /**
+     * Réglage utilisateur `Settings.fireExposureCompensation` (TECHNICAL SETTINGS,
+     * **désactivé par défaut**), poussé par `LiveScreen` à chaque composition. Coupé, la
+     * frame suivante rend l'automatisme et rien d'autre ne tourne.
+     */
+    @Volatile
+    var enabled: Boolean = false
 
     /** Gouverneur EV, `null` = aucune plage exploitable (automatisme seul, comme avant). */
     private var governor: ClipGovernor? = null
@@ -107,7 +92,7 @@ internal class LiveSensorControl {
         Log.i(
             TAG,
             "feu: plage EV ${range?.lower}..${range?.upper}, plancher $floor, régions AE $aeRegions, " +
-                "EV ${onOff(FireSensorFlags.evOnLightBox)}, AWB+métérage ${onOff(FireSensorFlags.awbLockAndMetering)}",
+                "EV ${onOff(enabled)}, AWB+métérage ${onOff(AWB_LOCK_AND_METERING)}",
         )
     }
 
@@ -117,9 +102,15 @@ internal class LiveSensorControl {
      */
     fun onFrame(nowMs: Long) {
         val camera = camera ?: return
+        if (!enabled) {
+            // Réglage coupé : on rend l'automatisme (une fois) et on ne lit plus rien.
+            releaseEv(camera)
+            if (!AWB_LOCK_AND_METERING) releaseMetering(camera)
+            return
+        }
         val signal = freshSignal(nowMs)
-        if (FireSensorFlags.evOnLightBox) govern(camera, signal, nowMs) else releaseEv(camera)
-        if (!FireSensorFlags.awbLockAndMetering) {
+        govern(camera, signal, nowMs)
+        if (!AWB_LOCK_AND_METERING) {
             releaseMetering(camera)
             return
         }
@@ -249,5 +240,13 @@ internal class LiveSensorControl {
 
         /** Mesure plus vieille que ça = traversée finie : on ne pilote plus rien. */
         private const val STALE_MS = 1500L
+
+        /**
+         * Verrou AWB + région AE (étape 3 de l'audit A6) : **jamais armé en rue**, aucun
+         * réglage ne l'expose. Le code reste pour la recette ; l'allumer demande de le
+         * passer à `true` ici, et seulement après mesure (un HAL peut ignorer la requête
+         * ou figer la teinte). Voir `docs/RECETTE-FEU-EXPOSITION.md` §4.
+         */
+        private const val AWB_LOCK_AND_METERING = false
     }
 }

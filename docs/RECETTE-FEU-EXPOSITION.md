@@ -18,19 +18,24 @@ il mesure trois choses et une invariante.
 |---|---|---|---|---|
 | 0 | antibanding 50 Hz + AF continu sur le chemin du feu | — (toujours) | — | logcat `réglage capteur refusé` **absent** ; plus de bandes qui battent sous un LED |
 | 1 | compteur d'écrêtage du crop de lampe | — (toujours) | — | champ `burn` dans `lightcrops-*.jsonl`, log `feu:` avec un pourcentage |
-| 2 | gouverneur EV sur la **boîte du feu** | `EV on the light box` | **allumé** | `feu: EV 0 -> -1 (blancs écrasés 4,1 %)`, 2 crans au plus, retour à 0 après 3 s sans feu |
-| 3 | verrou AWB temporisé + région AE 2 points | `AWB lock + AE region (A/B)` | **éteint** | `feu: verrou AWB posé` puis `relâché`, `feu: région AE lampe (x, y) + plein cadre` |
+| 2 | gouverneur EV sur la **boîte du feu** | `Fire exposure` (interrupteur persisté, `Settings.fireExposureCompensation`) | **éteint** | `feu: EV 0 -> -1 (blancs écrasés 4,1 %)`, 2 crans au plus, retour à 0 après 3 s sans feu ou si la médiane du crop passe sous `ClipGovernor.DARK_MEDIAN` |
+| 3 | verrou AWB temporisé + région AE 2 points | aucune : `AWB_LOCK_AND_METERING` constant `false` | **éteint, non exposé** | rien à observer en rue ; levier réservé à la recette (`LiveSensorControl.kt`) |
 
-Les deux drapeaux sont **runtime** (Réglages → TECHNICAL SETTINGS → *Fire exposure*), **non
-persistés** : ils retombent à leur défaut au redémarrage. Aucun rebind de caméra n'est nécessaire,
-la bascule s'applique à la frame suivante.
+Un seul réglage est **exposé** (Réglages → TECHNICAL SETTINGS → *Fire exposure*), **persisté** et
+**éteint par défaut** ; les deux autres leviers du lot (verrou AWB, région AE) ne sont **pas**
+branchés sur un interrupteur. Aucun rebind de caméra n'est nécessaire : la bascule s'applique à la
+frame suivante. Le retour à zéro est explicite dans le code (`releaseEv`) : couper l'interrupteur
+en pleine sous-exposition rend l'automatisme.
 
 **Ce que fait le gouverneur EV, exactement** — pour savoir quoi observer : il lit la part de pixels
 « canal max ≥ 250 **et** saturation < 0,15 » dans le crop de la lampe (celle que le classifieur
 perd : ni franche, ni délavée). Au-delà de **2 %** du crop, il descend d'un cran (−1 EV), attend
 **700 ms** que l'AE converge, relit, et redescend si c'est encore cramé — **deux crans au plus**
 même si le téléphone offre −6. Sous **0,6 %** (hystérésis), il remonte vers l'automatisme, et il y
-retourne seul après **3 s** sans boîte de feu. Ces seuils viennent de la mesure des 13 crops
+retourne seul après **3 s** sans boîte de feu. Si la **médiane** du crop passe sous
+`ClipGovernor.DARK_MEDIAN` (51/255), il remonte d'un cran et **cesse de descendre** : une image
+déjà sombre ne doit jamais être assombrie (mesuré : un −2 EV simulé fait tomber la médiane sous ce
+plancher sur 99,7 % des frames, voir `~/.scratch/feux-expo/RAPPORT.md`). Ces seuils viennent de la mesure des 13 crops
 téléphone du dépôt (`core/src/test/resources/feuxfr3/`) : 0 % à 4,84 %, moyenne 1,08 %.
 
 ---

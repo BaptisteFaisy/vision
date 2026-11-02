@@ -341,7 +341,7 @@ internal fun TechnicalSection(
         GpuRegionSettings(draft, gpu) { onChange(it) }
         DistanceSettings(draft) { onChange(it) }
         LightCropCollectSettings(draft) { onChange(it) }
-        FireSensorSettings()
+        FireSensorSettings(draft) { onChange(it) }
         CameraHalSettings(draft) { onChange(it) }
         PerceptionSettings(draft) { onChange(it) }
         TtsSettings(

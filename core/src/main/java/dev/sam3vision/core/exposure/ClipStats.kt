@@ -22,6 +22,14 @@ data class ClipStats(
     val burnedWhite: Int,
     /** Pixels du crop (dénominateur ; 0 = crop vide ou dimensions incohérentes). */
     val total: Int,
+    /**
+     * Valeur médiane du crop (canal max de chaque pixel, 0..255), ou [UNMEASURED] quand
+     * elle n'a pas été calculée : c'est le garde-fou de **nuit** du gouverneur — une
+     * image déjà sombre ne doit jamais être assombrie davantage. Défaut `-1` pour que
+     * les appelants qui ne mesurent que l'écrêtage (tests, faux) restent inertes sur
+     * cette règle.
+     */
+    val median: Int = UNMEASURED,
 ) {
     /** Part du crop écrasée en blanc, 0..1 — `0` sur un crop vide, jamais NaN. */
     val fraction: Float
@@ -47,6 +55,9 @@ data class ClipStats(
 
         /** Aucune mesure : l'appelant ne pilote rien (voir `ClipGovernor`). */
         val NONE = ClipStats(0, 0, 0)
+
+        /** [median] non mesurée : la règle de plancher nocturne ne s'applique pas. */
+        const val UNMEASURED = -1
     }
 }
 
@@ -67,18 +78,31 @@ object Clipping {
         if (argb.size < count) return ClipStats.NONE
         var clipped = 0
         var burned = 0
+        val histogram = IntArray(256)
         for (index in 0 until count) {
             val pixel = argb[index]
             val r = (pixel shr 16) and 0xFF
             val g = (pixel shr 8) and 0xFF
             val b = pixel and 0xFF
             val max = if (r >= g) maxOf(r, b) else maxOf(g, b)
+            histogram[max] += 1
             if (max < ClipStats.CLIP_LEVEL) continue
             clipped += 1
             val min = if (r <= g) minOf(r, b) else minOf(g, b)
             // Saturation HSV = (max − min) / max, max ≥ 250 : jamais de division par zéro.
             if ((max - min).toFloat() / max < ClipStats.BURN_SATURATION) burned += 1
         }
-        return ClipStats(clipped, burned, count)
+        return ClipStats(clipped, burned, count, medianOf(histogram, count))
+    }
+
+    /** Médiane du canal max en **une** passe sur un histogramme de 256 cases (pas de tri). */
+    private fun medianOf(histogram: IntArray, count: Int): Int {
+        val target = (count + 1) / 2
+        var seen = 0
+        for (value in histogram.indices) {
+            seen += histogram[value]
+            if (seen >= target) return value
+        }
+        return 0
     }
 }

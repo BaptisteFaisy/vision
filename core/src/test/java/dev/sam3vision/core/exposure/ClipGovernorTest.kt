@@ -67,6 +67,33 @@ class ClipGovernorTest {
         assertEquals(0, governor.tick(null, 3000, -1))
     }
 
+    private fun stats(fraction: Float, median: Int): ClipStats =
+        ClipStats(0, (fraction * 1000).toInt(), 1000, median)
+
+    @Test
+    fun `crop trop sombre - on remonte malgre l'ecretage, jamais au-dessus de zero`() {
+        val governor = ClipGovernor(minIndex = -6)
+        // Cramé ET sombre (médiane 20 < 51) : la remontée prime sur la descente.
+        assertEquals(0, governor.tick(stats(0.5f, median = 20), 0, -1))
+        // Déjà à 0 : plus rien à rendre, et surtout pas descendre pour assombrir encore.
+        assertNull(governor.tick(stats(0.5f, median = 20), 700, 0))
+    }
+
+    @Test
+    fun `crop sain et lumineux - descente normale`() {
+        val governor = ClipGovernor(minIndex = -6)
+        assertEquals(-1, governor.tick(stats(0.05f, median = 120), 0, 0))
+        // Médiane juste au plancher : la règle ne tire pas (inégalité stricte).
+        assertEquals(-2, governor.tick(stats(0.05f, median = ClipGovernor.DARK_MEDIAN), 700, -1))
+    }
+
+    @Test
+    fun `mediane non mesuree - la regle de plancher reste inerte`() {
+        // -1 = non mesurée : 1 % de blancs, entre sortie et entrée → l'hystérésis tient,
+        // alors qu'une médiane à 0 aurait fait remonter à 0.
+        assertNull(ClipGovernor(minIndex = -6).tick(ClipStats(0, 10, 1000), 700, -1))
+    }
+
     @Test
     fun `sans plage exploitable - gouverneur inerte`() {
         assertNull(ClipGovernor(minIndex = 0).tick(stats(0.9f), 0, 0))
