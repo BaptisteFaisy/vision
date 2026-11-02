@@ -81,12 +81,6 @@ object IseeClipsEn {
     // Niveau 8 : passage piéton < 6 m (annonce + alignement + arrivée).
     const val CROSSWALK_ALIGNED = "crosswalk_aligned"
     const val CROSSWALK_ALIGNED_TEXT = "Aligned with the crosswalk."
-    const val CROSSWALK_AHEAD = "cross_approach_ahead"
-    const val CROSSWALK_AHEAD_TEXT = "Crosswalk ahead."
-    const val CROSSWALK_LEFT = "cross_approach_left"
-    const val CROSSWALK_LEFT_TEXT = "Crosswalk to the left."
-    const val CROSSWALK_RIGHT = "cross_approach_right"
-    const val CROSSWALK_RIGHT_TEXT = "Crosswalk to the right."
     const val CROSSWALK_ARRIVED = "cross_arrived"
     const val CROSSWALK_ARRIVED_TEXT = "On the crosswalk."
     const val CROSSWALK = "crosswalk"
@@ -401,9 +395,6 @@ object IseeClipsEn {
         BIN to BIN_TEXT,
         KEEPSAKE to KEEPSAKE_TEXT,
         CROSSWALK_ALIGNED to CROSSWALK_ALIGNED_TEXT,
-        CROSSWALK_AHEAD to CROSSWALK_AHEAD_TEXT,
-        CROSSWALK_LEFT to CROSSWALK_LEFT_TEXT,
-        CROSSWALK_RIGHT to CROSSWALK_RIGHT_TEXT,
         CROSSWALK_ARRIVED to CROSSWALK_ARRIVED_TEXT,
         CROSSWALK to CROSSWALK_TEXT,
         SIDEWALK_AHEAD to SIDEWALK_AHEAD_TEXT,

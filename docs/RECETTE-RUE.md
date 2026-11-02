@@ -31,7 +31,7 @@ même temps** (bus vocal : le plus petit niveau gagne, écrasé jeté).
 | Passage piéton | « Crosswalk. » (clip < 500 ms, toutes les 2 s hors Traversée) / « left/right » (1 fois par vue), « Aligned with the crosswalk. » (au changement), « On the crosswalk. » (1 fois) | Niveau 8 |
 | Trottoir | « Sidewalk ahead/on the left/on the right. » (dérive seule, 10 s) | Niveau 10 |
 | Virage + obstacle | 0 chevauchement : manœuvre (11) et obstacle ne parlent jamais l'un sur l'autre (le plus petit gagne, écrasé jeté) | `VoiceBus` |
-| Traversée, préavis | « Crosswalk ahead. » (niveau 8), jamais de « Straight. » au bord | Niveau 8 |
+| Traversée, préavis | « Crosswalk. » (niveau 8), jamais de « Straight. » au bord | Niveau 8 |
 | Traversée, mode | « Crossing mode on. » (`cross_on`), chat et GPS muets, dictée active | Niveaux 100-102 |
 | Traversée, verdict | « Cross. » / « Don't cross. » (3 s, changement immédiat) | Niveau 100 |
 | Traversée passée | « Crossing mode off. » (`cross_off`), le guidage reprend | Retour dehors |

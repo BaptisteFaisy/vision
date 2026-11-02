@@ -15,18 +15,17 @@ import org.junit.Test
 class IseeClipsEnTest {
 
     @Test
-    fun `le registre couvre les 106 nouveaux clips et les 21 réutilisés`() {
-        // Le registre de master est un sur-ensemble de celui de la branche :
-        // les 105 nouveaux clips et les 19 réutilisés de la branche y sont
-        // toujours présents, complétés par 1 nouveau clip et 2 réutilisés.
-        assertEquals(127, IseeClipsEn.all.size)
+    fun `le registre couvre les 107 nouveaux clips et les 18 réutilisés`() {
+        // 125 clips au total : le catalogue JSON et le registre Kotlin se
+        // couvrent exactement (test suivant), zéro entrée morte.
+        assertEquals(125, IseeClipsEn.all.size)
     }
 
     @Test
     fun `chaque entrée du catalogue JSON est dans le registre au caractère près`() {
         val catalog = JSONObject(catalogFile().readText())
         val entries = catalog.getJSONArray("clips") + catalog.getJSONArray("reuse")
-        assertEquals(124, entries.size)
+        assertEquals(125, entries.size)
         for ((id, text) in entries) {
             assertEquals("clip $id", text, IseeClipsEn.all[id])
         }
