@@ -3,6 +3,18 @@
 Le journal part du 2026-10-26 après 19 h : le commit de départ, puis une entrée par fait
 livré et ses preuves (tâche, fichiers, chiffres) dans l'arbre.
 
+## 2026-11-02 — iSee : contourner les humains à 1 m minimum (branche `evitement-humains-1m`)
+
+- **Demande** : « dès qu'un humain est reconnu, quand il doit dire gauche et
+  droite, qu'il s'éloigne pour être minimum à 1 m de lui ou plus ».
+- **Fait** (`:core`) : `PeoplePath.MIN_CLEARANCE_M` 0,8 → 1,0 m — le chemin
+  optimal, le côté dégagé, le veto trou de grillage, le veto passage SAM et
+  le retour trottoir garantissent tous 1 m au corps. Repli inchangé : aucun
+  côté à 1 m (foule dense) → côté le moins encombré, on se faufile.
+- **Preuve** : `:core` 3 223 tests, `:app` 1 909 tests, 0 échec ;
+  `check-kotlin-limits.py` OK. `PeoplePathTest` recalibré au mètre (caps,
+  écarts vrais, discriminants, créneau fantôme conservé).
+
 ## 2026-11-02 — iSee : le décalage des humains parle avec de la distance (branche `decalage-humains-distance`)
 
 - **Demande** : « il prend pas assez de distance pour se décaler des humains,
