@@ -134,7 +134,9 @@ class IseeRootLayout(context: Context) : FrameLayout(context) {
         },
     )
 
-    private val brain = IseeGestureBrain(
+    // Type explicite : `swipeHold` (ci-dessus) et le brain se référencent à
+    // l'initialisation (armement au swipe-down), l'inférence croisée boucle.
+    private val brain: IseeGestureBrain = IseeGestureBrain(
         listener = object : IseeGestureBrain.Listener {
             override fun onSingleTap() = onSingleTap?.invoke() ?: Unit
             override fun onSwipeUp() = onSwipeUp?.invoke() ?: Unit
