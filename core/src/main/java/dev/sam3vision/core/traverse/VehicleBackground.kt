@@ -1,7 +1,6 @@
 package dev.sam3vision.core.traverse
 
 import dev.sam3vision.core.motion.EgoMotion
-import dev.sam3vision.core.motion.GyroHint
 import dev.sam3vision.core.motion.MotionSample
 import dev.sam3vision.core.predict.EgoVerdict
 import dev.sam3vision.core.predict.ResiduDecision
@@ -95,15 +94,6 @@ object VehicleBackground {
      * [lumaWidth]/[lumaHeight] la grille du plan de luminance (unités de
      * [global]), [dtMs] le délai inter-frames (> 0), [bgChangeScore] la part
      * de fond changé (0..1, hors bornes = ramené, non fini = 0).
-     *
-     * [gyro] (PISTE4, `null` = verdicts visuels seuls, inchangés) : déplacement
-     * gyro attendu en pixels du plan de luminance. Ordre avec la piste 1
-     * (compensation ego-motion) : le résidu **visuel** (boîte − fond mesuré)
-     * passe d'abord — si [global] est utilisable, [gyro] est ignoré ; le résidu
-     * gyro ne sert qu'en **complément** quand le bloc-matching sature en rotation
-     * rapide (fond muet ou peu confiant), où le résidu décisionnel devient
-     * boîte − gyro. Si la piste 1 corrige [global] en entrée, ce hook la reçoit
-     * déjà corrigée : translation ego d'abord, rotation gyro ensuite, sans conflit.
      */
     fun decide(
         trackId: Int,
@@ -114,17 +104,13 @@ object VehicleBackground {
         lumaHeight: Int,
         dtMs: Long,
         bgChangeScore: Float,
-        gyro: GyroHint? = null,
     ): MovingVerdict {
         val bg = bgChangeScore.takeIf { it.isFinite() }?.coerceIn(0f, 1f) ?: 0f
         if (dtMs <= 0L || lumaWidth <= 0 || lumaHeight <= 0) {
             return unknown(trackId, global, bg)
         }
         if (!boxDx.isFinite() || !boxDy.isFinite()) return unknown(trackId, global, bg)
-        // PISTE4 : résidu visuel d'abord ; le gyro ne prend le relais (fond de
-        // repli, rotation pure) que si le fond mesuré est inutilisable — pan rapide
-        // qui sature le bloc-matching. Sans gyro, chemin strictement inchangé.
-        val sample = EgoMotion.fusedSample(global, gyro)
+        val sample = global?.takeIf(::visualUsable)
         if (sample == null) return unknown(trackId, global, bg)
         val dtSeconds = dtMs / 1000f
         val gx = sample.dx / lumaWidth / dtSeconds
@@ -156,11 +142,7 @@ object VehicleBackground {
         return ground.takeIf { it.isFinite() }
     }
 
-    /**
-     * Fond visuel exploitable : les mêmes exigences que [decide] avant la PISTE4
-     * (confiance et valeurs finies). Un fond qui échoue ici laisse la place au
-     * repli gyro au lieu de conclure [Verdict.UNKNOWN] tout de suite.
-     */
+    /** Fond visuel exploitable (confiance et valeurs finies), voir [EgoMotion.visualUsable]. */
     private fun visualUsable(sample: MotionSample): Boolean = EgoMotion.visualUsable(sample)
 
     /**

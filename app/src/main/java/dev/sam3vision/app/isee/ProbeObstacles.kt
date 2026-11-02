@@ -23,7 +23,9 @@ private const val MOVING_SPEAK_METERS = 20f
  * Véhicule de la frame : **frames SAM seules** — la porte avance à chaque
  * compteur vu, Traversée ou non (une réémission sans nouvelle frame rejoue
  * des lectures figées et casserait la confirmation). En Traversée, rien :
- * le verdict couvre les voitures. Portée 20 m (SPEC v4, niveau 0).
+ * le verdict couvre les voitures. Portée 20 m (SPEC v4, niveau 0), sans
+ * arbitrage fond (ordre user du 02/11 : le mouvement se juge sur la boîte
+ * brute — une garée qui défile parle « Car. », assumé).
  */
 private fun vehicleCueOf(
     st: LiveProbeState,
@@ -39,6 +41,7 @@ private fun vehicleCueOf(
     return watchers.vehicle.update(
         detectionsOf(readings, st.width, st.height), readings, nowMs, lang, motion,
         movingMeters = MOVING_SPEAK_METERS,
+        arbitrateBackground = false,
     )
         ?.also {
             logMotionTransition(

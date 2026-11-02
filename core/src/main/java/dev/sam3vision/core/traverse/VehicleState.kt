@@ -4,7 +4,6 @@ import dev.sam3vision.core.cycle.CycleConcepts
 import dev.sam3vision.core.distance.DistanceReading
 import dev.sam3vision.core.live.PositionText
 import dev.sam3vision.core.model.Detection
-import dev.sam3vision.core.motion.GyroMotion
 import dev.sam3vision.core.predict.Box
 import dev.sam3vision.core.predict.EgoCompensator
 import dev.sam3vision.core.speech.SpeechLanguage
@@ -44,14 +43,15 @@ data class VehicleStateCue(
  * entre [STOPPED_METERS] et [PARKED_METERS] m (même silence que l'arrêt).
  * Le reste est doute : piste jeune, seau instable, hors portée.
  *
- * Gyro-arret : [update] accepte la rotation camera ([GyroMotion]) en repli du
- * fond optique — pan rapide, fond muet : une boite qui suit le gyro prouve
- * l'arret compense, une boite qui s'en ecarte roule. Le gyro ne decote jamais
- * la croissance (rotation pure, pas d'avance/zoom) : un mobile ne passe jamais
- * pour arrete. Dehors (spec v4, niveau 0 = mouvement seul), le cablage passe
- * `announceStopped = false` et `movingMeters = OUTDOOR_MOVING_METERS` (20 m) :
- * l'arret et le stationnement se taisent mais restent suivis ; en Traversee,
- * le defaut (`announceStopped = true`) garde l'arret utilisable.
+ * Arbitrage fond ([arbitrateBackground], défaut vrai) : le mouvement se
+ * prouve contre le défilement du décor — une piste qui suit la caméra ne
+ * conclut pas. À faux (voix iSee dehors, ordre user du 02/11 : les voitures
+ * ne confirmaient jamais en marchant), le mouvement se juge sur la boîte
+ * brute — une garée qui défile parle « Car. », assumé. Dehors (spec v4,
+ * niveau 0 = mouvement seul), le cablage passe `announceStopped = false` et
+ * `movingMeters = OUTDOOR_MOVING_METERS` (20 m) : l'arret et le
+ * stationnement se taisent mais restent suivis ; en Traversee, le defaut
+ * (`announceStopped = true`) garde l'arret utilisable.
  *
  * Les cycles (vélo, trottinette) sont exclus ici : `CycleWatcher` les
  * annonce (« Attention, vélo en mouvement… »), sans double annonce. Le
@@ -139,11 +139,11 @@ class VehicleStateWatcher(
      * porte les boîtes SAM, [readings] les distances affinées ; [atMs] < 0
      * désactive le suivi temporel (croissance seule, comme le veto).
      * [motion] (`null` = pas de signal fond) fait juger chaque piste par le
-     * fond : une piste qui suit la caméra ne conclut plus le mouvement.
+     * fond : une piste qui suit la caméra ne conclut plus le mouvement —
+     * sauf [arbitrateBackground] faux (voix iSee dehors : boîte brute).
      * [movingMeters] borne la portée du mouvement (sans-feu : infini — toute voiture qui bouge se dit).
-     * [gyro] (`null` = verdicts visuels seuls, inchangés) : rotation caméra datée,
-     * repli quand le fond optique est muet. [announceStopped] faux = dehors
-     * (mouvement seul, l'arrêt reste suivi mais tu) ; vrai = traversée.
+     * [announceStopped] faux = dehors (mouvement seul, l'arrêt reste suivi
+     * mais tu) ; vrai = traversée.
      */
     @Synchronized
     fun update(
@@ -153,15 +153,16 @@ class VehicleStateWatcher(
         language: SpeechLanguage = SpeechLanguage.DEFAULT,
         motion: FrameMotion? = null, depthByBox: Map<List<Float>, Float>? = null, // PISTE2 : proximités par boîte — null = repli géométrie.
         movingMeters: Float = MOVING_METERS,
-        gyro: GyroMotion? = null,
         announceStopped: Boolean = true,
+        arbitrateBackground: Boolean = true,
     ): VehicleStateCue? {
-        val tau = if (atMs >= 0L) approach.update(detections, atMs, motion, depthByBox, gyro = gyro) // PISTE2 + gyro-arret
+        val arbMotion = if (arbitrateBackground) motion else null
+        val tau = if (atMs >= 0L) approach.update(detections, atMs, arbMotion, depthByBox) // PISTE2
         else ApproachVerdict(false, null, null)
         val current = currentByKey(detections, depthByBox)
         val meters = metersByKey(readings)
         val hushed = if (atMs >= 0L) approach.cameraMovedKeys else emptySet()
-        val pick = pick(gyro, announceStopped, current, meters, tau, atMs, hushed, approach.fondFranc, movingMeters, motion)
+        val pick = pick(announceStopped, current, meters, tau, atMs, hushed, approach.fondFranc, movingMeters, arbMotion)
         previous = current.mapValues { (key, seen) ->
             Prev(seen.area, seen.cx, seen.cy, PositionText.sceneBucket(metersFor(meters, key)), atMs, seen.closeness, seen.box, seen.edge) // PISTE2
         }
@@ -227,7 +228,6 @@ class VehicleStateWatcher(
 
     /** Le candidat de la frame : le mouvement d'abord, l'arrêt ensuite, le stationnement enfin. */
     private fun pick(
-        gyro: GyroMotion?,
         announceStopped: Boolean,
         current: Map<String, Current>,
         meters: Map<String, Float>,
@@ -239,7 +239,7 @@ class VehicleStateWatcher(
         motion: FrameMotion?,
     ): Pick? {
         if (current.isEmpty()) return null
-        return movingPick(current, meters, tau, atMs, hushed, movingMeters, motion, gyro) ?: if (announceStopped) stoppedPick(gyro, current, meters, atMs, hushed, fondFranc, motion) else null
+        return movingPick(current, meters, tau, atMs, hushed, movingMeters, motion) ?: if (announceStopped) stoppedPick(current, meters, atMs, hushed, fondFranc, motion) else null
     }
 
     /** Véhicule en mouvement : tau, traversée du champ ou croissance, en portée (ou non mesuré). */
@@ -251,7 +251,6 @@ class VehicleStateWatcher(
         hushed: Set<String>,
         movingMeters: Float,
         motion: FrameMotion?,
-        gyro: GyroMotion?,
     ): Pick? {
         val tauKey = tau.label?.takeIf { tau.approaching }?.let(::vehicleKey)
         val moving = current.keys
@@ -270,7 +269,7 @@ class VehicleStateWatcher(
                 // elle-même — sinon une piste qui churn entre voitures voisines
                 // fait annoncer la garée d'à côté (faux « Stop », Times Square).
                 val lateralHit = tau.lateralMoving && tau.lateralLabel?.let(::vehicleKey) == labelPart(candidate) && tau.lateralFresh &&
-                    prev != null && !still(prev, seen, atMs, motion, gyro)
+                    prev != null && !still(prev, seen, atMs, motion)
                 // Tronqué au cadre (entrée/sortie de champ) : la croissance est
                 // un artefact de (dé)clip, pas une approche (doctrine onEdge).
                 val growth = prev != null && !prev.edge && !seen.edge && isVehicleGrowth(prev.area, prev.atMs, prev.closeness, // FUSION P1+2.
@@ -290,7 +289,6 @@ class VehicleStateWatcher(
 
     /** Véhicule à l'arrêt : boîte figée (dérive, taille) et seau stable, mesuré ou non, partout. */
     private fun stoppedPick(
-        gyro: GyroMotion?,
         current: Map<String, Current>,
         meters: Map<String, Float>,
         atMs: Long,
@@ -305,11 +303,11 @@ class VehicleStateWatcher(
                 val prev = previous[candidate] ?: return@filter false
                 // Fond franc : l'arrêt brut est suspect — sauf piste suiveuse
                 // (arrêt compensé prouvé, pas un faux).
-                if (fondFranc && (motion == null && gyro == null || backgroundVerdict(prev, seen, atMs, motion, gyro) != Verdict.CAMERA_MOVED)) return@filter false
+                if (fondFranc && (motion == null || backgroundVerdict(prev, seen, atMs, motion) != Verdict.CAMERA_MOVED)) return@filter false
                 val measured = metersFor(meters, candidate)
                 if (measured != null && measured > PARKED_METERS) return@filter false
                 val grown = seen.area > prev.area * (1f + EgoCompensator.AREA_REL_EPS)
-                if (!still(prev, seen, atMs, motion, gyro) || grown) return@filter false
+                if (!still(prev, seen, atMs, motion) || grown) return@filter false
                 PositionText.sceneBucket(measured) == prev.bucket
             }
             .minByOrNull { metersFor(meters, it) ?: Float.MAX_VALUE }
@@ -324,30 +322,30 @@ class VehicleStateWatcher(
     /** Boîte qui suit la caméra : sa surface qui flicker est de la gigue SAM, pas une approche (miroir du veto arrêt). */
     private fun followingCamera(prev: Prev, seen: Current, atMs: Long, motion: FrameMotion?): Boolean {
         if (motion == null) return false
-        return backgroundVerdict(prev, seen, atMs, motion, null) == Verdict.CAMERA_MOVED
+        return backgroundVerdict(prev, seen, atMs, motion) == Verdict.CAMERA_MOVED
     }
 
     /** Dérive faible : brute sans signal fond, jugée contre le défilement sinon (une piste qui suit la caméra est un arrêt compensé, pas un mouvement). */
-    private fun still(prev: Prev, seen: Current, atMs: Long, motion: FrameMotion?, gyro: GyroMotion?): Boolean {
-        if (motion == null && gyro == null) return isStillBox(prev.cx, prev.cy, prev.atMs, seen.cx, seen.cy, atMs)
-        val verdict = backgroundVerdict(prev, seen, atMs, motion, gyro)
+    private fun still(prev: Prev, seen: Current, atMs: Long, motion: FrameMotion?): Boolean {
+        if (motion == null) return isStillBox(prev.cx, prev.cy, prev.atMs, seen.cx, seen.cy, atMs)
+        val verdict = backgroundVerdict(prev, seen, atMs, motion)
         return verdict == Verdict.STATIC || verdict == Verdict.CAMERA_MOVED
     }
 
     /** Verdict fond de la dérive [prev]→[seen] ([Verdict.UNKNOWN] sans datation ni géométrie). */
-    private fun backgroundVerdict(prev: Prev, seen: Current, atMs: Long, motion: FrameMotion?, gyro: GyroMotion?): Verdict {
+    private fun backgroundVerdict(prev: Prev, seen: Current, atMs: Long, motion: FrameMotion?): Verdict {
         if (atMs < 0L || prev.atMs < 0L) return Verdict.UNKNOWN
         val dtSeconds = (atMs - prev.atMs) / 1000f
         if (dtSeconds <= 0f) return Verdict.UNKNOWN
         val dx = (seen.cx ?: Float.NaN) - (prev.cx ?: Float.NaN)
         val dy = (seen.cy ?: Float.NaN) - (prev.cy ?: Float.NaN)
-        val lumaWidth = motion?.lumaWidth ?: gyro?.lumaWidth ?: return Verdict.UNKNOWN
-        val lumaHeight = motion?.lumaHeight ?: gyro?.lumaHeight ?: return Verdict.UNKNOWN
-        val dtMs = motion?.dtMs ?: gyro?.dtMs ?: return Verdict.UNKNOWN
+        val lumaWidth = motion?.lumaWidth ?: return Verdict.UNKNOWN
+        val lumaHeight = motion?.lumaHeight ?: return Verdict.UNKNOWN
+        val dtMs = motion?.dtMs ?: return Verdict.UNKNOWN
         val frameScale = dtMs / 1000f / dtSeconds
         return VehicleBackground.decide(
             -1, dx * frameScale, dy * frameScale,
-            motion?.global, lumaWidth, lumaHeight, dtMs, 0f, gyro?.hint,
+            motion.global, lumaWidth, lumaHeight, dtMs, 0f,
         ).verdict
     }
 
