@@ -106,13 +106,7 @@ fun LiveScreen(
     val scope = rememberCoroutineScope()
     val previewView = rememberLivePreview(context) { attached = it }
 
-    LaunchedEffect(Unit) { viewModel.startFromSettings(HomePresetRequest.consume()) }
-    ForegroundGate(viewModel)
-    LiveCameraHost(viewModel, previewView, attached) { failure = it }
-    // Dernier poste de la chronologie : la frame n'est comptée dessinée qu'après compose.
-    // La clé est la liste de masques (neuve à chaque frame), pas la frame : deux scènes
-    // identiques donnent deux `LiveFrame` égales.
-    FirstPixelWatcher(pixels.overlays, pixels.overlays.isNotEmpty()) { viewModel.noteDrawn() }
+    LiveEffects(viewModel, pixels, previewView, attached) { failure = it }
 
     LiveStage(
         pixels = pixels,
@@ -140,6 +134,24 @@ fun LiveScreen(
         localFrame = viewModel.local.frame,
         pictoPng = viewModel.asker::pngOf,
     )
+}
+
+/**
+ * Effets du Direct : démarrage depuis les réglages, coupe/reprise au premier plan,
+ * caméra d'analyse, et guet du premier pixel dessiné.
+ */
+@Composable
+private fun LiveEffects(
+    viewModel: LiveViewModel, pixels: LiveUiState, previewView: PreviewView,
+    attached: Boolean, onFailure: (String) -> Unit,
+) {
+    LaunchedEffect(Unit) { viewModel.startFromSettings(HomePresetRequest.consume()) }
+    ForegroundGate(viewModel)
+    LiveCameraHost(viewModel, previewView, attached, onFailure)
+    // Dernier poste de la chronologie : la frame n'est comptée dessinée qu'après compose.
+    // La clé est la liste de masques (neuve à chaque frame), pas la frame : deux scènes
+    // identiques donnent deux `LiveFrame` égales.
+    FirstPixelWatcher(pixels.overlays, pixels.overlays.isNotEmpty()) { viewModel.noteDrawn() }
 }
 
 /** Aperçu mémorisé, avec notification d'attachement (sinon l'analyseur n'est jamais lié). */
@@ -263,18 +275,33 @@ private fun LiveStage(
             onToggleLocal = onToggleLocal,
             modifier = Modifier.align(Alignment.TopCenter),
         )
-        LiveFooter(
-            state = rest,
-            memoryOpen = memoryOpen,
-            onToggleMemory = onToggleMemory,
-            onOpenChat = onAsk,
-            onFocus = onFocus,
-            onAskMemory = onAskMemory,
-            onVoiceStart = onVoiceStart,
-            onVoiceStop = onVoiceStop,
+        LiveStageFooter(
+            state = rest, memoryOpen = memoryOpen, onToggleMemory = onToggleMemory,
+            onOpenChat = onAsk, onFocus = onFocus, onAskMemory = onAskMemory,
+            onVoiceStart = onVoiceStart, onVoiceStop = onVoiceStop,
             modifier = Modifier.align(Alignment.BottomCenter),
         )
     }
+}
+
+/** Barre basse de la scène : mémoire, question, focus et voix. */
+@Composable
+private fun LiveStageFooter(
+    state: LiveUiState, memoryOpen: Boolean, onToggleMemory: () -> Unit,
+    onOpenChat: () -> Unit, onFocus: (Int) -> Unit, onAskMemory: (String) -> Unit,
+    onVoiceStart: () -> Unit, onVoiceStop: () -> Unit, modifier: Modifier = Modifier,
+) {
+    LiveFooter(
+        state = state,
+        memoryOpen = memoryOpen,
+        onToggleMemory = onToggleMemory,
+        onOpenChat = onOpenChat,
+        onFocus = onFocus,
+        onAskMemory = onAskMemory,
+        onVoiceStart = onVoiceStart,
+        onVoiceStop = onVoiceStop,
+        modifier = modifier,
+    )
 }
 
 /**

@@ -117,6 +117,10 @@ class Sam3LiveService:
         self._warmup_frame()
         self.gpu_name = gpu_name()
         self.load_seconds = round(time.monotonic() - started, 1)
+        self._freeze_load_breakdown(age)
+
+    def _freeze_load_breakdown(self, age) -> None:
+        """Fige le temps d'ouverture (restauration incluse) et le diagnostic gel/boot."""
         snap = getattr(self, "snap_seconds", None)
         self.load_breakdown = {"age_conteneur_s": age,
                                "poids_cpu_1er_demarrage_s": snap,
