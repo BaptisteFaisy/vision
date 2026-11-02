@@ -1,7 +1,9 @@
 package dev.sam3vision.core.net
 
 import dev.sam3vision.core.TestHttpServer
+import kotlinx.coroutines.delay
 import kotlinx.coroutines.runBlocking
+import kotlinx.coroutines.withTimeout
 import org.json.JSONObject
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
@@ -86,5 +88,61 @@ class WsLiveClientNetworkTest {
         assertEquals(1, cancel.getInt("id"))
         assertTrue(cancel.getBoolean("cancel"))
         client.close()
+    }
+
+    @Test
+    fun `le ping applicatif porte type ping et un id negatif`() {
+        assertEquals("""{"type":"ping","id":-2}""", pingMessage(-2))
+    }
+
+    @Test
+    fun `pas de ping avant 30 s sans frame en vol`() {
+        var now = 1_000_000L
+        val pump = WsKeepAlive(clock = { now })
+
+        now += PING_INTERVAL_MS - 1
+        assertFalse(pump.poll(inFlight = false))
+        now += 1
+        assertTrue(pump.poll(inFlight = false))
+        assertFalse("un seul ping par tick", pump.poll(inFlight = false))
+    }
+
+    @Test
+    fun `pas de ping quand une frame est en vol`() {
+        var now = 0L
+        val pump = WsKeepAlive(clock = { now })
+
+        now += 120_000L
+        assertFalse(pump.poll(inFlight = true))
+        assertTrue(pump.poll(inFlight = false))
+    }
+
+    @Test
+    fun `une frame re-arme le delai de 30 s`() {
+        var now = 0L
+        val pump = WsKeepAlive(clock = { now })
+
+        now += 20_000L
+        pump.markActive()
+        now += 20_000L
+        assertFalse(pump.poll(inFlight = false))
+        now += 10_000L
+        assertTrue(pump.poll(inFlight = false))
+    }
+
+    @Test
+    fun `le client pingue en idle et la pompe s arrete a close`() = runBlocking {
+        val transport = ContractWsTransport()
+        val client = WsLiveClient(base, transport, 30_000, RecordingLiveClient(), binaryWs = false, keepAlive = WsKeepAlive(intervalMs = 60))
+
+        assertTrue(client.preconnect())
+        assertTrue(client.pingActive)
+        withTimeout(2_000) { while (transport.sent.none { "\"type\":\"ping\"" in it }) delay(10) }
+        val ping = JSONObject(transport.sent.first { "\"type\":\"ping\"" in it })
+        assertEquals("ping", ping.getString("type"))
+        assertTrue("id négatif, hors espace des frames", ping.getInt("id") < -1)
+
+        client.close()
+        assertFalse(client.pingActive)
     }
 }

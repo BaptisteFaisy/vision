@@ -4,8 +4,10 @@ import dev.sam3vision.core.mask.base64Bytes
 import dev.sam3vision.core.mask.base64Text
 import dev.sam3vision.core.model.LiveFrame
 import dev.sam3vision.core.model.LiveHealth
+import java.util.Timer
 import kotlinx.coroutines.CompletableDeferred
 import kotlinx.coroutines.withTimeoutOrNull
+import kotlin.concurrent.timer
 import org.json.JSONObject
 
 /**
@@ -63,6 +65,12 @@ class WsLiveClient(
      * lourd (appelée sous [lock], sur le thread d'envoi ou le lecteur).
      */
     private val onBinaryChange: ((Boolean) -> Unit)? = null,
+    /**
+     * Keepalive applicatif (FIX-17) : `{"type":"ping","id":N}` toutes les 30 s sans
+     * frame en vol, pour que l'idle serveur (45 s) ne coupe pas le socket. `null` =
+     * coupé (tests déterministes).
+     */
+    private val keepAlive: WsKeepAlive? = WsKeepAlive(),
 ) : LiveClient {
 
     private val lock = Any()
@@ -78,6 +86,11 @@ class WsLiveClient(
      * d'une frame tuait le socket rouvert par sa sœur (coupure fantôme).
      */
     private var socketGen = 0
+
+    /** Minuteur du keepalive : un seul par session, rendu par [close]. */
+    private var pingTimer: Timer? = null
+    /** Prochain `id` de ping : négatif ([FIRST_PING_ID]), hors de l'espace des frames. */
+    private var pingId = FIRST_PING_ID
 
     /**
      * Le serveur a déjà répondu `id: -1` : sans WS binaire, les frames suivantes partent
@@ -195,6 +208,8 @@ class WsLiveClient(
             synchronized(lock) { pending.remove(id) }
             return Result.failure(ApiError.Network("WebSocket /live/ws: send refused"))
         }
+        // La frame prouve que le socket vit : le prochain ping recule d'un intervalle.
+        keepAlive?.markActive()
         return try {
             awaitReply(id, reply, gen)
         } finally {
@@ -243,9 +258,41 @@ class WsLiveClient(
         synchronized(lock) {
             connected = false
             socketGen++
+            stopPingLocked()
         }
         transport.close()
         failPending(ApiError.Network(WS_CLOSED))
+    }
+
+    /**
+     * Pompe ping (FIX-17) : un seul minuteur par session, premier tick après un
+     * intervalle plein (appel sous [lock], depuis [openLocked]).
+     */
+    private fun startPingLocked() {
+        val pump = keepAlive
+        if (pump == null || pingTimer != null) return
+        pingTimer = timer(name = "ws-ping", daemon = true, initialDelay = pump.intervalMs, period = pump.intervalMs) {
+            maybePing()
+        }
+    }
+
+    /** Arrêt de la pompe (appel sous [lock]) : socket fermé, plus rien à tenir éveillé. */
+    private fun stopPingLocked() {
+        pingTimer?.cancel()
+        pingTimer = null
+    }
+
+    /** Pompe en route, exposée aux tests : le câblage minuteur ↔ socket. */
+    internal val pingActive: Boolean get() = synchronized(lock) { pingTimer != null }
+
+    /** Tick ping : `{"type":"ping","id":N}` si rien ne part depuis 30 s (best-effort). */
+    private fun maybePing() {
+        val id = synchronized(lock) {
+            val pump = keepAlive
+            if (!connected || pump == null || !pump.poll(pending.isNotEmpty())) return
+            pingId--
+        }
+        runCatching { transport.send(pingMessage(id)) }
     }
 
     /** Ouvre la connexion si besoin (appel sous [lock]). */
@@ -264,6 +311,7 @@ class WsLiveClient(
         if (opened) {
             connected = true
             socketGen = gen
+            startPingLocked()
         }
         return connected
     }
@@ -359,6 +407,7 @@ class WsLiveClient(
         val stale = synchronized(lock) {
             if (gen != socketGen) true else {
                 connected = false
+                stopPingLocked()
                 false
             }
         }
