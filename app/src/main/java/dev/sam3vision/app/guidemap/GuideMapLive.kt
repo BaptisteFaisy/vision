@@ -9,6 +9,7 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberUpdatedState
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.graphics.Color
 import dev.sam3vision.app.voicenav.MiniRouteMap
 import dev.sam3vision.app.voicenav.ROUTE_MAP_POLL_MS
 import dev.sam3vision.core.nav.GuidanceMapState
@@ -46,6 +47,7 @@ internal fun rememberGuidanceMapState(
  * schéma sinon (repli jusqu'à la sortie d'écran — rouvrir pour réessayer
  * les tuiles). Rien sans tracé (repos).
  * [showAttribution] `false` masque la mention légale (pages blind).
+ * [cornerColor] peint les coins arrondis : le fond uni derrière la carte.
  */
 @Composable
 fun GuidanceMapCard(
@@ -53,6 +55,7 @@ fun GuidanceMapCard(
     update: GuidanceUpdate,
     modifier: Modifier = Modifier,
     showAttribution: Boolean = true,
+    cornerColor: Color,
 ) {
     val mapState by rememberGuidanceMapState(snapshot, update)
     val current = mapState ?: return
@@ -63,6 +66,7 @@ fun GuidanceMapCard(
             modifier,
             onTilesError = { tilesOk = false },
             showAttribution = showAttribution,
+            cornerColor = cornerColor,
         )
     } else {
         MiniRouteMap(snapshot, modifier)

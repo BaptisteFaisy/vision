@@ -4,6 +4,7 @@ import android.content.Context
 import android.graphics.Bitmap
 import android.graphics.Canvas
 import android.graphics.Paint
+import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.fillMaxSize
@@ -18,7 +19,12 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.geometry.CornerRadius
+import androidx.compose.ui.geometry.Rect
+import androidx.compose.ui.geometry.RoundRect
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.Path
+import androidx.compose.ui.graphics.PathFillType
 import androidx.compose.ui.graphics.toArgb
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalLifecycleOwner
@@ -65,6 +71,11 @@ import org.maplibre.android.maps.Style
  * recréées — et la caméra ne bouge que si la cible a vraiment bougé (2 m)
  * ou si le zoom change — sinon le doigt de l'utilisateur serait arraché à
  * chaque seconde.
+ *
+ * Coins arrondis ([GuideMapCornerRadius]) : la MapView rend sur une
+ * SurfaceView (surface dédiée, insensible au `clip` Compose) — les coins
+ * sont donc repeints à [cornerColor], qui doit être le fond uni derrière
+ * la carte (blanc sur l'accueil iSee) sous peine de carrés visibles.
  */
 @Composable
 fun GuidanceMapView(
@@ -72,6 +83,7 @@ fun GuidanceMapView(
     modifier: Modifier = Modifier,
     onTilesError: () -> Unit = {},
     showAttribution: Boolean = true,
+    cornerColor: Color,
 ) {
     val mapView = rememberGuideMapView()
     GuideMapLifecycle(mapView)
@@ -81,22 +93,7 @@ fun GuidanceMapView(
     val marks = remember { GuideMarks() }
     val appContext = LocalContext.current.applicationContext
     val pins = remember(appContext) { GuidePinIcons(appContext) }
-    LaunchedEffect(mapView) {
-        var sent = false
-        fun report() {
-            if (!sent) {
-                sent = true
-                onTilesError()
-            }
-        }
-        mapView.addOnDidFailLoadingMapListener { report() }
-        mapView.getMapAsync { ready ->
-            map = ready
-            runCatching {
-                ready.setStyle(Style.Builder().fromUrl(OPENFREEMAP_STYLE_URL)) { styleReady = true }
-            }.onFailure { report() }
-        }
-    }
+    GuideMapLoader(mapView, onMap = { map = it }, onStyle = { styleReady = true }, onTilesError = onTilesError)
     val current = map
     val loaded = styleReady
     Box(modifier) {
@@ -113,7 +110,33 @@ fun GuidanceMapView(
             onRelease = ::releaseGuideMap,
             modifier = Modifier.fillMaxSize(),
         )
+        // Masque composé APRÈS l'AndroidView : le Compose d'avant passerait
+        // derrière la carte (vraie View, voir docs/MASQUES-DEBUG.md).
+        GuideMapCorners(cornerColor, Modifier.fillMaxSize())
         if (showAttribution) GuideAttribution(Modifier.align(Alignment.BottomStart))
+    }
+}
+
+/** Rayon des coins de la carte GPS, partagé avec le repli schéma. */
+val GuideMapCornerRadius = 16.dp
+
+/**
+ * Coins arrondis peints sur la carte : remplit le rectangle hors du
+ * rectangle arrondi (remplissage pair-impair, bords adoucis), à la
+ * couleur du fond derrière la carte. La surface GL ne se laissant pas
+ * rogner par le `clip` Compose, c'est la seule retouche sans changer
+ * le mode de rendu (texture = copie GPU par frame, écartée).
+ */
+@Composable
+private fun GuideMapCorners(cornerColor: Color, modifier: Modifier = Modifier) {
+    Canvas(modifier) {
+        val radius = GuideMapCornerRadius.toPx()
+        val outside = Path().apply {
+            fillType = PathFillType.EvenOdd
+            addRect(Rect(0f, 0f, size.width, size.height))
+            addRoundRect(RoundRect(0f, 0f, size.width, size.height, CornerRadius(radius)))
+        }
+        drawPath(outside, cornerColor)
     }
 }
 
@@ -161,6 +184,35 @@ private fun GuideMapLifecycle(mapView: MapView) {
         }
         lifecycle.addObserver(observer)
         onDispose { lifecycle.removeObserver(observer) }
+    }
+}
+
+/**
+ * Charge la carte et son style Liberty ; signale l'échec des tuiles une
+ * fois. Ne lève jamais (l'appelant bascule sur le repli schéma).
+ */
+@Composable
+private fun GuideMapLoader(
+    mapView: MapView,
+    onMap: (MapLibreMap) -> Unit,
+    onStyle: () -> Unit,
+    onTilesError: () -> Unit,
+) {
+    LaunchedEffect(mapView) {
+        var sent = false
+        fun report() {
+            if (!sent) {
+                sent = true
+                onTilesError()
+            }
+        }
+        mapView.addOnDidFailLoadingMapListener { report() }
+        mapView.getMapAsync { ready ->
+            onMap(ready)
+            runCatching {
+                ready.setStyle(Style.Builder().fromUrl(OPENFREEMAP_STYLE_URL)) { onStyle() }
+            }.onFailure { report() }
+        }
     }
 }
 

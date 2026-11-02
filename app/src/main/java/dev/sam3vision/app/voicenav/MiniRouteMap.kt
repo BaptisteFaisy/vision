@@ -12,8 +12,8 @@ import androidx.compose.ui.draw.clip
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.drawscope.DrawScope
-import androidx.compose.ui.unit.dp
 import dev.sam3vision.app.AppColors
+import dev.sam3vision.app.guidemap.GuideMapCornerRadius
 import dev.sam3vision.core.nav.MapPx
 import dev.sam3vision.core.nav.NavFix
 import dev.sam3vision.core.nav.NavRoute
@@ -38,7 +38,7 @@ fun MiniRouteMap(
     val current = snap ?: return
     Box(
         modifier
-            .clip(RoundedCornerShape(16.dp))
+            .clip(RoundedCornerShape(GuideMapCornerRadius))
             .background(AppColors.surfaceHigh),
     ) {
         Canvas(Modifier.fillMaxSize()) { drawMiniRoute(current) }
