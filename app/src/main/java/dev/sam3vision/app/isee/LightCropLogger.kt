@@ -6,8 +6,15 @@ import android.util.Log
 import dev.sam3vision.core.crossing.CrossingState
 import java.io.ByteArrayOutputStream
 import java.io.File
+import java.util.Locale
 
-/** Ligne JSONL d'un crop collecté : que des valeurs sûres (pas de guillemets à échapper). */
+/**
+ * Ligne JSONL d'un crop collecté : que des valeurs sûres (pas de guillemets à échapper).
+ * [burn] = part du crop écrasée en blanc ([dev.sam3vision.core.exposure.ClipStats.fraction],
+ * 4 décimales, point décimal forcé par [Locale.ROOT]) : la collecte terrain devient
+ * directement exploitable pour comparer « feu éteint » et « lampe blanche par
+ * surexposition », et pour rejouer le seuil de 1,5 % sur de vrais crops.
+ */
 internal fun lightCropLine(
     tsMs: Long,
     box: List<Float>,
@@ -16,10 +23,13 @@ internal fun lightCropLine(
     height: Int,
     pngB64: String,
     appVersion: String,
+    burn: Float = 0f,
 ): String {
     val boxJson = box.joinToString(",", "[", "]") { it.toString() }
+    val burnJson = String.format(Locale.ROOT, "%.4f", burn)
     return "{\"ts\":$tsMs,\"box\":$boxJson,\"verdict\":\"${verdict.name}\"," +
-        "\"w\":$width,\"h\":$height,\"png\":\"$pngB64\",\"v\":\"${sanitizeVersion(appVersion)}\"}"
+        "\"w\":$width,\"h\":$height,\"burn\":$burnJson,\"png\":\"$pngB64\"," +
+        "\"v\":\"${sanitizeVersion(appVersion)}\"}"
 }
 
 /** Version bornée au jeu sûr JSON (sans guillemets ni contrôles). */
@@ -74,7 +84,10 @@ internal class LightCropLogger(
             }
             return false
         }
-        val line = lightCropLine(tsMs, box, verdict, crop.width, crop.height, pngOf(crop.argb, crop.width, crop.height), appVersion)
+        val line = lightCropLine(
+            tsMs, box, verdict, crop.width, crop.height,
+            pngOf(crop.argb, crop.width, crop.height), appVersion, crop.clip.fraction,
+        )
         writer(file, line)
         count++
         return true

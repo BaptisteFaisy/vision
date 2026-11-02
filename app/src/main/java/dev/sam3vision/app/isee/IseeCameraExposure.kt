@@ -74,16 +74,25 @@ class IseeExposureDriver {
  * [halStages] (décidés par [CameraHalProcessing]) : étages HAL passés à OFF
  * dans le MÊME appel — `setCaptureRequestOptions` écrase le précédent, deux
  * appels séparés perdraient ce tuning. Vide = tuning d'avant, inchangé.
+ *
+ * [awbLock] : `null` = ne pas toucher à l'AWB (cas iSee), `true`/`false` = poser ou
+ * relâcher `CONTROL_AWB_LOCK` **dans la même requête** que l'antibanding et l'AF —
+ * l'API écrase la requête précédente, un second appel perdrait le tuning ci-dessus
+ * (mesuré et commenté en tête de fichier). Disponible sur toutes les plateformes
+ * (doc AOSP de `CaptureRequest`) mais un HAL peut l'ignorer sans erreur : c'est
+ * pourquoi le pilote le journalise au lieu de le supposer appliqué.
  */
 @OptIn(markerClass = [ExperimentalCamera2Interop::class])
 fun applySensorTuning(
     camera: androidx.camera.core.Camera,
     halStages: Set<CameraHalProcessing.HalStage> = emptySet(),
+    awbLock: Boolean? = null,
 ) {
     runCatching {
         val builder = CaptureRequestOptions.Builder()
             .setCaptureRequestOption(CaptureRequest.CONTROL_AE_ANTIBANDING_MODE, CameraMetadata.CONTROL_AE_ANTIBANDING_MODE_50HZ)
             .setCaptureRequestOption(CaptureRequest.CONTROL_AF_MODE, CaptureRequest.CONTROL_AF_MODE_CONTINUOUS_PICTURE)
+        if (awbLock != null) builder.setCaptureRequestOption(CaptureRequest.CONTROL_AWB_LOCK, awbLock)
         for (stage in halStages) {
             builder.setCaptureRequestOption(CameraHalProcessing.keyOf(stage), CameraHalProcessing.OFF)
         }

@@ -3,6 +3,7 @@ package dev.sam3vision.app
 import android.app.Activity
 import android.content.Context
 import android.graphics.Bitmap
+import android.os.SystemClock
 import android.util.Size
 import androidx.camera.core.CameraSelector
 import androidx.camera.core.ImageAnalysis
@@ -44,6 +45,8 @@ import androidx.compose.ui.unit.sp
 import androidx.compose.ui.viewinterop.AndroidView
 import dev.sam3vision.app.isee.CrossingOverlayLayer
 import dev.sam3vision.app.isee.FramePolicy
+import dev.sam3vision.app.isee.applySensorTuning
+import dev.sam3vision.app.live.LiveSensorControl
 import androidx.lifecycle.findViewTreeLifecycleOwner
 import dev.sam3vision.app.live.setFocus
 import dev.sam3vision.app.media.Nv21JpegEncoder
@@ -191,12 +194,15 @@ private fun LiveCameraHost(
     val context = LocalContext.current
     val executor = remember { Executors.newSingleThreadExecutor() }
     val encoder = remember { Nv21JpegEncoder() }
+    // Pilotage capteur de la traversée (EV sur la boîte du feu, verrou AWB, région AE) :
+    // un seul objet par liaison, inerte tant que rien n'est mesuré (voir LiveSensorControl).
+    val sensor = remember { LiveSensorControl() }
     var bound by remember { mutableStateOf(false) }
     LaunchedEffect(attached) {
         if (!attached) return@LaunchedEffect
         runCatching {
-            bindLiveCamera(context, previewView, executor, viewModel::applyLens) { proxy ->
-                pushFrame(proxy, viewModel, encoder)
+            bindLiveCamera(context, previewView, executor, sensor, viewModel::applyLens) { proxy ->
+                pushFrame(proxy, viewModel, encoder, sensor)
             }
         }.onSuccess { bound = true }
             .onFailure { onFailure("Camera unavailable: ${it.message}") }
@@ -205,6 +211,7 @@ private fun LiveCameraHost(
         onDispose {
             viewModel.stop()
             viewModel.local.reset()
+            sensor.release()
             // Le fournisseur est déjà initialisé si on a lié : `.get()` est immédiat.
             // Sans liaison, l'initialiser ici bloquerait le thread principal pour rien.
             if (bound) runCatching { ProcessCameraProvider.getInstance(context).get().unbindAll() }
@@ -368,11 +375,17 @@ private fun RecoveryTap(onRestart: () -> Unit) {
  * tirait vers le bas et la carte affichait des aplats.
  * [onLens] reçoit le champ de vision réel du capteur dès la liaison (les distances
  * en ont besoin ; `null` si le driver est muet).
+ *
+ * Ce chemin-là lisait le feu **sans aucun réglage capteur** (audit A6, 2026-11-02) :
+ * `applySensorTuning` y est désormais branché comme sur la page iSee — antibanding 50 Hz
+ * et autofocus continu. Aucun changement d'exposition ici : le verrou AE reste exclu
+ * (mesuré nuisible le 2026-11-01), la compensation vient de [sensor].
  */
 private suspend fun bindLiveCamera(
     context: Context,
     previewView: PreviewView,
     executor: ExecutorService,
+    sensor: LiveSensorControl,
     onLens: (LensSpec?) -> Unit,
     onImage: (ImageProxy) -> Unit,
 ) {
@@ -397,6 +410,11 @@ private suspend fun bindLiveCamera(
         .also { it.setAnalyzer(executor) { proxy -> onImage(proxy) } }
     provider.unbindAll()
     val camera = provider.bindToLifecycle(owner, CameraSelector.DEFAULT_BACK_CAMERA, preview, analysis)
+    // Étape 0 (audit A6) : le tuning qui tourne déjà en prod côté iSee manquait ici — sans
+    // lui, l'éclairage LED/sodium bat à 50 Hz et la teinte de la lampe oscille entre deux
+    // frames. Aucun effet sur l'exposition : c'est un réglage de fréquence et de mise au point.
+    applySensorTuning(camera)
+    sensor.bind(camera)
     onLens(lensSpecOf(camera.cameraInfo))
 }
 
@@ -407,8 +425,16 @@ private suspend fun bindLiveCamera(
  * gate côté ViewModel. Repli sur l'ancien chemin `Bitmap` si le buffer n'est pas en YUV
  * 4:2:0.
  */
-private fun pushFrame(proxy: ImageProxy, viewModel: LiveViewModel, encoder: Nv21JpegEncoder) {
+private fun pushFrame(
+    proxy: ImageProxy,
+    viewModel: LiveViewModel,
+    encoder: Nv21JpegEncoder,
+    sensor: LiveSensorControl,
+) {
     try {
+        // Capteur d'abord : la mesure de la frame précédente se consomme même si celle-ci
+        // ne part pas (aucun consommateur) — sinon l'exposition resterait figée.
+        sensor.onFrame(SystemClock.elapsedRealtime())
         // Porte d'encodage (motif `IseeCameraPane`) : aucun consommateur (réseau, calque,
         // traversée, questions) ne veut la frame — on économise le JPEG (le `finally` ferme).
         if (!viewModel.wantsFrame()) {

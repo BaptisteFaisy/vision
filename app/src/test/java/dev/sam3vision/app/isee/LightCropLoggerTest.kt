@@ -41,7 +41,7 @@ class LightCropLoggerTest {
         assertEquals(1, lines.size)
         assertEquals(
             "{\"ts\":1700000000000,\"box\":[0.1,0.2,0.3,0.4],\"verdict\":\"Red\"," +
-                "\"w\":48,\"h\":64,\"png\":\"UE5H\",\"v\":\"1.2.3\"}",
+                "\"w\":48,\"h\":64,\"burn\":0.0000,\"png\":\"UE5H\",\"v\":\"1.2.3\"}",
             lines[0],
         )
     }
