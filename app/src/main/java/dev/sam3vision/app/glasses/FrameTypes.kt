@@ -96,6 +96,49 @@ object YuvConverter {
         return true
     }
 
+    /**
+     * Remplit [out] en sous-échantillonnant d'un facteur 2 dans chaque axe
+     * (un pixel sur quatre converti) : le pont réduit de toute façon à 320 px,
+     * convertir le 720p plein (~921 kpx) avant de jeter les trois quarts est du
+     * CPU jeté (~10-30 ms/frame). Mêmes gardes que [yuv420ToArgb], [out] fait
+     * au moins [halfDimensions] cases.
+     */
+    fun yuv420ToArgbHalf(data: ByteArray, layout: Yuv420Layout, out: IntArray): Boolean {
+        val width = layout.width
+        val height = layout.height
+        if (width <= 0 || height <= 0) return false
+        if (layout.yRowStride < width) return false
+        if (layout.uvPixelStride < 1) return false
+        val (halfW, halfH) = halfDimensions(width, height)
+        if (out.size < halfW * halfH) return false
+        if (layout.requiredBytes() > data.size) return false
+        fillArgbHalf(data, layout, out, halfW, halfH)
+        return true
+    }
+
+    /** Conversion d'un pixel sur quatre, sans allocation dans la boucle. */
+    private fun fillArgbHalf(data: ByteArray, layout: Yuv420Layout, out: IntArray, halfW: Int, halfH: Int) {
+        val yStride = layout.yRowStride
+        val uvStride = layout.uvRowStride
+        val uvStep = layout.uvPixelStride
+        val uOffset = layout.uOffset
+        val vOffset = layout.vOffset
+        var o = 0
+        for (row in 0 until halfH) {
+            // Pixel de sortie (row, col) = pixel source (2·row, 2·col) : le
+            // chroma du couple (2·row, 2·col) est exactement (row, col).
+            val yBase = (row * 2) * yStride
+            val uvBase = row * uvStride
+            for (col in 0 until halfW) {
+                val y = data[yBase + col * 2].toInt() and 0xFF
+                val ci = uvBase + col * uvStep
+                val u = (data[uOffset + ci].toInt() and 0xFF) - 128
+                val v = (data[vOffset + ci].toInt() and 0xFF) - 128
+                out[o++] = argb(y, u, v)
+            }
+        }
+    }
+
     /** Conversion pixel par pixel, sans allocation dans la boucle. */
     private fun fillArgb(data: ByteArray, layout: Yuv420Layout, out: IntArray) {
         val width = layout.width
@@ -127,6 +170,14 @@ object YuvConverter {
         return (0xFF shl 24) or (r shl 16) or (g shl 8) or b
     }
 }
+
+/**
+ * Dimensions d'une conversion demi-résolution ([YuvConverter.yuv420ToArgbHalf]) :
+ * moitié arrondie au supérieur (un impair garde son dernier pixel), jamais zéro.
+ * Pure, testée en JVM.
+ */
+internal fun halfDimensions(width: Int, height: Int): Pair<Int, Int> =
+    ((width + 1) / 2).coerceAtLeast(1) to ((height + 1) / 2).coerceAtLeast(1)
 
 /** Alignements de ligne testés par [inferYuv420Layout] (pixels). */
 private val ROW_ALIGNMENTS = intArrayOf(1, 2, 4, 8, 16, 32, 64, 128, 256)

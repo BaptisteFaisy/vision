@@ -2,6 +2,7 @@ package dev.sam3vision.app.glasses.bench
 
 import dev.sam3vision.app.glasses.Yuv420Layout
 import dev.sam3vision.app.glasses.YuvConverter
+import dev.sam3vision.app.glasses.halfDimensions
 import dev.sam3vision.app.glasses.inferYuv420Layout
 import org.junit.Assert.assertArrayEquals
 import org.junit.Assert.assertEquals
@@ -201,5 +202,67 @@ class YuvConverterTest {
         assertEquals(48, Yuv420Layout(4, 4, 8, 4).requiredBytes())
         // Semi-planaire : un seul plan de chroma entrelacé.
         assertEquals(24, Yuv420Layout(4, 4, 4, 4, 2).requiredBytes())
+    }
+
+    private fun convertHalf(layout: Yuv420Layout, data: ByteArray = buildYuv(layout)): IntArray {
+        val (halfW, halfH) = halfDimensions(layout.width, layout.height)
+        val out = IntArray(halfW * halfH)
+        assertTrue("la demi-résolution doit réussir", YuvConverter.yuv420ToArgbHalf(data, layout, out))
+        return out
+    }
+
+    @Test
+    fun `la demi-resolution echantillonne les lignes et colonnes paires`() {
+        // Un Y distinct par pixel : chaque sortie doit valoir exactement sa source (2·r, 2·c).
+        val yAt: (Int, Int) -> Int = { row, col -> (10 * (row * 4 + col)) % 256 }
+        val data = buildYuv(tight(), yAt = yAt)
+        val full = convert(tight(), data)
+        val half = convertHalf(tight(), data)
+        assertEquals("4x4 → 2x2", 4, half.size)
+        for (row in 0 until 2) {
+            for (col in 0 until 2) {
+                assertEquals(
+                    "pixel ($row,$col) = source (${row * 2},${col * 2})",
+                    full[(row * 2) * 4 + col * 2],
+                    half[row * 2 + col],
+                )
+            }
+        }
+    }
+
+    @Test
+    fun `la demi-resolution ignore le padding et lit le NV12 comme l I420`() {
+        val yAt: (Int, Int) -> Int = { row, col -> (10 * (row * 4 + col)) % 256 }
+        val planar = convertHalf(tight(), buildYuv(tight(), yAt = yAt))
+        val padded = Yuv420Layout(width = 4, height = 4, yRowStride = 8, uvRowStride = 4)
+        assertArrayEquals(planar, convertHalf(padded, buildYuv(padded, yAt = yAt)))
+        val nv12 = Yuv420Layout(width = 4, height = 4, yRowStride = 4, uvRowStride = 4, uvPixelStride = 2)
+        assertArrayEquals(planar, convertHalf(nv12, buildYuv(nv12, yAt = yAt)))
+    }
+
+    @Test
+    fun `la demi-resolution garde le dernier pixel des dimensions impaires`() {
+        assertEquals(2 to 2, halfDimensions(3, 3))
+        assertEquals(360 to 640, halfDimensions(720, 1280))
+        assertEquals(1 to 1, halfDimensions(1, 1))
+        val odd = Yuv420Layout(width = 3, height = 3, yRowStride = 3, uvRowStride = 2)
+        val yAt: (Int, Int) -> Int = { row, col -> (20 * (row * 3 + col)) % 256 }
+        val data = buildYuv(odd, yAt = yAt)
+        val full = convert(odd, data)
+        val half = convertHalf(odd, data)
+        assertEquals("3x3 → 2x2", 4, half.size)
+        // Sources (0,0), (0,2), (2,0), (2,2) : le dernier pixel impair est lu, pas deviné.
+        assertArrayEquals(intArrayOf(full[0], full[2], full[6], full[8]), half)
+    }
+
+    @Test
+    fun `la demi-resolution refuse les entrees incoherentes sans lever`() {
+        val out = IntArray(4)
+        assertFalse(YuvConverter.yuv420ToArgbHalf(ByteArray(0), tight(), out))
+        assertFalse(YuvConverter.yuv420ToArgbHalf(ByteArray(24), tight().copy(width = 0), out))
+        assertFalse(YuvConverter.yuv420ToArgbHalf(ByteArray(24), tight().copy(yRowStride = 2), out))
+        assertFalse(YuvConverter.yuv420ToArgbHalf(ByteArray(24), tight().copy(uvPixelStride = 0), out))
+        assertFalse(YuvConverter.yuv420ToArgbHalf(buildYuv(tight()), tight(), IntArray(3)))
+        assertFalse(YuvConverter.yuv420ToArgbHalf(buildYuv(tight()).copyOf(23), tight(), out))
     }
 }

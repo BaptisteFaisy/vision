@@ -200,9 +200,12 @@ internal open class GlassesVideoDecoder(
             view.position(info.offset)
             view.limit(info.offset + info.size)
             view.get(bytes)
-            val argb = IntArray(frame.width * frame.height)
-            if (!YuvConverter.yuv420ToArgb(bytes, layout, argb)) return null
-            return ArgbImage(argb, frame.width, frame.height, info.presentationTimeUs)
+            // Demi-résolution : le pont réduit à 320 px de toute façon, le
+            // 720p plein (~921 kpx) coûtait ~10-30 ms de CPU jetés par frame.
+            val (halfW, halfH) = halfDimensions(frame.width, frame.height)
+            val argb = IntArray(halfW * halfH)
+            if (!YuvConverter.yuv420ToArgbHalf(bytes, layout, argb)) return null
+            return ArgbImage(argb, halfW, halfH, info.presentationTimeUs)
         } catch (_: Exception) {
             return null
         } finally {
