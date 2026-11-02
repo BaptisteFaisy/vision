@@ -40,7 +40,7 @@ class TraversePipelineTest {
         if (!withVoice) {
             null
         } else {
-            TraversePhrases.ALL.forEach { clips[it] = "/cache/${it.hashCode()}.wav" }
+            TraversePhrases.ALL.forEach { clips.putIfAbsent(it, "/cache/${it.hashCode()}.wav") }
             TraverseVoice(player, FakeStore(clips), FakeBundled(store = clips))
         }
 
