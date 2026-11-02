@@ -141,12 +141,12 @@ class TraverseVetoPriorityTest {
     fun `phrases prechauffees - litteraux anglais exacts`() {
         assertEquals("Don't cross yet", TraversePhrases.RED)
         assertEquals("You can cross", TraversePhrases.GREEN)
-        assertEquals("Sidewalk across the street.", TraversePhrases.SIDEWALK_ACROSS)
+        assertEquals("Sidewalk across.", TraversePhrases.SIDEWALK_ACROSS)
         assertEquals("Here.", TraversePhrases.ON_CROSSWALK)
         assertEquals(
             listOf(
                 "Don't cross yet", "You can cross",
-                "Sidewalk across the street.", "Here.",
+                "Sidewalk across.", "Here.",
             ),
             TraversePhrases.ALL,
         )

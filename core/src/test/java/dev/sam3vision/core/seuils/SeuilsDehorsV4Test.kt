@@ -405,14 +405,14 @@ class SeuilsDehorsV4Test {
         val watcher = SidewalkWatcher()
         assertNull(watcher.onPosition(SidewalkPosition.Left, 1_000L, En))
         val cue = watcher.onPosition(SidewalkPosition.Left, 1_100L, En)
-        assertEquals("Sidewalk on the left.", cue!!.phrase)
+        assertEquals("Sidewalk left.", cue!!.phrase)
         assertEquals(10, cue.level)
         assertEquals("sidewalk", cue.antiRepeatKey)
         watcher.onPosition(SidewalkPosition.Left, 2_000L, En)
         assertNull(watcher.onPosition(SidewalkPosition.Left, 2_100L, En))
         assertNull(watcher.onPosition(SidewalkPosition.Absent, 3_000L, En))
         watcher.onPosition(SidewalkPosition.Right, 3_100L, En)
-        assertEquals("Sidewalk on the right.", watcher.onPosition(SidewalkPosition.Right, 3_200L, En)!!.phrase)
+        assertEquals("Sidewalk right.", watcher.onPosition(SidewalkPosition.Right, 3_200L, En)!!.phrase)
     }
 
     // Voitures — textes EN (la détection est une autre mission).

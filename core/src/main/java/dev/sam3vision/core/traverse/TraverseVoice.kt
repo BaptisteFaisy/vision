@@ -35,14 +35,15 @@ object TraversePhrases {
 
     /**
      * Clip embarqué de [phrase] (`vp_<id>_en.mp3`), `null` si hors liste.
-     * Rouge/vert/but : pack existant (`tools/voicepack-catalog.json`) ;
-     * arrivée : `cross_here` (« Here. », PAS `cross_arrived` qui dit
+     * Rouge/vert : pack existant (`tools/voicepack-catalog.json`) ; but :
+     * clip trottoir court (§ 46, « Sidewalk across. ») ; arrivée :
+     * `cross_here` (« Here. », PAS `cross_arrived` qui dit
      * « On the crosswalk. »).
      */
     fun clipIdFor(phrase: String): String? = when (phrase) {
         RED -> "cross_red"
         GREEN -> "cross_green"
-        SIDEWALK_ACROSS -> "sidewalk_across"
+        SIDEWALK_ACROSS -> "sidewalk_across_short"
         ON_CROSSWALK -> IseeClipsEn.CROSS_HERE
         else -> null
     }
