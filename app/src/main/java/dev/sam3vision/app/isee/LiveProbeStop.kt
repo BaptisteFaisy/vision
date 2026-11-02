@@ -21,14 +21,20 @@ import kotlinx.coroutines.launch
  * et sa première frame réveille la carte.
  */
 internal fun LiveProbe.stop() {
+    stopLocal()
+    releaseOnCameraOff(state.value.endpoint)
+}
+
+/**
+ * Arrêt local seul, sans extinction : la mise en fond diffère le `/release`
+ * (grâce [ReleaseGrace]) et la destruction l'a déjà envoyé (`onDestroy`).
+ */
+internal fun LiveProbe.stopLocal() {
     resetPipeline()
     wifiLock.release() // fin du direct (caméra coupée, fond, onCleared) : la radio redort.
     closeSessions()
-    // Carte éteinte : le prochain direct est un **réveil**, il repayera le budget froid
-    // une fois (FIX-19) — et l'état du lien ne prétend plus rien du précédent.
     link.reset()
     LiveLatencyLog.resetFailures()
-    releaseOnCameraOff(state.value.endpoint)
     clear()
 }
 
@@ -45,8 +51,8 @@ internal fun LiveProbe.closeSessions() {
 }
 
 /**
- * Caméra coupée : éteint le conteneur GPU aussitôt, en tâche de fond (`stop()`
- * reste synchrone pour ses appelants). Même `releaseSam` que la fermeture d'app
+ * Mise en fond (grâce [ReleaseGrace] expirée) : éteint le conteneur GPU, en tâche
+ * de fond (l'appelant reste synchrone). Même `releaseSam` que la fermeture d'app
  * (`AppDiagnostics`), endpoint vide : rien à éteindre.
  */
 internal fun releaseOnCameraOff(endpoint: String) {
@@ -55,7 +61,7 @@ internal fun releaseOnCameraOff(endpoint: String) {
         val outcome = releaseOnStop(endpoint.trim())
         Log.i(
             "sam3vision",
-            "extinction GPU (caméra coupée) -> $endpoint : " +
+            "extinction GPU (fond sans retour, grâce expirée) -> $endpoint : " +
                 (outcome.getOrNull()?.let { "code=${it.code} ok=${it.released} corps=${it.body}" }
                     ?: "échec ${outcome.exceptionOrNull()?.message}"),
         )

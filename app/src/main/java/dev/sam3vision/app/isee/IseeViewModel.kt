@@ -55,14 +55,9 @@ import kotlinx.coroutines.launch
 import java.io.File
 
 /**
- * Le chef d'orchestre de l'écran unique (chat, caméra : vidéo du tap, photo
- * automatique de l'appui long) : il tient l'état affiché et branche les
- * collaborateurs — [IseeTranscript] (bulles), [IseeDictation] (micro et
- * transcription), [IseeAnswers] (question → réponse → voix), [IseePhotoShot]
- * (photo-contexte des questions), [IseeCameraCoordinator] (vidéo), plus la
- * lecture, l'intro et la sonde déjà extraites.
- *
- * Lui-même ne fait que conduire : gestes, cycle de vie, et réglages lus une fois.
+ * Chef d'orchestre de l'écran unique (chat, caméra) : état affiché + branchement
+ * des collaborateurs ([IseeTranscript], [IseeDictation], [IseeAnswers],
+ * [IseePhotoShot], [IseeCameraCoordinator]). Lui-même ne fait que conduire.
  */
 class IseeViewModel(app: Application) : AndroidViewModel(app) {
 
@@ -316,7 +311,7 @@ class IseeViewModel(app: Application) : AndroidViewModel(app) {
         dictation.discard()
         player.release()
         voiceNav.shutdown()
-        probe.stop()
+        probe.stopLocal()
         pitch.stop()
         super.onCleared()
     }
@@ -326,19 +321,19 @@ class IseeViewModel(app: Application) : AndroidViewModel(app) {
     fun detachCamera() { camera = null }
 
     /**
-     * Caméra liée ou coupée (remonté par la liaison) : coupée, la sonde est arrêtée
-     * net (sessions fermées, la carte peut retomber à zéro) ; liée, les sessions
-     * rouvrent et la première frame réveille la carte.
+     * Caméra liée ou coupée : coupée, grâce d'extinction armée (sessions gardées
+     * pour une reprise sans réveil) ; liée, grâce annulée, les sessions rouvrent.
      */
     fun setCameraActive(active: Boolean) {
         if (_state.value.cameraActive == active) return
         update { it.copy(cameraActive = active) }
         if (active) {
+            IseeBackground.cancelRelease()
             pitch.startUnlessGlassesLive()
             syncProbe()
         } else {
             pitch.stop()
-            probe.stop()
+            IseeBackground.armRelease(probe)
         }
     }
 
@@ -406,11 +401,7 @@ class IseeViewModel(app: Application) : AndroidViewModel(app) {
         answerHeard(heard.text, heard.audio)
     }
 
-    /**
-     * Ordre vocal d'ouverture des Réglages (« settings », « réglages ») : la
-     * navigation pousse la page, la dictée ne part ni au LLM ni ailleurs.
-     * Vrai si [text] portait l'ordre.
-     */
+    /** Ordre vocal « settings » : pousse la page, la dictée ne part nulle part. */
     private fun runSettingsCommand(text: String): Boolean {
         if (!SettingsVoiceCommand.isSettingsOrder(text)) return false
         dropHeard()
@@ -474,11 +465,12 @@ class IseeViewModel(app: Application) : AndroidViewModel(app) {
 
     /** Purge totale à la fermeture de l'activité (option A) : table + cache. */
     fun onAppClosed() {
+        IseeBackground.cancelRelease()
         gestures.onHoldCancel()
         session.onClosed()
     }
 
-    /** L'app part derrière : minuteur armé (option C), sonde arrêtée sauf session lunettes. */
+    /** L'app part derrière : grâce 60 s armée, extinction seulement sans retour avant. */
     fun onBackground() {
         gestures.onHoldCancel()
         session.onBackground()
@@ -487,8 +479,9 @@ class IseeViewModel(app: Application) : AndroidViewModel(app) {
         if (voiceNav.state.value is VoiceNavUiState.Guiding) GuidanceLifecycle.startBackground(getApplication())
     }
 
-    /** L'app revient au premier plan : minuteur annulé (option C), sessions rouvertes. */
+    /** L'app revient au premier plan : grâce annulée, sessions rouvertes. */
     fun onForeground() {
+        IseeBackground.cancelRelease()
         GuidanceLifecycle.stopBackground(getApplication())
         session.onForeground()
         probe.onForeground()
