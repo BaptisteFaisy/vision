@@ -59,7 +59,7 @@ class VoiceNavSessionAutoStartTest {
     ) = VoiceNavSession(
         launcher = launcher,
         guidanceEnabled = { guidance },
-        announcer = NavigationAnnouncer({ Settings.Default }) { _, text -> spoken += text },
+        announcer = NavigationAnnouncer({ Settings.Default }, { _, text -> spoken += text }, { text -> spoken += text }),
         voice = VoiceNavAnnouncer({ Settings.Default }) { _, text -> spoken += text },
         routeLoader = loader,
         router = NavigationRouter(),
