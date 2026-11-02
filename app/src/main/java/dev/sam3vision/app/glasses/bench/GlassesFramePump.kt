@@ -3,7 +3,9 @@ package dev.sam3vision.app.glasses.bench
 import android.os.SystemClock
 import com.meta.wearable.dat.camera.Stream
 import com.meta.wearable.dat.camera.types.StreamError
+import dev.sam3vision.app.glasses.glassesAspectNote
 import dev.sam3vision.app.glasses.throttleDelayMs
+import dev.sam3vision.app.glasses.withAspectFlag
 import kotlinx.coroutines.delay
 
 /**
@@ -53,7 +55,9 @@ internal suspend fun GlassesRuntime.consumeFrames() {
             onLog("frame not encodable: skipped")
             continue
         }
+        // Garde W3 : aspect de la frame BRUTE, journalisé + marqué, jamais jeté.
+        glassesAspectNote(fresh.width, fresh.height)?.let { onLog(it) }
         onLog("frame forwarded: ${fresh.width}x${fresh.height}")
-        onFrame(jpeg)
+        onFrame(jpeg.withAspectFlag(fresh.width, fresh.height))
     }
 }
