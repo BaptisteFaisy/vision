@@ -48,10 +48,10 @@
     {"id": "nav_clarify", "en": "I didn't catch where you want to go. Say for example: I want to go to the train station.", "parts": ["Where to?", "Où aller ?"], "stale_audio": "audio ancien texte — régénérer (tranche 700ms)"},
     {"id": "maison_entered", "en": "Home mode on. Looking for household objects.", "parts": ["Home mode.", "Mode maison."], "stale_audio": "audio ancien texte — régénérer (tranche 700ms)"},
     {"id": "maison_already", "en": "Already in home mode.", "parts": ["Already on.", "Déjà actif."], "stale_audio": "audio ancien texte — régénérer (tranche 700ms)"},
-    {"id": "picto_started", "en": "Creating the pictogram.", "parts": ["Creating picto.", "Création picto."], "stale_audio": "audio ancien texte — régénérer (tranche 700ms)"},
-    {"id": "picto_ready", "en": "Pictogram ready.", "parts": ["Picto ready.", "Picto prêt."], "stale_audio": "audio ancien texte — régénérer (tranche 700ms)"},
-    {"id": "picto_failed", "en": "Pictogram creation failed.", "parts": ["Picto failed.", "Picto raté."], "stale_audio": "audio ancien texte — régénérer (tranche 700ms)"},
-    {"id": "picto_busy", "en": "Creation already running.", "parts": ["Still running.", "En cours."], "stale_audio": "audio ancien texte — régénérer (tranche 700ms)"},
+
+
+
+
     {"id": "picto_demo_on", "en": "Picto demo on."},
     {"id": "picto_demo_off", "en": "Picto demo off."},
     {"id": "sidewalk_ahead", "en": "Sidewalk ahead."},
