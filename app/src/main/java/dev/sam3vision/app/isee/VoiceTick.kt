@@ -57,7 +57,7 @@ internal object VoiceTick {
     /** Grillage et pans suivis (niveau 4, guetteur confirmatif). */
     const val SRC_FENCE = "fence"
 
-    /** Trottoir nommé (niveau 10, guetteur confirmatif). */
+    /** Trottoir nommé (niveau 10 absolu, § 45, guetteur confirmatif). */
     const val SRC_SIDEWALK = "sidewalk"
 
     /** Objet cherché trouvé dedans (cran find 0, détection). */

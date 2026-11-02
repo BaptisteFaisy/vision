@@ -178,9 +178,9 @@ internal fun LiveProbe.observeSpoken(
     ) { text, urgent ->
         if (placeMode() != PictoPlaceMode.DEHORS) return@observeSpokenEmissions
         if (urgent || GuidanceWord.isStopPhrase(text)) {
-            // Sous un compte : le stop attend le silence sans manger son
-            // tour (§ 42 — ré-émis à chaque frame, il parle dans l'intervalle).
-            if (!VoiceBus.stairsSpeaking() &&
+            // Sous un compte ou un trottoir : le stop attend le silence
+            // sans manger son tour (§ 42, § 45 — ré-émis à chaque frame).
+            if (!VoiceBus.stairsSpeaking() && !VoiceBus.sidewalkSpeaking() &&
                 AntiRepeat.allow(AntiRepeat.KEY_FENCE, System.currentTimeMillis())
             ) {
                 SpeechLog.expect("FENCE", text)
@@ -218,7 +218,7 @@ internal fun LiveProbe.observeFenceOpening(
             val readings = st.distanceLayer?.readings ?: return@collect
             val signal = FenceOpeningSignal.of(readings, st.width, st.height)
             val cue = watcher.onSignal(signal, System.currentTimeMillis(), language()) ?: return@collect
-            if (VoiceBus.stairsSpeaking()) return@collect
+            if (VoiceBus.stairsSpeaking() || VoiceBus.sidewalkSpeaking()) return@collect
             VoiceTick.report(
                 VoiceTick.SRC_FENCE,
                 VoiceWish(cue.level, cue.phrase, cue.antiRepeatKey),
@@ -356,10 +356,11 @@ internal fun LiveProbe.phraseOf(
 }
 
 /**
- * Guetteur trottoir-nommé de la sonde (SPEC v4, niveau 10) : la position lue
- * dans la voix guidée (rien dans l'état ne porte le plan du trottoir, non
- * mesuré), postée au bus avec le niveau et la clé du signalement, et au battement 700 ms ([VoiceTick]). Coupé en
- * mode Traversée (le verdict y est propriétaire du son).
+ * Guetteur trottoir-nommé de la sonde (SPEC v4, niveau 10 absolu, § 45) :
+ * la position lue dans la voix guidée (rien dans l'état ne porte le plan
+ * du trottoir, non mesuré), postée au bus avec le niveau et la clé du
+ * signalement (coupe tout, escaliers compris), et au battement 700 ms
+ * ([VoiceTick]). Coupé en mode Traversée (le verdict y est propriétaire du son).
  */
 internal fun LiveProbe.observeSidewalk(
     scope: CoroutineScope,
@@ -373,7 +374,6 @@ internal fun LiveProbe.observeSidewalk(
             if (placeMode() != PictoPlaceMode.DEHORS) return@collect
             val position = this@observeSidewalk.voice.lastSidewalk
             val cue = watcher.onPosition(position, System.currentTimeMillis(), language()) ?: return@collect
-            if (VoiceBus.stairsSpeaking()) return@collect
             VoiceTick.report(
                 VoiceTick.SRC_SIDEWALK,
                 VoiceWish(cue.level, cue.phrase, cue.antiRepeatKey),

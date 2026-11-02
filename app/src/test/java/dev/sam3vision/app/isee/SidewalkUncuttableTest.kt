@@ -4,6 +4,7 @@ import dev.sam3vision.core.crossing.CrossingLevels
 import dev.sam3vision.core.live.AntiRepeat
 import org.junit.After
 import org.junit.Assert.assertEquals
+import org.junit.Assert.assertFalse
 import org.junit.Assert.assertTrue
 import org.junit.Before
 import org.junit.Test
@@ -132,5 +133,13 @@ class SidewalkUncuttableTest {
         VoiceBus.post(OutdoorLevel.SIDEWALK, "Trottoir à droite.")
 
         assertEquals(2, speaker.said.size)
+    }
+
+    @Test
+    fun `bus bloque sur trottoir se libere apres le delai`() {
+        assertTrue(sidewalkBusStuck(OutdoorLevel.SIDEWALK, 4_001L, 0L))
+        assertFalse(sidewalkBusStuck(OutdoorLevel.SIDEWALK, 4_000L, 0L))
+        assertFalse(sidewalkBusStuck(OutdoorLevel.SIDEWALK, 1_000L, 500L))
+        assertFalse(sidewalkBusStuck(OutdoorLevel.HUMAN, 99_999L, 0L))
     }
 }

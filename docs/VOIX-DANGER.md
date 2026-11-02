@@ -38,7 +38,7 @@ chat (9) et GPS (3, 11) en synthèse réseau.
 | 7 | Poteau ≤ 15 m droit devant : **mot continu** (§ 36) ; mobilier vertical + divers < 6 m : doux confirmé | `guide_left`, `guide_right` (poteau) ; `pole`, `lamp`, `sign`, `animal`, `bin`, `keepsake` (divers) |
 | 8 | Passages piétons < 6 m | Annonce **1 fois par vue** + alignement **au changement** + arrivée **1 fois** | `cross_approach_*`, `crosswalk_aligned`, `cross_arrived` |
 | 9 | Réponses du chat | **Attente + reprise depuis la coupure** (tranche interrompue rejouée) ; **seule file restante** | Synthèse réseau (chat) |
-| 10 | Trottoirs | Comportement actuel (rail : ne parle que si dérive) | `sidewalk_*` (existants) |
+| 10 | Trottoirs | **Absolu (§ 45)** : coupe tout (escaliers et guidage compris), va au bout ; seul le micro user passe devant | `sidewalk_*` (existants) |
 | 11 | GPS manœuvres et événements | Aux événements moteur | Synthèse réseau (GPS) |
 | 12 | Repli | **Rien à dire + silence 300 ms** : gauche, droite ou tout droit selon GPS + obstacles | `guide_left`, `guide_right`, `guide_straight` |
 
@@ -572,3 +572,42 @@ Recette téléphone : monter un escalier avec iSee — chaque compte dit en
 entier, jamais de syllabe répétée, jamais de silence prolongé — **non
 mesuré**, exige un APK sur appareil réel (preuves par `logcat` : `VoiceMute`
 `bus-escaliers-en-attente` / `bus-escaliers-enchaine`).
+
+## 45. Trottoir absolu : coupe tout, va au bout (ordre user du 02/11)
+
+Le user veut l'annonce du trottoir (« Trottoir à gauche. »…) incoupable
+et la plus prioritaire : elle coupe toute parole en cours — escaliers
+et mot de guidage compris — et va au bout, personne ne la coupe.
+
+- **bus** : `VoiceBus.post` parle un niveau 10 aussitôt (`postSidewalk` :
+  coupe tout) et jette tout pendant un niveau 10 (`trottoir-en-cours`,
+  tour rendu) — escaliers (6) et Traversée (100+) attendent ; seule la
+  parole du user (1, micro tenu) passe devant ;
+- **pas de place retenue** : l'antirépétition trottoir (10 s) et les clips
+  courts rendent l'auto-coupe impossible (deux annonces ne se chevauchent
+  jamais) — pas de pendant du `pendingStairs` (§ 44) ;
+- **amont** : le guetteur trottoir ne se tait plus sous un compte
+  (`observeSidewalk`) ; `offer` tient les vœux non trottoirs sous un
+  trottoir et laisse passer le trottoir sous un compte (tours intacts) ;
+  stop, grillage et escaliers (annonce + compteur) attendent sa fin sans
+  manger leur tour (le compteur attend devant `onTick`, pour reparler au
+  battement suivant) ;
+- **GPS** : une manœuvre sous un trottoir est reportée au silence (un
+  cycle au plus), jamais perdue (`speakGps`, `deferGpsToGap`) ;
+- **garde anti-blocage** : `sidewalkBusStuck` (4 s, miroir de
+  `stairsBusStuck`) rend le bus si un niveau 10 orphelin ne parle plus —
+  gardes sorties dans `VoiceBusGuards.kt` (plafond 500 lignes) ;
+- **inchangé** : niveau 10, clé `sidewalk` (10 s), Traversée (le guetteur
+  s'y tait, le verdict attend un trottoir en cours), chat (reprise depuis
+  la coupure après un trottoir comme après des escaliers).
+
+Verrouillé par `SidewalkUncuttableTest` (nouveau : coupe tout, tous
+attendent, micro user, dernier gagnant, garde 4 s), `EchelleOverwriteTest`
+(+2 : offres sous trottoir/compte ; écrasé trottoir→repli),
+`StairsUncuttableTest` (amendé : le trottoir coupe le compte),
+`IseeVoiceSpineTest` (+1 : GPS reporté), `ProbeWiringSpokenTest` (+1 : stop
+attendu) et `ProbeStairsCountVoiceTest` (+1 : compte attendu, tour intact).
+
+Recette téléphone : trottoir nommé pendant un compte — l'annonce entière
+aussitôt, le compte juste après — **non mesuré**, exige un APK sur appareil
+réel (preuves par `logcat`, jamais à l'oreille côté agent).

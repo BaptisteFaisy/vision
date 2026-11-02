@@ -74,13 +74,13 @@ internal class IseeVoiceSpine(
      * Parole GPS vers le bus (SPEC v4) : manœuvres au rang 11, rappel au
      * rang 3 — tus en Traversée (le verdict y est propriétaire du son) et
      * dedans (chaîne dedans : find, user, humain, chat, porte et murs).
-     * Sous un compte (§ 42) : reportée au silence (un cycle au plus),
-     * jamais perdue (une manœuvre ne se re-propose pas).
+     * Sous un compte (§ 42) ou un trottoir (§ 45) : reportée au silence
+     * (un cycle au plus), jamais perdue (une manœuvre ne se re-propose pas).
      */
     fun speakGps(text: String, level: Int) {
         if (crossingActive()) return
         if (placeMode() != PictoPlaceMode.DEHORS) return
-        if (VoiceBus.stairsSpeaking()) {
+        if (VoiceBus.stairsSpeaking() || VoiceBus.sidewalkSpeaking()) {
             scope.launch { deferGpsToGap(text, level) }
             return
         }
@@ -94,9 +94,9 @@ internal class IseeVoiceSpine(
         runCatching { speakPending() }
     }
 
-    /** Manœuvre sous un compte : attendue au silence, puis postée (Traversée entre-temps : jetée). */
+    /** Manœuvre sous un compte ou un trottoir : attendue au silence, puis postée (Traversée entre-temps : jetée). */
     private suspend fun deferGpsToGap(text: String, level: Int) {
-        while (VoiceBus.stairsSpeaking()) delay(GPS_GAP_POLL_MS)
+        while (VoiceBus.stairsSpeaking() || VoiceBus.sidewalkSpeaking()) delay(GPS_GAP_POLL_MS)
         if (!crossingActive()) VoiceBus.post(level, text)
     }
 
