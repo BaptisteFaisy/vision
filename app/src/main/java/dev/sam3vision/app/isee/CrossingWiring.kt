@@ -68,7 +68,7 @@ class CrossingChipZone {
  * unique normal/Traversée, ordre user du 30/10 — mêmes masques dans les deux
  * modes), seule la voix bascule (feu + veto trafic au lieu du guidage). Les
  * prompts courants sont rejoués tels quels : monde (dehors/dedans), champ
- * « Suivre » et « Find the X » survivent à la bascule. Le guidage obstacles
+ * « Suivre » et « mode find my X » survivent à la bascule. Le guidage obstacles
  * n'est plus coupé (§ 25) : ses ordres d'évitement (« Gauche. », « Droite. »,
  * stop) passent devant la voix rouge/vert, « Tout droit. » restant tu tant
  * que le mode est actif. Toute bascule est manuelle (puce, ordre vocal).

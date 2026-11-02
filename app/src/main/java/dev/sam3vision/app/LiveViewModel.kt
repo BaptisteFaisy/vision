@@ -179,7 +179,7 @@ class LiveViewModel(app: Application) : AndroidViewModel(app) {
         foregroundGate.reset()
         if (!this.settings.llmConfigured) return run { _state.update { it.copy(error = LLM_ABSENT_LINE) } }
         resetForStart(prompts)
-        LiveVoiceRequest.consume()?.let { asker.applyVoiceRequest(it) }
+
         liveNarration(this.settings)?.let { narration.open(it) }
         if (!this.settings.liveSamEnabled) {
             startVisionOnly()

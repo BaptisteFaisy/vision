@@ -87,7 +87,7 @@ private fun rawClip(app: Application, fileName: String): ByteArray? = runCatchin
  *
  * Les prompts effectifs suivent le monde ([Settings.outdoorMode]) quand
  * l'appelant a passé les défauts (`default`, `indoor`, vide) ; une liste
- * explicite (Traversée, « Follow », « Find the X ») traverse inchangée.
+ * explicite (Traversée, « Follow », « mode find my X ») traverse inchangée.
  */
 internal fun LiveProbe.configureFrom(
     settings: Settings,
@@ -135,7 +135,7 @@ fun LiveProbe.clearRouteCap() {
 }
 
 /**
- * Ordre « Find the X » : [label] rejoint les concepts SAM de la sonde quand
+ * Ordre « mode find my X » : [label] rejoint les concepts SAM de la sonde quand
  * il n'y est pas déjà (comparaison insensible à la casse) — la session
  * repart comme à tout changement de prompts. En mode Traversée on ne
  * reconfigure pas (sécurité : pas de coupure en pleine traversée) ; au

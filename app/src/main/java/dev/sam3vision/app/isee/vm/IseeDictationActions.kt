@@ -29,7 +29,7 @@ internal class IseeDictationActions(
     }
 
     override suspend fun onFind(label: String) {
-        modes.run("find the " + label)
+        modes.run("mode find my " + label)
     }
 
     override suspend fun onFindOff() {

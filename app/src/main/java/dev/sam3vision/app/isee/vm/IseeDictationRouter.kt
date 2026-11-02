@@ -21,7 +21,7 @@ interface DictationActions {
     /** « mode crossing on/off » : activer ou couper le mode Traversée. */
     suspend fun onCrossing(active: Boolean)
 
-    /** « mode find my X » : chercher l'objet [label]. */
+    /** « mode find my X » : chercher l'objet [label], quel qu'il soit. */
     suspend fun onFind(label: String)
 
     /** « mode find off » : arrêter la recherche d'objet en cours. */
@@ -38,14 +38,11 @@ interface DictationActions {
 }
 
 /**
- * Routeur de dictée iSee (spec v4 + chasse sans « mode », décision user du
- * 01/11) : « mode … » en tête de phrase ⇒ l'un des 10 ordres
- * ([DictationActions]) ; sans « mode », seule une chasse visant l'une des
- * 10 cibles dedans est un ordre (« où sont mes clés », « where are my
- * keys », « find my keys ») ; tout le reste ⇒ `false`, l'appelant envoie
- * le texte au LLM comme question. Sans état et sans condition de
- * mode : la dictée reste active partout, traversée comprise — un ordre
- * dit en traversée est routé comme ailleurs.
+ * Routeur de dictée iSee (spec v4 : ordres « mode … » uniquement) : « mode … »
+ * en tête de phrase ⇒ l'un des 10 ordres ([DictationActions]) ; tout le
+ * reste ⇒ `false`, l'appelant envoie le texte au LLM comme question. Sans
+ * état et sans condition de mode : la dictée reste active partout, traversée
+ * comprise — un ordre dit en traversée est routé comme ailleurs.
  *
  * Pur côté décision ([DictationOrders.parse]) : le seul effet de bord est
  * l'appel de l'effet correspondant, une fois.
@@ -58,8 +55,8 @@ class IseeDictationRouter(
      * Vrai si [text] était un ordre (exécuté, consommé) ; faux si c'est une
      * question pour le LLM (rien n'est appelé).
      */
-    suspend fun run(text: String, hunting: String? = null): Boolean {
-        return when (val order = DictationOrders.parse(text, hunting)) {
+    suspend fun run(text: String): Boolean {
+        return when (val order = DictationOrders.parse(text)) {
             null -> false
             DictationOrder.Outdoor -> { actions.onOutdoor(); true }
             DictationOrder.Indoor -> { actions.onIndoor(); true }

@@ -1,15 +1,12 @@
 package dev.sam3vision.app.live
 
-import android.util.Base64
 import dev.sam3vision.app.LLM_ABSENT_LINE
 import dev.sam3vision.app.LiveUiState
 import dev.sam3vision.app.NO_FRAME_LINE
 import dev.sam3vision.app.PictoOverlay
-import dev.sam3vision.app.LiveVoiceRequest
 import dev.sam3vision.app.focusLabel
 import dev.sam3vision.app.focusWindow
 import dev.sam3vision.app.isee.PICTO_FRAME_EDGE
-import dev.sam3vision.app.isee.PICTO_PHOTO_EDGE
 import dev.sam3vision.app.isee.PictoStore
 import dev.sam3vision.app.isee.StoredPicto
 import dev.sam3vision.app.isee.decodeFrameGray
@@ -25,13 +22,10 @@ import dev.sam3vision.core.live.PositionAnnouncer
 import dev.sam3vision.core.model.ChatTurn
 import dev.sam3vision.core.nav.GpsDestinationText
 import dev.sam3vision.core.net.LlmClient
-import dev.sam3vision.core.net.MetaImageClient
-import dev.sam3vision.core.net.PictoImageClient
 import dev.sam3vision.core.picto.GrayImage
 import dev.sam3vision.core.picto.PictoHit
 import dev.sam3vision.core.picto.PictoVoiceOrder
 import dev.sam3vision.core.picto.PictoVoiceText
-import dev.sam3vision.core.picto.buildTemplate
 import dev.sam3vision.core.picto.matchTemplate
 import dev.sam3vision.core.settings.Settings
 import dev.sam3vision.core.usecase.AskUseCase
@@ -47,8 +41,8 @@ import kotlinx.coroutines.sync.Mutex
 /**
  * Demandes sur le direct, à l'écrit ou à la voix (« Parler ») : questions LLM
  * (la **dernière image part tout de suite au LLM**, sans dépendre de SAM),
- * chasse SAM (mot maison seul → relance du direct) et ordres picto (« fais
- * un pictogramme de X » → repère armé, « X » → guidage parlé).
+ * chasse SAM (mot maison seul → relance du direct) et guidage picto
+ * (« X » → guidage parlé vers un repère armé).
  *
  * L'historique de la conversation est conservé d'une question à l'autre —
  * jusqu'à la fin de la séance : [reset] l'oublie, et avec lui le journal
@@ -88,40 +82,25 @@ class LiveAskSession(
     /** Voix des positions, partagée : une seule phrase à la fois sur le direct. */
     private val pictoSpeak: suspend (Settings, String) -> Unit = { _, _ -> },
     private val io: CoroutineDispatcher = Dispatchers.IO,
-    private val pictoClient: (Settings) -> PictoImageClient =
-        { s -> MetaImageClient(s.asrBaseUrl, s.asrApiKey) },
     private val store: PictoStore = PictoStore(pictoDir()),
     private val frameGray: (String, Int) -> GrayImage? = ::decodeFrameGray,
-    private val decodeB64: (String) -> ByteArray = { Base64.decode(it, Base64.DEFAULT) },
     private val guideAnnouncer: PositionAnnouncer = PositionAnnouncer(),
 ) {
 
     /** Historique envoyé au modèle, remis à zéro à chaque nouvelle séance. */
     private var history: List<ChatTurn> = emptyList()
 
-    /** Repères armés (rechargés à chaque séance + après chaque création). */
+    /** Repères armés (rechargés à chaque séance). */
     @Volatile
     private var pictos: List<StoredPicto> = emptyList()
-
-    /** Création en vol : une seule à la fois, la suivante est dite puis jetée. */
-    @Volatile
-    private var pictoBusy = false
 
     /** Mot guidé (`null` = pas de guidage : les repères restent muets). */
     @Volatile
     private var pictoHunt: String? = null
 
-    /** Label à créer dès la première frame (ordre iSee), `null` une fois lancé. */
-    @Volatile
-    private var pendingCreate: String? = null
-
     /** Démo active : les faux repères remplacent le repérage (overlay + guidage). */
     @Volatile
     private var pictoDemo = false
-
-    /** Génération du tour : une séance neuve fait taire les retours tardifs. */
-    @Volatile
-    private var pictoTurn = 0
 
     /** Dernier passage du matcher (2 Hz comme l'écran iSee). */
     private var lastPictoMatchAt = 0L
@@ -129,8 +108,8 @@ class LiveAskSession(
     /** Une phrase picto à la fois : la suivante est jetée, pas mise en file. */
     private val pictoSpeaking = Mutex()
 
-    /** Le picto parle ou va parler : les positions SAM se taisent (pas de chevauchement). */
-    val pictoActive: Boolean get() = pictoBusy || pictoHunt != null
+    /** Un picto est guidé : les positions SAM se taisent (pas de chevauchement). */
+    val pictoActive: Boolean get() = pictoHunt != null
 
     /** PNG d'un repère armé pour l'overlay, `null` si inconnu (démo, faux repères). */
     fun pngOf(id: String): ByteArray? = pictos.firstOrNull { it.id == id }?.png
@@ -141,8 +120,6 @@ class LiveAskSession(
         timeline.clear()
         pictoHunt = null
         pictoDemo = false
-        pendingCreate = null
-        pictoTurn++
         state.update { it.copy(pictoOverlay = null) }
         scope.launch(io) { pictos = store.list() }
     }
@@ -150,9 +127,10 @@ class LiveAskSession(
     /**
      * Question posée à l'écrit ou à la voix (« Parler ») : une seule à la fois.
      * Ordre de navigation (« je veux aller à X », « aller X ») → écran de
-     * navigation, ou redemande de la destination si elle manque ; ordre picto
-     * (« fais un pictogramme de X ») → création ; mot visant un repère armé →
-     * guidage ; mot maison seul → chasse SAM ; sinon LLM.
+     * navigation, ou redemande de la destination si elle manque ; mot visant
+     * un repère armé → guidage ; mot maison seul → chasse SAM ; sinon LLM.
+     * (La création picto ne passe plus par le direct : unique ordre
+     * « mode find my X » sur l'écran iSee.)
      */
     fun ask(question: String) {
         if (LiveNavOrders.handle(question, settings(), scope, pictoSpeak)) return
@@ -164,7 +142,6 @@ class LiveAskSession(
             toggleDemo()
             return
         }
-        PictoVoiceOrder.parse(question)?.let { createPicto(it); return }
         pictoHunt = null
         val hunted = huntWord(question)
         if (hunted != null) {
@@ -215,16 +192,6 @@ class LiveAskSession(
         }
     }
 
-    /** Ordres venus de l'appui long iSee : chasse, démo ou création en attente de frame. */
-    fun applyVoiceRequest(request: LiveVoiceRequest.Request) {
-        request.pictoHunt?.let {
-            pictoHunt = it
-            guideAnnouncer.reset()
-        }
-        if (request.pictoDemo && !pictoDemo) toggleDemo()
-        request.pictoCreate?.let { pendingCreate = it }
-    }
-
     /** Bascule de la démo : faux repères affichés (et guidables), état dit à voix haute. */
     private fun toggleDemo() {
         pictoDemo = !pictoDemo
@@ -232,52 +199,11 @@ class LiveAskSession(
         speakPicto(PictoVoiceText.demo(pictoDemo, settings().speechLanguage))
     }
 
-    /** Ordre « fais un pictogramme de X » : frame gardée → Muse → repère armé, sans relecture. */
-    private fun createPicto(label: String) {
-        if (pictoBusy) {
-            speakPicto(PictoVoiceText.busy(settings().speechLanguage))
-            return
-        }
-        val jpeg = latestJpeg()
-        if (jpeg.isBlank()) {
-            speakPicto(PictoVoiceText.failed(settings().speechLanguage))
-            return
-        }
-        pictoBusy = true
-        val turn = pictoTurn
-        speakPicto(PictoVoiceText.started(settings().speechLanguage))
-        scope.launch(io) {
-            val done = runCatching {
-                val photo = decodeB64(jpeg)
-                val gray = frameGray(jpeg, PICTO_PHOTO_EDGE) ?: throw IllegalStateException("frame illisible")
-                val png = pictoClient(settings()).editToPictogram(photo, label).getOrThrow()
-                store.save(label, png, buildTemplate(gray))
-            }
-            pictos = runCatching { store.list() }.getOrElse { pictos }
-            pictoBusy = false
-            if (turn != pictoTurn) return@launch
-            val language = settings().speechLanguage
-            if (done.isSuccess) {
-                val created = if (label.isBlank()) PictoVoiceText.createdUnnamed(language)
-                else PictoVoiceText.created(label, language)
-                speakPicto(created)
-            } else {
-                speakPicto(PictoVoiceText.failed(language))
-            }
-        }
-    }
-
     /**
      * Frame du direct (2 Hz) : les repères armés y sont cherchés, l'overlay
      * posé dans tous les cas, la voix ne guide que le mot chassé.
      */
     fun onLiveFrame(width: Int, height: Int, nowMs: Long = System.currentTimeMillis()) {
-        pendingCreate?.let { label ->
-            if (latestJpeg().isNotBlank()) {
-                pendingCreate = null
-                createPicto(label)
-            }
-        }
         if (nowMs - lastPictoMatchAt < IseePicto.MATCH_EVERY_MS) return
         lastPictoMatchAt = nowMs
         if (pictoDemo) {

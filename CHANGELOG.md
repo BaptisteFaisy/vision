@@ -14,6 +14,28 @@ livré et ses preuves (tâche, fichiers, chiffres) dans l'arbre.
 - **Preuve** : `IseeGuidanceMapTest` (+3) et `IseePortraitTest` (+1) verts,
   `:core` complet vert ; `check-kotlin-limits.py` et `check-isee-design.py`
   verts. Recette téléphone **non mesurée**.
+## 2026-11-02 — iSee : « mode find my X » seul ordre de recherche et de création picto (branche `feat/isee-mode-find-only`)
+
+- **Demande** : un seul ordre pour trouver un objet et créer son picto —
+  « mode find my X », en anglais uniquement ; « Create a picto for my mug »
+  restait muet (dehors par défaut) et « find my mug » répondait
+  « I cannot find that. » (hors des 10 cibles).
+- **Cause** : « mode find my X » rejouait « find the X » dans la chaîne
+  historique, bornée aux 10 cibles dedans ; les autres ordres (création,
+  where, où sont) éparpillaient la voix.
+- **Fait** : `DictationOrders.parse` ne route que les 10 ordres « mode … »
+  (sans « mode » : LLM ; « please » final ignoré côté recherche) ;
+  `ModeFindVoice` exécute la recherche pour tout objet, dedans uniquement
+  (départ, refus et trouvé en synthèse vocale) ; suppression de
+  `IseePictoVoice`, `FindIndoorVoice`, `FindIndoorOrder`, des parsers
+  `PictoVoiceOrder`, des clips find et de la création picto du direct
+  (`LiveVoiceRequest`, `LiveAskSession.createPicto`).
+- **Preuve** : `DictationOrderTest`, `ModeFindVoiceTest`,
+  `IseeDictationActionsTest`, `IseeVoiceSpineTest`, `PictoVoiceOrderTest`,
+  `FindIndoorTest`, `IseeSpecV4RouterFindTest`, `LiveAskSessionTest`,
+  `LiveAskVoiceTest` verts ; `:app` 1 840 + `:core` 3 226 tests, 0 échec ;
+  `check-kotlin-limits.py` vert ; `assembleDebug` vert. Recette téléphone
+  **non mesurée**.
 
 ## 2026-11-01 — iSee : la rue reparle au lancement, dehors est le défaut (branche `fix/voix-dehors-defaut`)
 

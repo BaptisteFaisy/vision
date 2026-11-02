@@ -1,66 +1,22 @@
 package dev.sam3vision.core.picto
 
 import dev.sam3vision.core.distance.KnownSizes
-import dev.sam3vision.core.live.HomeModes
+import dev.sam3vision.core.live.PositionText
 import dev.sam3vision.core.speech.SpeechLanguage
 
 /**
- * Ordre vocal de création (« fais un pictogramme de X », « create a picto
- * for X ») : la photo part en génération, le repère armé guide ensuite
- * vers X. Appelé sur le texte
- * dicté avant le LLM — une commande ne fait jamais d'appel réseau elle-même
- * (la génération, elle, en fait un).
- *
- * Le mot « pictogramme » (ou « picto ») seul ne suffit pas : « c'est quoi
- * ce pictogramme ? » reste une question pour le LLM. Il faut un verbe de
- * création (« fais », « crée », « dessine »…). Le label rendu est la suite
- * brute après « de » / « for » / « of », sans ses articles (« ces médics » → « medics ») ;
- * « de ça » rend vide (objet filmé sans nom, overlay seul, jamais guidé).
- *
- * Tolérant : casse, accents et ponctuation neutralisés par
+ * Aides vocales picto : le mot qui vise un repère armé ([matches],
+ * [huntWord] — « médicament » guide vers « boîte de médicaments ») et la
+ * démo overlay ([isDemoToggle], [demoHits]). Il n'y a plus aucun ordre de
+ * création ou de recherche ici : l'unique ordre « mode find my X » est parsé
+ * par [dev.sam3vision.core.speech.DictationOrders], tout le reste part au
+ * LLM. Tolérant : casse, accents et ponctuation neutralisés par
  * [KnownSizes.canonical]. Pur et testé en JVM.
  */
 object PictoVoiceOrder {
 
-    /** Verbes de création (canoniques) : sans eux, pas d'ordre picto. */
-    private val CREATE_VERBS = setOf(
-        "fait", "fais", "faire", "faites", "faisons",
-        "cree", "creer", "creez",
-        "genere", "generer",
-        "fabrique", "fabriquer",
-        "dessine", "dessiner", "dessinez",
-        "make", "create",
-    )
-
     /** Noms qui désignent le pictogramme (canoniques, français et anglais). */
     private val PICTO_WORDS = setOf("pictogramme", "picto", "pictogram")
-
-    /** Verbes de l'ordre « Find the X » : anglais seul, en premier mot. */
-    private val FIND_VERBS = setOf("find", "locate")
-
-    /** Auxiliaire « be » de l'ordre « Where is/are X » (« where's » → « where s »). */
-    private val WHERE_BE = setOf("is", "are", "s")
-
-    /** Articles et possessifs retirés devant le label (« de ces médics »). */
-    private val LEADERS = setOf(
-        "de", "d", "des", "du", "le", "la", "les", "l", "un", "une",
-        "ce", "cet", "cette", "ces", "mon", "ma", "mes",
-    )
-
-    /** Articles élidés après le verbe de recherche (anglais + [LEADERS]). */
-    private val FIND_LEADERS = LEADERS + setOf("the", "a", "an", "my", "some")
-
-    /** Mots élidés après « picto » : articles FR/EN ([FIND_LEADERS]) et prépositions anglaises (« for », « of »). */
-    private val CREATE_LEADERS = FIND_LEADERS + setOf("for", "of")
-
-    /** Articles et possessifs retirés après « où est/sont » (« mes clés »). */
-    private val OU_SONT_LEADERS = setOf("mes", "mon", "ma", "les", "le", "la")
-
-    /** Auxiliaires acceptes apres "ou" : present et imparfait. */
-    private val OU_SONT_BE = setOf("est", "sont", "etait", "etaient")
-
-    /** Démonstratifs : l'objet est filmé, aucun nom à guider (« de ça »). */
-    private val NAMELESS = setOf("ca", "cela")
 
     /**
      * Vrai si [text] bascule la démo picto (« démo picto », « active la démo
@@ -80,80 +36,6 @@ object PictoVoiceOrder {
         PictoHit(pictoId = "demo", label = "wall", x = 0.05f, y = 0.05f, w = 0.9f, h = 0.9f, score = 1f),
         PictoHit(pictoId = "demo", label = "window", x = 0.55f, y = 0.2f, w = 0.3f, h = 0.4f, score = 1f),
     )
-
-    /**
-     * Label brut de l'ordre « Find the X » porté par [text], `null` si ce
-     * n'en est pas un. Le verbe anglais est en premier mot (« Find the keys »
-     * → « keys », « Locate my phone » → « phone ») ; un « please » final est
-     * ignoré. Le label sert tel quel de concept SAM et de nom de repère —
-     * jamais vide (verbe seul ⇒ `null`), jamais traduit.
-     */
-    fun parseFind(text: String): String? {
-        val words = KnownSizes.canonical(text).split(' ').filter { it.isNotEmpty() }
-        if (words.isEmpty() || !FIND_VERBS.contains(words[0])) return null
-        val rest = words.drop(1).dropWhile { FIND_LEADERS.contains(it) }.dropLastWhile { it == "please" }
-        if (rest.isEmpty()) return null
-        return rest.joinToString(" ")
-    }
-
-    /**
-     * Label brut de l'ordre « Where is/are X » porté par [text], `null` si ce
-     * n'en est pas un (« Where are my keys » → « keys », « Where's my phone »
-     * → « phone ») ; un « please » final est ignoré. Seuls les objets maison
-     * ([HomeModes.CONCEPTS], singulier ou pluriel) ou possédés (« my »)
-     * déclenchent : « Where is the exit? » reste une question pour le LLM.
-     * Le label sert tel quel de concept SAM et de nom de repère — jamais
-     * vide (« Where is it? » ⇒ `null`), jamais traduit.
-     */
-    fun parseWhere(text: String): String? {
-        val words = KnownSizes.canonical(text).split(' ').filter { it.isNotEmpty() }
-        if (words.size < 2 || words[0] != "where" || !WHERE_BE.contains(words[1])) return null
-        val rest = words.drop(2).dropWhile { FIND_LEADERS.contains(it) }.dropLastWhile { it == "please" }
-        if (rest.isEmpty()) return null
-        val label = rest.joinToString(" ")
-        if (words.contains("my")) return label
-        if (isHousehold(label)) return label
-        return null
-    }
-
-    /**
-     * Concept SAM maison de l'ordre « Où est/sont X » porté par [text], `null`
-     * si ce n'en est pas un (« où sont mes clés » → « keys », « où est mon
-     * téléphone » → « phone »). Le libellé français ne fait qu'un seul mot,
-     * articles et possessifs retirés : un label inconnu ou composé reste une
-     * question pour le LLM. Singulier et pluriel gérés par
-     * [HomeModes.conceptForWord] — jamais vide, jamais traduit.
-     */
-    fun parseOuSont(text: String): String? {
-        val words = KnownSizes.canonical(text).split(' ').filter { it.isNotEmpty() }
-        if (words.size < 3 || words[0] != "ou") return null
-        if (!OU_SONT_BE.contains(words[1])) return null
-        val rest = words.drop(2).dropWhile { OU_SONT_LEADERS.contains(it) }
-            .dropLastWhile { it == "please" || it == "plait" }
-        if (rest.size != 1) return null
-        return HomeModes.conceptForWord(rest[0])
-    }
-
-    /** Vrai si [label] est un concept maison, au singulier ou au pluriel. */
-    private fun isHousehold(label: String): Boolean {
-        if (HomeModes.CONCEPTS.contains(label)) return true
-        val flip = if (label.endsWith("s")) label.dropLast(1) else label + "s"
-        return HomeModes.CONCEPTS.contains(flip)
-    }
-
-    /**
-     * Label brut de l'ordre porté par [text], `null` si ce n'en est pas un
-     * (le texte part alors au LLM comme avant). Vide = objet sans nom.
-     * Anglais accepté (« create a picto for my keys » → « keys »).
-     */
-    fun parse(text: String): String? {
-        val words = KnownSizes.canonical(text).split(' ').filter { it.isNotEmpty() }
-        val at = words.indexOfFirst { PICTO_WORDS.contains(it) }
-        if (at < 0 || words.none { CREATE_VERBS.contains(it) }) return null
-        val rest = words.drop(at + 1).dropWhile { CREATE_LEADERS.contains(it) }
-        if (rest.isEmpty() || (rest.size == 1 && NAMELESS.contains(rest[0]))) return ""
-        return rest.joinToString(" ")
-    }
 
     /**
      * Vrai si [spoken] dicté (un mot) vise le repère nommé [label], même à
@@ -195,40 +77,10 @@ object PictoVoiceOrder {
 }
 
 /**
- * Phrases parlées du picto du direct, dites par la voix des positions.
+ * Phrases parlées de la recherche picto, dites par la voix des positions.
  * Pures et testées en JVM.
  */
 object PictoVoiceText {
-
-    /** La génération part (~10 s) : le dire, puis se taire jusqu'au résultat. */
-    fun started(language: SpeechLanguage = SpeechLanguage.DEFAULT): String = when (language) {
-        SpeechLanguage.Fr -> "Création picto."
-        SpeechLanguage.En -> "Creating picto."
-    }
-
-    /** Le repère est armé : le nommer et dire comment être guidé. */
-    fun created(label: String, language: SpeechLanguage = SpeechLanguage.DEFAULT): String = when (language) {
-        SpeechLanguage.Fr -> "$label prêt."
-        SpeechLanguage.En -> "$label ready."
-    }
-
-    /** Le repère sans nom (« de ça ») est armé : overlay seul, jamais guidé. */
-    fun createdUnnamed(language: SpeechLanguage = SpeechLanguage.DEFAULT): String = when (language) {
-        SpeechLanguage.Fr -> "Picto prêt."
-        SpeechLanguage.En -> "Picto ready."
-    }
-
-    /** Échec (photo, clé, réseau : le détail reste à l'écran, jamais dit). */
-    fun failed(language: SpeechLanguage = SpeechLanguage.DEFAULT): String = when (language) {
-        SpeechLanguage.Fr -> "Picto raté."
-        SpeechLanguage.En -> "Picto failed."
-    }
-
-    /** Une génération est déjà en vol : la seconde est jetée, et dite. */
-    fun busy(language: SpeechLanguage = SpeechLanguage.DEFAULT): String = when (language) {
-        SpeechLanguage.Fr -> "En cours."
-        SpeechLanguage.En -> "Still running."
-    }
 
     /** La démo change d'état : le dire, c'est le seul témoin du basculement. */
     fun demo(active: Boolean, language: SpeechLanguage = SpeechLanguage.DEFAULT): String = when (language) {
@@ -236,9 +88,24 @@ object PictoVoiceText {
         SpeechLanguage.En -> if (active) "Picto demo on." else "Picto demo off."
     }
 
-    /** L'ordre « Find the X » part : SAM suit X, son pictogramme se crée. */
+    /** L'ordre « mode find my X » part : SAM suit X, son pictogramme se crée. */
     fun findStarted(label: String, language: SpeechLanguage = SpeechLanguage.Fr): String = when (language) {
-        SpeechLanguage.Fr -> "Cherche $label."
-        SpeechLanguage.En -> "Finding $label."
+        SpeechLanguage.Fr -> "Je cherche $label."
+        SpeechLanguage.En -> "Looking for $label."
+    }
+
+    /** La recherche dehors : refusée, jamais de picto dehors. */
+    fun refused(language: SpeechLanguage = SpeechLanguage.DEFAULT): String = when (language) {
+        SpeechLanguage.Fr -> "La recherche ne marche que dedans."
+        SpeechLanguage.En -> "Find works indoors only."
+    }
+
+    /**
+     * Le trouvé au cadran [hour] : « Mug at 9 o'clock. » — dit quand la
+     * chasse voit l'objet, une fois par couple (objet, cadran).
+     */
+    fun found(label: String, hour: Int, language: SpeechLanguage = SpeechLanguage.DEFAULT): String {
+        val name = label.trim().replaceFirstChar { it.uppercaseChar() }
+        return "$name ${PositionText.hourLabel(hour, language)}."
     }
 }

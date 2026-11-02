@@ -32,7 +32,7 @@ data class LiveProbeState(
     /** Concepts envoyés à SAM (les suivis), pas seulement ceux reconnus. */
     val conceptsSent: List<String> = emptyList(),
     /**
-     * Concepts suivis explicitement (Find the X, pictos — hors liste du
+     * Concepts suivis explicitement (mode find my X, pictos — hors liste du
      * monde) : seules leurs pastilles s'affichent ; vide = tout s'affiche
      * (la voix et le guidage lisent toujours tous les concepts envoyés).
      */

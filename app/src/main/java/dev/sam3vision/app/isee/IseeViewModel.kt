@@ -29,7 +29,7 @@ import dev.sam3vision.app.isee.vm.IseeStreamDictation
 import dev.sam3vision.app.isee.vm.IseeSpeedOrder
 import dev.sam3vision.app.isee.vm.IseePhotoShot
 import dev.sam3vision.app.isee.vm.IseePicto
-import dev.sam3vision.app.isee.vm.IseePictoVoice
+
 import dev.sam3vision.app.isee.vm.IseeStatusText
 import dev.sam3vision.app.isee.vm.IseeSteeringOrders
 import dev.sam3vision.app.isee.vm.IseeTranscript
@@ -104,7 +104,7 @@ class IseeViewModel(app: Application) : AndroidViewModel(app) {
         clientOf = { s -> MetaImageClient(s.asrBaseUrl, s.asrApiKey) }, placeMode = { _state.value.placeMode }, probeState = probe.state,
         update = ::update,
         scope = viewModelScope, photoTemplateBox = { file, box -> templateFromPhoto(file, box) },
-        onFound = ::postFoundClip,
+        onFound = { label, hour -> viewModelScope.launch { spine.speakFound(label, hour) } },
     )
     /** Zone tactile publiée par la puce Traversée (exemption d'interception racine). */
     val crossingChip = CrossingChipZone()
@@ -204,7 +204,7 @@ class IseeViewModel(app: Application) : AndroidViewModel(app) {
 
     /** Ordre dicté sur le direct : routeur « mode … » d'abord, repli historique ensuite. */
     suspend fun acceptNavOrder(transcript: String): Boolean {
-        if (dictationRouter.run(transcript, picto.hunting())) return true
+        if (dictationRouter.run(transcript)) return true
         if (voiceNav.run(transcript)) return true
         return steering.runCrossing(transcript)
     }
@@ -213,10 +213,10 @@ class IseeViewModel(app: Application) : AndroidViewModel(app) {
     fun dismissVoiceNav() = voiceNav.dismiss()
 
     /** Ordres de mode (lieu, picto), rejoués par le routeur sous leurs phrases canoniques. */
-    private val modes = IseeModeOrders({ settings }, ::speakNavigation, ::update, picto::labels, { label -> runFindOrder(probe, settings, camera?.lensSpec, lensFeeds, picto, label) }, { label -> runFindOrder(probe, settings, camera?.lensSpec, lensFeeds, picto, label) }, { _state.value.picto.hits }, { _state.value.placeMode }, onFindOff = { picto.cancelHunt() }, post = { level, text, clip -> VoiceBus.post(level, text, clip) }, onPlaceMode = (IseePlaceSync({ settings }, { settings = it }, viewModelScope, prefs::save, ::syncProbe))::onPlaceMode)
+    private val modes = IseeModeOrders({ settings }, ::speakNavigation, ::update, { label -> runFindOrder(probe, settings, camera?.lensSpec, lensFeeds, picto, label) }, { _state.value.placeMode }, onFindOff = { picto.cancelHunt() }, onPlaceMode = (IseePlaceSync({ settings }, { settings = it }, viewModelScope, prefs::save, ::syncProbe))::onPlaceMode)
 
     /** Colonne vocale v4 : bus, bascule Traversée, parole GPS, reprise chat, trouvé (voir [IseeVoiceSpine]). */
-    private val spine: IseeVoiceSpine = IseeVoiceSpine(viewModelScope, { probe.state.value.crossingActive }, { _state.value.placeMode }, ::cutSpeech, voiceNav::stopVoice, { playback.speakPending() })
+    private val spine: IseeVoiceSpine = IseeVoiceSpine(viewModelScope, { probe.state.value.crossingActive }, { _state.value.placeMode }, ::cutSpeech, voiceNav::stopVoice, { playback.speakPending() }, ::speakNavigation, { settings })
 
     /** Routeur de la dictée (SPEC v4) : « mode … » ⇒ ordre exécuté ; le reste ⇒ question au LLM (voir [IseeDictationActions]). */
     private val dictationRouter = IseeDictationRouter(IseeDictationActions(
@@ -431,9 +431,9 @@ class IseeViewModel(app: Application) : AndroidViewModel(app) {
         // Pas de garde « thinking » : une nouvelle parole écrase la réponse en vol
         // (ordres locaux directs, question préemptée dans `IseeAnswers.answer`).
         // Routeur (spec v4) : « mode … » ⇒ ordre exécuté ; tout le reste ⇒ question LLM.
-        // Les anciens ordres sans « mode » (maison, cap, GPS, traversée, clarification)
+        // Les anciens ordres sans « mode » (maison, cap, GPS, traversée, clarification, find, picto, where, où sont)
         // sont supprimés : leurs phrases partent au LLM comme questions.
-        if (dictationRouter.run(text, picto.hunting())) return
+        if (dictationRouter.run(text)) return
         val row = answers.recordQuestion(pcm, text)
         enforceFifo()
         transcript.refresh()
