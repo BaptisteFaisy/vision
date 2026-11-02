@@ -61,6 +61,20 @@ class GuidanceWordTest {
     }
 
     @Test
+    fun `phrase parlee redonne le mot, autre phrase donne rien`() {
+        assertEquals(GuidanceWord.Left, GuidanceWord.fromText("Left."))
+        assertEquals(GuidanceWord.Left, GuidanceWord.fromText("Gauche."))
+        assertEquals(GuidanceWord.Straight, GuidanceWord.fromText("Straight."))
+        assertEquals(GuidanceWord.Straight, GuidanceWord.fromText("Tout droit."))
+        assertEquals(GuidanceWord.Right, GuidanceWord.fromText("Right."))
+        assertEquals(GuidanceWord.Right, GuidanceWord.fromText("Droite."))
+        assertEquals(GuidanceWord.Stop, GuidanceWord.fromText("Stop."))
+        assertNull(GuidanceWord.fromText("left."))
+        assertNull(GuidanceWord.fromText("Waking the server, up to a minute."))
+        assertNull(GuidanceWord.fromText(""))
+    }
+
+    @Test
     fun `seul stop coupe`() {
         assertTrue(GuidanceWord.isStopPhrase("Stop."))
         assertTrue(GuidanceWord.isStopPhrase(GuidanceWord.Stop.text(SpeechLanguage.Fr)))
