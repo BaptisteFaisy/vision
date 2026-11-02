@@ -401,11 +401,33 @@ Recette téléphone : guidage vers un virage — « Left. » sec au moment de
 tourner, rien avant, jamais coupé — **non mesuré**, exige un APK sur
 appareil réel (preuves par `logcat`, jamais à l'oreille côté agent).
 
-> Amendé par le § 42 (ordre user du 02/11, même jour) : plus seul le
+> Amendé par le § 43 (ordre user du 02/11, même jour) : plus seul le
 > niveau 0 attend — tout le monde attend, et les escaliers coupent
 > (respect mutuel avec les mots de guidage, § 41).
 
-## 42. Compte des marches prioritaire : toutes les 1 s, esquive au milieu (ordre user du 02/11)
+## 42. Évitement des humains à 1 m minimum (ordre user du 02/11)
+
+« Quand il doit dire gauche et droite, qu'il s'éloigne pour être minimum à
+1 m de lui ou plus. »
+
+- **constante** : `PeoplePath.MIN_CLEARANCE_M` 0,8 → 1,0 m — bandes
+  interdites (corps + 1 m), `clearsSide`/`clearsAhead`, veto trou de
+  grillage, veto passage SAM et retour trottoir suivent ;
+- **repli inchangé** : aucun côté à 1 m (foule dense) → côté le moins
+  encombré, on se faufile (ordre du 31/10) — l'app ne se tait ni ne
+  s'arrête devant des humains ;
+- **à 1 m, un proche couvre le champ** : une personne à ≤ 1,5 m près de
+  l'axe bouche toute la largeur d'image — le plan avoue (`fits=false`)
+  et le couloir prend le repli ;
+- **priorité du compte** : le compte des marches passe avant (§ 43) — il
+  ne se tait pas pour l'évitement, l'esquive « gauche » / « droite »
+  parle au milieu de chaque seconde.
+
+Verrouillé par `PeoplePathTest` (caps, écarts vrais et discriminants
+recalibrés au mètre, créneau fantôme conservé) + renommages 80cm → 1m
+(`GuidanceSteeringTest`, `GuidanceAnnouncerTest`, `ProbeVoiceFenceHoleTest`).
+
+## 43. Compte des marches prioritaire : toutes les 1 s, esquive au milieu (ordre user du 02/11)
 
 Le user, dans l'escalier avec iSee : quand un escalier est reconnu, le
 compte (« N marches. ») se dit toutes les 1 s, prioritaire sur tout ce
