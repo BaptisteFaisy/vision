@@ -31,6 +31,8 @@ object IseePortrait {
     const val PICTURE_H = 0.58f
     const val PICTURE_IDLE_H = 0.64f
     const val PICTURE_SPEAKING_H = 0.50f
+    /** Guidage (carte en bas, boule effacée) : la rue grandit, la phrase garde sa place. */
+    const val PICTURE_GUIDING_H = 0.60f
     const val CAM_Y = 0.555f
     const val CAM_R = 0.20f
 
@@ -59,14 +61,15 @@ fun smoothOpen(k: Float): Float {
 
 /**
  * Où sont la boule, la rue et la phrase pour un écran [width]×[height] quand la caméra est
- * ouverte à [open] (0 fermée, 1 ouverte). La phrase est toujours sous la boule.
+ * ouverte à [open] (0 fermée, 1 ouverte). En guidage ([guiding]), la carte prend
+ * le bas, la rue grandit et la boule s'efface ; sinon la phrase reste sous la boule.
  */
-fun portraitGeometry(width: Float, height: Float, open: Float, speech: Float = 0f): PortraitGeometry {
+fun portraitGeometry(width: Float, height: Float, open: Float, speech: Float = 0f, guiding: Boolean = false): PortraitGeometry {
     val k = smoothOpen(open)
     val talking = smoothOpen(speech)
     val cameraR = minOf(width * IseePortrait.CAM_R, height * 0.105f)
     val r = mix(width * IseePortrait.REST_R, cameraR, k)
-    val picture = height * mix(IseePortrait.PICTURE_IDLE_H, IseePortrait.PICTURE_SPEAKING_H, talking)
+    val picture = height * if (guiding) IseePortrait.PICTURE_GUIDING_H else mix(IseePortrait.PICTURE_IDLE_H, IseePortrait.PICTURE_SPEAKING_H, talking)
     // Même la couronne et la respiration restent sous l'image, sans recouvrement.
     val cameraY = picture + cameraR * 1.32f + width * 0.025f
     val y = mix(height * IseePortrait.REST_Y, cameraY, k)

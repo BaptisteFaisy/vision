@@ -44,7 +44,8 @@ import kotlinx.coroutines.delay
  * L'écran iSee au design « Portrait » : fond blanc, une seule boule de verre au liquide marbré
  * (plus de satellites, plus de pixels), et seulement la phrase en cours, en gros, sous la boule.
  * Quand la caméra tourne (vidéo ou photo), la rue occupe le haut de l'écran et se fond dans le
- * blanc ; la boule rétrécit et reste dessous. Le user parle : liquide bleu, mots qui
+ * blanc ; la boule rétrécit et reste dessous. En guidage elle s'efface (rue agrandie,
+ * phrase gardée). Le user parle : liquide bleu, mots qui
  * s'allument en bleu puis passent au noir. iSee parle : liquide ambre, couronne ambre autour de
  * la boule, mot en cours en ambre. Toute l'interaction reste aux gestes de `IseeRootLayout`.
  *
@@ -95,14 +96,15 @@ private fun BoxWithConstraintsScope.PortraitScene(
     val open = rememberCameraOpen(layers.cameraCard || layers.glassesFeed || layers.photoFeed)
     val position = rememberSpeechPosition(viewModel, state.speakingEntryId)
     val showGlasses = rememberGlassesFeed(layers, open)
+    val navState by viewModel.voiceNavState.collectAsState()
     val density = LocalDensity.current
-    // Rue toujours à la taille parole (50 %) quand elle est affichée : la voix
-    // qui se met à parler ne fait plus respirer l'image.
-    val geo = with(density) { portraitGeometry(width.toPx(), (height - navInsetDp()).toPx(), open, 1f) }
+    // Rue à la taille parole (50 %) ; en guidage, la carte prend le bas,
+    // la boule s'efface et la rue grandit (60 %), sans respirer.
+    val geo = with(density) { portraitGeometry(width.toPx(), (height - navInsetDp()).toPx(), open, 1f, isGuidanceOverlay(navState)) }
     with(density) { PortraitCamera(state, glue, probe, viewModel, open, geo.pictureH.toDp(), showGlasses, layers.glassesGhost) }
     GlassesProbeWiring(viewModel.probe, (glassesLive || glassesStreaming) && state.glassesPhoto == null)
     Header(view.scene, onPicture = open > 0.5f, modifier = Modifier.fillMaxWidth())
-    val navState by viewModel.voiceNavState.collectAsState()
+    // navState est collecté plus haut : la taille de la rue en dépend.
     SceneGuidanceLayer(viewModel) {
         SceneOrbLayer(state, view, geo, open, position, navState)
     }
@@ -120,9 +122,9 @@ private fun BoxWithConstraintsScope.PortraitScene(
 }
 
 /**
- * La boule et la phrase en cours. En guidage, quand le user parle, son
- * transcript prend la place de la boule au milieu (caméra en haut, carte
- * en bas) au lieu de rester sous la boule. Extrait pour garder
+ * La boule et la phrase en cours. En guidage caméra ouverte, la boule
+ * s'efface entre la rue et la carte mais la phrase d'iSee reste affichée
+ * en direct ; quand le user parle, son transcript prend le milieu. Extrait pour garder
  * `PortraitScene` sous le plafond de 50 lignes.
  */
 @Composable
@@ -139,6 +141,11 @@ private fun BoxWithConstraintsScope.SceneOrbLayer(
     if (showGuidanceTranscript(navState, state)) {
         with(density) {
             SpokenLine(currentCaption(state, position), fromUser, (geo.orbY - geo.orbR).toDp(), compact = open > 0.5f)
+        }
+    } else if (hideGuidanceOrb(navState, open > 0.5f)) {
+        // Boule effacée : la phrase d'iSee reste entre la rue agrandie et la carte.
+        with(density) {
+            SpokenLine(currentCaption(state, position), fromUser, geo.pictureH.toDp() + 8.dp, compact = true)
         }
     } else {
         OrbClockLayer(view.scene, geo, open)
