@@ -109,12 +109,12 @@ class IseeSpecV4AntiRepeatTest {
     }
 
     @Test
-    fun `verdict = 3s avec changement immediat`() {
+    fun `verdict = 2s avec changement immediat`() {
         val gate = SpecVerdictRepeat()
 
         assertTrue(gate.allow("Wait.", 0L))
-        assertFalse("même verdict : tenu 3s", gate.allow("Wait.", 2_999L))
-        assertTrue("verdict changé : immédiat", gate.allow("Cross.", 2_999L))
+        assertFalse("même verdict : tenu 2s", gate.allow("Wait.", 1_999L))
+        assertTrue("verdict changé : immédiat", gate.allow("Cross.", 1_999L))
         assertTrue(gate.allow("Cross.", 6_000L))
     }
 
@@ -166,7 +166,7 @@ class IseeSpecV4AntiRepeatTest {
             "stairs-count" to 500L,
             "pole" to 2_000L,
             "sidewalk" to 10_000L,
-            "verdict" to 3_000L,
+            "verdict" to 2_000L,
         )
 
         fun allow(key: String, nowMs: Long): Boolean {
@@ -178,14 +178,14 @@ class IseeSpecV4AntiRepeatTest {
         }
     }
 
-    /** Verdict : même texte tenu 3 s, texte changé immédiat. */
+    /** Verdict : même texte tenu 2 s, texte changé immédiat. */
     private class SpecVerdictRepeat {
         private var lastText: String? = null
         private var lastAtMs: Long = 0L
 
         fun allow(text: String, nowMs: Long): Boolean {
             val last = lastText
-            if (last != null && last == text && nowMs - lastAtMs < 3_000L) return false
+            if (last != null && last == text && nowMs - lastAtMs < 2_000L) return false
             lastText = text
             lastAtMs = nowMs
             return true
