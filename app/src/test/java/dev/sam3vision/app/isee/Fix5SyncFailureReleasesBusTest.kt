@@ -8,6 +8,7 @@ import java.io.File
 import java.nio.file.Files
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.delay
+import kotlinx.coroutines.test.StandardTestDispatcher
 import kotlinx.coroutines.test.advanceUntilIdle
 import kotlinx.coroutines.test.runTest
 import kotlinx.coroutines.withContext
@@ -79,16 +80,18 @@ class Fix5SyncFailureReleasesBusTest {
                 File(tempDir(), "play"),
                 // Même câblage que le ViewModel : fin (erreur comprise) = bus rendu.
                 onPlaybackError = { VoiceBus.onSpeechIdle() },
+                audio = StandardTestDispatcher(testScheduler),
             ),
             settings = { Settings.Default.copy(ttsVoiceId = "voix-test") },
             clips = pack(),
         )
         // "Voiture." a un clip pack (RecordedPhrase) : la proximité tente la
-        // lecture, qui échoue en synchrone (MediaPlayer indisponible en JVM).
+        // lecture, qui échoue sur le fil audio (MediaPlayer indisponible en JVM).
         VoiceBus.post(OutdoorLevel.STAIRS, "prise")
         assertTrue(VoiceBus.stairsSpeaking())
 
         proximity.speak("Voiture.", level = OutdoorLevel.STAIRS)
+        advanceUntilIdle()
 
         assertFalse(VoiceBus.stairsSpeaking())
     }
