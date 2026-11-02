@@ -51,9 +51,9 @@ class CrossingTextTest {
 
     @Test
     fun `confirmation parlee du mode`() {
-        assertEquals("Crossing on.", CrossingText.mode(true))
-        assertEquals("Crossing off.", CrossingText.mode(false))
-        assertEquals("Crossing on.", CrossingText.mode(true, SpeechLanguage.En))
-        assertEquals("Crossing off.", CrossingText.mode(false, SpeechLanguage.En))
+        assertEquals("Crossing mode on.", CrossingText.mode(true))
+        assertEquals("Crossing mode off.", CrossingText.mode(false))
+        assertEquals("Crossing mode on.", CrossingText.mode(true, SpeechLanguage.En))
+        assertEquals("Crossing mode off.", CrossingText.mode(false, SpeechLanguage.En))
     }
 }

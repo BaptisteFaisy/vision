@@ -71,6 +71,16 @@ class VoiceAnnouncer {
         return Result.failure(cause)
     }
 
+    /**
+     * Lit un MP3 local (clip embarqué résolu par l'appelant). Vitesse des
+     * réglages ; fichier absent = échec silencieux (jamais de synthèse).
+     */
+    suspend fun sayFile(settings: Settings, file: File): Result<Unit> {
+        player.speed = settings.ttsSpeed
+        if (!file.isFile) return Result.failure(java.io.FileNotFoundException(file.path))
+        return player.play(file)
+    }
+
     fun stop() = player.stop()
 
     fun release() = player.release()

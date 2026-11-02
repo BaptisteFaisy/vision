@@ -77,10 +77,10 @@ class IseeSteeringOrders(
         }
     }
 
-    /** Le passage en vue est annoncé avec sa distance, jamais devinée (`null` = silence). */
+    /** Le passage en vue est annoncé, direction seule (ordres minimaux : pas de distance parlée). */
     private suspend fun announceAhead(language: SpeechLanguage) {
         val ahead = runCatching { crossingAhead() }.getOrNull() ?: return
-        speak(CrossingText.approach(CrossingGuidance.directionOf(ahead.centerX), ahead.meters, language))
+        speak(CrossingText.approach(CrossingGuidance.directionOf(ahead.centerX), null, language))
     }
 }
 

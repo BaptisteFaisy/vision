@@ -1,11 +1,15 @@
 package dev.sam3vision.app.glasses
 
+import android.app.Application
 import android.content.Context
 import android.util.Log
 import dev.sam3vision.app.VoiceAnnouncer
+import dev.sam3vision.app.isee.guideVoicePack
 import dev.sam3vision.app.llmClient
 import dev.sam3vision.app.samClientOrNull
 import dev.sam3vision.core.settings.Settings
+import dev.sam3vision.core.speech.IseeClipsEn
+import dev.sam3vision.core.speech.SpeechLanguage
 import dev.sam3vision.core.usecase.AnalyzeUseCase
 
 /** Journal logcat de la collecte des frames (`adb logcat -s GlassesDirect`). */
@@ -26,6 +30,9 @@ internal class GlassesFrameVoice(
 ) {
     /** Voix des descriptions collectées : le haut-parleur, comme le reste de l'app. */
     private val voice = VoiceAnnouncer(context.applicationContext, FRAMES_VOICE_DIR)
+
+    /** Clips anglais (SPEC v4) : l'annonce de session est un MP3 embarqué. */
+    private val clips = guideVoicePack(context.applicationContext as Application)
 
     private val step = GlassesAnalysisStep(
         analyze = { base64 ->
@@ -57,12 +64,16 @@ internal class GlassesFrameVoice(
     }
 
     /**
-     * Session ouverte : dit « connected » sur la sortie voix (les lunettes en
-     * session, le haut-parleur en repli). Clé TTS absente = échec silencieux,
-     * comme les descriptions collectées.
+     * Session ouverte : dit « connected » (clip embarqué) sur la sortie voix
+     * (les lunettes en session, le haut-parleur en repli). Clip absent =
+     * échec silencieux, comme les descriptions collectées.
      */
-    suspend fun announceConnected(): Result<Unit> =
-        voice.say(settings(), SESSION_CONNECTED_ANNOUNCEMENT)
+    suspend fun announceConnected(): Result<Unit> {
+        val current = settings()
+        val file = clips.clipFor(IseeClipsEn.CONNECTED, SpeechLanguage.En, current.ttsVoiceId)
+            ?: return Result.failure(java.io.FileNotFoundException(IseeClipsEn.CONNECTED))
+        return voice.sayFile(current, file)
+    }
 
     /** Fin de session : la voix en cours se tait. */
     fun stop() {

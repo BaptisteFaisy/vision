@@ -52,6 +52,8 @@ class IseeVoiceNav(
     private val settings: () -> Settings,
     private val scope: CoroutineScope,
     private val speak: suspend (String) -> Unit,
+    /** Voix réseau (noms GPS dynamiques : exception ElevenLabs). */
+    private val speakNetwork: suspend (String) -> Unit = speak,
     /** Parole route (manœuvres niveau 11, rappel niveau 3 : postée au bus). */
     private val speakRoute: (suspend (phrase: String, level: Int) -> Unit)? = null,
     /** Coupe la parole route (fin de guidage). */
@@ -96,7 +98,7 @@ class IseeVoiceNav(
         VoiceNavSession(
             launcher = AndroidNavigationLauncher(context),
             guidanceEnabled = { settings().navigationGuidanceEnabled },
-            announcer = NavigationAnnouncer({ settings() }) { _, text -> speak(text) },
+            announcer = NavigationAnnouncer({ settings() }, { _, text -> speakNetwork(text) }, speak),
             voice = VoiceNavAnnouncer({ settings() }) { _, text -> speak(text) },
             routeLoader = { destination -> loader(destination) },
             extraParsers = listOf(VoiceDestinationParser::parseExtra),
