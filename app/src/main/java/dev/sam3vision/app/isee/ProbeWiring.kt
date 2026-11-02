@@ -332,7 +332,7 @@ internal fun LiveProbe.phraseOf(
     hfovDeg: Float,
 ): String? {
     val guide = probeGuideFrameOf(ProbeTracks.tracker, at, state.value.timings, placed, hfovDeg)
-    // Traversée : silence — le verdict parle au bus (niveau 0, CrossingLevels.VERDICT, nourri dans
+    // Traversée : silence — le verdict parle au bus (niveau 100, CrossingLevels.VERDICT, nourri dans
     // `computeRest`), humains et bordures via le guetteur obstacles (101/102).
     if (state.value.crossingActive) return null
     resetCrossingWatches()

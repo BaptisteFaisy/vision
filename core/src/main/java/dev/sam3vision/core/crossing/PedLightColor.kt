@@ -6,8 +6,8 @@ package dev.sam3vision.core.crossing
  * [CrossingState.Green] — binaire, tout non-vert attend (ordre user du 31/10).
  *
  * **Décision par projection chromatique signée, sans borne de teinte**
- * (mesures du 02/11/2026, `.scratch/feux-improve/a8/RAPPORT.md`) : un pixel
- * vote selon `p = (G − R) / max(R, G, B)` — vert si `p ≥ 0,30`, rouge si
+ * (mesures du 02/11/2026, `~/.scratch/feux-improve/a8/RAPPORT.md` §2 et §3) :
+ * un pixel vote selon `p = (G − R) / max(R, G, B)` — vert si `p ≥ 0,30`, rouge si
  * `p ≤ −0,50`, neutre entre les deux. Une teinte HSV est un angle lu sur une
  * chroma arbitrairement faible : c'est ce qui obligeait la borne haute à 195°
  * (les verts français sont vert-de-mer, 22 à 42 % de leur masse au-dessus de
@@ -18,27 +18,39 @@ package dev.sam3vision.core.crossing
  * À saturation pleine, `p ≥ 0,30` coupe à 78° de teinte (l'ancienne borne 80°
  * reproduite sans la nommer) et refuse une teinte lue sur une chroma faible.
  *
- * Mesuré le 02/11/2026 (harnais JVM hors dépôt, corpus publics de l'axe A8 ;
- * « classifieur » = [classify], « porte » = [PedLightGate.verdict], qui lit la
- * même projection entre-temps) :
+ * Mesuré le 02/11/2026 au **harnais JVM hors dépôt**, compilé une fois sur
+ * `aacdcd20` et une fois sur le patch (`~/.scratch/feux-impl/w4/RAPPORT.md`
+ * §2, §3, §4, §5 ; « classifieur » = [classify], « porte » =
+ * [PedLightGate.verdict], qui lit la même projection entre-temps) :
  *   - 49 crops téléphone FR (20 V / 29 R) : **20/20 verts, 0 faux vert** au
- *     classifieur (bornes de teinte : 11/20) et 20/20 à la porte (+ 3 disques
- *     `ub7` admis, comme avant) ;
+ *     classifieur (bornes de teinte : 11/20) et 20/20 à la porte, 0/29 faux
+ *     vert (+ 3 disques `ub7` admis, comme avant) — w4 §2 ;
  *   - 33 ancres `{feuxfr,feuxfr2,feuxfr3}` : **33/33 verdicts inchangés**
- *     (22 verts / 11 rouges) à la porte ;
+ *     (22 verts / 11 rouges) à la porte — w4 §3 ;
  *   - 280 crops jitterés : **155/240** au classifieur, **160/240** à la porte
- *     (bornes de teinte : 93/240 et 140/240) ;
- *   - PTL (Shanghaï, hors domaine) : 99/184 avec 14 faux verts à la porte
- *     (bornes : 103/184, 14) — coût assumé hors France ;
- *   - photos hors domaine (fenêtres 48 px) : 62 fenêtres « vertes » sur les
- *     négatifs contre 190 (246 → 257 au total, la hausse venant des traversées) ;
- *   - robustesse exposition (gain 1,45 écrêté) : **42/42 verts** sur les 20
- *     verts FR + 22 ancres vertes à la porte, contre 36/42 avec les bornes.
+ *     (bornes de teinte : 93/240 et 140/240) — w4 §2 ;
+ *   - PTL (Shanghaï, hors domaine) : 99/184 avec **14** faux verts à la porte
+ *     (bornes : 103/184, 14) — coût assumé hors France, w4 §2 ;
+ *   - photos hors domaine (fenêtres 48 px) : **62** fenêtres « vertes » sur
+ *     les négatifs contre 190 (246 → 257 au total, la hausse venant des
+ *     traversées) — w4 §5 ;
+ *   - robustesse exposition (gain 1,45 puis écrêtage) : **42/42 verts** à la
+ *     porte sur les 20 verts FR + 22 ancres vertes, contre 36/42 avec les
+ *     bornes (classifieur : 40/42 contre 33/42) — w4 §4.
+ *
+ * Ces valeurs sont celles du **Kotlin livré**. Le miroir Python de l'axe A8
+ * (`~/.scratch/feux-improve/a8/RAPPORT.md` §4, tableau des taux d'erreur)
+ * donne des valeurs voisines mais non identiques : jitter **144/240** contre
+ * **124/240** avec les bornes, exposition **40/40** contre **34/40**, PTL
+ * **13** faux verts. L'écart est mesuré et documenté dans w4 §2 (le miroir
+ * et le Kotlin ne comptent pas les mêmes crops) : c'est le Kotlin qui fait
+ * foi ici, le miroir sert de contrôle de principe.
  *
  * Le plancher de pureté est mesuré, pas copié : 5 % du cœur brillant (valeur
- * de l'axe A2) laissait tomber 2 verts FR sur 20 (`0004` à 3,0 % et `0009` à
- * 0,84 % d'un cœur saturé par le ciel) ; à 5 ‰ les 20 passent et le balayage
- * 0,2 % → 1 % ne bouge rien d'autre. La marge 2,5 est inerte sur ces corpus
+ * de l'axe A2) laissait tomber 2 verts FR sur 20 — `0004` à 3,0 % et `0009` à
+ * 0,84 % de 1 424 px de cœur (w4 §6) ; à 5 ‰ les 20 passent, et 0,3 % → 0,8 %
+ * donnent le même résultat partout (à 0,2 % seulement, un faux vert PTL de
+ * plus, à 5 % deux verts tombent). La marge 2,5 est inerte sur ces corpus
  * (aucun crop n'a de rouge à moins d'un tiers du vert) : elle ne sert qu'au
  * cas synthétique de match nul.
  *
