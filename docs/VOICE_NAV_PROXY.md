@@ -53,7 +53,10 @@ point à ≤30 m d'un carrefour routier sans mot d'infra piétonne —
 le feu le plus proche (150 m max, 2 réparations, +20 % de temps max,
 réduction stricte, repli route de base). Mesuré : réparations actives
 en prod (logs `traversée réparée`), routes propres inchangées,
-Montmartre non réparé par design (pas de feu ≤150 m).
+Montmartre non réparé par design (pas de feu ≤150 m). Les feux sont
+indexés dans la même grille 0,01° que les carrefours (02/11/2026) :
+~11 ms → ~0,2 ms par recherche, résultats identiques (parité verrouillée
+par `valhalla_grid_tests`).
 
 ## Rollback
 

@@ -30,7 +30,7 @@ from tests_units import (boot_tests, concepts_street_tests, crossing_concepts_te
                          depth_tests, detr_evict_tests, feux_guard_tests, latency_tests,
                          live_fast_tests, live_fast_perf_tests, llm_tests, m1_vectors_tests,
                          merge_tests, native_tests, post_tests, preproc_tests, tracking_tests,
-                         weights_tests, ws_binary_tests, ws_pump_tests)
+                         valhalla_grid_tests, weights_tests, ws_binary_tests, ws_pump_tests)
 
 BACKEND_DIR = Path(__file__).resolve().parent.parent / "backend"
 PASSED: list[str] = []
@@ -471,12 +471,12 @@ RUNNERS = (
      post_tests.test_post_validation),
     ("live_fast : post (parité bit-à-bit HF)", "timing",
      post_tests.test_post_parity),
-    ("live_fast : post (gain mesuré)", "timing",
-     post_tests.test_post_faster),
-    ("live_fast : post (levier recuit au déploiement)", "timing",
-     post_tests.test_post_deploy),
-    ("live_fast : WS double-buffer (FIX-13/8/17, health)", "timing",
-     ws_pump_tests.test_ws_pump),
+    ("live_fast : post (gain mesuré)", "timing", post_tests.test_post_faster),
+    ("live_fast : post (levier recuit au déploiement)", "timing", post_tests.test_post_deploy),
+    ("live_fast : WS double-buffer (FIX-13/8/17, health)", "timing", ws_pump_tests.test_ws_pump),
+    ("valhalla : grille feux == scan", "valhalla_cpu", valhalla_grid_tests.test_grid_equivalence),
+    ("valhalla : grille feux (bordures)", "valhalla_cpu", valhalla_grid_tests.test_grid_borders),
+    ("valhalla : traversées sur grille", "valhalla_cpu", valhalla_grid_tests.test_unsafe_crossings_shape),
 )
 
 
