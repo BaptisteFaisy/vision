@@ -5,10 +5,14 @@ import dev.sam3vision.app.SpeechPlayer
 import dev.sam3vision.app.VOICE_SLICE_MS
 import dev.sam3vision.core.crossing.CrossingLevels
 import dev.sam3vision.core.speech.IseeClipsEn
+import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.Job
+import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.sync.withLock
+import kotlinx.coroutines.withTimeoutOrNull
 import java.io.File
 
 /**
@@ -18,6 +22,26 @@ import java.io.File
  */
 /** Étiquette des diagnostics du mutisme spontané (`logcat -s VoiceMute:*`). */
 private const val TAG_MUTE = "VoiceMute"
+
+/**
+ * Budget d'une parole du bus (20 s) : une phrase spontanée plus vieille est
+ * périmée (la scène a changé), et une parole coincée ne doit jamais épingler
+ * le bus — observé sur appareil : paroles acceptées sans issue, niveau actif
+ * bloqué, synthèse et clips empilés derrière sans erreur. Au dépassement, la
+ * parole est jetée (warning `bus-depassement`, même en release) et le bus
+ * rendu si aucune parole plus récente ne l'a pris entre-temps.
+ */
+internal const val SAY_TIMEOUT_MS = 20_000L
+
+/**
+ * Budget de restitution du bus (25 s, après [SAY_TIMEOUT_MS]) : si le bus
+ * tient encore la parole passé ce délai, la lecture est coincée côté
+ * plateforme (`prepare()` figé, observé sur appareil — ni erreur, ni fin,
+ * donc aucun rappel) et le bus est rendu de force (`bus-sans-retour`). Le
+ * niveau ET le jeton doivent encore matcher : une parole plus récente ne
+ * se fait jamais voler son tour.
+ */
+internal const val RELEASE_TIMEOUT_MS = 25_000L
 
 internal class SpeechPlayerClipSink(private val player: SpeechPlayer) : ClipSink {
     override suspend fun playFile(file: File): Result<Unit> = player.playFile(file)
@@ -40,12 +64,21 @@ internal class SpeechPlayerClipSink(private val player: SpeechPlayer) : ClipSink
  * remplaçante. Les lectures simples libèrent par le rappel du lecteur
  * ([VoiceBus.onSpeechIdle]) ; les séquences (sans rappel) et les jets
  * libèrent ici.
+ *
+ * Vigile ([sayTimeoutMs], [SAY_TIMEOUT_MS] en prod) : l'attente du mutex et
+ * la parole partagent un seul budget — une parole qui ne parle pas à temps
+ * (mutex tenu par une parole coincée, synthèse ou lecteur figés) est jetée
+ * et rend le bus. Une phrase spontanée en retard est périmée, jamais rejouée.
+ * Une parole qui lève sous le mutex ([speakGuarded]) rend le bus de même
+ * (annulation propagée, exception journalisée — jamais de `finally`
+ * inconditionnel : seule la parole la plus récente rend le repos).
  */
 internal class BusSpeaker(
     private val scope: CoroutineScope,
     private val player: SpeechPlayer,
     private val clips: IseeClipPlayer,
     private val proximity: ProximityVoice,
+    private val sayTimeoutMs: Long = SAY_TIMEOUT_MS,
 ) : VoiceBusSpeaker {
 
     /** Parole en cours sous mutex : une seule lecture du bus à la fois. */
@@ -57,19 +90,57 @@ internal class BusSpeaker(
     override fun idle(): Boolean = player.position() == null
 
     override fun say(level: Int, text: String, clipId: String?, clips: List<String>) {
+        // Lue sous le verrou de post() : c'est bien la parole acceptée.
+        val (heldLevel, heldToken) = VoiceBus.hold()
+        if (BuildConfig.DEBUG) {
+            val alive = scope.coroutineContext[Job]?.isActive ?: false
+            android.util.Log.d(TAG_MUTE, "bus-parole level=$level texte=[$text] scope-actif=$alive loc=${hashCode()}")
+        }
+        // Superviseur de restitution (frère, pas enfant : il survit à la
+        // parole elle-même — une lecture figée ne rend jamais le bus).
+        scope.launch {
+            delay(RELEASE_TIMEOUT_MS)
+            if (VoiceBus.holds(heldLevel, heldToken)) {
+                android.util.Log.w(TAG_MUTE, "bus-sans-retour level=$level texte=[$text] ms=$RELEASE_TIMEOUT_MS")
+                VoiceBus.onSpeechIdle()
+            }
+        }
         scope.launch {
             // Hors mutex : la coupe libère la séquence qui le tient.
             player.stop()
-            speech.withLock {
-                val current = ++generation
-                if (clips.isNotEmpty()) {
-                    val seqOk = this@BusSpeaker.clips.speakSequence(clips, urgent = true)
-                    if (BuildConfig.DEBUG) android.util.Log.d(TAG_MUTE, "bus-seq level=$level ok=$seqOk n=${clips.size}")
-                    if (current == generation) VoiceBus.onSpeechIdle()
-                    return@withLock
+            var current = -1L
+            var played = false
+            val done = withTimeoutOrNull(sayTimeoutMs) {
+                speech.withLock {
+                    current = ++generation
+                    played = speakGuarded(level, text, clipId, clips, current)
                 }
+            }
+            if (done == null) {
+                android.util.Log.w(TAG_MUTE, "bus-depassement level=$level texte=[$text] ms=$sayTimeoutMs joue=$played")
+                if (current == generation) VoiceBus.onSpeechIdle()
+            }
+        }
+    }
+
+    /**
+     * Parole sous mutex ([current] = sa génération) : séquence si [clips]
+     * est non vide, sinon clip puis synthèse — vrai si parlé. Une annulation
+     * (budget dépassé) rend le bus si dernière et se propage ; une exception
+     * est journalisée ([SpeechLog.fail]) et rend le bus si dernière (faux).
+     * Jamais de `finally` inconditionnel : une parole dépassée ne doit pas
+     * voler le repos de sa remplaçante.
+     */
+    private suspend fun speakGuarded(level: Int, text: String, clipId: String?, clips: List<String>, current: Long): Boolean {
+        return try {
+            if (clips.isNotEmpty()) {
+                val seqOk = this@BusSpeaker.clips.speakSequence(clips, urgent = true)
+                if (BuildConfig.DEBUG) android.util.Log.d(TAG_MUTE, "bus-seq level=$level ok=$seqOk n=${clips.size}")
+                if (current == generation) VoiceBus.onSpeechIdle()
+                seqOk
+            } else {
                 val id = clipId ?: spokenClipId(text)
-                val slice = if (level == CrossingLevels.VERDICT) null else VOICE_SLICE_MS
+                val slice = VOICE_SLICE_MS.takeUnless { level == CrossingLevels.VERDICT }
                 val clipOk = id != null && this@BusSpeaker.clips.speak(id, urgent = true, sliceMs = slice)
                 val proxOk = clipOk || proximity.speak(text, clipId = null, level = level)
                 if (proxOk) SpeechLog.play(if (clipOk) "clip" else "synthèse", text)
@@ -78,7 +149,15 @@ internal class BusSpeaker(
                 if (!clipOk && !proxOk && current == generation) {
                     VoiceBus.onSpeechIdle()
                 }
+                clipOk || proxOk
             }
+        } catch (cancel: CancellationException) {
+            if (current == generation) VoiceBus.onSpeechIdle()
+            throw cancel
+        } catch (e: Exception) {
+            SpeechLog.fail("bus", "exception ${e.message}")
+            if (current == generation) VoiceBus.onSpeechIdle()
+            false
         }
     }
 
