@@ -89,7 +89,7 @@ internal fun startsWithAnnexB(bytes: ByteArray): Boolean {
 
 /**
  * Faut-il tenter le décodage bitmap avant le codec ? Non pour un bitstream déjà en
- * Annex B : `BitmapFactory` y échoue à coup sûr après 1 à 3 ms (60 i/s, c'est ~180 ms
+ * Annex B : `BitmapFactory` y échoue à coup sûr après 1 à 3 ms (24 i/s, c'est jusqu'à ~72 ms
  * de CPU jetées par seconde). Les images fixes (JPEG/PNG/WebP, jamais `00 00 01…` en
  * tête) et le brut non compressé gardent la sonde ; le longueur-préfixé ambigu aussi
  * (prudence : [annexB] tranche déjà ce cas vers Annex B, la sonde reste le repli sûr).
@@ -127,6 +127,19 @@ fun nalTypes(bytes: ByteArray): Set<Int> {
     }
     return found
 }
+
+/**
+ * Faut-il (re)créer le codec ? Un codec vivant à taille identique suffit : une config
+ * nouvelle qui garde la taille ne doit jamais le recréer (100 à 500 ms de gel par config).
+ * Pur, testé en JVM.
+ */
+internal fun needsCodecRebuild(
+    hasCodec: Boolean,
+    codecW: Int,
+    codecH: Int,
+    width: Int,
+    height: Int,
+): Boolean = !hasCodec || width != codecW || height != codecH
 
 /**
  * Rend les frames du flux des lunettes sur une `Surface` (celle de l'accueil iSee).
@@ -193,7 +206,7 @@ class GlassesLiveDecoder(
                 try {
                     return drawBitmap(target, frame, it)
                 } finally {
-                    // Bitmap décodé pour ce seul dessin (jusqu'à 60 i/s) : libéré aussitôt.
+                    // Bitmap décodé pour ce seul dessin (jusqu'à 24 i/s) : libéré aussitôt.
                     runCatching { it.recycle() }
                 }
             }
@@ -233,16 +246,23 @@ class GlassesLiveDecoder(
     /**
      * Config H.265 (VPS/SPS/PPS) : mémorisée puis posée en `csd-0` à la configuration —
      * beaucoup de décodeurs ignorent la config envoyée en buffer avec le drapeau, et ne
-     * sortent alors jamais rien, sans erreur. Une config nouvelle recrée le décodeur.
+     * sortent alors jamais rien. Une config nouvelle ne recrée le décodeur que si la taille
+     * change, ou si aucun codec ne vit (voir [needsCodecRebuild]).
      */
     private fun stashConfig(target: Surface, frame: GlassesFrame) {
         configSeen += 1
         if (configSeen <= 3) Log.i(TAG, "direct lunettes : config #$configSeen (${frame.bytes.size} o)")
-        if (csd == null || !frame.bytes.contentEquals(csd)) {
-            csd = frame.bytes.copyOf()
-            dropCodecLocked()
-            ensureCodec(target, frame.width, frame.height)
+        if (csd != null && frame.bytes.contentEquals(csd)) return
+        val rebuild = needsCodecRebuild(codec != null, codecWidth, codecHeight, frame.width, frame.height)
+        csd = frame.bytes.copyOf()
+        if (!rebuild) {
+            // Taille inchangée : le codec vit, seule la config change. Le recréer coûterait
+            // 100 à 500 ms de gel par config, pour un format identique.
+            Log.i(TAG, "direct lunettes : config à taille ${frame.width}×${frame.height} inchangée, codec conservé")
+            return
         }
+        dropCodecLocked()
+        ensureCodec(target, frame.width, frame.height)
     }
 
     /** Envoie un accès H.265 au décodeur ; `true` = au moins une image rendue. */
@@ -253,10 +273,14 @@ class GlassesLiveDecoder(
         }
         val index = runCatching { decoder.dequeueInputBuffer(INPUT_TIMEOUT_US) }.getOrNull() ?: return false
         if (index < 0) return false
-        val input = runCatching { decoder.getInputBuffer(index) }.getOrNull() ?: return false
+        val input = runCatching { decoder.getInputBuffer(index) }.getOrNull()
+        if (input == null) return recycleInput(decoder, index)
         input.clear()
         val access = annexB(frame.bytes)
-        if (input.remaining() < access.size) return false
+        // Accès plus gros que le buffer : rendre l'index vide, sinon `dequeueInputBuffer`
+        // rend < 0 ensuite et le décodeur meurt de faim en silence (même règle que
+        // `GlassesVideoDecoder.queueInput`).
+        if (input.remaining() < access.size) return recycleInput(decoder, index)
         input.put(access)
         inputFed += 1
         if (inputFed == 1L) {
@@ -274,12 +298,26 @@ class GlassesLiveDecoder(
         return drain(decoder)
     }
 
-    /** Vide les sorties vers la surface ; annonce la taille réelle quand le codec la donne. */
+    /** Rend un buffer d'entrée inutilisé (vide) : sans ça l'index est perdu à jamais. */
+    private fun recycleInput(decoder: MediaCodec, index: Int): Boolean {
+        runCatching { decoder.queueInputBuffer(index, 0, 0, 0L, 0) }
+        return false
+    }
+
+    /**
+     * Vide les sorties vers la surface ; annonce la taille réelle quand le codec la donne.
+     *
+     * La sortie de l'accès courant n'existe qu'une fois ce décodage fini : sans attente, elle
+     * n'est libérée qu'à l'arrivée de l'accès suivant (une période image, ≈ 42 ms à 24 i/s).
+     * On attend donc [OUTPUT_WAIT_US] tant que rien n'est rendu, puis `0` : les sorties
+     * suivantes du même accès ne coûtent rien, et l'attente disparaît dès que la première
+     * image est sortie.
+     */
     private fun drain(decoder: MediaCodec): Boolean {
         val info = MediaCodec.BufferInfo()
         var rendered = false
         while (true) {
-            val index = decoder.dequeueOutputBuffer(info, 0)
+            val index = decoder.dequeueOutputBuffer(info, if (rendered) 0L else OUTPUT_WAIT_US)
             when {
                 index >= 0 -> {
                     decoder.releaseOutputBuffer(index, true)
@@ -307,7 +345,7 @@ class GlassesLiveDecoder(
     /** Décodeur H.265 paresseux : créé à la première frame, recréé si la taille change. */
     private fun ensureCodec(target: Surface, width: Int, height: Int): MediaCodec? {
         val current = codec
-        if (current != null && width == codecWidth && height == codecHeight) return current
+        if (!needsCodecRebuild(current != null, codecWidth, codecHeight, width, height)) return current
         dropCodecLocked()
         val effectiveCsd = csd ?: GlassesVideoLink.fallbackCsd
         if (effectiveCsd != null && !csdAnnounced) {
@@ -318,6 +356,7 @@ class GlassesLiveDecoder(
             MediaCodec.createDecoderByType(MediaFormat.MIMETYPE_VIDEO_HEVC).apply {
                 val format = MediaFormat.createVideoFormat(MediaFormat.MIMETYPE_VIDEO_HEVC, width, height)
                 effectiveCsd?.let { format.setByteBuffer("csd-0", ByteBuffer.wrap(it)) }
+                applyLowLatencyKeys(format)
                 configure(format, target, null, 0)
                 start()
             }
@@ -328,6 +367,21 @@ class GlassesLiveDecoder(
         Log.i(TAG, "direct lunettes : décodeur H.265 ${width}×${height}")
         onVideoSize(width, height)
         return created
+    }
+
+    /**
+     * Clés basse latence du décodeur : pas de mise en file interne, cadence annoncée à
+     * l'opérateur, priorité temps réel, aucun B-frame à réordonner.
+     *
+     * Chaque clé est posée dans son propre `runCatching` : une clé inconnue de
+     * l'implémentation lève `IllegalArgumentException`, et sous un seul `runCatching`
+     * elle ferait échouer la création entière du codec (écran noir, sans erreur).
+     */
+    private fun applyLowLatencyKeys(format: MediaFormat) {
+        runCatching { format.setInteger(MediaFormat.KEY_LOW_LATENCY, 1) }
+        runCatching { format.setInteger(MediaFormat.KEY_OPERATING_RATE, OPERATING_RATE) }
+        runCatching { format.setInteger(MediaFormat.KEY_PRIORITY, 0) }
+        runCatching { format.setInteger(MediaFormat.KEY_MAX_B_FRAMES, 0) }
     }
 
     private fun dropCodecLocked() {
@@ -366,7 +420,7 @@ class GlassesLiveDecoder(
     }
 
     /**
-     * Panne de rendu : journalisée (1re fois puis une sur 100, le flux bat jusqu'à 60 i/s),
+     * Panne de rendu : journalisée (1re fois puis une sur 100, le flux bat jusqu'à 24 i/s),
      * annoncée à l'utilisateur une seule fois.
      */
     private fun noteFailure(message: GlassesMessage) {
@@ -378,6 +432,10 @@ class GlassesLiveDecoder(
     private companion object {
         const val TAG = "GlassesVideo"
         const val INPUT_TIMEOUT_US = 5_000L
+        /** Attente de la première sortie d'un accès : une demi-période image à 24 i/s. */
+        const val OUTPUT_WAIT_US = 20_000L
+        /** Cadence annoncée au décodeur (clé `operating-rate`), en images par seconde. */
+        const val OPERATING_RATE = 24
         const val LOG_EVERY_RENDERS = 300L
         const val NAL_SURVEY_FRAMES = 50L
     }
