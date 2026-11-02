@@ -53,6 +53,7 @@ class IseeIntro(
         onSettings(cut)
         prefs.save(cut)
         player.stop()
+        VoiceBus.onSpeechIdle()
         update { it.copy(introVisible = true, speakingEntryId = null, status = "Intro voice off") }
     }
 }
