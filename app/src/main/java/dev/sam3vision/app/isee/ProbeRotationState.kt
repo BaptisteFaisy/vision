@@ -15,8 +15,8 @@ import java.util.concurrent.atomic.AtomicLong
  *
  * Levier de repli `ROTATION_OFF` : [enabled] à `false` — la sonde renvoie la
  * liste complète à chaque frame, sans accumulation. Actif par défaut :
- * l'accumulation est prouvée sûre par les tests (continuité, négatif frais,
- * expiry, voix inchangée sur scénario suivi).
+ * l'accumulation est prouvée sûre par les tests (continuité, négatif
+ * confirmé, expiry, voix inchangée sur scénario suivi).
  */
 internal class ProbeRotationState {
 
