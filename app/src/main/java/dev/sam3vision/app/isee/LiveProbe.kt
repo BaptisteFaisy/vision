@@ -457,7 +457,8 @@ _state.update { it.cleared() }
             // masques (~15 ms) ne doivent pas laisser le GPU inactif.
             drain()
             yield()
-            val frame = accumulated(result.getOrNull(), prompts, rotated)
+            val raw = result.getOrNull()
+            val frame = accumulated(raw, prompts, rotated)
             if (frame == null) {
                 // Échec : le compte d'objets n'est pas remis à zéro — les masques affichés
                 // restent les derniers connus, seul le message d'erreur change. Le lien
@@ -470,7 +471,10 @@ _state.update { it.cleared() }
             if (_state.value.frames == 0) {
                 android.util.Log.i("sam3vision", "première analyse : ${frame.objects.size} objets, ${frame.elapsedMs} ms")
             }
-            noteCrowd(frame.objects.count { PersonLabels.isBody(it.label) })
+            // Foule sur la réponse brute, pas la fusion : `person` est dans chaque
+            // groupe, la brute dit ce que le serveur vient de voir — un corps
+            // gardé en doute ne doit pas rallumer la cadence foule.
+            noteCrowd(raw?.objects.orEmpty().count { PersonLabels.isBody(it.label) })
             publish(active, frame, jpegB64, at, shown)
         }
     }
