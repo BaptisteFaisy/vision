@@ -429,6 +429,7 @@ recalibrés au mètre, créneau fantôme conservé) + renommages 80cm → 1m
 
 ## 43. Compte des marches prioritaire : toutes les 1 s, esquive au milieu (ordre user du 02/11)
 
+
 Le user, dans l'escalier avec iSee : quand un escalier est reconnu, le
 compte (« N marches. ») se dit toutes les 1 s, prioritaire sur tout ce
 que la voix doit dire — et au milieu de chaque seconde, l'esquive dit
@@ -483,3 +484,40 @@ Recette téléphone : escalier + gens qui passent — « N marches. »
 toutes les 1 s, « Gauche. »/« Droite. » entre deux — **non
 mesuré**, exige un APK sur appareil réel (preuves par `logcat`,
 jamais à l'oreille côté agent).
+
+## 43. GPS : rappel 15 s, jamais de coupe, phrases < 1 s (ordre user du 02/11)
+
+Le GPS dit l'info du guidage toutes les 15 s (rappel, comme avant), ne
+coupe jamais rien, et n'est coupé par rien une fois lancé (sauf la
+parole du user) ; chaque phrase tient la tranche ×3 (< 1 s jouée) —
+sauf les noms (destination, rues), gardés entiers (exception admise).
+
+- **rappel 15 s** : `GPS_REMINDER_MS` + `PeriodicGuidance` (mot seul de
+  près, cadence recalée par toute annonce moteur) — verrouillé par
+  `VoiceNavGpsVoiceTest`, inchangé ;
+- **jamais de coupe** : côté bus, les crans 11/3 perdent contre tout cran
+  plus petit (le GPS attend au lieu de couper) et le garde §41 le rend
+  incoupable une fois lancé ; côté repli système, les urgences partent
+  en file comme le doux (`VoiceNavSpeaker`, voix grave gardée) et le
+  user passe toujours devant, urgences comprises (miroir du bus) ;
+  `SpeechArbitration.interrupts` (mort en prod) est supprimé ;
+- **phrases < 1 s** : toutes les phrases GPS bornées tiennent 24 car /
+  4 mots (pire ancre mesurée ≈ 110 ms/car → ≲ 2,7 s d'audio → ≤ 0,9 s
+  à ×3) — rues et distances jamais parlées (écran seul) ; « Left. » /
+  « Right. » épinglés en clips offline ; destinations (« Vers X. »,
+  « Going to X », « Go to X? … ») gardées entières (exception user) ;
+- **gardes gardées** : le danger obstacle (`onHazard`, file TTS
+  système) reste le seul coupeur du repli (zéro appelant prod) ;
+- **escaliers (§ 42)** : respect mutuel — un mot GPS en cours va au
+  bout, une manœuvre sous un compte est reportée au silence (un cycle
+  au plus), jamais perdue.
+
+Verrouillé par `GpsUncuttableTest` (+1 : manœuvre et rappel attendent,
+le GPS ne coupe jamais), `GpsPhraseBudgetTest` (nouveau : budget,
+clips, rues/distances absentes, noms entiers), `VoiceNavSpeakerTest`
+(danger en file grave sans flush, user tait tout) et
+`SpeechArbitrationTest` (mapping seul, coupe supprimée).
+
+Recette téléphone : guidage avec rappel — un mot toutes les 15 s de
+près, jamais par-dessus une autre voix, jamais coupé — **non mesuré**,
+exige un APK sur appareil réel (preuves par `logcat`).

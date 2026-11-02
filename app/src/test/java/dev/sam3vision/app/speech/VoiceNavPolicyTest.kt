@@ -206,7 +206,7 @@ class VoiceNavPolicyTest {
     }
 
     @Test
-    fun `urgents coupent, virages patientent`() {
+    fun `urgents prioritaires au silence, virages patientent`() {
         assertTrue(VoiceNavPolicy.isUrgent(VoiceNavEvent.OffRoute))
         assertTrue(VoiceNavPolicy.isUrgent(VoiceNavEvent.Rerouted))
         assertTrue(VoiceNavPolicy.isUrgent(VoiceNavEvent.Stopped))

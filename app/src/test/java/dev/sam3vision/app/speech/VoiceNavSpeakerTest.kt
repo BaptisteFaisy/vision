@@ -168,25 +168,16 @@ class VoiceNavSpeakerTest {
     }
 
     @Test
-    fun `user parle - les urgences coupent et passent quand meme`() {
+    fun `user parle - tout le GPS se tait, urgences comprises`() {
         val driver = FakeSpeakerDriver()
         val voice = speaker(driver)
         userSpeaking = true
-        voice.onTurn(SteeringCap.Left, 100f)
 
-        // Hors-trace : urgence, la voix IA a le droit de couvrir le user.
-        // (La consigne gardée sous le user n'a jamais atteint le moteur.)
-        assertEquals("Hors route.", voice.onOffRoute())
-        assertEquals(1, driver.calls.size)
-        assertTrue(driver.calls[0].flush)
-
-        // Recalcul : urgence aussi.
-        assertEquals("Nouvelle route.", voice.onRerouted())
-        assertEquals(2, driver.calls.size)
-
-        // Arrivée : urgence.
-        assertEquals("Arrivé à la gare de Lyon.", voice.onArrival("la gare de Lyon"))
-        assertEquals(3, driver.calls.size)
+        assertNull(voice.onTurn(SteeringCap.Left, 20f))
+        assertNull(voice.onOffRoute())
+        assertNull(voice.onRerouted())
+        assertNull(voice.onArrival("la gare de Lyon"))
+        assertTrue(driver.calls.isEmpty())
     }
 
     @Test
@@ -336,21 +327,24 @@ class VoiceNavSpeakerTest {
     }
 
     @Test
-    fun `danger vide la file et coupe`() {
+    fun `danger file devant, grave au silence, jamais de coupe`() {
         val driver = FakeSpeakerDriver().apply { speakingValue = true }
         val voice = speaker(driver)
         voice.onTurn(SteeringCap.Left, 20f)
 
-        val phrase = voice.onOffRoute()
+        // En parole : le danger prend le créneau (le plus frais), sans parler.
+        assertNull(voice.onOffRoute())
+        assertTrue(driver.calls.isEmpty())
 
-        assertEquals("Hors route.", phrase)
-        assertEquals(1, driver.calls.size)
-        assertTrue(driver.calls.single().flush)
-
+        // Au silence : le danger d'abord (voix grave, sans flush), puis l'événement courant.
         driver.speakingValue = false
         voice.onTurn(SteeringCap.Right, 20f)
 
-        assertEquals(1, driver.calls.size)
+        assertEquals(2, driver.calls.size)
+        assertEquals("Hors route.", driver.calls[0].text)
+        assertEquals(SystemTtsEngine.SAFETY_PITCH, driver.calls[0].pitch, 0f)
+        assertEquals(false, driver.calls[0].flush)
+        assertEquals("Right.", driver.calls[1].text)
     }
 
     @Test
