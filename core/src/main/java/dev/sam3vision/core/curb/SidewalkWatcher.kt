@@ -51,8 +51,8 @@ object SidewalkText {
 }
 
 /**
- * Lissage temporel de la position trottoir (SPEC v4 : comportement inchangé,
- * niveau 10) : il faut [confirmFrames]
+ * Lissage temporel de la position trottoir (SPEC v4, niveau 10 absolu,
+ * § 45 : coupe tout, va au bout) : il faut [confirmFrames]
  * positifs consécutifs pour parler, et on ne parle qu'au changement —
  * stable = silence (le guidage confirme déjà qu'il veille). L'absent (ou le
  * `null`, guidage coupé) remet le compte à zéro sans parler et sans effacer
@@ -122,7 +122,7 @@ class SidewalkWatcher(
         /** Positifs consécutifs avant d'annoncer (un isolé = bruit). */
         const val DEFAULT_CONFIRM_FRAMES = 2
 
-        /** Niveau VoiceBus v4 : trottoirs (comportement inchangé). */
+        /** Niveau VoiceBus v4 : trottoirs (absolus, § 45). */
         const val LEVEL = 10
 
         /** Clé AntiRepeat v4 : trottoirs (10 s). */

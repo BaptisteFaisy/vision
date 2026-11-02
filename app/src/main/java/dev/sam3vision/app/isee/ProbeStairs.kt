@@ -31,6 +31,14 @@ import kotlinx.coroutines.launch
  * L'esquive en cours ([stairsYieldToAvoidance]) tait l'annonce : les humains
  * priment, même sur les escaliers.
  */
+/**
+ * Annonce escaliers tue sur cette frame : Traversée, dedans, esquive en
+ * cours ou trottoir absolu (§ 45) — l'annonce attend sans manger son tour.
+ */
+internal fun LiveProbe.stairsAnnounceMuted(st: LiveProbeState, placeMode: () -> PictoPlaceMode): Boolean =
+    st.crossingActive || placeMode() != PictoPlaceMode.DEHORS ||
+        stairsYieldToAvoidance() || VoiceBus.sidewalkSpeaking()
+
 internal fun LiveProbe.observeStairs(
     scope: CoroutineScope,
     language: () -> SpeechLanguage,
@@ -41,8 +49,7 @@ internal fun LiveProbe.observeStairs(
     val watcher = StairWatcher(confirmFrames = 2)
     scope.launch {
         state.collect { st ->
-            if (st.crossingActive || placeMode() != PictoPlaceMode.DEHORS) return@collect
-            if (this@observeStairs.stairsYieldToAvoidance()) return@collect
+            if (stairsAnnounceMuted(st, placeMode)) return@collect
             // Lectures d'abord (sens + heure par la boîte), libellés bruts en
             // repli : un escalier nommé sans mesure reste un escalier.
             val readings = st.distanceLayer?.readings.orEmpty()
@@ -146,6 +153,9 @@ internal fun LiveProbe.observeStairsCount(
             if (st.crossingActive) continue
             if (placeMode() != PictoPlaceMode.DEHORS) continue
             if (!stairsFoundOf(st).detected) continue
+            // Trottoir absolu (§ 45) : le compteur attend sa fin — devant
+            // `onTick`, pour que la fenêtre de répétition ne tourne pas.
+            if (VoiceBus.sidewalkSpeaking()) continue
             val said = counter.onTick(
                 true, StairCannyCount.lineCount(), nowMs(), language(),
             ) ?: continue

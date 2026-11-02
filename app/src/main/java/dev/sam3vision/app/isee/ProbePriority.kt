@@ -56,7 +56,7 @@ object OutdoorLevel {
     /** Réponses du chat (reprise depuis la coupure, seule file restante). */
     const val CHAT = 9
 
-    /** Trottoirs (comportement actuel). */
+    /** Trottoirs (absolus, § 45 : coupent tout, vont au bout). */
     const val SIDEWALK = 10
 
     /** Manœuvres et événements GPS. */
@@ -127,13 +127,17 @@ internal fun curbWish(cue: CurbCue?, crossingActive: Boolean = false): VoiceWish
 /**
  * Propose un vœu au bus : tu par l'antirépétition ([AntiRepeat]) ou écrasé
  * par le bus ([VoiceBus]) = `false` (jeté, jamais redit) ; sinon posté.
- * Sous un compte (§ 42), seuls les vœux escaliers passent — les autres
- * attendent sans consommer leur tour (le bus les jetterait de toute
- * façon, tour mangé).
+ * Sous un compte (§ 42), escaliers et trottoir passent (le trottoir coupe
+ * le compte, § 45) ; sous un trottoir (§ 45), seuls les trottoirs passent —
+ * les autres attendent sans consommer leur tour.
  */
 internal fun offer(wish: VoiceWish?, nowMs: Long = System.currentTimeMillis()): Boolean {
     if (wish == null || wish.text.isBlank()) return false
-    if (VoiceBus.stairsSpeaking() && wish.level != OutdoorLevel.STAIRS) {
+    if (VoiceBus.sidewalkSpeaking() && wish.level != OutdoorLevel.SIDEWALK) {
+        if (BuildConfig.DEBUG) android.util.Log.d(TAG_MUTE, "offre tenue-trottoir level=${wish.level} texte=[${wish.text}]")
+        return false
+    }
+    if (VoiceBus.stairsSpeaking() && wish.level != OutdoorLevel.STAIRS && wish.level != OutdoorLevel.SIDEWALK) {
         if (BuildConfig.DEBUG) android.util.Log.d(TAG_MUTE, "offre tenue-escaliers level=${wish.level} texte=[${wish.text}]")
         return false
     }

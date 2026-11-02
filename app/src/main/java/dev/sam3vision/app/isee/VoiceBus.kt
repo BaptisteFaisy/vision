@@ -70,6 +70,12 @@ interface VoiceBusSpeaker {
  * d'escaliers n'est jamais coupée par une autre phrase d'escaliers — elle
  * attend en place unique (dernier gagnant, TTL [STAIRS_PENDING_TTL_MS])
  * et joue à la fin de la courante ([onSpeechIdle]).
+ *
+ * Exception (ordre user du 02/11/2026, VOIX-DANGER § 45) : le trottoir
+ * (niveau 10) est absolu — il coupe toute parole en cours (escaliers et
+ * mots de guidage compris) et va au bout, personne ne le coupe. Seule
+ * la parole du user (niveau 1, micro tenu) passe devant : le trottoir
+ * l'attend ; le GPS reporté attend sa fin comme celle d'un compte.
  */
 object VoiceBus {
     /** Aucune parole en cours : tout niveau parle. */
@@ -178,18 +184,20 @@ object VoiceBus {
             return false
         }
         val nowMs = clock()
-        if (stairsBusStuck(activeLevel, nowMs, lastSayMs)) activeLevel = IDLE_LEVEL
+        if (stairsBusStuck(activeLevel, nowMs, lastSayMs) || sidewalkBusStuck(activeLevel, nowMs, lastSayMs)) activeLevel = IDLE_LEVEL
         if (guidanceSpeaking() && level != OutdoorLevel.USER_SPEECH && level != OutdoorLevel.CURB &&
-            level != OutdoorLevel.STAIRS) {
+            level != OutdoorLevel.STAIRS && level != OutdoorLevel.SIDEWALK) {
             android.util.Log.w(TAG_MUTE, "bus-jet motif=mot-guidage-en-cours level=$level texte=[$text]")
             refundTurn(antiRepeatKey)
             return false
         }
+        if (level == OutdoorLevel.SIDEWALK) return postSidewalk(target, text, clipId, clips, antiRepeatKey, nowMs)
         if (level == OutdoorLevel.STAIRS) {
             return postStairs(target, text, clipId, clips, antiRepeatKey, nowMs)
         }
-        if (activeLevel == OutdoorLevel.STAIRS) {
-            android.util.Log.w(TAG_MUTE, "bus-jet motif=escaliers-en-cours level=$level texte=[$text]")
+        if (activeLevel == OutdoorLevel.STAIRS || activeLevel == OutdoorLevel.SIDEWALK) {
+            val motif = if (activeLevel == OutdoorLevel.STAIRS) "escaliers" else "trottoir"
+            android.util.Log.w(TAG_MUTE, "bus-jet motif=$motif-en-cours level=$level texte=[$text]")
             refundTurn(antiRepeatKey)
             return false
         }
@@ -263,6 +271,17 @@ object VoiceBus {
     }
 
     /**
+     * Trottoir absolu (§ 45) : coupe tout et parle (micro user filtré par
+     * [post]). Pas de place retenue : antirépétition 10 s + clips courts.
+     */
+    private fun postSidewalk(target: VoiceBusSpeaker, text: String, clipId: String?, clips: List<String>, antiRepeatKey: String?, nowMs: Long): Boolean {
+        activeLevel = OutdoorLevel.SIDEWALK
+        lastSayMs = nowMs
+        holdToken++
+        return sayOrGhost(target, OutdoorLevel.SIDEWALK, text, clipId, clips, antiRepeatKey)
+    }
+
+    /**
      * Dit [text] via [target] : si [VoiceBusSpeaker.say] lève (porte-parole
      * fautif — le bus est timbré AVANT l'appel, prouvé par le corps), la
      * parole est fantôme (bus tenu, rien ne parle) : le bus est rendu
@@ -322,6 +341,10 @@ object VoiceBus {
      */
     @Synchronized
     fun stairsSpeaking(): Boolean = activeLevel == OutdoorLevel.STAIRS
+
+    /** Vrai quand un trottoir parle (niveau 10 absolu, § 45) : producteurs et GPS attendent sa fin. */
+    @Synchronized
+    fun sidewalkSpeaking(): Boolean = activeLevel == OutdoorLevel.SIDEWALK
 
     /**
      * Vrai quand un mot de guidage parle (manœuvre 11, rappel 3 — ≤0,5 s) :
@@ -471,26 +494,3 @@ object VoiceBus {
         clock = { System.currentTimeMillis() }
     }
 }
-
-/**
- * Bus bloqué sur des escaliers : niveau 6 en cours depuis plus de
- * [STAIRS_BUS_TTL_MS] sans parole acceptée (lecteur pendu, synthèse
- * jamais revenue — sinon chaque compte rafraîchit l'horodatage).
- * Sans cette garde, un niveau 6 orphelin tairait toute la voix,
- * les forts comme les doux. Pur, testé en JVM.
- */
-internal fun stairsBusStuck(activeLevel: Int, nowMs: Long, lastSayMs: Long): Boolean =
-    activeLevel == OutdoorLevel.STAIRS && nowMs - lastSayMs > STAIRS_BUS_TTL_MS
-
-/** Silence maximal sous un niveau 6 (4 s : 4 comptes manqués, jamais en direct normal). */
-internal const val STAIRS_BUS_TTL_MS = 4_000L
-
-/** Fin des marches : 2 s sans compte accepté (2 cycles manqués, le compte bat à 1 s). */
-internal const val STAIRS_QUIET_MS = 2_000L
-
-/**
- * Fraîcheur d'une phrase escaliers retenue : 1,5 s. Au-delà, le compte a été
- * dit pour l'image d'avant (la phrase en cours a duré plus longtemps qu'un
- * cycle) — le redire serait périmé ; le tick suivant reposte le compte courant.
- */
-internal const val STAIRS_PENDING_TTL_MS = 1_500L
