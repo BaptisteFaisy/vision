@@ -331,9 +331,10 @@ in `docs/CALIBRAGE-FEU.md`, so nobody walks that road twice.
 ## Glasses live on the phone screen: ~24.5 fps rendered (measured 01/11/2026)
 
 The iSee home shows the Ray-Ban Meta stream (DAT SDK 1.0.0, `HIGH` 720×1280
-H.265) on the phone. Requested 60 fps, accepted with no fallback
-(`GLASSES_FRAME_RATE_LADDER` 60 → 30 → 24 → 15); the link delivers **~30 fps**
-steady and the phone renders a **~24.5 fps** plateau (CPU-bound: the app burns
+H.265) on the phone. Requests **24 fps** (`GLASSES_FRAME_RATE_LADDER` 24 → 15);
+the 60 fps request of the 01/11/2026 run was clamped to 30 by the SDK, in
+silence (`docs/META-GLASSES.md` §5), and the link then delivered **~30 fps**
+steady while the phone rendered a **~24.5 fps** plateau (CPU-bound: the app burns
 ~300 % CPU with the phone SAM probe running alongside). End-to-end link→pixel
 over 60 s (n=1123): p50/p95/p99 **57/111/158 ms** (radio jitter p95 77 ms
 dominates), so the B2 < 100 ms p95 target is not held. Protocol and PASS/FAIL

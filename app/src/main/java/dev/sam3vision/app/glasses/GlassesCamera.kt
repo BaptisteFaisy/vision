@@ -71,9 +71,9 @@ internal class GlassesCamera(
      * de la dictée — puis 48 kHz mono, puis caméra seule. Un codec refusé par le flux ne doit
      * ni priver l'app de la caméra, ni lui faire croire que le micro fonctionne.
      *
-     * Et en descendant l'échelle de cadence ([GLASSES_FRAME_RATE_LADDER]) : 60 i/s
-     * refusés ne privent pas l'app de caméra — le repli tenu (30, 24, puis 15)
-     * est annoncé, jamais muet.
+     * Et en descendant l'échelle de cadence ([GLASSES_FRAME_RATE_LADDER]) : 24 i/s
+     * refusés ne privent pas l'app de caméra — le repli tenu (15) est annoncé,
+     * jamais muet.
      */
     fun start(): Boolean {
         if (camera != null) return true
@@ -133,8 +133,8 @@ internal class GlassesCamera(
     private fun adopt(attached: Camera, choice: AudioChoice, frameRate: Int) {
         camera = attached
         stream = attached.stream
-        // Cadence tenue, annoncée si dégradée : 60 refusés puis 30 tenus ne doivent
-        // pas passer pour 60 — la mesure (`fpsSuffix`, `GlassesLink`) tranche ensuite.
+        // Cadence tenue, annoncée si dégradée : 24 refusés puis 15 tenus ne doivent
+        // pas passer pour 24 — la mesure (`fpsSuffix`, `GlassesLink`) tranche ensuite.
         Log.i(TAG, "caméra attachée : $frameRate i/s acceptés")
         if (frameRate < GLASSES_FRAME_RATE) onNote(GlassesMessages.frameRateFallback(GLASSES_FRAME_RATE, frameRate))
         // L'enregistreur sait, avant la première image, s'il doit attendre une piste son.
