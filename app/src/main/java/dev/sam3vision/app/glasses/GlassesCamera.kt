@@ -194,7 +194,8 @@ internal class GlassesCamera(
         val bytes = runCatching { frame.buffer.readRemainingBytes() }.getOrNull() ?: return
         pushed += 1
         if (pushed == 1L) firstPushMs = SystemClock.elapsedRealtime()
-        if (pushed == 1L || pushed % 150 == 0L) {
+        // B1 à 1/24 (échantillon de drift pts↔horloge, ~2 lignes/s à 15 i/s).
+        if (pushed == 1L || pushed % 24 == 0L) {
             val elapsed = SystemClock.elapsedRealtime() - firstPushMs
             Log.i(TAG, "flux lunettes : $pushed frames (${frame.width}×${frame.height}, ${bytes.size} o," +
                 " ptsUs=${frame.presentationTimeUs}, rxMs=${arrivedAtNs / 1_000_000L})" + fpsSuffix(pushed, elapsed))
