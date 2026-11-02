@@ -484,7 +484,7 @@ internal fun observeCrossingVoice(
         if (placeMode() == PictoPlaceMode.DEHORS &&
             AntiRepeat.allow(AntiRepeat.KEY_CROSSWALK_ANNOUNCE, System.currentTimeMillis())
         ) {
-            VoiceBus.post(crossingLateralLevel(crossingActive()), text, antiRepeatKey = AntiRepeat.KEY_CROSSWALK_ANNOUNCE)
+            VoiceBus.post(crossingLateralLevel(crossingActive()), text, clips = crossingApproachClips(text), antiRepeatKey = AntiRepeat.KEY_CROSSWALK_ANNOUNCE)
         }
     },
     sayArrival = { text ->
