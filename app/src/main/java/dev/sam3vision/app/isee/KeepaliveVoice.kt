@@ -3,6 +3,7 @@ package dev.sam3vision.app.isee
 import dev.sam3vision.core.live.GuidanceWord
 import dev.sam3vision.core.picto.PictoPlaceMode
 import dev.sam3vision.core.speech.SpeechLanguage
+import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.delay
@@ -43,6 +44,16 @@ internal object KeepaliveVoice {
      */
     const val SILENCE_MS = 3_500L
 
+    /**
+     * Voie journal du keepalive (02/11) : le PUSH (boucle 700 ms) et le PULL
+     * ([FallbackVoice], ré-émission sonde) partageaient
+     * `voie=repli` — indiscernables au logcat (`EXPECT voie=repli`
+     * + `bus-parole level=12` identiques des deux côtés). Le PULL garde
+     * `repli`, le PUSH signe ici : l'attribution d'une parole niveau 12
+     * acceptée se lit au journal, sans deviner.
+     */
+    const val VOIE = "repli-keepalive"
+
     /** Dernier état de guidage connu (virage ou tout-droit, jamais stop). */
     private var lastWord: GuidanceWord = GuidanceWord.Straight
 
@@ -52,6 +63,14 @@ internal object KeepaliveVoice {
      * l'époque).
      */
     private var lastKeepaliveMs: Long = 0L
+
+    /**
+     * Jet déjà signalé dans l'épisode de silence courant : une offre due mais
+     * jetée par le bus (escaliers en cours, parole plus forte, micro tenu)
+     * journalise un seul FAIL par épisode — sobre (pas un FAIL par tick
+     * 700 ms), soldé dès que le bus reparle ou que le keepalive passe.
+     */
+    private var refusedEpisode: Boolean = false
 
     /**
      * Mémorise le mot de guidage courant : virage ou tout-droit — le stop
@@ -66,8 +85,14 @@ internal object KeepaliveVoice {
     /**
      * Propose le mot courant : posté niveau 12 si le bus est silencieux depuis
      * [SILENCE_MS] et que le précédent keepalive est plus vieux. Rend true si
-     * posté ET accepté — jeté entre-temps (bavardage revenu, micro tenu) =
-     * false sans timbrer, retenté au tick suivant. Testé en JVM.
+     * posté ET accepté — jeté entre-temps (bavardage revenu, micro tenu,
+     * escaliers en cours) = false sans timbrer, retenté au tick suivant
+     * (céder sous les escaliers est sain : le compte va au bout, personne ne
+     * le coupe — le keepalive parle dès le bus rendu, jamais par-dessus).
+     * Testé en JVM.
+     *
+     * Ne lève jamais : un porte-parole en faute (lecteur mort sur appareil)
+     * rend false + FAIL au lieu de tuer la boucle appelante.
      *
      * Verdict affamé : le keepalive comble le silence (positionnement seul,
      * jamais « Cross. ») ; verdict sain toutes les 2 s ⇒ le silence 3,5 s
@@ -75,20 +100,37 @@ internal object KeepaliveVoice {
      */
     @Synchronized
     fun offer(language: SpeechLanguage, nowMs: Long = System.currentTimeMillis()): Boolean {
-        if (VoiceBus.silenceMs(nowMs) < SILENCE_MS) return false
+        if (VoiceBus.silenceMs(nowMs) < SILENCE_MS) {
+            refusedEpisode = false
+            return false
+        }
         if (nowMs - lastKeepaliveMs < SILENCE_MS) return false
         val text = lastWord.text(language)
-        if (!VoiceBus.post(OutdoorLevel.FALLBACK, text, lastWord.clipId)) return false
-        SpeechLog.expect("repli", text)
+        val accepted = try {
+            VoiceBus.post(OutdoorLevel.FALLBACK, text, lastWord.clipId)
+        } catch (e: Exception) {
+            SpeechLog.fail("keepalive", "exception ${e.message}")
+            return false
+        }
+        if (!accepted) {
+            if (!refusedEpisode) {
+                refusedEpisode = true
+                SpeechLog.fail("keepalive", "offre due jetée")
+            }
+            return false
+        }
+        SpeechLog.expect(VOIE, text)
         lastKeepaliveMs = nowMs
+        refusedEpisode = false
         return true
     }
 
-    /** Nouvelle séance (et tests : l'objet est global) : mot et timbre oubliés. */
+    /** Nouvelle séance (et tests : l'objet est global) : mot, timbre et épisode oubliés. */
     @Synchronized
     fun reset() {
         lastWord = GuidanceWord.Straight
         lastKeepaliveMs = 0L
+        refusedEpisode = false
     }
 }
 
@@ -99,6 +141,17 @@ internal object KeepaliveVoice {
  * mots dehors) et pendant la parole du user (micro tenu, transcription).
  * Testée en JVM au temps virtuel (scope séparé, boucle infinie annulée en fin
  * de test, comme le battement 700 ms).
+ *
+ * La boucle survit à une offre en faute (une exception = un FAIL + tick
+ * suivant, jamais une mort silencieuse — seule l'annulation l'arrête).
+ *
+ * Dedans : silence assumé, pas un trou à combler ici — les mots de
+ * positionnement sont des mots dehors (virage/tout-droit du guidage rue),
+ * périmés et trompeurs dedans ; la chaîne dedans (SPEC §3 : find, user,
+ * humain, chat, porte et murs) est exclusive et n'a pas de vocabulaire de
+ * positionnement continu — un keepalive dedans exigerait ce vocabulaire
+ * (hors zone). Un test mené dedans tait donc le keepalive par contrat :
+ * vérifier le lieu avant de conclure à une régression.
  */
 internal fun keepaliveJob(
     scope: CoroutineScope,
@@ -111,10 +164,16 @@ internal fun keepaliveJob(
 ): Job = scope.launch {
     while (true) {
         delay(tickMs)
-        val st = ui.value
-        if (!st.cameraActive) continue
-        if (placeMode() != PictoPlaceMode.DEHORS) continue
-        if (st.holding || st.transcribing) continue
-        offer(language(), nowMs())
+        try {
+            val st = ui.value
+            if (!st.cameraActive) continue
+            if (placeMode() != PictoPlaceMode.DEHORS) continue
+            if (st.holding || st.transcribing) continue
+            offer(language(), nowMs())
+        } catch (cancelled: CancellationException) {
+            throw cancelled
+        } catch (e: Exception) {
+            SpeechLog.fail("keepalive", "tick ${e.message}")
+        }
     }
 }

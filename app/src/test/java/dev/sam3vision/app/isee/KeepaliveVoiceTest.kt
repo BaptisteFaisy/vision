@@ -19,6 +19,17 @@ import org.junit.Assert.assertTrue
 import org.junit.Before
 import org.junit.Test
 
+/** Porte-parole en faute (lecteur mort sur appareil : l'offre ne lève jamais). */
+private class KeepaliveExplodingSpeaker : VoiceBusSpeaker {
+    override fun idle(): Boolean = true
+
+    override fun say(level: Int, text: String, clipId: String?, clips: List<String>) {
+        throw RuntimeException("boom")
+    }
+
+    override fun cut() = Unit
+}
+
 /** Porte-parole faux : niveau, texte et clip enregistrés. */
 private class KeepaliveFakeSpeaker : VoiceBusSpeaker {
     val said = mutableListOf<Triple<Int, String, String?>>()
@@ -81,7 +92,12 @@ class KeepaliveVoiceTest {
             listOf(Triple(OutdoorLevel.FALLBACK, "Straight.", "guide_straight")),
             speaker.said,
         )
-        assertEquals(listOf(SpeechLog.TAG to "EXPECT voie=repli phrase=[Straight.]"), journal)
+        assertEquals(listOf(SpeechLog.TAG to "EXPECT voie=repli-keepalive phrase=[Straight.]"), journal)
+    }
+
+    @Test
+    fun `voie PUSH distincte du PULL, epinglee`() {
+        assertEquals("repli-keepalive", KeepaliveVoice.VOIE)
     }
 
     @Test
@@ -128,6 +144,48 @@ class KeepaliveVoiceTest {
         VoiceBus.userSpeaking(false)
         assertTrue(KeepaliveVoice.offer(SpeechLanguage.En))
         assertEquals(1, speaker.said.size)
+    }
+
+    @Test
+    fun `due-mais-jeté = un seul FAIL par épisode de silence`() {
+        VoiceBus.userSpeaking(true)
+        assertFalse(KeepaliveVoice.offer(SpeechLanguage.En))
+        assertFalse(KeepaliveVoice.offer(SpeechLanguage.En))
+        assertEquals(listOf(SpeechLog.TAG to "FAIL ou=keepalive cause=[offre due jetée]"), journal)
+        // Le bus reparle : épisode soldé — le jet suivant re-signale.
+        VoiceBus.userSpeaking(false)
+        VoiceBus.post(OutdoorLevel.HUMAN, "Personne à 3 mètres.")
+        assertFalse(KeepaliveVoice.offer(SpeechLanguage.En))
+        VoiceBus.userSpeaking(true)
+        assertFalse(KeepaliveVoice.offer(SpeechLanguage.En, System.currentTimeMillis() + 10_000L))
+        assertEquals(2, journal.size)
+    }
+
+    @Test
+    fun `escaliers en cours = jeté sans timbrer, reparle dès le bus rendu`() {
+        VoiceBus.post(OutdoorLevel.STAIRS, "1 step.")
+        assertFalse(KeepaliveVoice.offer(SpeechLanguage.En, System.currentTimeMillis() + 10_000L))
+        assertEquals(1, speaker.said.size)
+        VoiceBus.onSpeechIdle()
+        assertTrue(KeepaliveVoice.offer(SpeechLanguage.En, System.currentTimeMillis() + 10_000L))
+        assertEquals(2, speaker.said.size)
+    }
+
+    @Test
+    fun `say qui lève = offer false + FAIL, instance réutilisable`() {
+        VoiceBus.speaker = KeepaliveExplodingSpeaker()
+        assertFalse(KeepaliveVoice.offer(SpeechLanguage.En))
+        // Fantôme rendu par sayOrGhost (bus + tour anti-répétition), l'offre suivante repasse.
+        VoiceBus.reset()
+        VoiceBus.speaker = speaker
+        assertTrue(KeepaliveVoice.offer(SpeechLanguage.En))
+        assertEquals(
+            listOf(
+                SpeechLog.TAG to "FAIL ou=keepalive cause=[offre due jetée]",
+                SpeechLog.TAG to "EXPECT voie=repli-keepalive phrase=[Straight.]",
+            ),
+            journal,
+        )
     }
 
     @Test
@@ -178,6 +236,22 @@ class KeepaliveVoiceTest {
         }
     }
 
+    @Test
+    fun `boucle survit à une offre qui lève, FAIL puis reprise`() = runTest {
+        val h = demarreBoucle()
+        try {
+            h.explode = true
+            tick()
+            assertTrue(h.calls.isEmpty())
+            assertEquals(listOf(SpeechLog.TAG to "FAIL ou=keepalive cause=[tick boom]"), journal)
+            h.explode = false
+            tick()
+            assertEquals(1, h.calls.size)
+        } finally {
+            h.scope.cancel()
+        }
+    }
+
     /** Boucle câblée sur un faux état écran : offres horodatées en [BoucleHarnais.calls]. */
     private fun TestScope.demarreBoucle(): BoucleHarnais {
         val scope = CoroutineScope(SupervisorJob() + StandardTestDispatcher(testScheduler))
@@ -188,7 +262,7 @@ class KeepaliveVoiceTest {
             { SpeechLanguage.En },
             { h.lieu },
             nowMs = { testScheduler.currentTime },
-            offer = { _, at -> h.calls += at; true },
+            offer = { _, at -> if (h.explode) throw RuntimeException("boom") else run { h.calls += at; true } },
         )
         return h
     }
@@ -200,10 +274,11 @@ class KeepaliveVoiceTest {
     }
 }
 
-/** Harnais de la boucle : portée, état écran pilotable, offres reçues. */
+/** Harnais de la boucle : portée, état écran pilotable, offres reçues ([explode] = l'offre lève). */
 private class BoucleHarnais(
     val scope: CoroutineScope,
     val ui: MutableStateFlow<IseeUiState>,
     val calls: MutableList<Long> = mutableListOf(),
     var lieu: PictoPlaceMode = PictoPlaceMode.DEHORS,
+    var explode: Boolean = false,
 )
