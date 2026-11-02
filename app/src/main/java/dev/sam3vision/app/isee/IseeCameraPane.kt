@@ -197,7 +197,7 @@ internal class IseeCameraHost(private val context: Context) : CameraBindHost {
      * sortirait dans la `LaunchedEffect` de la carte et tuerait le process.
      */
     suspend fun bind(owner: LifecycleOwner): String? =
-        boundPreview?.let { binder.bind(owner, it) } ?: "Preview not attached yet"
+        boundPreview?.let { binder.bind(owner, it) } ?: run { android.util.Log.e("sam3vision", "isee: bind with no preview yet (host=${hashCode()})"); "Preview not attached yet" }
 
     /** Drapeau HAL dépouillé des Réglages, `false` si illisible (jamais d'exception). */
     private suspend fun readHalFlag(): Boolean = runCatching {
