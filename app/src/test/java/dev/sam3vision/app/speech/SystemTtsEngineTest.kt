@@ -183,4 +183,54 @@ class SystemTtsEngineTest {
         assertEquals(2f, SystemTtsEngine.clampPitch(9.9f), 0f)
         assertEquals(0.75f, SystemTtsEngine.clampPitch(SystemTtsEngine.SAFETY_PITCH), 0f)
     }
+
+    @Test
+    fun `ferme - speak refuse avec closed`() {
+        val events = mutableListOf<String>()
+        val engine = SystemTtsEngine(FakeDriver(), onEvent = { events += it })
+        engine.close()
+
+        assertFalse(engine.speak("À gauche.", urgent = false, Locale.FRENCH, 1f))
+
+        assertEquals(listOf("closed"), events)
+    }
+
+    @Test
+    fun `blanc - refuse avec blank sans toucher le pilote`() {
+        val driver = FakeDriver()
+        val events = mutableListOf<String>()
+        val engine = SystemTtsEngine(driver, onEvent = { events += it })
+
+        assertFalse(engine.speak("   ", urgent = false, Locale.FRENCH, 1f))
+
+        assertEquals(listOf("blank"), events)
+        assertTrue(driver.calls.isEmpty())
+    }
+
+    @Test
+    fun `pilote en echec ou qui jette - driver-false`() {
+        val refused = mutableListOf<String>()
+        assertFalse(
+            SystemTtsEngine(FakeDriver(fail = true), onEvent = { refused += it })
+                .speak("À gauche.", urgent = false, Locale.FRENCH, 1f),
+        )
+        val thrown = mutableListOf<String>()
+        assertFalse(
+            SystemTtsEngine(FakeDriver(throwOnSpeak = true), onEvent = { thrown += it })
+                .speak("À gauche.", urgent = false, Locale.FRENCH, 1f),
+        )
+
+        assertEquals(listOf("driver-false"), refused)
+        assertEquals(listOf("driver-false"), thrown)
+    }
+
+    @Test
+    fun `succes - aucun evenement, la fin vient du pilote`() {
+        val events = mutableListOf<String>()
+        val engine = SystemTtsEngine(FakeDriver(), onEvent = { events += it })
+
+        assertTrue(engine.speak("À gauche.", urgent = false, Locale.FRENCH, 1f))
+
+        assertTrue(events.isEmpty())
+    }
 }
