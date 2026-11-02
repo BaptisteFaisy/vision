@@ -55,7 +55,9 @@ class BlockMotionSource(
         if (!grids.fill(prevLuma, curLuma, coarseStride, fineStride)) return null
         val staticCost = alignmentCost(grids.refFine, grids.curFine, 0, 0, NEUTRAL_SCALE)
         if (staticCost == NO_COST) return null
-        if (staticCost == 0L) return MotionSample.Zero
+        // Frames identiques : texturées = arrêt prouvé ; unies (tout
+        // décalage s'aligne aussi — mur blanc en pan) = doute, muet.
+        if (staticCost == 0L) return provenZero()
         if (!coarseFit()) return null
         if (!fineFit()) return null
         val gain = confidence(staticCost, fine.cost)
@@ -66,6 +68,17 @@ class BlockMotionSource(
             scale = fine.scalePermille / 1000f,
             confidence = gain,
         )
+    }
+
+    /**
+     * Zéro prouvé ou doute : un décalage diagonal qui s'aligne aussi bien que
+     * l'immobile, c'est une image sans texture (pan sur mur blanc : mêmes
+     * frames) — `null`, muet. Sinon l'immobilité est prouvée ([MotionSample.Zero]).
+     */
+    private fun provenZero(): MotionSample? {
+        val shifted = alignmentCost(grids.refFine, grids.curFine, 1, 1, NEUTRAL_SCALE)
+        if (shifted == NO_COST || shifted == 0L) return null
+        return MotionSample.Zero
     }
 
     /**
