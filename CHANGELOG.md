@@ -3,6 +3,18 @@
 Le journal part du 2026-10-26 après 19 h : le commit de départ, puis une entrée par fait
 livré et ses preuves (tâche, fichiers, chiffres) dans l'arbre.
 
+## 2026-11-02 — Serveur : déploiements Modal réparés (branche `fix-deploy-modal-init`)
+
+- **Demande** : déploiement `sam3-eu-a100` (garde escaliers/murs PR #1025) refusé par Modal.
+- **Cause** : d810277d a ajouté `Sam3LiveService.__init__`, hérité par `Sam3Live` —
+  Modal interdit tout constructeur custom (`_validate_construction_mechanism`),
+  **tous** les déploiements de master échouaient depuis.
+- **Correctif** : état déplacé en `init_state()` idempotent — `Sam3Live` neutralise
+  l'hérité (`__init__ = object.__init__`) et s'initialise dans `@modal.enter`
+  (post-restauration, verrou frais) ; constructeur direct intact pour Baseten/tests.
+- **Preuves** : `boot_tests.test_modal_sans_constructeur` (garde AST + idempotence),
+  backend 847 OK / 0 KO, `check-kotlin-limits` OK (`test_units.py` compacté à 499 l).
+
 ## 2026-11-02 — iSee : escaliers détectés + jalons 2/1/0,5 m prioritaires sur le guidage (branche `isee-escaliers-2-1-05`)
 
 - **Demande** : « isee ne detecte plus les escalier […] il doit me dire qu'il y a un

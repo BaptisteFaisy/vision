@@ -99,3 +99,33 @@ def test_health_boot_shape(_module) -> None:
           baseten.get("restored") is False
           and (baseten.get("load_breakdown") or {}).get("poids_cpu_1er_demarrage_s") is None,
           str(baseten.get("load_breakdown")))
+
+
+def test_modal_sans_constructeur(_module) -> None:
+    """Modal refuse tout ``__init__`` custom, hérité compris (d810277d a cassé
+    tous les deploys : ``_validate_construction_mechanism``) : ``Sam3Live``
+    neutralise l'hérité, l'état part en ``init_state`` via ``@modal.enter``."""
+    import ast
+
+    from test_units import check
+    from tests_units.weights_tests import LIVE_FAST_DIR, _fresh_live_fast
+
+    service = _fresh_live_fast("service")
+    direct = service.Sam3LiveService()
+    check("constructeur direct initie l'état (Baseten, tests)",
+          direct._gpu_lock is not None and direct.slots is not None and direct.ws is not None)
+    lock = direct._gpu_lock
+    direct.init_state()
+    check("init_state idempotent", direct._gpu_lock is lock)
+
+    tree = ast.parse((LIVE_FAST_DIR / "live_app_fast.py").read_text())
+    sam3 = next(n for n in ast.walk(tree) if isinstance(n, ast.ClassDef) and n.name == "Sam3Live")
+    check("Sam3Live neutralise __init__ hérité",
+          any(isinstance(n, ast.Assign)
+              and any(isinstance(t, ast.Name) and t.id == "__init__" for t in n.targets)
+              for n in sam3.body))
+    enter = next(n for n in sam3.body
+                 if isinstance(n, ast.FunctionDef) and n.name == "load_container_on_enter")
+    check("enter appelle init_state",
+          any(isinstance(n, ast.Call) and isinstance(n.func, ast.Attribute)
+              and n.func.attr == "init_state" for n in ast.walk(enter)))

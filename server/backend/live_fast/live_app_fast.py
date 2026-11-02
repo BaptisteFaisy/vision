@@ -157,6 +157,11 @@ app = modal.App(APP_NAME)
 class Sam3Live(Sam3LiveService):
     """Conteneur de probe : modèle chargé une fois, leviers activables, verrou GPU unique."""
 
+    # Modal interdit tout constructeur custom, hérité compris
+    # (``_validate_construction_mechanism``) : l'état part en ``init_state``,
+    # appelé par ``@modal.enter`` ci-dessous (pattern prescrit par Modal).
+    __init__ = object.__init__
+
     @modal.enter(snap=True)
     def load_weights(self) -> None:
         """Phase snapshottée : poids sur **CPU** (aucun état CUDA, sinon Modal refuse)."""
@@ -164,7 +169,8 @@ class Sam3Live(Sam3LiveService):
 
     @modal.enter()
     def load_container_on_enter(self) -> None:
-        """Après restauration : passage GPU + leviers (idempotent, le lifespan suit)."""
+        """Après restauration : état frais + passage GPU + leviers (idempotent, le lifespan suit)."""
+        self.init_state()
         self.load_container()
 
     @modal.asgi_app()
