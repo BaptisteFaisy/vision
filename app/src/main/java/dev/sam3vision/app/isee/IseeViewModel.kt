@@ -186,8 +186,8 @@ class IseeViewModel(app: Application) : AndroidViewModel(app) {
     private val voiceNav = IseeVoiceNav(getApplication(), { settings }, viewModelScope, ::speakNavigation,
         speakRoute = { text, level -> spine.speakGps(text, level) },
         // Fin de guidage : le lecteur est coupé (une coupe ne termine
-        // jamais : pas de `onComplete`) — l'état parlant est rendu ici.
-        stopRoute = { player.stop(); update { it.copy(speakingEntryId = null, speakingText = "") } },
+        // jamais : pas de `onComplete`) — l'état parlant et le bus sont rendus ici.
+        stopRoute = { player.stop(); VoiceBus.onSpeechIdle(); update { it.copy(speakingEntryId = null, speakingText = "") } },
         onRouteCap = { cap -> if (cap == null) probe.clearRouteCap() else probe.setRouteCap(cap) },
         userSpeaking = { _state.value.holding || _state.value.transcribing },
         setGuidance = { enabled ->
@@ -346,10 +346,11 @@ class IseeViewModel(app: Application) : AndroidViewModel(app) {
         voiceNav.stopVoice()
     }
 
-    /** Coupe la lecture en cours et rend l'état parlant : la parole du user passe devant. */
+    /** Coupe la lecture en cours et rend l'état parlant et le bus : la parole du user passe devant. */
     private fun cutSpeech() {
         if (!playerIdle()) {
             player.stop()
+            VoiceBus.onSpeechIdle()
             update { it.cutSpeaking() }
         }
     }
