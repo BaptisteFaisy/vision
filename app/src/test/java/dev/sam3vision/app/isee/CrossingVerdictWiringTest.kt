@@ -109,11 +109,16 @@ class CrossingVerdictWiringTest {
         val second = engine.onFrame(
             frame(car(box = listOf(50f, 50f, 300f, 300f))), emptyList(), "", 200L,
         )
-        assertTrue(second.carMoving)
+        assertFalse("croissance isolée : brut faux (run-2)", second.carMoving)
         assertEquals(CrossingVerdict.Cross, second.verdict)
-        assertTrue("verdict maintenu : silence", second.posts.isEmpty())
-        assertNull(second.haptic)
-        assertEquals(CrossingState.Green, second.overlay)
+        val third = engine.onFrame(
+            frame(car(box = listOf(40f, 40f, 320f, 320f))), emptyList(), "", 400L,
+        )
+        assertTrue("croissance répétée : brut vrai", third.carMoving)
+        assertEquals(CrossingVerdict.Cross, third.verdict)
+        assertTrue("verdict maintenu : silence", third.posts.isEmpty())
+        assertNull(third.haptic)
+        assertEquals(CrossingState.Green, third.overlay)
     }
 
     @Test
@@ -322,7 +327,8 @@ class CrossingVerdictWiringTest {
     @Test
     fun `sans feu, approche reelle sur fond statique dit don't cross`() {
         // Garde : le fond ne tait que l'ego-motion — une voiture qui
-        // approche vraiment bloque, même quand la caméra est fixe.
+        // approche vraiment bloque, même quand la caméra est fixe (run-2 :
+        // le blocage vient à la 2e croissance, ~100 ms plus tard).
         val absent = CrossingLight(null, CrossingState.Red)
         val engine = engine(absent)
         val static = FrameMotion(MotionSample(0f, 0f, 1f, 1f), 96, 96, 100L)
@@ -331,8 +337,13 @@ class CrossingVerdictWiringTest {
         val second = engine.onFrame(
             frame(car(box = listOf(265f, 201f, 375f, 267f))), emptyList(), "", 100L, motion = static,
         )
-        assertTrue(second.carMoving)
-        assertEquals(CrossingVerdict.DontCross, second.verdict)
+        assertFalse("croissance isolée : brut faux (run-2)", second.carMoving)
+        assertEquals(CrossingVerdict.Cross, second.verdict)
+        val third = engine.onFrame(
+            frame(car(box = listOf(260f, 198f, 380f, 270f))), emptyList(), "", 200L, motion = static,
+        )
+        assertTrue("croissance répétée : brut vrai", third.carMoving)
+        assertEquals(CrossingVerdict.DontCross, third.verdict)
     }
 
     @Test

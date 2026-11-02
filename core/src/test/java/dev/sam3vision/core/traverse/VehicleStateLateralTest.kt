@@ -50,13 +50,15 @@ class VehicleStateLateralTest {
     }
 
     @Test
-    fun `brut par frame - vrai en croissance, faux gare, reset efface`() {
+    fun `brut par frame - run-2 en croissance, faux gare, reset efface`() {
         val watcher = VehicleStateWatcher()
         assertFalse("aucune frame vue", watcher.movingThisFrame)
         watcher.update(listOf(det("car", box(100f))), listOf(reading("car", 5f, box(100f))), atMs = 0L)
         assertFalse(watcher.movingThisFrame)
         watcher.update(listOf(det("car", box(110f))), listOf(reading("car", 5f, box(110f))), atMs = 100L)
-        assertTrue("croissance : brut vrai avant l'annonce", watcher.movingThisFrame)
+        assertFalse("croissance isolée : gigue possible, brut faux", watcher.movingThisFrame)
+        watcher.update(listOf(det("car", box(120f))), listOf(reading("car", 5f, box(120f))), atMs = 200L)
+        assertTrue("croissance répétée : brut vrai avant l'annonce", watcher.movingThisFrame)
 
         val parked = VehicleStateWatcher()
         repeat(3) { index ->

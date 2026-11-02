@@ -26,7 +26,12 @@ data class MotionSample(
     fun scaledBy(step: Float): MotionSample = copy(dx = dx * step, dy = dy * step)
 
     companion object {
-        /** Aucun mouvement : le calque garde le masque du keyframe tel quel. */
-        val Zero = MotionSample(0f, 0f, 1f, 0f)
+        /**
+         * Aucun mouvement, prouvé : coût statique nul = frames identiques —
+         * la preuve d'immobilité la plus forte, confiance pleine (un fond
+         * statique se lit STATIC, jamais UNKNOWN). Le calque garde le masque
+         * du keyframe tel quel.
+         */
+        val Zero = MotionSample(0f, 0f, 1f, 1f)
     }
 }
