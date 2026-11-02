@@ -19,6 +19,8 @@
 
 # iSee — eyes that speak
 
+[![CI](https://github.com/BaptisteFaisy/vision/actions/workflows/ci.yml/badge.svg?branch=master)](https://github.com/BaptisteFaisy/vision/actions/workflows/ci.yml)
+
 iSee is an Android app that helps a **blind or low-vision person** understand
 their surroundings: the phone films, one AI **segments** what it sees
 (objects, people, doors), another AI **describes** the scene and answers
@@ -27,8 +29,8 @@ guidance. A **companion** can follow along remotely, live, from their browser.
 
 > This repository (`BaptisteFaisy/vision`) carries the whole product: the Android
 > app, the segmenting GPU backend, and the companion page. This page describes
-> what the tree **actually ships**, re-checked on **01/11/2026** against
-> `origin/master` (`2387cd4f`) with the dead-code cleanup applied. The tree counts
+> what the tree **actually ships**, re-checked on **02/11/2026** against
+> `origin/master` (`1e4e9f01`) with the dead-code cleanup applied. The tree counts
 > in [Figures](#figures) are the output of `python3 tools/count-tree.py`; measured
 > figures elsewhere are dated and marked as measurements, not as code guarantees.
 
@@ -111,13 +113,13 @@ An ordinary phone, a remote GPU card, and voice as the only interface:
   only the current sentence below the bubble. Tap = video, long-press = speak; the
   whole surface is the interface (`app/src/main/java/dev/sam3vision/app/isee/`,
   `docs/ISEE-DESIGN-PORTRAIT.md`).
-- **Live** — **21 tracked concepts** by default (`person`, `car`, `bus`,
-  `bicycle`, `motorcycle`, `pedestrian traffic light`, `pedestrian signal head`,
-  `curb`, `sidewalk`, `crosswalk`, `pole`, `stairs`, `keys`, `gate`,
-  `souvenir shop`, `beanie`, `socks`, `wall`, `stroller`, `child`, `dog`), **22 at most**
+- **Live** — **16 outdoor concepts** by default (spec v4: `person`, `car`,
+  `pedestrian traffic light`, `curb`, `sidewalk`, `crosswalk`, `pole`, `stairs`,
+  `fence`, `wall`, `barrier`, `sign`, `street lamp`, `animal`, `trash can`,
+  `souvenir shop`) plus a **10-object indoor preset**, **22 at most**
   (`LivePrompts.MAX`, `MAX_PROMPTS` server-side), one frame in flight (WebSocket `/live/ws`, or tracker sessions
   when the *Tracker* chip is on), pills, distances, and voice announcements
-  (`docs/LIVE-SPEC.md`). The Direct tries the tracker first and falls back to `/live`
+  (`docs/LIVE-SPEC.md`, `core/…/live/LivePrompts.kt:29-73`). The Direct tries the tracker first and falls back to `/live`
   once if it never answers (`LiveTrackFallback`).
 - **Photo → description → questions** — the legacy screens stay reachable from
   Settings → **"Other screens"**: Direct mode (continuous video) and Classic home
@@ -163,9 +165,9 @@ An ordinary phone, a remote GPU card, and voice as the only interface:
 |---|---|
 | `:core` | Android library (`dev.sam3vision.core`, minSdk 26): network clients (LLM, SAM, live WebSocket, tracker, video, Valhalla), pacing and frame gate, masks, distances, pure depth, gestures, crossing/traverse, navigation, voice, encrypted settings, design tokens (`iseedesign`) |
 | `:app` | The APK (`dev.sam3vision.app`, minSdk 29): Compose + CameraX, iSee home, legacy screens, tap mode, glasses + bench, in-app map (MapLibre), voice navigation, companion share, capture purge |
-| `server/` | Deployed backend: live/photo (`backend/live_fast/`, app `sam3-eu-a100`), Valhalla CPU routing (`backend/valhalla_cpu.py`, app `valhalla-idf-cpu`), tracker (`backend/track_app.py`, manual deploy), the photo-era app (`backend/modal_app.py`, not called by the current app), Baseten host config (`backend/baseten/` — `config.yaml` + `src/server.py` versioned, `data/` synced at push time by `server/scripts/baseten_sync.py`), GPU probes, and `scripts/` (deploy, benches, probes, unit tests) |
+| `server/` | Deployed backend: live/photo (`backend/live_fast/`, app `sam3-eu-a100`), Valhalla CPU routing (`backend/valhalla_cpu.py`, app `valhalla-idf-cpu`), tracker (`backend/track_app.py`, manual deploy, no live app as of 02/11), the photo-era app (`backend/modal_app.py`, not called by the current app, no live app as of 02/11), Baseten host config (`backend/baseten/` — `config.yaml` + `src/server.py` versioned, `data/` synced at push time by `server/scripts/baseten_sync.py`), GPU probes, and `scripts/` (deploy, benches, probes, unit tests) |
 | `suivi-parent/` | Companion page (static, zero npm dependencies) embedded in every APK (`caregiverAssets`, `app/build.gradle.kts:197`); its Vercel deployment is abandoned, but `api/` still serves the local preview tests |
-| `suivi-relais/` | The relay actually used (Cloudflare Worker + D1 + one Durable Object per stream): `POST /api/share`, `GET /api/state`, `GET /ws` (live camera frames) |
+| `suivi-relais/` | The relay actually used (Cloudflare Worker + D1): `POST /api/share`, `GET /api/state`, `GET /health`, `GET /ws` with `role=watch` (caregiver view) or `role=push` + key (phone upload) — one Durable Object room per stream, frames never touch the base |
 | `tools/` | CI guards (Kotlin sizes, Portrait design, latency budget, voice navigation, APK keys), the pedestrian-light crop/training pipeline, voice pack generator, caregiver orb export, fake LLM/SAM for tests, the tree census (`count-tree.py`) |
 | `scripts/` | Build, phone/emulator recipes, checks, latency budget, golden masks |
 | `docs/` | Architecture, contracts, recipes; `docs/DOC-ETAT.md` is the documentation status table |
@@ -238,39 +240,53 @@ are kept for the local preview tests only.
 Prerequisites: JDK 17 + Android SDK (`JAVA_HOME`, `ANDROID_HOME`), Python 3 (guards),
 Node (companion page, no `npm install`).
 
+Android is **never compiled on a workstation**: `build-serveur <worktree> [gradle-task]`
+ships the sources to the r630 build machine (default `assembleDebug`) and the APK lands
+in `builds/<name>/…/app-debug.apk` there. The workstation debug keystore is authoritative
+(a copy sits on the r630) — every machine signing APKs for the test phones must use the
+same one (`INSTALL_FAILED_UPDATE_INCOMPATIBLE` otherwise).
+
 ```bash
-./gradlew :core:testDebugUnitTest :app:testDebugUnitTest   # JVM tests (4,809 @Test: 2,972 + 1,837)
-./gradlew :app:assembleDebug                               # debug APK
+./gradlew :core:testDebugUnitTest :app:testDebugUnitTest   # JVM tests (5,663 @Test: 3,461 + 2,202 — run in CI, never locally)
+./gradlew :app:assembleDebug                               # debug APK (server build only, see above)
 python3 tools/check-kotlin-limits.py                       # file < 500 lines, function < 50
 python3 tools/check-isee-design.py                         # mandatory Portrait design
 python3 tools/check-budget-derive.py                       # doc ↔ code latency figures
 python3 tools/check-voice-nav-doc.py                       # doc ↔ code voice navigation
 python3 tools/check-voicepack.py                           # voice pack catalog ↔ clips (CI gate)
-bash scripts/test_scripts.sh                               # 177 shell tests
-node --test suivi-parent/test/*.test.mjs suivi-relais/test/*.test.mjs  # 67 tests
-python3 server/scripts/test_units.py                       # backend unit tests (639, stdlib stubs, no GPU)
+bash scripts/test_scripts.sh                               # 195 shell tests
+node --test suivi-parent/test/*.test.mjs suivi-relais/test/*.test.mjs  # 69 tests
+python3 server/scripts/test_units.py                       # backend unit tests (847, stdlib stubs, no GPU)
 bash scripts/build.sh                                      # assembleDebug --offline + APK check
 python3 tools/count-tree.py                                # the Figure table below
 ```
 
+Every iSee test runs on a build of `origin/master` HEAD — align, rebuild, then test
+(a "regression" on a green master is a stale build until proven otherwise). The real
+phone (Redmi `2c6852ac`, Samsung fallback) goes through the shared `phone` lock
+(`phone status`, then `phone run --wait 600 --task "…" -- <adb…>`); anything needing
+neither phone nor glasses runs on the `isee-sim` emulator with a video-file camera
+(`scripts/isee-sim.sh`, no phone lock). Recipes: `scripts/install-phone-latest.sh`,
+`scripts/install-emulator.sh`, `docs/TESTING.md`.
+
 ## Figures
 
-Measured on `origin/master` (`d9d7b8b5`), 01/11/2026 — `python3 tools/count-tree.py`
+Measured on `origin/master` (`1e4e9f01`), 02/11/2026 — `python3 tools/count-tree.py`
 prints exactly this table (`--json` for scripts). The census is a script, not a habit:
 recopied numbers had drifted three times in one day.
 
 | Mesure | Valeur | Commande |
 |---|---|---|
-| Fichiers `.kt` | **1215** | `find . -name '*.kt' -not -path './.git/*' -not -path '*/build/*' \| wc -l` |
-| Lignes Kotlin | **152,586** | idem, `-exec cat {} + \| wc -l` |
-| Lignes de prod (`*/src/main`) | **78,831** — `:core` 257 f. / 34,397 l. · `:app` 370 f. / 44,434 l. | idem sous `core/src/main`, `app/src/main` |
-| `@Test` JVM | **4,809** — `:core` 2,972 · `:app` 1,837 | `grep -rho '@Test' core/src/test app/src/test --include='*.kt' \| wc -l` |
-| Tests instrumentés | **8** (appareil requis) | idem sous `app/src/androidTest*` |
+| Fichiers `.kt` | **1385** | `find . -name '*.kt' -not -path './.git/*' -not -path '*/build/*' \| wc -l` |
+| Lignes Kotlin | **178,229** | idem, `-exec cat {} + \| wc -l` |
+| Lignes de prod (`*/src/main`) | **90,000** — `:core` 288 f. / 38,980 l. · `:app` 408 f. / 51,020 l. | idem sous `core/src/main`, `app/src/main` |
+| `@Test` JVM | **5,663** — `:core` 3,461 · `:app` 2,202 | `grep -rho '@Test' core/src/test app/src/test --include='*.kt' \| wc -l` |
+| Tests instrumentés | **10** (appareil requis) | idem sous `app/src/androidTest*` |
 | `@Preview` Compose | **11** | idem, `@Preview` |
-| Backend Python (`server/backend`) | **43** fichiers, **9,043** lignes | `find server/backend -name '*.py' \| wc -l` |
-| Docs | **62** fichiers dans `docs/` | `ls docs/*.md \| wc -l` |
-| Workflows CI | **7** | `ls .github/workflows/*.yml \| wc -l` |
-| Plus gros fichier de prod | `app/src/main/java/dev/sam3vision/app/glasses/GlassesController.kt` — **499** lignes | `find core app -path '*/src/main/*' -name '*.kt' \| xargs wc -l \| sort -rn \| head` |
+| Backend Python (`server/backend`) | **47** fichiers, **9,972** lignes | `find server/backend -name '*.py' \| wc -l` |
+| Docs | **67** fichiers dans `docs/` | `ls docs/*.md \| wc -l` |
+| Workflows CI | **8** | `ls .github/workflows/*.yml \| wc -l` |
+| Plus gros fichier de prod | `core/src/main/java/dev/sam3vision/core/speech/IseeClipsEn.kt` — **499** lignes | `find core app -path '*/src/main/*' -name '*.kt' \| xargs wc -l \| sort -rn \| head` |
 
 Details (constants, budgets, thresholds) are in `docs/PERF.md`; recipes in
 `docs/TESTING.md`. The guards are green on this tree; Gradle tests are the only ones not
@@ -305,7 +321,8 @@ elongation among rejected true greens is **1.11**, the lowest among the car disc
 must reject is **1.30**. The two domains are inverted, so the assumption written in the gate —
 *"the SAM box hugs the lamp"* — does not hold for a text-prompted SAM 3.1, which segments the
 **housing**. Fix belongs upstream (frame the lamp, or re-calibrate on the housing domain), not
-in the constant.
+in the constant. (The current tree carries `1.0f` — `PedLightGate.kt:70`; the drift is
+recorded in `docs/MESURES-FEU-ROUGE-VERT.md`.)
 
 Two defects found while running it, worth carrying into the measurement code:
 
@@ -345,42 +362,67 @@ grid: `docs/LUNETTES-RECETTE-TEL.md` §3/§7; verdict script:
 
 - **PRs**: `ci` (guards + JVM tests + backend unit tests + goldens) and `ci-budget`
   (≤ 5 min per job, same file) and `couche0` (declared `## Scope`, forbidden patterns) —
-  all three **required**; a docs PR skips Gradle and gets its verdict in seconds.
+  all three **required**; a docs PR skips Gradle and gets its verdict in ~45 s wall time
+  (measured 02/11 on docs-only #1002 and #955).
 - **Merge queue**: **Mergify** (`.mergify.yml`, batches of 3, rebase). GitHub's native
   queue is unavailable — it needs an organisation-owned repository, and the API answers
   `422 Invalid rule 'merge_queue'` on a user repository. `pr-auto-merge.yml` survives as
   the sweeper (conflicts, failed-run retries) and `auto-approve.yml` approves the runs
   parked in `action_required` by bot pushes. `master` is protected (PR mandatory).
 - On `master`: `ci-native` (debug + release APK + lint, 10 min), Modal redeploys
-  (`deploy-live-fast`, `deploy-valhalla-cpu`).
+  (`deploy-live-fast`, `deploy-valhalla-cpu` — only when the push carries `[deploy-gpu]`),
+  and `triage-rouge` (post-CI triage, informational).
 - **Self-hosted** runners `[self-hosted, linux, x64, vision]` with a warm Gradle cache for
   every Gradle job; the two Modal redeploys run on `ubuntu-latest`.
 
 Detail: `docs/CI-QUEUE.md`.
 
+## Contributing
+
+One fresh worktree per task, from a fresh `origin/master` — never edit the shared
+checkout (`AGENTS.md` at the repo root is the enforceable rulebook):
+
+```bash
+SAM_REPO=/home/baptiste/vision sam-wt new <topic>   # → /home/baptiste/tmp/…
+# small, frequent commits; green CI; sam-wt merge <topic> (queue merge)
+# once the PR is MERGED: delete the task branch locally + remotely
+```
+
+Every file < 500 lines, every function < 50 lines; an unmeasured figure is written
+"not measured". PRs carry a `## Scope` section and merge through the Mergify queue
+once `ci`, `ci-budget` and `couche0` are green (`docs/CI-QUEUE.md` details the process).
+
 ## Docs
 
 - **Start here**: `docs/ARCHITECTURE.md` (modules, flows, HTTP contract, keys),
   `docs/TESTING.md` (recipes and test inventory), `docs/DOC-ETAT.md` (documentation
-  status, last full pass 29/10/2026), `NOTES.md` (versions, decisions),
-  `CHANGELOG.md` (journal since 26/10/2026).
+  status, last full pass 29/10/2026, concept rows fixed 02/11), `NOTES.md` (versions,
+  decisions), `CHANGELOG.md` (journal since 26/10/2026).
 - **Vision, distances, crossing**: `docs/LIVE-SPEC.md`, `docs/LATENCE-BUDGET.md`,
   `docs/MASK-DECODE.md`, `docs/DISTANCES.md`, `docs/DEPTH.md`, `docs/POSE-IMU.md`,
   `docs/TRAVERSEE.md`, `docs/VEHICLE-BACKGROUND.md`, `docs/MESURES-SAM3-FEUX.md`, `docs/CALIBRAGE-FEU.md`,
   `docs/COLLECTE-FEUX.md`, `docs/DATASETS-FEUX.md`, `docs/RECETTE-FEUX-FR.md`,
-  `docs/RECETTE-DISTANCES.md`, `docs/RECETTE-RUE.md`.
+  `docs/RECETTE-DISTANCES.md`, `docs/RECETTE-RUE.md`, `docs/MESURES-FEU-ROUGE-VERT.md`,
+  `docs/MESURES-FEU-TEMPOREL.md`, `docs/RECETTE-FEU-EXPOSITION.md`.
+- **Latency, tracking, prediction**: `docs/KEYFRAME-SCHEDULER.md`, `docs/L13-FUSION.md`,
+  `docs/LATENCE-M1-HARNESS.md`, `docs/LATENCE-M1-TRANSPORT-BINAIRE.md`,
+  `docs/LATENCE-M1-VECTEURS.md`, `docs/LATENCE-M2M3-SERVEUR-INFRA.md`,
+  `docs/MASQUES-DEBUG.md`, `docs/MOTION-EGO.md`, `docs/T8-PREDICTION.md`,
+  `docs/TRACK-PERF.md`.
 - **Voice, narration, navigation**: `docs/ELEVENLABS-TTS.md`, `docs/META-ASR.md`,
   `docs/VOICEPACK.md`, `docs/VOIX-ANGLAIS.md`,
   `docs/VOIX-DANGER.md`, `docs/MICRO-VERROUILLE.md`, `docs/TEST-LONGPRESS-DICTEE.md`,
   `docs/NAVIGATION.md`, `docs/NAVIGATION-VOCALE.md`, `docs/RECETTE-NAVIGATION-VOCALE.md`,
   `docs/VOICE_NAV_PROXY.md`, `docs/GPS-FUSION.md`, `docs/GPS_GUIDE_UTILISATEUR.md`,
-  `docs/GUIDAGE-TOUT-DROIT.md`, `docs/URGENCE-EXTERNE.md`.
+  `docs/GUIDAGE-TOUT-DROIT.md`.
 - **Glasses and product**: `docs/META-GLASSES.md`, `docs/META-IMAGE.md`,
   `docs/GLASSES-ETAT.md`, `docs/GLASSES-DECISION.md`, `docs/LUNETTES-RECETTE-TEL.md`,
-  `docs/LUNETTES-LANCEMENT.md`,
+  `docs/LUNETTES-LANCEMENT.md`, `docs/LUNETTES-META-CADRAGE.md`,
+  `docs/LUNETTES-VANGUARD.md`, `docs/glasses-dat-spike.md`, `docs/glasses-spike-ci.md`,
   `docs/DEMO-LUNETTES.md`, `docs/ISEE-DESIGN-PORTRAIT.md`, `docs/MODE-TAP.md`,
   `docs/MODE-US.md`, `docs/CARTE-OSM.md`, `docs/NETTOYAGE.md`, `docs/CLES-DU-BUILD.md`,
   `docs/CI-QUEUE.md`, `docs/OPTIMISATIONS.md`.
+- **Reviews, stability**: `docs/REVUE-V4.md`, `docs/STABILITE-ISEE.md`.
 - **Server and companion**: `server/README.md`, `server/backend/README.md`,
   `server/docs/`, `suivi-parent/README.md`, `suivi-relais/README.md`.
 
