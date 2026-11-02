@@ -19,7 +19,7 @@ import org.junit.Test
 class DistanceTickerTest {
 
     @Test
-    fun `pas du ticker a 10 Hz avec marge, sous les 150 ms exiges`() {
+    fun `pas du ticker a 12 5 Hz avec marge, sous les 150 ms exiges`() {
         assertEquals(80L, DistanceTicker.TICK_MS)
         assertTrue(DistanceTicker.TICK_MS <= 150L)
     }

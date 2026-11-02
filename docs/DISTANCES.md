@@ -22,7 +22,7 @@ Deux entrées, deux sources :
 
 | Entrée | D'où elle vient |
 |---|---|
-| **Hauteur réelle** | `KnownSizes.TABLE` : table label → mètres (personne 1,70 · personne assise 1,25 · cycliste 1,75 · voiture 1,45 · SUV 1,65 · camionnette 1,95 · camion 2,80 · porte 2,05 · fenêtre 1,30 · bouteille 0,25 · verre 0,12 · borne 0,80 · clôture 1,50 · portail 1,75…). Casse, accents, pluriel et expressions (« sac à dos ») sont neutralisés. Concept inconnu ⇒ **pas de distance**. Les défauts sans hauteur défendable n'ont volontairement pas d'entrée sténopé (`DEPTH_ONLY` : escalier, trottoir, passage piéton, poteau, feu, bordures…) : leur distance vient de la profondeur ou du plan de sol. Chaque entrée porte en plus son incertitude (`KnownSizes.TOLERANCE` : porte ±3 % · adulte ±6 % · enfant/arbre ±15-30 %) qui pondère la fusion. |
+| **Hauteur réelle** | `KnownSizes.TABLE` : table label → mètres (personne 1,70 · personne assise 1,25 · cycliste 1,75 · voiture 1,45 · SUV 1,65 · camionnette 1,95 · porte 2,05 · fenêtre 1,30 · bouteille 0,25 · verre 0,12 · clôture 1,50…). Casse, accents, pluriel et expressions (« sac à dos ») sont neutralisés. Concept inconnu ⇒ **pas de distance**. Les défauts sans hauteur défendable n'ont volontairement pas d'entrée sténopé (`DEPTH_ONLY` : escalier, trottoir, passage piéton, poteau, feu, bordures…) : leur distance vient de la profondeur ou du plan de sol. Chaque entrée porte en plus son incertitude (`KnownSizes.TOLERANCE` : porte ±3 % · adulte ±6 % · enfant/chien ±20-30 %) qui pondère la fusion. |
 | **Focale en pixels** | `LensSpec`, selon trois sources **dans cet ordre de priorité** : le **champ saisi dans Réglages** s'il est positif (`cameraFovDeg > 0`), sinon la **lecture Camera2 à la liaison** (`lensSpecOf`, `app/…/CameraLens.kt`) — d'abord la **calibration intrinsèque** (`LENS_INTRINSIC_CALIBRATION`, focale + centre optique en pixels, `Optics.lensSpecFromIntrinsics`) quand le driver l'expose, sinon **focale mm + taille physique** (`Optics.lensSpec`) — sinon 67° (`LensSpec.DEFAULT_H_FOV_DEG`, grand-angle typique). Règle unique des deux côtés (`chooseLens`, `LiveLens.kt`) : champ forcé (borné 15–130°) > capteur réel > repli. **Voie lunettes** : champ lunettes forcé (`glassesFovDeg`, aspect 9:16 du flux) > mire quand elle est posée (`glassesLens`) > profil flux du modèle détecté (`connectedGlassesStreamLens`, `GlassesLens.kt`, D1) > repli estimé 53,7° (`LensSpec.Glasses`, fenêtre 9:16 du capteur 12 MP — `glassesStreamForSensorH`), jamais le capteur du téléphone. La focale flux est recadrée par photo envoyée (`CropGeometry.afterCrop`, D2/E5) : pleine largeur = FOV horizontal inchangé. Voir `docs/META-GLASSES.md` §15. La sonde bascule à chaud (`observeGlassesLive`) et converge à la reconfiguration (`configureFrom`, `fromGlasses`). |
 
 L'axe vertical du capteur sert quand l'image est en portrait (`sensorLandscape` + `widthFovDeg`)
@@ -73,7 +73,7 @@ un peu plus qu'en Direct.
 
 Quand le sténopé et le plan de sol parlent tous deux et concordent (rapport ≤ 1,5), la lecture est leur
 **moyenne pondérée** (`DistanceFusion.combine`) : le sténopé pèse `1 / (1 + tolérance de sa classe)`
-(porte 0,97 · personne 0,94 · arbre 0,77), le sol pèse selon la dépression de ses pieds
+(porte 0,97 · personne 0,94 · chien 0,77), le sol pèse selon la dépression de ses pieds
 (`GroundWeight` : 1 dès 0,2 rad, 0,25 vers l'horizon — de près le sol tire, de loin le sténopé
 reprend la main). En cas de divergence, le sténopé garde la main quels que soient les poids —
 la pose du sol peut être fausse, le sténopé est la branche validée. En lunettes-live, la branche sol est coupée explicitement (`groundPlaneEnabled = false`, `LiveProbe.setGlassesLive`, D3) : le tangage du téléphone ne vise pas où visent les lunettes, donc sténopé seul — jamais de valeur téléphone silencieuse.
@@ -188,7 +188,7 @@ La phrase effectivement dite reste visible dans le panneau iSee sous `dit : …`
 - **Champ de vision caméra (°)** : `0` = lecture du capteur (voie normale). À saisir si le driver est muet ou
   si l'étalonnage dérive — la valeur se vérifie facilement : à 2 m, une personne de 1,70 m doit afficher
   « ≈ 2,0 m » (recette de contrôle ; tolérance chiffrée non mesurée).
-- **Champ de vision lunettes (°)** : `0` = repli estimé 60,6° (le SDK n'expose
+- **Champ de vision lunettes (°)** : `0` = profil flux du modèle détecté (capteur 66/66/70/95/68° → resserré 9:16, GlassesLens.kt D1), repli estimé 53,7° sans modèle (le SDK n'expose
   aucun calibrage). À saisir après mesure mire, ou pour affiner — même
   contrôle à 2 m, lunettes portées, tête droite.
 
@@ -198,8 +198,7 @@ La phrase effectivement dite reste visible dans le panneau iSee sous `dit : …`
 - `core.distance.OpticsTest` (**30**) : zone active, recadrages, bornes mm/px, calibration intrinsèque (exacte, décentrée, incohérente).
 - `core.distance.KnownSizesTest` (**16**) : chaque défaut du direct est calibré au sténopé **ou**
   explicitement profondeur (`DEPTH_ONLY` — voir le KDoc de `KnownSizes`) ; extérieur couvert
-  (`bollard`/`borne`/`plot`/`potelet` 0,80 · `fence`/`clôture`/`grillage` 1,50 · `gate`/`portail` 1,75,
-  `barrier` 1,00 déjà là) ; synonymes FR/EN, accents, pluriels, expressions (« clôture grillagée »),
+  (`fence`/`clôture`/`grillage` 1,50 · `barrier` 1,00 déjà là ; `bollard`/`borne`/`plot`/`potelet` et `gate`/`portail` sortis spec v4, inconnus) ; synonymes FR/EN, accents, pluriels, expressions (« clôture grillagée »),
   concept inconnu ; postures assises et sous-types de véhicules ; tolérances par classe et poids de fusion.
 - `core.distance.DistanceMeterTest` (**29**) : formule (personne 200 px, focale 386 px ⇒ **3,29 m**), doublement
   de distance quand la boîte est deux fois plus petite, bornes, objet non calibré, coupé haut/bas, colle aux
@@ -210,7 +209,7 @@ La phrase effectivement dite reste visible dans le panneau iSee sous `dit : …`
   prédiction (extrapolation, label/boîte/confiance, inconnue/périmée/passée).
 - `core.mask.MaskDetectionsTest` (**9**) : poly (exact, réduit, hors cadre), bits (exact, épars, dimensions),
   rle réduit, png/none/inconnu/cassé nuls, tracker.
-- `app.live.DistanceTickerTest` (**6**) : pas 80 ms (10 Hz) ≤ 150 ms, ticks virtuels, double start, couche (vide, champ).
+- `app.live.DistanceTickerTest` (**6**) : pas 80 ms (12,5 Hz) ≤ 150 ms, ticks virtuels, double start, couche (vide, champ).
 - `app.live.LiveLensTest` (**15**) : forcé > capteur > repli côté téléphone, forcé 9:16 > mire > repli estimé côté lunettes, provenance (`LensOrigin`).
 - `app.live.GlassesMireTest` (**7**) : validation des champs mire, parsing du bloc solveur, ligne de statut.
 - `app.isee.LiveProbeSamOnlyTest` (**3**) : pastilles = lectures SAM (dernière frame, frame vide, gelées entre deux inférences).
@@ -274,7 +273,7 @@ distorsion, donc tout ce qui suit est **estimé**, pas mesuré :
 
 | Paramètre | Valeur estimée | Source |
 |---|---|---|
-| Champ | H 60,6° · V 92,1° | diagonale 100° constructeur ramenée au 9:16 |
+| Champ (flux 9:16) | Ray-Ban Meta H 51,94° · V 81,78° · repli H 53,7° · V 83,9° | profils D1 par modèle (capteur 66/66/70/95/68° → flux 9:16, `LensSpec.glassesStreamForSensorH:161`, `GlassesLensTest`), mire en attente |
 | Capteur | natif portrait | géométrie du flux |
 | Centre optique | centré (0,5 · 0,5) | supposé (crop de la vue symétrique) |
 | Distorsion | non mesurée (`null`) | redressement identité |
@@ -291,7 +290,7 @@ réduite au bord 480 : la focale se recalcule par frame comme côté téléphone
 
 Fait depuis : pose IMU temps réel (`PitchMeter`, `docs/POSE-IMU.md`), hauteur/pieds du masque
 (`Detection.maskBox`, `bits` demandés par le client — actives si le serveur déployé suit),
-profondeur affine (`AffineScale`), Kalman par piste + ticker 120 ms, protocole et script de
+profondeur affine (`AffineScale`), Kalman par piste + ticker 80 ms, protocole et script de
 recette (`docs/RECETTE-DISTANCES.md`, `scripts/mesure-distances.sh`), étalonnage guidé
 (`CalibrationSolver`, section Réglages — voir « Étalonnage »), intrinsèques du téléphone
 mesurées et verrouillées (voir « Téléphone cible »), calibrage lunettes estimé +

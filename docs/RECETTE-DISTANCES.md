@@ -40,11 +40,11 @@ terrain — hauteur réelle supposée contre objet réel.
 | porte | 2,05 m | fermée, de face |
 | chaise | 0,90 m | vide, de profil |
 | chien | 0,55 m | debout, immobile si possible |
-| borne | 0,80 m | borne ou plot, verticale |
-| arbre | 4,00 m | tronc et houppier entiers dans le cadre |
+| barrière | 1,00 m | barrière Vauban debout, de face, entière |
+| lampadaire | 5,00 m | lampadaire entier, mât et tête dans le cadre |
 | panneau | 2,20 m | panneau seul, de face |
 
-L'arbre à 1 m et 2 m ne rentre pas entier dans le cadre : ces deux cases
+Le lampadaire à 1 m et 2 m ne rentre pas entier dans le cadre : ces deux cases
 restent « non applicable » (noter `n/a`, pas un chiffre). Même règle pour
 tout couple objet et distance impossible à cadrer entier.
 
