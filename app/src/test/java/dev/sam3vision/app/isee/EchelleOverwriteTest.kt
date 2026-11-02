@@ -259,7 +259,9 @@ class EchelleOverwriteTest {
     fun `pendant une parole seul un niveau plus petit ou egal coupe`() {
         speaker.idleValue = false
         VoiceBus.post(OutdoorLevel.CURB, "bordure")
-        VoiceBus.post(OutdoorLevel.SIDEWALK, "trottoir")
+        // Le trottoir (10) ne démontre plus l'écrasé : absolu depuis le § 45
+        // (il couperait la bordure) — le repli (12) garde le rôle.
+        VoiceBus.post(OutdoorLevel.FALLBACK, "repli")
         VoiceBus.post(OutdoorLevel.HUMAN, "personne")
         VoiceBus.post(OutdoorLevel.HUMAN, "personne encore")
 
@@ -361,6 +363,35 @@ class EchelleOverwriteTest {
         assertEquals(1, speaker.said.size)
         VoiceBus.onSpeechIdle()
         assertEquals(2, speaker.said.size)
+    }
+
+    @Test
+    fun `offre non trottoir tue sous un trottoir, tour intact`() {
+        VoiceBus.post(OutdoorLevel.SIDEWALK, "Trottoir à gauche.")
+        val wish = VoiceWish(OutdoorLevel.HUMAN, "personne", AntiRepeat.KEY_HUMAN_SOFT)
+
+        assertFalse(offer(wish, nowMs = 0L))
+        assertTrue(AntiRepeat.allow(AntiRepeat.KEY_HUMAN_SOFT, 1_000L))
+
+        VoiceBus.onSpeechIdle()
+        assertTrue(offer(wish, nowMs = 3_000L))
+        assertEquals(2, speaker.said.size)
+    }
+
+    @Test
+    fun `offre trottoir passe sous un compte et coupe`() {
+        VoiceBus.post(OutdoorLevel.STAIRS, "5 marches.")
+
+        assertTrue(offer(VoiceWish(OutdoorLevel.SIDEWALK, "Trottoir à gauche.", "test-trottoir-passe"), nowMs = 0L))
+
+        // Le trottoir absolu (§ 45) coupe le compte en cours, sans attendre.
+        assertEquals(
+            listOf(
+                FakeSpeaker.Said(OutdoorLevel.STAIRS, "5 marches.", null),
+                FakeSpeaker.Said(OutdoorLevel.SIDEWALK, "Trottoir à gauche.", null),
+            ),
+            speaker.said,
+        )
     }
 
     // Flux obstacles vers le bus.

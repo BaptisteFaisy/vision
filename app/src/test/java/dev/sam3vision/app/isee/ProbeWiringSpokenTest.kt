@@ -100,6 +100,24 @@ class ProbeWiringSpokenTest {
     }
 
     @Test
+    fun `stop attendu sous un trottoir, tour intact`() = runTest {
+        val scope = CoroutineScope(SupervisorJob() + StandardTestDispatcher(testScheduler))
+        try {
+            VoiceBus.post(OutdoorLevel.SIDEWALK, "Trottoir à gauche.")
+            val probe = LiveProbe(scope = this, clock = { 0L }, background = StandardTestDispatcher(testScheduler))
+            probe.observeSpoken(scope)
+            probe._state.value = LiveProbeState(spoken = "Stop.", spokenUrgent = true, spokenSeq = 1)
+            advanceUntilIdle()
+        } finally {
+            scope.cancel()
+        }
+
+        assertEquals(1, speaker.said.size)
+        assertEquals("Trottoir à gauche.", speaker.said.single().text)
+        assertTrue(AntiRepeat.allow(AntiRepeat.KEY_FENCE, System.currentTimeMillis()))
+    }
+
+    @Test
     fun `mot doux va au repli 12 sur silence`() = runTest {
         val scope = CoroutineScope(SupervisorJob() + StandardTestDispatcher(testScheduler))
         try {

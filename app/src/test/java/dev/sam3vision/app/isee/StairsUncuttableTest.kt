@@ -79,10 +79,11 @@ class StairsUncuttableTest {
     @Test
     fun `tous les niveaux attendent la fin des escaliers`() {
         VoiceBus.post(OutdoorLevel.STAIRS, "5 marches.")
+        // Le trottoir n'attend plus : absolu depuis le § 45 (il coupe le compte).
         listOf(
             OutdoorLevel.CAR_MOVING, OutdoorLevel.HUMAN, OutdoorLevel.GPS_REMINDER,
             OutdoorLevel.FENCE, OutdoorLevel.CURB, OutdoorLevel.POLE,
-            OutdoorLevel.CROSSWALK, OutdoorLevel.CHAT, OutdoorLevel.SIDEWALK,
+            OutdoorLevel.CROSSWALK, OutdoorLevel.CHAT,
             OutdoorLevel.GPS_EVENT, OutdoorLevel.FALLBACK,
         ).forEach { VoiceBus.post(it, "niveau $it.") }
 
