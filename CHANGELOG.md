@@ -36,6 +36,17 @@ livré et ses preuves (tâche, fichiers, chiffres) dans l'arbre.
   `LiveAskVoiceTest` verts ; `:app` 1 840 + `:core` 3 226 tests, 0 échec ;
   `check-kotlin-limits.py` vert ; `assembleDebug` vert. Recette téléphone
   **non mesurée**.
+## 2026-11-02 — Lunettes : la session tuée à l'ouverture se rejoue seule (branche `fix/isee-lunettes-session-20261102`)
+
+- **Demande** : lancer une session lunettes depuis iSee doit marcher à tous les coups.
+- **Cause** : le seul rejou couvrait `createSession` refusé, jamais le cas réel —
+  session créée puis tuée en STARTING en ~80 ms (`0xc001` côté lunettes, 31/10).
+- **Fait** : mort rapide (< 2 s) détectée (`GlassesSessionOpener.settled`), 3 essais
+  espacés 1/3/5 s, puis refus ciblé (force-restart) au lieu du « restart » générique.
+- **Preuve** : `GlassesSessionRetryTest` (+3), `GlassesMessagesTest` (+1 test, +2 assertions)
+  verts ; `:app` 1 884 tests, 0 échec ; `:core` 3 258 tests, 0 échec (5 sautés :
+  permissions POSIX sous Windows, `PrivateFileSettingsStoreTest`) ; `assembleDebug` vert ;
+  `check-kotlin-limits.py` vert. Recette téléphone **non mesurée**.
 
 ## 2026-11-01 — iSee : la rue reparle au lancement, dehors est le défaut (branche `fix/voix-dehors-defaut`)
 

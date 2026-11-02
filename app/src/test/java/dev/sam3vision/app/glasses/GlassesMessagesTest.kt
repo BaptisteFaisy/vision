@@ -25,6 +25,7 @@ class GlassesMessagesTest {
         GlassesMessages.noActivity(),
         GlassesMessages.mockUnavailable(),
         GlassesMessages.mockConnectTimeout(),
+        GlassesMessages.sessionRefusedByGlasses(),
     )
 
     @Test
@@ -49,6 +50,7 @@ class GlassesMessagesTest {
         assertEquals(MessageKind.INFO, GlassesMessages.registrationConfirmed().kind)
         assertEquals(MessageKind.INFO, GlassesMessages.mockReady().kind)
         assertEquals(MessageKind.INFO, GlassesMessages.framesVoiceRoute().kind)
+        assertEquals(MessageKind.INFO, GlassesMessages.sessionRetrying(1, 3).kind)
     }
 
     @Test
@@ -92,6 +94,15 @@ class GlassesMessagesTest {
     fun `le message garde la raison donnee par le SDK`() {
         assertTrue(GlassesMessages.registrationFailed("refus").text.contains("refus"))
         assertTrue(GlassesMessages.cameraUnavailable("occupée").text.contains("occupée"))
+    }
+
+    @Test
+    fun `le nouvel essai annonce son rang et le refus guide le force-restart`() {
+        val retrying = GlassesMessages.sessionRetrying(2, 3).text
+        assertTrue(retrying, retrying.contains("2/3"))
+        val refused = GlassesMessages.sessionRefusedByGlasses().text
+        assertTrue(refused, refused.contains("force-restart"))
+        assertTrue(refused, refused.contains("power + capture"))
     }
 
     @Test
