@@ -340,4 +340,41 @@ en phase 2 (dossier mesuré, 6/6 en simulation).
 - 883 crops FR téléphone : précision 1,0, rappel 0,78 — les 116 verts
   manqués relus sont des cadrages sans lampe visible (feuillage, poteau :
   labels de scène, pas de crop), que la porte a raison de refuser.
+  **Attribution corrigée le 02/11/2026 — voir ci-dessous.**
 - Lot1 : 17/17. Ancres : 33/33.
+
+#### Correction du 02/11/2026 : les manques verts sont d'abord la porte
+
+L'attribution ci-dessus (« cadrages sans lampe visible ») **ne tient pas** là
+où elle a été vérifiée. Sur **183 verts FR jour** (Panoramax, triés un par
+un), la porte accepte **133** crops et en refuse **50** ; les 50 refus ont été
+ouverts un par un : **49 sont la porte (géométrie), 1 seul est la couleur**
+(source : `~/.scratch/feux-improve/a1/RAPPORT.md` §4.1, table nominative).
+
+| cause du refus | règle | n |
+|---|---|---|
+| porte | `R1B_BOTTOM_FLOOR` (vert confiné en haut) | 16 |
+| porte | `BBOX_MIN_PX` (hauteur < 3 px) | 11 |
+| porte | `WIDE_FILL_MAX` (large + plein) | 10 |
+| porte | `EDGE_MAX` (contour trop dense) | 8 |
+| porte | `TOP3_MAX` (masse entassée en haut) | 3 |
+| porte | `RED_MAX_FRACTION` (rouge mélangé) | 1 |
+| **couleur** | plancher `green_frac < 0,002` | **1** |
+
+Les pixels verts **sont présents** (`green_frac` 0,005 à 0,45) : ce n'est donc
+pas un cadrage sans lampe, c'est la géométrie qui refuse. Contrôle visuel fait
+(`a1/diagnostic_crops.png`, ×8) : les cas `bottom` et `contour` sont des
+bonhommes verts nets. Le corpus 883 crops / 116 manques cité plus haut n'a pas
+été ré-audité crop par crop ; c'est **le mécanisme d'attribution** qui est
+rectifié, pas le comptage de ce lot.
+
+**Note de méthode — échelle de mesure.** Le corpus ci-dessus (comme la totalité
+du corpus étiqueté : 49 crops téléphone, 33 ancres, PTL, FR jour) est rendu à
+**48 px**, alors que la production découpe à **96 px**
+(`CrossingPixels.MAX_EDGE = 96`, source unique `CrossingCropScale.MAX_EDGE`).
+Les mêmes 280 boîtes re-rendues à 96 px changent de verdict dans **29,6 %** des
+cas (83/280) et font passer **22 crops rouges sur 40** en vert
+(`a1/RAPPORT.md` §7). Toute mesure de rappel ou de faux vert faite à 48 px est
+donc une borne **hors du domaine de déploiement**, et les règles en pixels de
+la porte (`BBOX_MIN_PX`) n'y ont pas le même sens. Détail et conséquences :
+`docs/MESURES-FEU-ROUGE-VERT.md` §3.

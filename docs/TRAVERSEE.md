@@ -1,14 +1,15 @@
 # Mode traversée — spec v4 (contrat actuel)
 
-> **Spec v4, 01/11/2026** (niveaux revus le 02/11/2026). Le mode traversée dit
+> **Spec v4, 01/11/2026** (niveaux revus le 02/11/2026 : verdict **100**,
+> puis 101/102). Le mode traversée dit
 > à une personne aveugle **quand traverser** : verdict exclusif (feu piéton
-> puis voitures), niveaux **0** (verdict) puis 101/102, chat et GPS muets,
+> puis voitures), niveaux **100** (verdict) puis 101/102, chat et GPS muets,
 > dictée active.
 > Historique pré-v4 (recherche 10 angles, `TraverseVeto`, hystérésis,
 > voix « Vert, traversez. » / « Rouge, attendez. ») :
 > `git show 4a3c2bcf:docs/TRAVERSEE.md`.
 
-## 1. Le verdict (niveau 0)
+## 1. Le verdict (niveau 100)
 
 Règle, dans cet ordre :
 
@@ -25,6 +26,14 @@ Règle, dans cet ordre :
 - Répétition : **2 s, changement immédiat** (ordre user du 02/11/2026) —
   le premier verdict parle aussitôt, un changement parle aussitôt, un
   verdict maintenu se répète toutes les 2 s (clé `verdict` / `verdict:état`).
+  `CrossingVerdictAnnouncer.REPEAT_MS = 2_000L` (`CrossingVerdict.kt`).
+- **Phrase refusée = rejouée** : le verdict est posté au cran **100**, donc
+  un mot d'obstacle dehors (2 à 12) le précède. `VoiceBus.post` rend un
+  `Boolean` ; sur `false`, `CrossingVerdictAnnouncer.rearm` remet
+  l'échéance de répétition à zéro et la phrase repart à la frame suivante
+  (≤ 7 fois/s, `post` est `@Synchronized` ; A9 § 4.4). C'est cette protection — le
+  ré-armement — qui remplace l'escalade de priorité : le cran 0 reste
+  **sans producteur** (ordre user du 02/11/2026, voitures muettes dehors).
 - Le verdict vibre (`IseeHaptics.crossing`) et s'affiche (cadre VERT /
   ROUGE sur le feu, étiquette `CROSS` / `DON'T CROSS`) — même vocabulaire
   sur les deux surfaces, pas de cadre quand le mode est coupé ou sans feu.
@@ -33,14 +42,15 @@ Règle, dans cet ordre :
 
 | Niveau | Quoi | Règle |
 |---|---|---|
-| **0** | Verdict | § 1, prioritaire sur tout le reste (coupe le 101/102, jamais coupé par eux) ; même cran que l'alerte voiture dehors — sinon n'importe quel mot d'obstacle (2 à 12) l'écrasait (A9 § 3 D8) |
+| **100** | Verdict | § 1, devant les humains (101) et les bordures (102), jamais coupé par eux. Il passe **après** les mots d'obstacle dehors (2 à 12) et après la parole du user (1) : la protection contre l'écrasement est le **ré-armement** (§ 1, `VoiceBus.post` rend `false`, `rearm` rejoue), pas une escalade de priorité — décision du 02/11/2026, voitures muettes dehors et cran 0 sans producteur (A9 § 3 D8, § 4.4) |
 | 101 | Humains du passage + alignement | Après le verdict (humains : même phrase qu'au niveau 2 : phrase + cadran + distance, imminent immédiat ; alignement passage : mot + annonce + arrivée, niveau 8 dehors, 101 en Traversée) |
 | 102 | Bordures du passage | Après les humains (montée / descente) |
 
 Chaque place `null` se tait (pas de remplissage : un verdict seul ne fait
 pas parler les bordures). Les niveaux dehors (0 à 12) ne parlent pas en
-traversée — sauf la parole du user (1), que seul le cran 0 coupe, et les
-producteurs dehors se taisent en mode traversée.
+traversée et leurs producteurs s'y taisent — sauf la parole du user (1),
+qui **précède** le verdict (plus petit nombre = plus forte priorité, donc
+1 passe avant 100) : aucun cran de la Traversée ne la coupe.
 
 ## 3. Exclusivité : chat et GPS muets, dictée active
 
@@ -59,9 +69,9 @@ producteurs dehors se taisent en mode traversée.
   la bascule ne change plus les prompts. Le verdict lit le feu
   (`pedestrian traffic light`) et les voitures (`car`) ; les niveaux 101
   et 102 lisent `person` et `curb`.
-- Couleur du feu : relue localement sur chaque frame caméra (au plus tard
-  toutes les 150 ms) ; position : cadence SAM. Hystérésis gardée côté voix
-  (le verdict ne bégaye pas).
+- Couleur du feu : relue localement sur **chaque** frame caméra (le moteur
+  du verdict est nourri par frame en Traversée, `LiveProbePublish.computeRest`) ;
+  position : cadence SAM. Hystérésis gardée côté voix (le verdict ne bégaye pas).
 - Mouvement voiture : suivi client (association IoU, vitesse lissée,
   ego-motion fond + gyro) — une boîte qui suit la caméra (pan sur une
   voiture garée) n'est pas un mouvement.
@@ -81,8 +91,9 @@ fait jamais seul : seuls la puce et l'ordre vocal arment le mode.
   `verdict-cross` / `verdict-dont-cross` (branche verdict). Le catalogue
   clips-en (`verdict_cross` / « Cross now. », `verdict_wait`) est aligné
   dessus à l'intégration — pas l'inverse (le verdict est la source).
-- **Niveaux** : `CrossingLevel` (0/101/102) est l'unique source côté app ;
-  `CrossingLevels` (core, branche verdict) est replié dessus.
+- **Niveaux** (appliqué) : `CrossingLevels` (`:core`, 100/101/102) est
+  l'unique source ; il n'y a pas de `CrossingLevel` côté `:app`, rien à
+  replier.
 - **Antirépétition du verdict** : clé `verdict:état` de la table centrale
   (2 s, changement immédiat) ; l'annonceur maison (`CrossingVerdictAnnouncer`)
   est replié dessus ou supprimé — pas deux mécanismes.

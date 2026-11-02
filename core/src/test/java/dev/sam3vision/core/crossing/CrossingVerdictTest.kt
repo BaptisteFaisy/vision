@@ -157,12 +157,15 @@ class CrossingVerdictTest {
     }
 
     @Test
-    fun `les niveaux sont 0 101 102`() {
+    fun `les niveaux sont 100 101 102`() {
         // Cran 100 (ordre user du 02/11 : voitures muettes dehors, cran 0 sans
         // producteur) : le verdict précède humains et bordures de la Traversée.
         // Contre un mot d'obstacle dehors (2..12) la protection est le
-        // ré-armement, pas le niveau — voir `rearm rejoue tout de suite`.
+        // ré-armement, pas le niveau — voir `un post refuse re-arme la
+        // repetition des la frame suivante`.
         assertEquals(100, CrossingLevels.VERDICT)
+        assertEquals(101, CrossingLevels.HUMAN)
+        assertEquals(102, CrossingLevels.CURB)
         assertTrue(CrossingLevels.VERDICT < CrossingLevels.HUMAN)
         assertTrue(CrossingLevels.HUMAN < CrossingLevels.CURB)
     }
