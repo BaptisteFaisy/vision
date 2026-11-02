@@ -22,7 +22,6 @@ import dev.sam3vision.core.live.FrameRate
 import dev.sam3vision.core.live.LatestFrameSlot
 import dev.sam3vision.core.live.LivePrompts
 import dev.sam3vision.core.live.LiveSession
-import dev.sam3vision.core.live.PersonLabels
 import dev.sam3vision.core.live.SteeringCap
 import dev.sam3vision.app.LiveMaskTransport
 import dev.sam3vision.app.depth.DepthMeter
@@ -471,10 +470,7 @@ _state.update { it.cleared() }
             if (_state.value.frames == 0) {
                 android.util.Log.i("sam3vision", "première analyse : ${frame.objects.size} objets, ${frame.elapsedMs} ms")
             }
-            // Foule sur la réponse brute, pas la fusion : `person` est dans chaque
-            // groupe, la brute dit ce que le serveur vient de voir — un corps
-            // gardé en doute ne doit pas rallumer la cadence foule.
-            noteCrowd(raw?.objects.orEmpty().count { PersonLabels.isBody(it.label) })
+            noteCrowd(rawBodiesOf(raw))
             publish(active, frame, jpegB64, at, shown)
         }
     }

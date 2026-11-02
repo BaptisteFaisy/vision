@@ -1,5 +1,8 @@
 package dev.sam3vision.app.isee
 
+import dev.sam3vision.core.live.PersonLabels
+import dev.sam3vision.core.model.LiveFrame
+
 /**
  * Hystérésis de l'état foule de la sonde iSee ([LiveProbe.crowd]) : on entre au
  * **premier** corps, on ne sort qu'après [CROWD_EXIT_MS] sans corps.
@@ -13,6 +16,15 @@ package dev.sam3vision.app.isee
  */
 internal fun crowdOf(previous: Boolean, bodies: Int, sinceMs: Long, nowMs: Long): Boolean =
     if (bodies > 0) true else previous && nowMs - sinceMs < CROWD_EXIT_MS
+
+/**
+ * Corps vus par le serveur sur la réponse brute : la foule se décide sur ce
+ * que le serveur vient de voir, pas sur la fusion accumulée — `person` est
+ * dans chaque groupe de rotation, et un corps gardé en doute par
+ * l'accumulateur ne doit pas rallumer la cadence foule. `null` = échec.
+ */
+internal fun rawBodiesOf(raw: LiveFrame?): Int =
+    raw?.objects.orEmpty().count { PersonLabels.isBody(it.label) }
 
 /** Sortie de foule : 3 s sans corps, soit ~4 décisions au rythme mesuré le plus lent. */
 internal const val CROWD_EXIT_MS = 3_000L
