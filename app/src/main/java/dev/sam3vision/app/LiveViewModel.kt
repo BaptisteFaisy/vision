@@ -17,7 +17,6 @@ import dev.sam3vision.app.live.LiveNarration
 import dev.sam3vision.app.live.LivePrediction
 import dev.sam3vision.app.live.chosenLens
 import dev.sam3vision.app.live.LiveSensors
-import dev.sam3vision.app.live.LiveDirectAnnouncers
 import dev.sam3vision.app.live.LiveTrackFallback
 import dev.sam3vision.app.live.LiveTransportLog
 import dev.sam3vision.app.live.LiveWakeGuard
@@ -124,12 +123,8 @@ class LiveViewModel(app: Application) : AndroidViewModel(app) {
     /** Masques coloriés sur [MaskPainter] : tampons réutilisés, même peintre que la sonde. */
     private val painter = MaskPainter({ maskColorAt(it).toArgb() }, MASK_ALPHA)
 
-    /** Annonce vocale des positions : une phrase à la fois, jamais superposée. */
+    /** Voix de la chasse nommée : une phrase à la fois, jamais superposée. */
     private val voice = VoiceAnnouncer(app, POSITION_VOICE_DIR)
-
-    /** Voix du direct : positions (un champ, plafond 500 lignes). */
-    private val announcers = LiveDirectAnnouncers(viewModelScope, _state, { settings },
-        { _state.value.memory.asking || asker.pictoActive }, { c, p -> voice.say(c, p) })
 
     /** Câblage traversée : pipeline + voix, branché dans [publish]. */
     private val traverse = TraverseWiring(TraversePipeline())
@@ -234,7 +229,6 @@ class LiveViewModel(app: Application) : AndroidViewModel(app) {
     private fun resetForStart(prompts: List<String>) {
         trackFallback.reset()
         traverse.reset()
-        announcers.reset()
         val chosen = LivePrompts.normalize(prompts)
         // Journal et historique : vidés par `asker.reset()` (implémentation unique, partagée avec `stop()`).
         asker.reset()
@@ -283,7 +277,7 @@ class LiveViewModel(app: Application) : AndroidViewModel(app) {
 
     /** Bascule le mode traversée : prompts véhicules + voix, ou retour au défaut. */
     fun setTraverseActive(active: Boolean) {
-        traverse.setActive(active, getApplication(), settings, viewModelScope, _state.value.prompts, { restart(it) }, announcers::resetPositions)
+        traverse.setActive(active, getApplication(), settings, viewModelScope, _state.value.prompts, { restart(it) })
         _state.update { it.copy(traverseActive = traverse.active) }
     }
 
@@ -384,7 +378,6 @@ class LiveViewModel(app: Application) : AndroidViewModel(app) {
         // extrapolées entre deux inférences. Flag éteint : appel inerte (`null`).
         prediction.absorb(shown.frame, now, width, height)
         val readings = distances.measure(width, height, shown.detections, seen.map { it?.id })
-        announcers.announce(shown.frame, width, height, now, readings, !traverse.active || shown.keepGuidance)
         if (!traverse.active) asker.onLiveFrame(width, height, now)
         // Calcul hors thread principal ; le poste `overlays` est posé juste après.
         val overlays = decodeOverlays(shown.frame)
@@ -478,7 +471,7 @@ class LiveViewModel(app: Application) : AndroidViewModel(app) {
         prediction.reset()
         adaptive.reset()
         wake.reset()
-        traverse.deactivate(announcers::resetPositions)
+        traverse.deactivate()
         voice.stop()
         latestFrame.clear()
         chronology.reset()

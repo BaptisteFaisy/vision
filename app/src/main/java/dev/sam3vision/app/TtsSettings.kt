@@ -78,8 +78,8 @@ private fun SpeedSetting(draft: Settings, onChange: (Settings) -> Unit) {
 }
 
 /**
- * The playback switches: chat replies (🔊 button or automatic) and detected
- * position announcements. One explanation line under each.
+ * The playback switches: chat replies (🔊 button or automatic) and straight
+ * guidance. One explanation line under each.
  */
 @Composable
 private fun VoiceSwitches(draft: Settings, onChange: (Settings) -> Unit) {
@@ -87,10 +87,6 @@ private fun VoiceSwitches(draft: Settings, onChange: (Settings) -> Unit) {
         label = "Read replies automatically",
         checked = draft.ttsAutoplay,
     ) { onChange(draft.copy(ttsAutoplay = it)) }
-    SwitchRow(
-        label = "Announce objects and their distance",
-        checked = draft.ttsAnnouncePositions,
-    ) { onChange(draft.copy(ttsAnnouncePositions = it)) }
     SwitchRow(
         label = "Guide straight ahead (iSee camera)",
         checked = draft.ttsGuidanceStraight,

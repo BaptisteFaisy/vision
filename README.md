@@ -370,7 +370,7 @@ Detail: `docs/CI-QUEUE.md`.
   `docs/COLLECTE-FEUX.md`, `docs/DATASETS-FEUX.md`, `docs/RECETTE-FEUX-FR.md`,
   `docs/RECETTE-DISTANCES.md`, `docs/RECETTE-RUE.md`.
 - **Voice, narration, navigation**: `docs/ELEVENLABS-TTS.md`, `docs/META-ASR.md`,
-  `docs/VOICEPACK.md`, `docs/VOIX-POSITIONS.md`, `docs/VOIX-ANGLAIS.md`,
+  `docs/VOICEPACK.md`, `docs/VOIX-ANGLAIS.md`,
   `docs/VOIX-DANGER.md`, `docs/MICRO-VERROUILLE.md`, `docs/TEST-LONGPRESS-DICTEE.md`,
   `docs/NAVIGATION.md`, `docs/NAVIGATION-VOCALE.md`, `docs/RECETTE-NAVIGATION-VOCALE.md`,
   `docs/VOICE_NAV_PROXY.md`, `docs/GPS-FUSION.md`, `docs/GPS_GUIDE_UTILISATEUR.md`,

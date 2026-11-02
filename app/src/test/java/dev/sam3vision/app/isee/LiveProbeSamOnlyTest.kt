@@ -86,7 +86,7 @@ class LiveProbeSamOnlyTest {
         background = StandardTestDispatcher(scope.testScheduler),
         clientFor = { _, _, _ -> NeverClient() },
     ).also {
-        it.configure("https://sam.test", announce = false, guide = true)
+        it.configure("https://sam.test", guide = true)
         it.begin()
     }
 

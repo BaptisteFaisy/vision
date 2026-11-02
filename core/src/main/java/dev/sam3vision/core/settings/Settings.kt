@@ -47,15 +47,9 @@ data class Settings(
      */
     val liveLlmApiKey: String = "",
     /**
-     * Annonce vocale des **positions** dès qu'un objet est détecté (mode Direct et
-     * analyse photo) : « Personne à 9 heures, chien à 3 heures. » Via ElevenLabs, jamais
-     * le TTS système. `true` par défaut : c'est la fonction d'assistance attendue.
-     */
-    val ttsAnnouncePositions: Boolean = true,
-    /**
      * Guidage « tout droit » de la page caméra iSee : la voix dit un mot
-     * (« Tout droit. », « Gauche. », « Droite. », « Stop. ») au lieu de la
-     * position des objets. `true` par défaut : c'est l'intention de marche attendue.
+     * (« Tout droit. », « Gauche. », « Droite. », « Stop. »).
+     * `true` par défaut : c'est l'intention de marche attendue.
      * Clips pré-synthétisés (< 100 ms), jamais le TTS système, sans aucun appel LLM.
      */
     val ttsGuidanceStraight: Boolean = true,
@@ -329,10 +323,7 @@ data class Settings(
     /** Vrai si une réponse du chat doit être lue dès qu'elle arrive. */
     val ttsAutoRead: Boolean get() = ttsAutoplay && ttsConfigured
 
-    /** Vrai si les positions détectées doivent être dites à voix haute. */
-    val announcePositions: Boolean get() = ttsAnnouncePositions && ttsConfigured
-
-    /** Vrai si la page caméra iSee doit guider la marche au lieu de décrire les positions. */
+    /** Vrai si la page caméra iSee doit guider la marche. */
     val guideStraight: Boolean get() = ttsGuidanceStraight && ttsConfigured
 
     /** Vrai si la dictée Meta est utilisable (endpoint + clé renseignés). */
@@ -361,8 +352,7 @@ data class Settings(
         "llmBaseUrl=$llmBaseUrl, llmApiKey=${maskSecret(llmApiKey)}, llmModel=$llmModel, " +
         "samBaseUrl=$samBaseUrl, samRegion=$samRegion, speechLanguage=$speechLanguage, " +
         "ttsApiKey=${maskSecret(ttsApiKey)}, ttsVoiceId=$ttsVoiceId, ttsSpeed=$ttsSpeed, " +
-        "ttsAutoplay=$ttsAutoplay, ttsAnnouncePositions=$ttsAnnouncePositions, " +
-        "ttsGuidanceStraight=$ttsGuidanceStraight, " +
+        "ttsAutoplay=$ttsAutoplay, ttsGuidanceStraight=$ttsGuidanceStraight, " +
         "asrBaseUrl=$asrBaseUrl, asrApiKey=${maskSecret(asrApiKey)}, asrModel=$asrModel, " +
             "museRealtime=$museRealtime, " +
         "introEnabled=$introEnabled, introPlayed=$introPlayed, " +

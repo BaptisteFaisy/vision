@@ -14,12 +14,10 @@ import dev.sam3vision.app.vm.AppImageLoader
 import dev.sam3vision.app.vm.AppStatusText
 import dev.sam3vision.app.vm.AppVoice
 import dev.sam3vision.app.vm.StateUpdate
-import dev.sam3vision.core.live.PositionText
 import dev.sam3vision.core.mask.colorizedMaskBitmap
 import dev.sam3vision.core.mask.colorizedOverlays
 import dev.sam3vision.core.model.Analysis
 import dev.sam3vision.core.model.ChatTurn
-import dev.sam3vision.core.model.Detection
 import dev.sam3vision.core.model.MASK_ENCODING_PNG
 import dev.sam3vision.core.model.SegObject
 import dev.sam3vision.core.net.GpuMonitor
@@ -77,7 +75,7 @@ data class UiState(
  * le cycle de vie, et le branchement des collaborateurs :
  *
  * - [AppImageLoader] : décodage réduit au bord max + encodage base64 de la photo ;
- * - [AppAnalysis] : SAM + LLM, masques, note de segmentation, annonce des positions ;
+ * - [AppAnalysis] : SAM + LLM, masques, note de segmentation ;
  * - [AppChat] : question → réponse → historique du chat ;
  * - [AppVoice] : synthèse ElevenLabs et lecture d'une phrase à la fois ;
  * - [AppDiagnostics] : « Tester LLM / SAM / dictée » et extinction de la GPU ;
@@ -148,14 +146,13 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
     /** Chronologie de l'analyse en cours (logcat `ISEE_PERF` + écran Analyse). */
     private val photoTimings = PhotoTimings()
 
-    /** Analyse d'une photo : SAM puis LLM, masques coloriés et positions annoncées. */
+    /** Analyse d'une photo : SAM puis LLM, masques coloriés. */
     private val analysis = AppAnalysis(
         state = { _state.value },
         update = stateUpdate,
         llm = { settings -> llmClient(settings) },
         sam = ::samClientOrNull,
         overlays = ::buildOverlays,
-        announce = ::announcePositions,
         noteSam = { endpoint, result -> gpuMonitor.noteSamResult(endpoint, result) },
         mark = photoTimings::mark,
     )
@@ -242,21 +239,6 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
         }
         analysis.analyze(loaded.base64)
         update { it.copy(timingsLine = photoTimings.emit()) }
-    }
-
-    /**
-     * Dit à voix haute où sont les objets segmentés (« Personne à gauche, chaise au centre »).
-     * Même bascule que le direct, même voix ElevenLabs ; silencieux sans objet ou sans clé.
-     * Les murs sont nommés : c'est une photo, pas une marche — aucune esquive à dire.
-     */
-    private fun announcePositions(objects: List<SegObject>, settings: Settings) {
-        val photo = _state.value.photo
-        if (!settings.announcePositions || photo == null) return
-        val placed = objects.mapNotNull {
-            PositionText.fromDetection(Detection(it.label, it.score, it.box, photo.width, photo.height))
-        }
-        val phrase = PositionText.phrase(placed, language = settings.speechLanguage, nameWalls = true) ?: return
-        viewModelScope.launch { voice.say(settings, phrase) }
     }
 
     /** Masques coloriés dans les bornes de la photo ; aucun masque lisible ⇒ liste vide. */

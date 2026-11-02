@@ -111,7 +111,6 @@ internal fun LiveProbe.configureFrom(
     configure(
         baseUrl = settings.resolveSamEndpoint(BuildConfig.SAM_BASE_URL, BuildConfig.SAM_US_BASE_URL),
         prompts = effective,
-        announce = settings.ttsAnnouncePositions,
         guide = settings.ttsGuidanceStraight,
         lens = chosen.spec,
         distancesOn = settings.distanceOverlayEnabled,
@@ -319,9 +318,9 @@ internal fun probeGuideFrameOf(
 /**
  * Phrase à dire pour la frame (`null` = silence, SPEC v4) : silence en
  * Traversée (le verdict parle au bus), sinon guidage (cap route, sinon cap
- * manuel) puis positions. Compteur de marches actif : seul l'évitement
- * parle (virage, stop), le reste se tait devant le compte. Le suivi
- * alimente **chaque** frame ; le guidage reçoit les étiquettes identifiées
+ * manuel). Compteur de marches actif : seul l'évitement parle (virage,
+ * stop), le reste se tait devant le compte. Le suivi alimente **chaque**
+ * frame ; le guidage reçoit les étiquettes identifiées
  * ([ProbeGuideFrame.labels]) et le rail trottoir de la frame.
  */
 internal fun LiveProbe.phraseOf(

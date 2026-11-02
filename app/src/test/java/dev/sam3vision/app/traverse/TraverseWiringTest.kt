@@ -72,26 +72,22 @@ class TraverseWiringTest {
     fun `setActive faux sur repos - sans effet ni relance`() {
         val wiring = wiring()
         var relaunches = 0
-        var quiets = 0
         // L'app est inutilisée sur le chemin sans effet : `null` suffit en JVM.
-        wiring.setActive(false, null, Settings.Default, scope(), listOf("car"), { relaunches++ }, { quiets++ })
+        wiring.setActive(false, null, Settings.Default, scope(), listOf("car"), { relaunches++ })
 
         assertFalse(wiring.active)
         assertEquals(0, relaunches)
-        assertEquals(0, quiets)
     }
 
     @Test
-    fun `deactivate - pipeline efface et quiet appele`() = runBlocking {
+    fun `deactivate - pipeline efface`() = runBlocking {
         val wiring = wiring()
         wiring.at(listOf(seg()), 1)
         wiring.at(listOf(seg()), 2)
         wiring.updateLight(CrossingState.Green)
-        var quiets = 0
-        wiring.deactivate { quiets++ }
+        wiring.deactivate()
 
         assertFalse(wiring.active)
-        assertEquals(1, quiets)
         assertFalse("vert oublie", wiring.lightGreen)
         assertTrue("pistes oubliees", wiring.at(listOf(seg()), 3).frame.objects.isEmpty())
     }
@@ -238,7 +234,7 @@ class TraverseWiringTest {
     fun `deactivate - mode OFF journalise`() {
         val lines = mutableListOf<String>()
         val wiring = TraverseWiring(TraversePipeline(), log = { lines += it })
-        wiring.deactivate { }
+        wiring.deactivate()
 
         assertEquals(listOf("traversee mode=OFF"), lines)
     }

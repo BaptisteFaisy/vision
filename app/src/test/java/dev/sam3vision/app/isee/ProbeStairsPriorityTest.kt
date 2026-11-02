@@ -22,10 +22,10 @@ import org.junit.Before
 import org.junit.Test
 
 /**
- * Priorité du compteur de marches : il parle toutes les secondes devant les
- * positions et le guidage normal — l'évitement (décalage humain, couloir
- * bouché, stop) est émis devant le compteur et parle au bus entre deux
- * comptes (plus par-dessus, § 42) ; l'annonce seule cède à l'esquive.
+ * Priorité du compteur de marches : il parle toutes les secondes devant le
+ * guidage normal — l'évitement (décalage humain, couloir bouché, stop) est
+ * émis devant le compteur et parle au bus entre deux comptes (plus
+ * par-dessus, § 42).
  */
 @OptIn(ExperimentalCoroutinesApi::class)
 class ProbeStairsPriorityTest {
@@ -61,14 +61,13 @@ class ProbeStairsPriorityTest {
         return luma
     }
 
-    private fun probe(scope: TestScope, guide: Boolean = false, announce: Boolean = false): LiveProbe {
+    private fun probe(scope: TestScope, guide: Boolean = false): LiveProbe {
         val probe = LiveProbe(
             scope = scope,
             clock = { 0L },
             background = StandardTestDispatcher(scope.testScheduler),
         )
         probe.voice.guide = guide
-        probe.voice.announce = announce
         probe.voice.language = SpeechLanguage.Fr
         return probe
     }
@@ -110,32 +109,6 @@ class ProbeStairsPriorityTest {
         probe.voice.phrase(0L, listOf(personne(0.5f, 1.0f)), SteeringCap.Straight)
 
         assertTrue(probe.stairsYieldToAvoidance())
-    }
-
-    @Test
-    fun `positions tues devant le compteur`() = runTest {
-        val probe = probe(this, announce = true)
-        StairCannyCount.offerLuma(stairsLuma())
-        assertTrue(StairCannyCount.lineCount() > 0)
-
-        val phrase = probe.phraseOf(
-            listOf(personne(0.3f, 2.0f)), listOf(stairsReading()),
-            stairsFrame(), 0L, SpeechLanguage.Fr, LensSpec.DEFAULT_H_FOV_DEG,
-        )
-
-        assertNull(phrase)
-    }
-
-    @Test
-    fun `positions parlent sans compteur`() = runTest {
-        val probe = probe(this, announce = true)
-
-        val phrase = probe.phraseOf(
-            listOf(personne(0.3f, 2.0f)), listOf(stairsReading()),
-            stairsFrame(), 0L, SpeechLanguage.Fr, LensSpec.DEFAULT_H_FOV_DEG,
-        )
-
-        assertNotNull(phrase)
     }
 
     @Test

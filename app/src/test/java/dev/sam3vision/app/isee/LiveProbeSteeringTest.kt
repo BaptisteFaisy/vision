@@ -91,7 +91,7 @@ class LiveProbeSteeringTest {
 
     @Test
     fun `sans guidage pas de chemin dans l etat`() = runTest {
-        val (probe, fake) = harness(this, guide = false, announce = true)
+        val (probe, fake) = harness(this, guide = false)
         probe.setSteering(SteeringCap.Left)
         probe.onFrame("A", captureAtNs = 8_000_000L)
         advanceUntilIdle()
@@ -120,7 +120,7 @@ class LiveProbeSteeringTest {
     }
 
     /** Sonde branchée sur un faux client : les réponses SAM sont livrées par le test. */
-    private fun harness(scope: TestScope, guide: Boolean, announce: Boolean = false): Pair<LiveProbe, FakeLiveClient> {
+    private fun harness(scope: TestScope, guide: Boolean): Pair<LiveProbe, FakeLiveClient> {
         val fake = FakeLiveClient()
         val probe = LiveProbe(
             scope = scope,
@@ -128,7 +128,7 @@ class LiveProbeSteeringTest {
             background = StandardTestDispatcher(scope.testScheduler),
             clientFor = { _, _, marks -> fake.also { it.marks = marks } },
         )
-        probe.configure("https://sam.test", announce = announce, guide = guide)
+        probe.configure("https://sam.test", guide = guide)
         // Scheduler coupé : ce test verrouille le cap, pas les keyframes (voir LiveAdaptiveTest).
         probe.adaptive.configure(uploadEnabled = false, keyframesEnabled = false)
         probe.begin()

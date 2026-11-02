@@ -1,6 +1,6 @@
-# Voix ElevenLabs — contrat réel, annonce des positions, silence
+# Voix ElevenLabs — contrat réel et silence
 
-> La **langue** de cette voix (annonces de position, réponses du chat, consignes du LLM) se
+> La **langue** de cette voix (chasse picto, réponses du chat, consignes du LLM) se
 > règle dans Réglages → « Langue de la voix » : voir `docs/VOIX-ANGLAIS.md`. La voix reste un
 > choix (`ID de voix ElevenLabs`) indépendant de la langue.
 
@@ -83,20 +83,22 @@ Content-Type: application/json
   (cache LRU de 6 réponses) a été **supprimé le 01/11/2026** : jamais branché
   (`git grep SpeechUseCase app/` ne trouvait aucun appel dans l'app).
 
-## Déclenchement : une bascule **ET** une clé
+## Déclenchement : une clé suffit (bascule positions **virée le 02/11**)
 
 ```kotlin
 // core/settings/Settings.kt
-val ttsConfigured     get() = ttsApiKey.isNotBlank() && ttsVoiceId.isNotBlank()
-val announcePositions get() = ttsAnnouncePositions && ttsConfigured
+val ttsConfigured get() = ttsApiKey.isNotBlank() && ttsVoiceId.isNotBlank()
 ```
 
-Donc la voix des positions parle seulement si **les deux** sont vraies :
+**Marqué périmé le 02/11, pas effacé** : le mode annonce vocale des positions est viré
+(ordre user — il ne servait à rien). Avant, la voix des positions parlait seulement si
+**les deux** étaient vraies : la bascule Réglages **« Annoncer les objets et leur
+distance »** (`ttsAnnouncePositions`, vrai par défaut) **ET** une clé ElevenLabs. La
+bascule, le réglage et les voix du direct et de la photo sont supprimés ; il reste :
 
-- la bascule Réglages **« Annoncer les objets et leur distance »** (`ttsAnnouncePositions`,
-  vrai par défaut) ;
 - une **clé ElevenLabs** non vide (et un ID de voix non vide) — saisie à l'écran
-  Réglages ou venue du build (`tts.api.key`).
+  Réglages ou venue du build (`tts.api.key`) — qui arme le guidage (`guideStraight`),
+  la lecture auto du chat (`ttsAutoRead`) et la chasse picto.
 
 **Si l'une manque : rien n'est dit, aucun appel réseau.** L'erreur typée remonte à
 l'appelant (`VoiceAnnouncer.say()` rend `Result<Unit>` : succès si le texte est vide,
@@ -200,12 +202,12 @@ annonce muette n'est donc jamais une raison de redéployer.
 | Élément | Où |
 |---|---|
 | Client HTTP TTS | `core/net/ElevenLabsTtsClient.kt` (pur JVM, testé : URL, erreurs, audio) |
-| Réglages (clé, voix, bascule) | `core/settings/Settings.kt` (`ttsApiKey`, `ttsVoiceId`, `ttsAnnouncePositions`, `announcePositions`) |
+| Réglages (clé, voix) | `core/settings/Settings.kt` (`ttsApiKey`, `ttsVoiceId`, `ttsConfigured`) — bascule positions virée le 02/11 |
 | Clé de build | `app/SettingsSeed.kt` (`seededFromBuild`) |
 | Découpage d'énoncés | `core/audio/SentenceChunker.kt` (branché : `app/isee/IseePlayback.kt`) ; l'ancien cache LRU (`SpeechUseCase`) est supprimé depuis le 01/11/2026 (jamais branché) |
-| Lecture MP3 | `app/SpeechPlayer.kt` (`MediaPlayer`) ; `voice` (bandeaux), `isee-play` (iSee), `positions` (Direct) |
+| Lecture MP3 | `app/SpeechPlayer.kt` (`MediaPlayer`) ; `voice` (bandeaux), `isee-play` (iSee), `positions` (chasse) |
 | Bandeaux de dictée | `app/VoiceAnnouncer.kt` |
-| Positions (mots) | `core/live/PositionText.kt`, `core/live/PositionAnnouncer.kt` |
+| Chasse nommée (mots) | `core/live/PositionText.kt`, `core/live/PositionAnnouncer.kt` (voix annonce passive virée le 02/11, mécanisme gardé pour la chasse) |
 | Positions (câblage iSee) | `app/isee/LiveProbe.kt` (`phraseOf`), `app/isee/ProbeWiring.kt` (`observeSpoken`), `app/isee/ProximityVoice.kt`, `app/isee/IseeViewModel.kt` |
 | Positions (écran Direct) | `app/LiveViewModel.kt` (`announcePositions`, `sayPositions`) |
 | Boutons « 🔊 / ⏹ » | `app/TtsState.kt`, `app/TtsSettings.kt`, `app/SharedUi.kt` |
@@ -255,5 +257,5 @@ Un énoncé déjà en cache disque (bulle du chat) coûte **0** caractère.
   `400 text_too_long`.
 - La clé du compte n'a pas `voices_read` : le champ voix est un ID libre, pas une
   liste réelle du compte.
-- Sur l'écran Direct, l'annonce des positions n'est pas exclusive avec la voix du
-  chat (lecteurs distincts) — seul iSee garantit « jamais par-dessus ».
+- **Viré le 02/11** : sur l'écran Direct, l'annonce des positions n'était pas exclusive
+  avec la voix du chat (lecteurs distincts) — seul iSee garantissait « jamais par-dessus ».

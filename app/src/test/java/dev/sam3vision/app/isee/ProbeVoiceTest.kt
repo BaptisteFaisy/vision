@@ -9,8 +9,8 @@ import org.junit.Assert.assertTrue
 import org.junit.Test
 
 /**
- * Voix de la sonde : le guidage (cap route, sinon cap manuel) prime sur
- * l'annonce, et le chemin dessiné est celui de la décision parlée.
+ * Voix de la sonde : le guidage (cap route, sinon cap manuel) parle seul,
+ * et le chemin dessiné est celui de la décision parlée.
  */
 class ProbeVoiceTest {
 
@@ -20,7 +20,7 @@ class ProbeVoiceTest {
     private fun guided(): ProbeVoice = ProbeVoice().also { it.guide = true }
 
     @Test
-    fun `guide coupe et annonce coupee restent muets`() {
+    fun `guidage coupe reste muet`() {
         val voice = ProbeVoice()
 
         assertNull(voice.phrase(0L, libre, SteeringCap.Straight))
@@ -144,15 +144,5 @@ class ProbeVoiceTest {
         assertEquals(SteeringCap.Left, cue!!.passage)
         assertTrue(cue.urgent)
         assertFalse(cue.blocked)
-    }
-
-    @Test
-    fun `annonce mur seul = cote d'esquive, jamais le nom`() {
-        val voice = ProbeVoice().also { it.announce = true }
-
-        assertEquals(
-            "Left.",
-            voice.phrase(0L, listOf(PlacedLabel("wall", 0.5f, 0.5f)), SteeringCap.Straight),
-        )
     }
 }

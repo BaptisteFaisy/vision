@@ -26,7 +26,6 @@ import org.junit.Test
 class AppAnalysisTest {
 
     private val screen = FakeScreen()
-    private val announced = mutableListOf<List<SegObject>>()
     private var overlayCalls = 0
 
     private fun runner(
@@ -39,7 +38,6 @@ class AppAnalysisTest {
         llm = { llm },
         sam = { sam },
         overlays = { overlayCalls++; emptyList<Bitmap>() },
-        announce = { objects, _ -> announced += objects },
         noteSam = noteSam,
     )
 
@@ -49,7 +47,7 @@ class AppAnalysisTest {
     }
 
     @Test
-    fun `analyse reussie — etat pret, objets segmentes, positions annoncees`() = runTest {
+    fun `analyse reussie — etat pret, objets segmentes`() = runTest {
         val chaise = SegObject("chaise", 0.9f, listOf(0f, 0f, 1f, 1f), "masque")
         var labelsSeen: List<String> = emptyList()
         val llm = FakeLlm(onDescribe = { labels ->
@@ -66,7 +64,6 @@ class AppAnalysisTest {
         assertTrue(screen.value.segmentationActive)
         assertNull("des objets : aucune note", screen.value.segmentationNote)
         assertEquals("masques demandés", 1, overlayCalls)
-        assertEquals("positions annoncées", listOf(listOf(chaise)), announced)
     }
 
     @Test
@@ -139,7 +136,6 @@ class AppAnalysisTest {
         assertEquals("délai dépassé côté LLM", (phase as Phase.Failed).message)
         assertNull("aucune analyse posée", screen.value.analysis)
         assertFalse(screen.value.segmentationActive)
-        assertTrue("aucune position annoncée", announced.isEmpty())
     }
 
     @Test
