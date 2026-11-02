@@ -269,7 +269,7 @@ class WsLiveClientTest {
     }
 
     @Test
-    fun `un silence du serveur referme le socket pour que la frame suivante le rouvre`() = runBlocking {
+    fun `un silence du serveur rouvre le socket aussitot, sans attendre la frame suivante`() = runBlocking {
         var opens = 0
         val transport = object : WsTransport {
             override fun open(
@@ -291,11 +291,12 @@ class WsLiveClientTest {
         val client = WsLiveClient(base, transport, timeoutMs = 120, http = RecordingLiveClient(), binaryWs = false)
 
         assertTrue(client.live("QQ==", listOf("person"), 640, 4).exceptionOrNull() is ApiError.Timeout)
-        assertFalse("le socket muet doit être considéré fermé", client.isConnected)
-        assertEquals(1, opens)
+        assertEquals("handshake de reprise immédiat, en fond", 2, opens)
+        assertTrue("le socket de reprise est déjà ouvert", client.isConnected)
 
-        client.live("QQ==", listOf("person"), 640, 4)
-        assertEquals("la frame suivante doit retenter un handshake", 2, opens)
+        assertTrue(client.live("QQ==", listOf("person"), 640, 4).exceptionOrNull() is ApiError.Timeout)
+        assertEquals("chaque timeout rouvre aussitôt", 3, opens)
+        assertTrue(client.isConnected)
     }
 
     /** Client dont les deux lectures du chemin WebSocket sont comptées. */

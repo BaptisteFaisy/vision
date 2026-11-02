@@ -221,6 +221,8 @@ class LiveSession(
         val startedAt = clock()
         try {
             val result = send()
+            // Échec : le handshake de reprise part en fond (FIX-16), recouvert par l'inter-frame.
+            if (result.isFailure) preconnect()
             if (!gate.isCurrent(era)) return null
             result.getOrNull()?.let { frame -> serverStats.record(frame.elapsedMs) }
             stats.record(clock() - startedAt)
