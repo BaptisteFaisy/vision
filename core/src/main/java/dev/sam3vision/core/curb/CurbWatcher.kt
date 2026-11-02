@@ -19,8 +19,8 @@ enum class CurbEdge { Up, Down, Uncertain }
 /**
  * Ordre d'annonce « trottoir » : [phrase] dans la langue de la voix, [meters]
  * la distance du signal qui l'a déclenché (journal, réglages), [tier] son
- * palier, [urgent] vrai pour les seuls paliers proches 0,7 / 0,5 m,
- * [safetyPhrase] l'alerte immédiate (« Bordure à 0,5 mètre. ») pour le seul
+ * palier, [urgent] vrai pour le seul palier proche 0,5 m,
+ * [safetyPhrase] l'alerte immédiate (« Bordure 0,5 m. ») pour le seul
  * palier 0,5 m (`null` pour la détection et les paliers doux — info douce,
  * pas d'alerte), [level] le niveau VoiceBus v4 (5, bordures),
  * [antiRepeatKey] sa clé AntiRepeat v4 (`curb`, 2 s) et [edge] le sens du
@@ -44,9 +44,9 @@ data class CurbCue(
 /**
  * Phrases bordure, FR/EN comme les positions (`PositionText`) : la détection
  * (« Bordure détectée » / « Curb detected », avec l'heure quand le centre
- * est connu — c'est elle qui situe le bord), le compte à rebours 2 / 1,5 /
- * 1 / 0,7 / 0,5 m (« Bordure à … » / « Curb at … », sans heure : courts
- * pour s'enchaîner), les marches sensées ([phrase] à 1 m, [stepPhrase]
+ * est connu — c'est elle qui situe le bord), le compte à rebours 2 / 1 /
+ * 0,5 m (« Bordure … m » / « Curb … m », sans heure : courts pour
+ * s'enchaîner), les marches sensées ([phrase] à 1 m, [stepPhrase]
  * imminente, [safetyStepPhrase] consigne — montée, descente ou sens
  * incertain, reel audit 31/10). Liste fermée : le préchauffage sait quels
  * clips générer.
@@ -79,26 +79,20 @@ object CurbText {
     }
 
     /**
-     * Palier du compte à rebours : « Bordure à 2 mètres. » — [palier] vaut
+     * Palier du compte à rebours : « Bordure 2 m. » — [palier] vaut
      * toujours un [CurbWatcher.COUNTDOWN_METERS] ; toute autre distance se
-     * dit quand même (virgule FR, accord), jamais d'exception.
+     * dit quand même (virgule FR), jamais d'exception.
      */
     fun distancePhrase(palier: Float, language: SpeechLanguage): String = when (language) {
-        SpeechLanguage.Fr -> "Bordure à ${frenchMeters(palier)}."
-        SpeechLanguage.En -> "Curb at ${englishMeters(palier)}."
+        SpeechLanguage.Fr -> "Bordure ${frenchMeters(palier)}."
+        SpeechLanguage.En -> "Curb ${englishMeters(palier)}."
     }
 
-    /** « 2 mètres », « 1,5 mètre » (singulier sous 2 m, virgule décimale). */
-    private fun frenchMeters(meters: Float): String {
-        val digits = digits(meters).replace('.', ',')
-        return if (meters >= 2f) "$digits mètres" else "$digits mètre"
-    }
+    /** « 2 m », « 1,5 m » (abréviation invariable, virgule décimale). */
+    private fun frenchMeters(meters: Float): String = "${digits(meters).replace('.', ',')} m"
 
-    /** « 2 meters », « 1 meter » (pluriel sauf 1 m). */
-    private fun englishMeters(meters: Float): String {
-        val digits = digits(meters)
-        return if (meters == 1f) "$digits meter" else "$digits meters"
-    }
+    /** « 2 m », « 1.5 m » (abréviation invariable, point décimal). */
+    private fun englishMeters(meters: Float): String = "${digits(meters)} m"
 
     /** « 2 », « 1.5 » : l'entier sans décimale, le reste brut (point, la virgule est FR). */
     private fun digits(meters: Float): String {
@@ -150,8 +144,8 @@ object CurbText {
  * silence pendant [cooldownMs].
  *
  * Détection dite aussitôt confirmée (« Bordure détectée. », une fois par
- * approche), puis compte à rebours [COUNTDOWN_METERS] (2 / 1,5 / 1 / 0,7 /
- * 0,5 m) : chaque palier dit une fois par approche dès [confirmFrames]
+ * approche), puis compte à rebours [COUNTDOWN_METERS] (2 / 1 / 0,5 m) :
+ * chaque palier dit une fois par approche dès [confirmFrames]
  * frames sous le seuil, **sans** cooldown entre paliers — l'approche à pied
  * les enchaîne en ~2 s, un cooldown les tuerait. Verrous + hystérésis
  * ([REARM_MARGIN_METERS] : recul au-delà = le palier reparle) tiennent le
@@ -195,7 +189,7 @@ class CurbWatcher(
     private var detectedSpoken: Boolean = false
 
 
-    /** Instant du dernier palier proche dit (0,7 / 0,5 m), [NO_INSTANT] si aucun. */
+    /** Instant du dernier palier proche dit (0,5 m), [NO_INSTANT] si aucun. */
     private var lastNearAtMs: Long = NO_INSTANT
 
     /** Instant de la dernière annonce, [NO_INSTANT] si aucune. */
@@ -370,7 +364,7 @@ class CurbWatcher(
         const val STEP_NEAR_METERS = 0.7f
 
         /** Paliers du compte à rebours (m), du plus loin au plus proche. */
-        val COUNTDOWN_METERS = listOf(2.0f, 1.5f, 1.0f, 0.7f, 0.5f)
+        val COUNTDOWN_METERS = listOf(2.0f, 1.0f, 0.5f)
 
         /**
          * Hystérésis : un palier dit se ré-arme quand on recule au-delà de
