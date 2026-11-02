@@ -85,11 +85,11 @@ class ProximityVoiceFallbackTest {
     }
 
     @Test
-    fun `cle credits cadence timeout reseau, toutes repliees`() = runTest {
+    fun `cle credits cadence timeout reseau GPS, toutes repliees`() = runTest {
         networkDown.forEach { error ->
             val rig = Rig(error = error)
 
-            assertTrue("$error", rig.voice().speak("Bordure détectée."))
+            assertTrue("$error", rig.voice().speak("Bordure détectée.", level = OutdoorLevel.GPS_EVENT))
 
             assertEquals(listOf("Bordure détectée."), rig.driver.heard)
         }
@@ -123,10 +123,10 @@ class ProximityVoiceFallbackTest {
     }
 
     @Test
-    fun `mot panne reseau, dit au systeme`() = runTest {
+    fun `mot panne reseau GPS, dit au systeme`() = runTest {
         val rig = Rig()
 
-        assertTrue(rig.voice().speakWord("guide_left", "Gauche.", SpeechLanguage.Fr))
+        assertTrue(rig.voice().speakWord("guide_left", "Gauche.", SpeechLanguage.Fr, level = OutdoorLevel.GPS_EVENT))
 
         assertEquals(listOf("Gauche."), rig.driver.heard)
         assertEquals(listOf("Gauche."), rig.spoken)
@@ -158,8 +158,8 @@ class ProximityVoiceFallbackTest {
         val voice = rig.voice()
         val stop = GuidanceWord.Stop.text(SpeechLanguage.Fr)
 
-        assertTrue(voice.speakWord("guide_stop", stop, SpeechLanguage.Fr))
-        assertFalse(voice.speakWord("guide_stop", stop, SpeechLanguage.Fr))
+        assertTrue(voice.speakWord("guide_stop", stop, SpeechLanguage.Fr, level = OutdoorLevel.GPS_EVENT))
+        assertFalse(voice.speakWord("guide_stop", stop, SpeechLanguage.Fr, level = OutdoorLevel.GPS_EVENT))
 
         assertEquals(listOf(stop), rig.driver.heard)
     }

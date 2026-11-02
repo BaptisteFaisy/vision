@@ -65,15 +65,15 @@ class ProximityVoiceEchelleTest {
     }
 
     @Test
-    fun `phrase hors GPS sans clip = synthese reseau`() = runTest {
+    fun `phrase hors GPS sans clip = silence, zero reseau`() = runTest {
         val rig = Rig()
         val voice = rig.voice()
 
-        assertTrue(voice.speak("Bordure détectée."))
-        assertTrue(voice.speak("Trottoir à gauche."))
+        assertFalse(voice.speak("Bordure détectée."))
+        assertFalse(voice.speak("Trottoir à gauche."))
 
-        assertEquals(listOf("Bordure détectée.", "Trottoir à gauche."), rig.attempts)
-        assertEquals(listOf("Bordure détectée.", "Trottoir à gauche."), rig.said())
+        assertTrue(rig.attempts.isEmpty())
+        assertTrue(rig.said().isEmpty())
     }
 
     @Test

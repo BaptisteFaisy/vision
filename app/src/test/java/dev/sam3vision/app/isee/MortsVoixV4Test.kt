@@ -17,9 +17,9 @@ import org.junit.Test
  * SPEC v4 morts-voix : les portes et files sont supprimées (le bus
  * arbitre), le repli hors-ligne et son signal sont supprimés (sans clé ou
  * voix réseau en panne : silence, jamais de TTS système — seuls les clips
- * parlent sans réseau, et tous les niveaux synthétisent sans clip
- * (porte D-04 rouverte) — le compte escaliers est verrouillé audible
- * ici, § 42.
+ * parlent sans réseau, et sans clip seuls les niveaux GPS synthétisent
+ * (noms rues/lieux, ordre user : ElevenLabs = LLM + noms GPS) — le compte
+ * escaliers parle en chaînes au bus (§ 42), silence sans clip ici.
  */
 class MortsVoixV4Test {
 
@@ -54,14 +54,14 @@ class MortsVoixV4Test {
     }
 
     @Test
-    fun `compte escaliers synthetise comme gps`() = runTest {
+    fun `compte escaliers sans clip = silence ici, chaines au bus`() = runTest {
         val rig = Rig()
         val voice = rig.voice()
 
-        assertTrue(voice.speak("5 marches.", level = OutdoorLevel.STAIRS))
+        assertFalse(voice.speak("5 marches.", level = OutdoorLevel.STAIRS))
 
-        assertEquals(listOf("5 marches."), rig.attempts)
-        assertEquals(listOf("5 marches."), rig.spoken)
+        assertTrue(rig.attempts.isEmpty())
+        assertTrue(rig.spoken.isEmpty())
     }
 
     @Test

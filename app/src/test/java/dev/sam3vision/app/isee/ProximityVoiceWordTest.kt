@@ -83,16 +83,16 @@ class ProximityVoiceWordTest {
     }
 
     @Test
-    fun `clip absent hors GPS, synthese reseau`() = runTest {
+    fun `clip absent hors GPS, silence zero reseau`() = runTest {
         val attempts = mutableListOf<String>()
         val spoken = mutableListOf<String>()
 
         val dit = voice(packVide(), attempts, spoken)
             .speakWord("guide_left", "Gauche.", SpeechLanguage.Fr, level = OutdoorLevel.HUMAN)
 
-        assertTrue(dit)
-        assertEquals(listOf("Gauche."), attempts)
-        assertEquals(listOf("Gauche."), spoken.filter { it.isNotBlank() })
+        assertFalse(dit)
+        assertTrue(attempts.isEmpty())
+        assertTrue(spoken.filter { it.isNotBlank() }.isEmpty())
     }
 
     @Test
