@@ -1,6 +1,7 @@
 package dev.sam3vision.app.isee
 
 import dev.sam3vision.app.BuildConfig
+import dev.sam3vision.app.SIDEWALK_SLICE_MS
 import dev.sam3vision.app.SpeechPlayer
 import dev.sam3vision.app.VOICE_SLICE_MS
 import dev.sam3vision.app.safety.CrashGuard
@@ -54,6 +55,17 @@ internal const val RELEASE_TIMEOUT_MS = 25_000L
  * `withLock` sur l'instance coincée attendrait pour toujours).
  */
 internal const val SPEECH_POLL_MS = 50L
+
+/**
+ * Tranche de lecture pour [level] : verdict dit entier (`null`), trottoir
+ * en moins de 500 ms (§ 46, absolu bref), tout le reste en 700 ms (§ 39).
+ * Pure, testée en JVM.
+ */
+internal fun sliceMsForLevel(level: Int): Long? = when (level) {
+    CrossingLevels.VERDICT -> null
+    OutdoorLevel.SIDEWALK -> SIDEWALK_SLICE_MS
+    else -> VOICE_SLICE_MS
+}
 
 internal class SpeechPlayerClipSink(private val player: SpeechPlayer) : ClipSink {
     override suspend fun playFile(file: File): Result<Unit> = player.playFile(file)

@@ -19,6 +19,9 @@ enum class PlaybackEnd { Done, Stopped }
 /** Tranche voix : chaque parole tient dans 700 ms (ordre user du 01/11 — un tick, une phrase). */
 internal const val VOICE_SLICE_MS = 700L
 
+/** Tranche trottoir : l'annonce absolue tient en moins de 500 ms (ordre user du 02/11, § 46). */
+internal const val SIDEWALK_SLICE_MS = 500L
+
 /** Plafond d'accélération d'une tranche (pitch conservé ; au-delà, refus plateforme possible). */
 internal const val MAX_SLICE_RATE = 3f
 
