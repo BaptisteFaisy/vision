@@ -74,15 +74,24 @@ class VoiceNavTracker(
      * double abonnement après un retour de fond).
      *
      * @return `true` si au moins un fournisseur écoute réellement. Sans
-     *   permission ou sans fournisseur, rien n'est demandé et `false` est
-     *   rendu : l'appelant bascule sur Maps au lieu d'afficher un guidage
-     *   qui ne recevrait jamais de position.
+     *   permission, sans fournisseur ou localisation coupée, rien n'est
+     *   demandé et `false` est rendu : l'appelant bascule sur Maps au lieu
+     *   d'afficher un guidage qui ne recevrait jamais de position.
      */
     @SuppressLint("MissingPermission")
     fun start(): Boolean {
         if (listening) return true
+        val manager = locations
+        // Localisation coupée : les abonnements seraient acceptés sans
+        // jamais rappeler — `false` plutôt qu'un guidage muet.
+        if (manager == null || !anyProviderEnabled(manager)) return false
         listening = listen(LocationManager.GPS_PROVIDER) or listen(LocationManager.NETWORK_PROVIDER)
-        return listening
+        if (!listening) return false
+        // Dernier fix connu : la carte affiche un point aussitôt, sans
+        // attendre un GPS froid (miroir de `SharePosition`, affichage seul —
+        // le moteur, lui, attend ses fixes frais).
+        if (lastFix == null) seedLastKnown()
+        return true
     }
 
     /**
@@ -126,17 +135,34 @@ class VoiceNavTracker(
 
     /** Pousse la position brute au moteur et publie ses événements. */
     private fun onLocation(location: Location) {
-        val fix = navFixOf(
-            lat = location.latitude,
-            lon = location.longitude,
-            accuracyM = location.accuracy,
-            hasAccuracy = location.hasAccuracy(),
-            atMs = location.time,
-            headingDeg = if (location.hasBearing()) location.bearing else null,
-        )
+        val fix = location.toNavFix()
         lastFix = fix
         engine.onFix(fix).forEach(onEvent)
         onFix(fix)
+    }
+
+    /** Conversion unique des positions système (rappels frais comme amorce). */
+    private fun Location.toNavFix(): NavFix = navFixOf(
+        lat = latitude,
+        lon = longitude,
+        accuracyM = accuracy,
+        hasAccuracy = hasAccuracy(),
+        atMs = time,
+        headingDeg = if (hasBearing()) bearing else null,
+    )
+
+    /**
+     * Amorce [lastFix] sur le dernier fix connu (GPS ou réseau, le plus
+     * frais des exploitables) : sans elle, un guidage démarré à l'arrêt
+     * n'affichait aucun point jusqu'au premier rappel GPS. Affichage seul —
+     * le moteur ne reçoit que les fixes frais ([onLocation]).
+     */
+    @SuppressLint("MissingPermission")
+    private fun seedLastKnown() {
+        val manager = locations ?: return
+        val gps = runCatching { manager.getLastKnownLocation(LocationManager.GPS_PROVIDER) }.getOrNull()
+        val net = runCatching { manager.getLastKnownLocation(LocationManager.NETWORK_PROVIDER) }.getOrNull()
+        seedFixOf(gps?.toNavFix(), net?.toNavFix())?.let { lastFix = it }
     }
 
     private inner class FixListener : LocationListener {
@@ -179,3 +205,11 @@ fun navFixOf(
     atMs = atMs,
     headingDeg = headingDeg,
 )
+
+/**
+ * Amorce d'affichage : le plus frais des derniers fixes connus
+ * exploitables ([NavFix.isUsable]) — `null` sans candidat. À égalité, le
+ * GPS gagne (même arbitrage que `SharePosition`). Pure, testée en JVM.
+ */
+fun seedFixOf(gps: NavFix?, net: NavFix?): NavFix? =
+    listOfNotNull(gps, net).filter { it.isUsable() }.maxByOrNull { it.atMs }
