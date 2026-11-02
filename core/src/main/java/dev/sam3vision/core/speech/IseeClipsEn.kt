@@ -14,10 +14,11 @@ package dev.sam3vision.core.speech
  * Couverture : dehors niveaux 0 (voitures), 2 (humains), 4 (grillages, murs,
  * barrières), 5 (bordures), 6 (escaliers jalons 4/2/1 + marches), 7 (poteaux,
  * mobilier, divers), 8 (passage), 10 (trottoirs, comportement actuel), 12
- * (repli gauche/droite/tout droit), verdicts traversée, confirmations des 10
- * ordres dictée, recherche dedans (10 objets + trouvé + cadran), nombres (5,
- * 10, 15, 20 mètres + 1 à 12 + heures 1 à 12). Le GPS (manœuvres, rappels) et
- * le chat restent en synthèse réseau, hors scope.
+ * (repli gauche/droite/tout droit), verdicts traversée (+ Here, Don't go,
+ * Ready, Mixed lights, Ahead), confirmations des 10 ordres dictée, recherche
+ * dedans (10 objets + trouvé + cadran), nombres (5, 10, 15, 20 mètres + 1 à
+ * 12 + heures 1 à 12 + chaînables 1 à 20 + step/steps/steps left), No glasses,
+ * No guidance. Le GPS (noms rues/lieux) et le chat restent en synthèse réseau.
  *
  * Pur Kotlin : testé en JVM, aucune dépendance Android.
  */
@@ -117,6 +118,18 @@ object IseeClipsEn {
     const val VERDICT_WAIT = "verdict_dont_cross"
     const val VERDICT_WAIT_TEXT = "Don't cross."
 
+    // Traversée : détails du verdict + approche (ordres directs, incoupables).
+    const val CROSS_HERE = "cross_here"
+    const val CROSS_HERE_TEXT = "Here."
+    const val CROSS_DONT_GO = "cross_dont_go"
+    const val CROSS_DONT_GO_TEXT = "Don't go."
+    const val CROSS_READY = "cross_ready"
+    const val CROSS_READY_TEXT = "Ready."
+    const val CROSS_MIXED = "cross_mixed"
+    const val CROSS_MIXED_TEXT = "Mixed lights."
+    const val AHEAD = "ahead"
+    const val AHEAD_TEXT = "Ahead."
+
     // Ordres dictée : modes dehors/dedans + traversée (clips existants).
     const val OUTDOOR_ON = "outdoor_on"
     const val OUTDOOR_ON_TEXT = "Outdoor mode on."
@@ -140,12 +153,16 @@ object IseeClipsEn {
     const val GPS_UNAVAILABLE_TEXT = "Guidance unavailable."
     const val GPS_OFF = "nav_stopped"
     const val GPS_OFF_TEXT = "Guidance stopped."
+    const val NO_GUIDANCE = "no_guidance"
+    const val NO_GUIDANCE_TEXT = "No guidance."
 
     // Ordres dictée : lunettes.
     const val GLASSES_ON = "glasses_on"
     const val GLASSES_ON_TEXT = "Glasses on."
     const val GLASSES_OFF = "glasses_off"
     const val GLASSES_OFF_TEXT = "Glasses off."
+    const val NO_GLASSES = "no_glasses"
+    const val NO_GLASSES_TEXT = "No glasses."
 
     // Dedans : les 10 objets cherchés (humain = clip niveau 2).
     const val KEYS = "keys"
@@ -290,6 +307,25 @@ object IseeClipsEn {
         else -> null
     }
 
+    // Nombres chaînables 1 à 20 (comptes de marches, sans point final).
+    private val CARDINALS = listOf(
+        "one", "two", "three", "four", "five",
+        "six", "seven", "eight", "nine", "ten",
+        "eleven", "twelve", "thirteen", "fourteen", "fifteen",
+        "sixteen", "seventeen", "eighteen", "nineteen", "twenty",
+    )
+
+    /** Id du nombre chaînable [n] (1 à 20), `null` hors plage. */
+    fun cardinal(n: Int): String? = if (n in 1..20) "c_$n" else null
+
+    // Unités chaînables (comptes de marches, sans point final).
+    const val C_STEP = "c_step"
+    const val C_STEP_TEXT = "step"
+    const val C_STEPS = "c_steps"
+    const val C_STEPS_TEXT = "steps"
+    const val C_STEPS_LEFT = "c_steps_left"
+    const val C_STEPS_LEFT_TEXT = "steps left"
+
     /** Les 10 objets cherchés dedans, dans l'ordre de la spec. */
     val indoorObjects: List<String> = listOf(
         KEYS, MEDBOX, GLASSES, GLASSES_CASE, PHONE,
@@ -329,7 +365,7 @@ object IseeClipsEn {
     fun fileName(clipId: String): String = "vp_" + clipId + "_en.mp3"
 
     /** Registre complet : clipId → texte parlé (nouveaux + réutilisés). */
-    val all: Map<String, String> = outdoor() + orders() + indoor() + quantities()
+    val all: Map<String, String> = outdoor() + orders() + indoor() + quantities() + chainables()
 
     /**
      * Clip d'une phrase parlée par un producteur, `null` si aucun texte du
@@ -379,6 +415,11 @@ object IseeClipsEn {
         GO_STRAIGHT to GO_STRAIGHT_TEXT,
         VERDICT_CROSS to VERDICT_CROSS_TEXT,
         VERDICT_WAIT to VERDICT_WAIT_TEXT,
+        CROSS_HERE to CROSS_HERE_TEXT,
+        CROSS_DONT_GO to CROSS_DONT_GO_TEXT,
+        CROSS_READY to CROSS_READY_TEXT,
+        CROSS_MIXED to CROSS_MIXED_TEXT,
+        AHEAD to AHEAD_TEXT,
         TL_STRAIGHT to TL_STRAIGHT_TEXT,
         TL_LEFT to TL_LEFT_TEXT,
         TL_RIGHT to TL_RIGHT_TEXT,
@@ -397,7 +438,16 @@ object IseeClipsEn {
         GPS_OFF to GPS_OFF_TEXT,
         GLASSES_ON to GLASSES_ON_TEXT,
         GLASSES_OFF to GLASSES_OFF_TEXT,
+        NO_GLASSES to NO_GLASSES_TEXT,
+        NO_GUIDANCE to NO_GUIDANCE_TEXT,
     )
+
+    private fun chainables(): Map<String, String> =
+        CARDINALS.mapIndexed { i, word -> "c_${i + 1}" to word }.toMap() + mapOf(
+            C_STEP to C_STEP_TEXT,
+            C_STEPS to C_STEPS_TEXT,
+            C_STEPS_LEFT to C_STEPS_LEFT_TEXT,
+        )
 
     private fun indoor(): Map<String, String> = mapOf(
         KEYS to KEYS_TEXT,
