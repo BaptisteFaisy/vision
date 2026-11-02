@@ -30,7 +30,7 @@ unique du 26/10.
   `settings.gradle.kts` ni sur le disque).
 - `docs/MASQUES-DEBUG.md` — z-order `AndroidView`/Compose et recette des masques.
 - `docs/LIVE-SPEC.md` — contrat du direct (cité par `core/net/HttpLiveClient.kt:42`).
-- `docs/VOIX-DANGER.md` — voix spec v4 : échelle dehors 0-12, traversée 100-102, chaîne dedans, écrasement, antirépétition, clips anglais, 10 ordres dictée, listes 16/10.
+- `docs/VOIX-DANGER.md` — voix spec v4 : échelle dehors 0-12, traversée 100-102, chaîne dedans, écrasement, antirépétition, clips anglais, 11 ordres dictée, listes 16/10.
 - `docs/TRAVERSEE.md` — verdict v4 (« Cross. » / « Don't cross. », voiture uniquement), ordre 100-102, exclusivité.
 - `docs/GUIDAGE-TOUT-DROIT.md` — guidage v4 : GPS (11 + rappel 3), rail trottoir (10), repli (12).
 - `docs/RECETTE-RUE.md` — recette rue v4 (une prise, phrases exactes, checklist).
@@ -61,7 +61,7 @@ là, atteignables depuis les Réglages, section « Other screens »
 | Tests | **4 809 `@Test`** JVM (`:core` 2 972, `:app` 1 837, relevé du 01/11/2026, voir `docs/TESTING.md`) + 8 instrumentés (`:app` : 7 + 1 banc `MockGlassesTest`) |
 | Taille | **1 215** fichiers `.kt`, **78 831** lignes de prod (`:core` 34 397, `:app` 44 434, mesure du 01/11/2026 par `tools/count-tree.py`) |
 | Versions | JDK Temurin 17.0.21 (par `JAVA_HOME`, hors dépôt) · Gradle 8.14.1 · AGP 8.11.1 · Kotlin 2.2.21 · compileSdk/targetSdk 36 |
-| Spec v4 (mergée le 01/11/2026) | voix : échelle 0-12 dehors, 100-102 traversée, chaîne dedans ; clips anglais, zéro réseau sauf chat + GPS ; 10 ordres « mode … » (reste = LLM), recherche « mode find my X » ouverte à tout objet (voir § 1 bis) |
+| Spec v4 (mergée le 01/11/2026) | voix : échelle 0-12 dehors, 100-102 traversée, chaîne dedans ; clips anglais, zéro réseau sauf chat + GPS ; 11 ordres « mode … » (reste = LLM), recherche « mode find my X » ouverte à tout objet (voir § 1 bis) |
 
 ## 1 bis. Spec v4 — résumé (`feat/isee-*`, 01/11/2026, mergée)
 

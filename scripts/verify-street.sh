@@ -242,13 +242,13 @@ main() {
   note "  terrain (IdF, GPS, réseau, jour) : $(ask 'Êtes-vous en Île-de-France, GPS fixé, réseau OK, de jour')"
   note "  parcours (~200 m, voiture + humain + poteau + mur + bordure + escalier + passage piéton + virage) : $(ask 'Le parcours de ~200 m passe-t-il par ces imposés')"
 
-  note "### 1. dictée ordre (« mode GPS I want to go to X »)"
+  note "### 1. dictée ordre (« mode GPS je veux aller à X »)"
   require_phone
   local dest=""
   printf '  Destination choisie (adresse à ~200 m, Île-de-France) : '
   read -r dest || dest=""
   note "  destination : ${dest:-non saisie}"
-  dire "mode GPS I want to go to ${dest:-...}"
+  dire "mode GPS je veux aller à ${dest:-...}"
   sleep 4
   hear "confirmation (attendu « Guidance started. », pas de question LLM)"
   note "  écran après dictée : $(ui)"

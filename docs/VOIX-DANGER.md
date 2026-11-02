@@ -53,7 +53,7 @@ Détail : `docs/TRAVERSEE.md`.
 - **101 humains** du passage + alignement passage (mot + annonce +
   arrivée : niveau 8 dehors, 101 en Traversée), après le verdict.
 - **102 bordures** du passage, après les humains.
-- **Dictée active** (les 10 ordres restent écoutés, `crossing off` compris).
+- **Dictée active** (les 11 ordres restent écoutés, `crossing off` compris).
 - **Chat et GPS muets** tant que le mode est actif (le chat reprend à la
   sortie, jamais perdu).
 
@@ -113,15 +113,21 @@ une annonce avalée ne consomme pas son tour).
 Clés inconnues : toujours autorisées (jamais bloquantes — une faute de
 frappe ne fait jamais taire une annonce).
 
-## 6. Ordres dictée : les 10, préfixés par « mode »
+## 6. Ordres dictée : les 11, préfixés par « mode »
 
 - `mode outdoor`, `mode indoor`, `mode crossing on`, `mode crossing off`,
-  `mode find my X`, `mode find off`, `mode GPS I want to go to …`,
-  `mode GPS off`, `mode glasses on`, `mode glasses off`.
-- **Tout le reste = question LLM.** Un « mode … » qui n'est aucun des 10
+  `mode find my X`, `mode find off`, `mode GPS … X`, `mode GPS` (seul :
+  redemande), `mode GPS off`, `mode glasses on`, `mode glasses off`.
+- GPS : formes FR/EN comprises (« je veux aller à X », « I want to go to
+  X », « aller à X », « take me to X »…) ou nom de lieu nu (« mode GPS
+  gare de Lyon ») ; « mode GPS » seul ou sans destination comprise →
+  « Où aller ? » / « Where to? » (`NavClarifyText.ask`, voix réseau
+  `speakNetwork` — le FR n'a pas de clip, le clip EN `where_to` reste un
+  repli hors-ligne), jamais le LLM ; questions (« où est X ») → LLM.
+- **Tout le reste = question LLM.** Un « mode … » qui n'est aucun des 11
   part au LLM (jamais un ordre deviné) ; les ordres fixes n'acceptent aucun
-  mot supplémentaire ; les ordres à libellé exigent un libellé non vide.
-- Les 10 ordres sont écoutés **partout, traversée comprise**.
+  mot supplémentaire ; « mode find my » sans objet part au LLM.
+- Les 11 ordres sont écoutés **partout, traversée comprise**.
 - Confirmations en clips anglais (`outdoor_on`, `indoor_on`, `cross_on`,
   `cross_off`, `find_stopped`, `gps_started`,
   `nav_stopped`, `glasses_on`, `glasses_off`) ; la recherche (`mode find my X`,

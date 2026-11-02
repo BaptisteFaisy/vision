@@ -54,7 +54,7 @@ l'historique côté dictée).
 ## Ordre « mode find my X »
 
 Sur l'accueil iSee, « mode find my mug » (`DictationOrders.parse`, l'un des
-10 ordres « mode … ») ajoute « mug » aux concepts SAM de la sonde
+11 ordres « mode … ») ajoute « mug » aux concepts SAM de la sonde
 (`LiveProbe.ensureConcept`, sauf en Traversée) puis crée le pictogramme à sa
 première détection (`IseePicto.findObject`, rejoué par `IseeDictationActions`
 dans `IseeModeOrders`) : même appel Muse (`muse-image-1.0`, jaune/noir),

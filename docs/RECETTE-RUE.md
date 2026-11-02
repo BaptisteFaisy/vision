@@ -10,7 +10,7 @@ jusqu'à la première prise.
 
 ## Ce qui est vrai dans le code (après intégration v4)
 
-Chaîne : appui long iSee → dictée → routeur « mode … » (10 ordres, § 6 de
+Chaîne : appui long iSee → dictée → routeur « mode … » (11 ordres, § 6 de
 `docs/VOIX-DANGER.md`) → question LLM sinon → moteur Valhalla in-app
 (`VoiceNavEngine` + `VoiceNavEngineDriver`, si `routeBaseUrl` renseignée)
 → manœuvres (11) et rappels (3) par la voix réseau ElevenLabs ; obstacles
@@ -19,7 +19,7 @@ même temps** (bus vocal : le plus petit niveau gagne, écrasé jeté).
 
 | Étape | Observable promis | Source |
 |---|---|---|
-| Dictée ordre | « mode GPS I want to go to X » consommé avant le LLM, X transmis tel quel ; tout le reste = question LLM | `DictationOrders`, `IseeDictationRouter` |
+| Dictée ordre | « mode GPS … X » (FR : « je veux aller à X », lieu nu ; EN : « I want to go to X ») consommé avant le LLM, X transmis tel quel ; « mode GPS » seul → « Où aller ? » / « Where to? » ; tout le reste = question LLM | `DictationOrders`, `IseeDictationRouter` |
 | Confirmation | « Guidance started. » (clip `gps_started`) ; indisponible : « Guidance unavailable. » (`gps_unavailable`) | `IseeClipsEn` |
 | Voiture en mouvement | « Car. » / « Cars. » (< 20 m, présence seule, 4 s) | Niveau 0, `car` / `cars` |
 | Humain | « Person. » + cadran + distance (< 10 m, 2 s) ; ≤ 2 m : « Stop. » immédiat | Niveau 2 |
@@ -57,10 +57,12 @@ même temps** (bus vocal : le plus petit niveau gagne, écrasé jeté).
 
 ## Recette (une prise, ~15 min)
 
-1. **Dictée ordre.** Appui long ≥ 300 ms, dicter « mode GPS I want to go
-   to X » (X = adresse à ~200 m). Attendu : « Guidance started. », pas de
-   crash, pas de question LLM. Contre-essai : « je veux aller à X » (sans
-   « mode ») → question LLM, pas de guidage.
+1. **Dictée ordre.** Appui long ≥ 300 ms, dicter « mode GPS je veux aller
+   à X » (X = adresse à ~200 m ; EN : « mode GPS I want to go to X », ou
+   lieu nu « mode GPS X »). Attendu : « Guidance started. », pas de
+   crash, pas de question LLM. Contre-essais : « je veux aller à X » (sans
+   « mode ») → question LLM, pas de guidage ; « mode GPS » seul →
+   « Où aller ? » / « Where to? », pas de guidage, pas de LLM.
 2. **Voiture.** Une voiture bouge à < 20 m. Attendu : « Car. » (ou « Cars. »
    si plusieurs), sans cadran ni distance, pas plus d'une fois toutes les
    4 s. Une voiture garée ne dit rien.
@@ -96,7 +98,7 @@ Tout écart au tableau part en **issue GitHub**, pas en commentaire.
 
 | # | Observable | SHA | Heure | Verdict |
 |---|---|---|---|---|
-| 1 | « Guidance started. » après « mode GPS… » ; sans « mode » → LLM | | | |
+| 1 | « Guidance started. » après « mode GPS… » ; sans « mode » → LLM ; « mode GPS » seul → « Où aller ? » | | | |
 | 2 | « Car. » / « Cars. », présence seule, 4 s ; garée = silence | | | |
 | 3 | « Person. » + cadran + distance, 2 s ; ≤ 2 m → « Stop. » immédiat | | | |
 | 4 | « Pole./Lamp./Sign. » 2 s ; « Fence./Wall./Barrier. » 4 s | | | |

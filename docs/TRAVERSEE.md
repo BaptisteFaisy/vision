@@ -49,7 +49,7 @@ producteurs dehors se taisent en mode traversée.
   actif. La progression route se tait ; au rappel proche, le mode s'arme
   une seule fois (« Mode traversée activé. » reste en synthèse ? Non :
   clip `cross_on` « Crossing mode on. »).
-- **Dictée active** : les 10 ordres « mode … » restent écoutés, `mode
+- **Dictée active** : les 11 ordres « mode … » restent écoutés, `mode
   crossing off` compris.
 
 ## 4. Détection en traversée
