@@ -178,4 +178,16 @@ class HazardConceptsTest {
         assertFalse(HazardConcepts.isPerson("stroller"))
         assertFalse(HazardConcepts.isPerson("dog"))
     }
+
+    @Test
+    fun `corps guides comme une personne - poussette fauteuil chien`() {
+        // Ordre user du 02/11 : mot continu, portée et priorité personne.
+        listOf("person", "child", "stroller", "poussette", "wheelchair", "fauteuil roulant", "dog", "chien").forEach {
+            assertTrue(it, HazardConcepts.isGuidedBody(it))
+        }
+        assertFalse(HazardConcepts.isGuidedBody("pole"))
+        assertFalse(HazardConcepts.isGuidedBody("barrier"))
+        assertFalse(HazardConcepts.isGuidedBody("scooter"))
+        assertFalse(HazardConcepts.isGuidedBody("trampoline"))
+    }
 }

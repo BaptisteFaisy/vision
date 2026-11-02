@@ -106,6 +106,23 @@ class GuidanceSteeringTest {
     }
 
     @Test
+    fun `cap droit on ne contourne pas vers une poussette`() {
+        // Corps guidé comme une personne (ordre user du 02/11) : poussette
+        // à gauche, chaise à droite — l'évitement part à droite.
+        val labels = listOf(
+            placed("mur", 0.5f),
+            placed("poussette", 0.2f, 2f),
+            placed("chaise", 0.8f, 2f),
+        )
+
+        val decision = Guidance.decide(labels, SteeringCap.Straight)
+
+        assertTrue(decision.blocked)
+        assertEquals(GuidanceSide.Right, decision.side)
+        assertEquals(SteeringCap.Right, decision.passage)
+    }
+
+    @Test
     fun `cap droit des personnes des deux cotes on se faufile quand meme`() {
         // Foule : le cap droit ne dit jamais stop — à égalité de personnes,
         // l'ancien départage (côté opposé au décalage) s'applique.

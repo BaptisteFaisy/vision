@@ -8,18 +8,19 @@ import dev.sam3vision.core.live.SteeringCap
 import dev.sam3vision.core.speech.SpeechLanguage
 
 /**
- * Signal danger d'une frame : [detected] quand une personne ou du mobilier
- * suivi est dans le couloir marché à [HazardWatcher.HAZARD_METERS] ou moins
- * ([HazardWatcher.PERSON_METERS] pour une personne, 15 m droit devant pour
- * la personne et le poteau — [HazardWatcher.PERSON_FAR_METERS] et
+ * Signal danger d'une frame : [detected] quand un corps guidé (personne,
+ * enfant, poussette, fauteuil, chien — [HazardConcepts.isGuidedBody]) ou du
+ * mobilier suivi est dans le couloir marché à [HazardWatcher.HAZARD_METERS]
+ * ou moins ([HazardWatcher.PERSON_METERS] pour un corps, 15 m droit devant
+ * pour les corps et le poteau — [HazardWatcher.PERSON_FAR_METERS] et
  * [HazardWatcher.POLE_FAR_METERS], ordre user du 01/11), [meters] sa
  * distance, [label] son libellé SAM brut (la phrase y lit le nom parlé),
  * [centerX] son centre normalisé (l'heure du cadran, `null` = inconnue).
- * La personne prime : présente, elle est retenue même si une barrière est
- * plus proche ; sinon le plus proche gagne. SPEC v4 : niveaux VoiceBus
- * (2 la personne, 4 grillages/murs/barrières, 7 poteaux et divers) ; la
- * borne et le portail ne sont plus reconnus. Sans repli : le mot continu
- * ne cède jamais la parole tant que la personne ou le poteau est là.
+ * Le corps prime : présent, il est retenu même si une barrière est plus
+ * proche ; sinon le plus proche gagne. SPEC v4 : niveaux VoiceBus (2 les
+ * corps, 4 grillages/murs/barrières, 7 poteaux et divers) ; la borne et le
+ * portail ne sont plus reconnus. Sans repli : le mot continu ne cède
+ * jamais la parole tant que le corps ou le poteau est là.
  */
 data class HazardSignal(
     val detected: Boolean,
@@ -35,12 +36,12 @@ data class HazardSignal(
 
         /**
          * Signal des lectures affinées : un label parlé [HazardConcepts] dans
-         * le couloir ([PositionText.SIDE_EDGE]) — plein axe pour une personne
-         * imminente ([HazardWatcher.PERSON_FAST_METERS], le proche percute
+         * le couloir ([PositionText.SIDE_EDGE]) — plein axe pour un corps
+         * imminent ([HazardWatcher.PERSON_FAST_METERS], le proche percute
          * même au bord du cadre) — mesuré sous le seuil (15 m droit devant
-         * pour la personne et le poteau, portée proche sinon). La personne
-         * prime sur tout non-personne (P3 avant P4) ; à sorte égale le plus
-         * proche gagne ; boîte illisible ou dimensions nulles = ignoré.
+         * pour les corps et le poteau, portée proche sinon). Le corps prime
+         * sur tout le reste ; à sorte égale le plus proche gagne ; boîte
+         * illisible ou dimensions nulles = ignoré.
          */
         fun of(readings: List<DistanceReading>, frameW: Int, frameH: Int): HazardSignal {
             if (frameW <= 0 || frameH <= 0) return none()
@@ -48,7 +49,7 @@ data class HazardSignal(
             var other: Hit? = null
             for (reading in readings) {
                 val hit = nearHazard(reading, frameW) ?: continue
-                if (HazardConcepts.isPerson(reading.label)) {
+                if (HazardConcepts.isGuidedBody(reading.label)) {
                     if (person == null || hit.meters < person.meters) person = hit
                 } else {
                     if (other == null || hit.meters < other.meters) other = hit
@@ -72,8 +73,8 @@ data class HazardSignal(
             if (box.size < 4) return null
             val centerX = (box[0] + box[2]) / 2f / frameW
             val inCorridor = centerX in PositionText.SIDE_EDGE..1f - PositionText.SIDE_EDGE
-            val person = HazardConcepts.isPerson(reading.label)
-            // Personne imminente : plein axe — à ≤ 2 m, le bord du cadre percute autant que le centre.
+            val person = HazardConcepts.isGuidedBody(reading.label)
+            // Corps imminent : plein axe — à ≤ 2 m, le bord du cadre percute autant que le centre.
             val nearPerson = person && meters <= HazardWatcher.PERSON_FAST_METERS
             if (!nearPerson && !inCorridor) return null
             if (meters > nearLimit(reading.label, person, inCorridor)) return null
@@ -82,9 +83,9 @@ data class HazardSignal(
         }
 
         /**
-         * Seuil parlé : 15 m droit devant pour la personne et le poteau
+         * Seuil parlé : 15 m droit devant pour les corps et le poteau
          * (palier loin, couloir strict — ordre user du 01/11), portée
-         * proche sinon (la personne hors couloir garde 10 m, SPEC v4).
+         * proche sinon (le corps hors couloir garde 10 m, SPEC v4).
          */
         private fun nearLimit(label: String, person: Boolean, inCorridor: Boolean): Float {
             if (inCorridor && person) return HazardWatcher.PERSON_FAR_METERS
@@ -97,7 +98,7 @@ data class HazardSignal(
 /**
  * Ordre d'annonce « attention … » : [phrase] dans la langue de la voix,
  * [meters] la distance du signal qui l'a déclenché (journal, réglages),
- * [urgent] pour la personne et le poteau (leur mot d'évitement,
+ * [urgent] pour les corps et le poteau (leur mot d'évitement,
  * « Droite. »/« Gauche. », part en clip `guide_*`, jamais fusionné),
  * [kind] sa sorte (l'arbitre voix y lit le rang : personne P3, barrière
  * P4, poteau et divers avec le reste), [safetyPhrase] l'alerte immédiate
@@ -129,7 +130,7 @@ data class HazardCue(
  * Phrases « Attention … », FR/EN comme les positions (`PositionText`) :
  * « Attention à la barrière, à 2 heures. » / « Attention, barrier, at 2
  * o'clock. » — une info de description, jamais une consigne (l'ordre user :
- * iSee décrit, en douceur, au cadran des aveugles) — sauf la personne et
+ * iSee décrit, en douceur, au cadran des aveugles) — sauf les corps et
  * le poteau, qui disent le mot d'évitement en continu (ordre user du
  * 01/11, voir [avoidWord]).
  */
@@ -138,11 +139,11 @@ object HazardText {
     private const val AXIS_MID = 0.5f
 
     /**
-     * « Gauche. » / « Left. » : la personne et le poteau disent le mot
+     * « Gauche. » / « Left. » : les corps et le poteau disent le mot
      * d'évitement en continu — le côté conseillé est l'opposé de
      * l'obstacle (à gauche de l'axe = on passe à droite). Axe pile ou
      * heure inconnue = droite par défaut (prior, à valider rue : on serre
-     * à droite). Personne et poteau seuls (les autres dangers restent
+     * à droite). Corps et poteau seuls (les autres dangers restent
      * descriptifs, voir [phrase]) ; le mot part en clip, voir
      * [HazardWatcher].
      */
@@ -172,15 +173,15 @@ object HazardText {
 }
 
 /**
- * Parole du [HazardSignal] (SPEC v4 + ordre continu du 01/11) : la
- * personne et le poteau disent le mot d'évitement en continu dès la 1re
- * frame (« Droite. »/« Gauche. », clips `guide_*`, départ < 100 ms,
- * répété toutes les [AVOID_REPEAT_MS] tant que présent, immédiat au
- * changement de mot — la position optimale se dit en permanence) ; le
- * reste parle en doux confirmé ([confirmFrames] positifs consécutifs,
- * puis silence par groupe : grillages/murs/barrières 4 s, divers 2 s —
- * un groupe ne fait plus taire les autres). Le mot continu ne consomme
- * pas les silences doux et ne passe pas par la voix de sécurité.
+ * Parole du [HazardSignal] (SPEC v4 + ordre continu du 01/11) : les corps
+ * et le poteau disent le mot d'évitement en continu dès la 1re frame
+ * (« Droite. »/« Gauche. », clips `guide_*`, départ < 100 ms, répété
+ * toutes les [AVOID_REPEAT_MS] tant que présent, immédiat au changement
+ * de mot — la position optimale se dit en permanence) ; le reste parle
+ * en doux confirmé ([confirmFrames] positifs consécutifs, puis silence
+ * par groupe : grillages/murs/barrières 4 s, divers 2 s — un groupe ne
+ * fait plus taire les autres). Le mot continu ne consomme pas les
+ * silences doux et ne passe pas par la voix de sécurité.
  *
  * Pur JVM et testé.
  */
@@ -230,15 +231,15 @@ class HazardWatcher(
     }
 
     /**
-     * Candidat de la frame : le signal retenu, `null` si rien à dire. La
-     * personne et le poteau parlent en continu ; le reste en doux confirmé.
+     * Candidat de la frame : le signal retenu, `null` si rien à dire. Les
+     * corps et le poteau parlent en continu ; le reste en doux confirmé.
      */
     private fun candidateOf(signal: HazardSignal): Candidate? {
         if (!signal.detected) return null
         val label = signal.label ?: return null
         if (!HazardConcepts.isSpoken(label)) return null
         val name = HazardConcepts.nameOf(label) ?: return null
-        val continuous = HazardConcepts.isPerson(label) || HazardConcepts.isPole(label)
+        val continuous = HazardConcepts.isGuidedBody(label) || HazardConcepts.isPole(label)
         return Candidate(HazardConcepts.kindOf(label), name, signal.meters, signal.centerX,
             HazardConcepts.levelOf(label), continuous, trackId = signal.trackId)
     }
@@ -259,7 +260,7 @@ class HazardWatcher(
     }
 
     /**
-     * Hors personne et poteau : doux confirmé, silence du groupe
+     * Hors corps et poteau : doux confirmé, silence du groupe
      * (grillages/murs/barrières [FENCE_COOLDOWN_MS], divers [cooldownMs]).
      */
     private fun onOther(candidate: Candidate, nowMs: Long, language: SpeechLanguage): HazardCue? {
