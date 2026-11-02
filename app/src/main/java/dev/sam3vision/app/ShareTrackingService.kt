@@ -1,16 +1,18 @@
 package dev.sam3vision.app
 
-import android.app.NotificationChannel
+import android.app.Notification
 import android.app.NotificationManager
 import android.app.PendingIntent
 import android.app.Service
 import android.content.Context
 import android.content.Intent
 import android.content.pm.ServiceInfo
-import android.os.Build
 import android.os.IBinder
 import android.os.PowerManager
+import android.util.Log
 import androidx.core.app.NotificationCompat
+import dev.sam3vision.app.voicenav.ForegroundFx
+import dev.sam3vision.app.voicenav.GuidanceServiceRunner
 import dev.sam3vision.core.settings.Settings
 import dev.sam3vision.core.settings.SettingsStore
 import dev.sam3vision.core.settings.SettingsStoreFactory
@@ -43,7 +45,7 @@ import kotlinx.coroutines.launch
  * ([ShareTrackingPolicy]). During the Direct the screen already publishes
  * itself ([ShareGate]): the service steps aside to never double-send.
  */
-class ShareTrackingService : Service() {
+class ShareTrackingService : Service(), ForegroundFx {
 
     private val scope = CoroutineScope(SupervisorJob() + Dispatchers.IO)
     private val reporter = ShareReporter()
@@ -55,10 +57,19 @@ class ShareTrackingService : Service() {
     /** A single send loop, never relaunched (repeated starts are no-op). */
     private var loop: kotlinx.coroutines.Job? = null
 
+    private lateinit var runner: GuidanceServiceRunner
+
+    /** True between a held `startForeground` and the exit (runner idempotence guard). */
+    private var foreground = false
+
     override fun onBind(intent: Intent?): IBinder? = null
 
     override fun onCreate() {
         super.onCreate()
+        runner = GuidanceServiceRunner(this)
+        // First useful line: the five-second obligation is met before any I/O work
+        // (settings store, GPS), whatever the main thread is busy with.
+        holdForeground()
         positions = SharePosition(applicationContext)
         store = SettingsStoreFactory.create(applicationContext)
     }
@@ -66,18 +77,18 @@ class ShareTrackingService : Service() {
     override fun onStartCommand(intent: Intent?, flags: Int, startId: Int): Int {
         if (intent?.action == ACTION_STOP) {
             ShareTracking.running.value = false
-            stopForeground(STOP_FOREGROUND_REMOVE)
-            stopSelf()
+            runner.stop() // guarded: the stop path never throws
             return START_NOT_STICKY
         }
         ShareTracking.running.value = true
-        showForeground()
+        if (!holdForeground()) return START_NOT_STICKY
         if (loop == null) loop = scope.launch { track() }
         return START_STICKY
     }
 
     override fun onDestroy() {
         ShareTracking.running.value = false
+        foreground = false
         loop = null
         positions.stop()
         scope.cancel()
@@ -133,8 +144,50 @@ class ShareTrackingService : Service() {
     /** Re-reads the saved settings (the channel may change mid-tracking). */
     private suspend fun readSettings(): Settings = store.load()
 
+    /**
+     * Holds the foreground through the runner and logs incidents; `false` = refusal, the
+     * service already stopped itself instead of letting the system kill the process.
+     */
+    private fun holdForeground(): Boolean {
+        val held = runner.start()
+        val label = if (held) "foreground" else "foreground refused, clean exit"
+        runner.incidents.forEach { Log.w(TAG, "$label: $it") }
+        if (!held) {
+            ShareTracking.running.value = false
+            stopSelf()
+        }
+        return held
+    }
+
+    // --- ForegroundFx: the Android effects, all guarded by the runner ---
+
+    /** Primary channel first, backup second; `false` = primary unavailable. */
+    override fun ensureChannel(): Boolean {
+        val manager = getSystemService(Context.NOTIFICATION_SERVICE) as? NotificationManager
+        ForegroundChannels.ensure(manager, FALLBACK_CHANNEL_ID, "Live tracking (backup)")
+        return ForegroundChannels.ensure(manager, CHANNEL_ID, "Live tracking")
+    }
+
+    override fun enterForeground(fallback: Boolean) {
+        val channelId = if (fallback) FALLBACK_CHANNEL_ID else CHANNEL_ID
+        startForeground(
+            NOTIFICATION_ID,
+            notification(channelId),
+            ServiceInfo.FOREGROUND_SERVICE_TYPE_LOCATION,
+        )
+        foreground = true
+    }
+
+    override fun exitForeground() {
+        foreground = false
+        stopForeground(STOP_FOREGROUND_REMOVE)
+        stopSelf()
+    }
+
+    override fun isForeground(): Boolean = foreground
+
     /** Mandatory permanent notification of a foreground service. */
-    private fun showForeground() {
+    private fun notification(channelId: String): Notification {
         val stop = PendingIntent.getService(
             this,
             0,
@@ -142,8 +195,7 @@ class ShareTrackingService : Service() {
             FLAGS,
         )
         val back = PendingIntent.getActivity(this, 0, Intent(this, MainActivity::class.java), FLAGS)
-        createChannel()
-        val notification = NotificationCompat.Builder(this, CHANNEL_ID)
+        return NotificationCompat.Builder(this, channelId)
             .setSmallIcon(android.R.drawable.ic_menu_mylocation)
             .setContentTitle("Live tracking active")
             .setContentText("Your position is shared with your caregiver on the tracking site.")
@@ -151,26 +203,16 @@ class ShareTrackingService : Service() {
             .setContentIntent(back)
             .addAction(0, "Stop tracking", stop)
             .build()
-        if (Build.VERSION.SDK_INT >= 29) {
-            startForeground(NOTIFICATION_ID, notification, ServiceInfo.FOREGROUND_SERVICE_TYPE_LOCATION)
-        } else {
-            startForeground(NOTIFICATION_ID, notification)
-        }
-    }
-
-    /** Single tracking channel, created once per install. */
-    private fun createChannel() {
-        val manager = getSystemService(Context.NOTIFICATION_SERVICE) as NotificationManager
-        val channel = NotificationChannel(
-            CHANNEL_ID,
-            "Live tracking",
-            NotificationManager.IMPORTANCE_LOW,
-        )
-        manager.createNotificationChannel(channel)
     }
 
     companion object {
+        private const val TAG = "ShareTracking"
+
         const val CHANNEL_ID = "suivi_parent"
+
+        /** Backup channel: a missing primary must never fail the foreground entry. */
+        const val FALLBACK_CHANNEL_ID = "suivi_parent_fallback"
+
         const val NOTIFICATION_ID = 42
         const val ACTION_STOP = "dev.sam3vision.app.share.STOP"
 
@@ -180,7 +222,7 @@ class ShareTrackingService : Service() {
         /** Starts tracking; no-op when already alive (idempotent). */
         fun start(context: Context) {
             val intent = Intent(context, ShareTrackingService::class.java)
-            if (Build.VERSION.SDK_INT >= 26) context.startForegroundService(intent) else context.startService(intent)
+            runCatching { context.startForegroundService(intent) }
         }
     }
 }

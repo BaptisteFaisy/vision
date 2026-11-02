@@ -4,6 +4,7 @@ import android.os.SystemClock
 import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.BoxScope
 import androidx.compose.foundation.layout.BoxWithConstraints
 import androidx.compose.foundation.layout.BoxWithConstraintsScope
 import androidx.compose.foundation.layout.WindowInsets
@@ -109,16 +110,31 @@ private fun BoxWithConstraintsScope.PortraitScene(
         SceneOrbLayer(state, view, geo, open, position, navState)
     }
     BottomScrim()
-    // Ligne de statut + pill d'instructions : sans elle, `IseeUiState.status`
-    // (échecs de dictée, LLM, micro) n'est lu par aucun composable et l'écran
-    // reste figé sur l'attente. Câblage d'origine (0db26f2), perdu par 580b2e5.
-    if (!isGuidanceOverlay(navState)) SceneBottomBar(
-        state,
-        Modifier.align(Alignment.BottomCenter).padding(bottom = navInsetDp() + 10.dp),
-    )
+    SceneStatusBar(state, viewModel, isGuidanceOverlay(navState))
     // Génération picto : le bloc fin semi-transparent survit à la rue
     // (génération lancée, vidéo coupée), jamais dehors.
     if (state.placeMode.pictoEnabled && state.picto.phase == PictoPhase.Generating) PictoGeneratingCard()
+}
+
+
+/**
+ * Ligne de statut du bas : sans elle, `IseeUiState.status` (échecs de dictée, LLM, micro)
+ * n'est lu par aucun composable et l'écran reste figé sur l'attente — câblage d'origine
+ * (0db26f2), perdu par 580b2e5.
+ *
+ * Deux exceptions voulues : en **guidage** la ligne de confort disparaît (la carte prend la
+ * place), mais une **panne du direct** s'affiche quand même — c'est justement le mode où
+ * l'on marche, donc celui où des masques figés font croire que tout va bien.
+ */
+@Composable
+private fun BoxScope.SceneStatusBar(state: IseeUiState, viewModel: IseeViewModel, guidance: Boolean) {
+    val outage = outageLineOf(viewModel.probe.state.collectAsState().value)
+    if (guidance && outage == null) return
+    SceneBottomBar(
+        state,
+        outage,
+        Modifier.align(Alignment.BottomCenter).padding(bottom = navInsetDp() + 10.dp),
+    )
 }
 
 /**

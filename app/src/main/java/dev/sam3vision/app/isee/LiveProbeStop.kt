@@ -1,6 +1,7 @@
 package dev.sam3vision.app.isee
 
 import android.util.Log
+import dev.sam3vision.app.live.LiveLatencyLog
 import dev.sam3vision.core.net.ReleaseOutcome
 import dev.sam3vision.core.net.releaseSam
 import kotlinx.coroutines.CoroutineScope
@@ -23,20 +24,24 @@ internal fun LiveProbe.stop() {
     resetPipeline()
     wifiLock.release() // fin du direct (caméra coupée, fond, onCleared) : la radio redort.
     closeSessions()
+    // Carte éteinte : le prochain direct est un **réveil**, il repayera le budget froid
+    // une fois (FIX-19) — et l'état du lien ne prétend plus rien du précédent.
+    link.reset()
+    LiveLatencyLog.resetFailures()
     releaseOnCameraOff(state.value.endpoint)
     clear()
 }
 
 /**
- * Ferme les deux sessions (normale + froide) et les oublie : la réponse en vol est
- * révoquée par `close`, les frames suivantes sont refusées (`wantsFrame` sans
- * session répond non). Idempotent : sans session, ne fait rien.
+ * Ferme la session du direct et l'oublie : la réponse en vol est révoquée par `close`,
+ * les frames suivantes sont refusées (`wantsFrame` sans session répond non). Idempotent.
+ *
+ * Une seule fermeture depuis FIX-19 : `coldSession` lit `session` (session unique,
+ * FIX-18), le second `close()` d'autrefois fermait deux fois le même transport.
  */
 internal fun LiveProbe.closeSessions() {
     session?.close()
     session = null
-    coldSession?.close()
-    coldSession = null
 }
 
 /**

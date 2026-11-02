@@ -16,14 +16,13 @@ import com.meta.wearable.dat.core.types.WearablesError
 import dev.sam3vision.app.BuildConfig
 import dev.sam3vision.app.PcmSource
 import dev.sam3vision.app.pose.EyeHeightStore
+import dev.sam3vision.app.safety.CrashGuard
 import dev.sam3vision.app.speechClient
 import dev.sam3vision.core.glasses.CaptureAction
 import dev.sam3vision.core.settings.Settings
 import java.io.File
-import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.Job
-import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.cancel
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.MutableSharedFlow
@@ -67,7 +66,7 @@ class GlassesController(
     /** Ouvre la page d'autorisation de Meta AI (contrat du SDK, fil principal). */
     private val permissionRequester: (Permission) -> Unit = {},
 ) {
-    private val scope = CoroutineScope(SupervisorJob() + Dispatchers.Default)
+    private val scope = CrashGuard.scope("glasses", Dispatchers.Default)
     private val _state = MutableStateFlow(GlassesUiState())
     private val _events = MutableSharedFlow<GlassesEvent>(extraBufferCapacity = 8)
 

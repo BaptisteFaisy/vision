@@ -43,4 +43,21 @@ class GuidanceLifecycleTest {
             GuidanceLifecycle.SERVICE_CLASS,
         )
     }
+
+    @Test
+    fun `rotation en guidage — le service de fond ne démarre pas`() {
+        assertFalse(GuidanceLifecycle.shouldStartBackground(guiding, changingConfigurations = true))
+    }
+
+    @Test
+    fun `sortie d'écran en guidage — le service de fond démarre`() {
+        assertTrue(GuidanceLifecycle.shouldStartBackground(guiding, changingConfigurations = false))
+    }
+
+    @Test
+    fun `rotation hors guidage — aucun service de fond`() {
+        assertFalse(
+            GuidanceLifecycle.shouldStartBackground(VoiceNavUiState.Idle, changingConfigurations = true),
+        )
+    }
 }

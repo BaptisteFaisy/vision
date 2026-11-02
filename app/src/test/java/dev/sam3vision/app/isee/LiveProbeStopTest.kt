@@ -59,7 +59,9 @@ class LiveProbeStopTest {
         probe.onFrame("B")
         advanceUntilIdle()
         assertEquals(1, fake.sent)
-        assertEquals(2, fake.closed)
+        // Une seule fermeture (FIX-19) : la session froide lit la session unique (FIX-18),
+        // l'ancien second `close()` fermait deux fois le même transport.
+        assertEquals(1, fake.closed)
         assertEquals(0, probe.state.value.frames)
     }
 
@@ -82,7 +84,7 @@ class LiveProbeStopTest {
 
         probe.configure(PROBE_TEST_ENDPOINT)
 
-        assertEquals(2, fake.closed)
+        assertEquals("une session à fermer, pas deux (FIX-19)", 1, fake.closed)
         probe.onFrame("A")
         advanceUntilIdle()
         fake.respond("A", LiveFrame(width = 512, height = 512, elapsedMs = 111, objects = emptyList()))

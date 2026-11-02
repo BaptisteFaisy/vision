@@ -1,15 +1,16 @@
 package dev.sam3vision.app.voicenav
 
-import android.app.NotificationChannel
+import android.app.Notification
 import android.app.NotificationManager
 import android.app.PendingIntent
 import android.app.Service
 import android.content.Context
 import android.content.Intent
 import android.content.pm.ServiceInfo
-import android.os.Build
 import android.os.IBinder
+import android.util.Log
 import androidx.core.app.NotificationCompat
+import dev.sam3vision.app.ForegroundChannels
 import dev.sam3vision.app.MainActivity
 import kotlinx.coroutines.flow.MutableStateFlow
 
@@ -23,34 +24,104 @@ import kotlinx.coroutines.flow.MutableStateFlow
  * `location` (déclaré dans le manifeste). Le service ne possède ni GPS ni
  * voix — il garde le processus vivant ; le démarrage/arrêt est piloté par
  * le cycle de vie du guidage ([start], [stop], idempotents).
+ *
+ * **Premier plan tenu dès [onCreate]** : l'obligation des cinq secondes est tenue avant
+ * tout traitement de l'intent, et [GuidanceServiceRunner] garantit qu'aucune branche
+ * (y compris `ACTION_STOP`) ne sort sans premier plan ni exception.
  */
-class GuidanceTrackingService : Service() {
+class GuidanceTrackingService : Service(), ForegroundFx {
 
     /** Dernière destination connue, pour le texte de la notification. */
     private var destinationLabel: String? = null
 
+    private lateinit var runner: GuidanceServiceRunner
+
+    /** Vrai entre `startForeground` tenu et la sortie : garde d'idempotence du runner. */
+    private var foreground = false
+
     override fun onBind(intent: Intent?): IBinder? = null
+
+    override fun onCreate() {
+        super.onCreate()
+        runner = GuidanceServiceRunner(this)
+        // Première ligne utile : même si `onStartCommand` n'est jamais atteint (thread
+        // principal saturé par un `window_resize`), le premier plan est déjà tenu.
+        holdForeground()
+    }
 
     override fun onStartCommand(intent: Intent?, flags: Int, startId: Int): Int {
         if (intent?.action == GuidanceNotification.ACTION_STOP) {
             GuidanceTracking.running.value = false
-            stopForeground(STOP_FOREGROUND_REMOVE)
-            stopSelf()
+            runner.stop() // gardé : l'arrêt ne peut pas lever
             return START_NOT_STICKY
         }
         intent?.getStringExtra(EXTRA_DESTINATION)?.let { destinationLabel = it }
         GuidanceTracking.running.value = true
-        showForeground()
-        return START_STICKY
+        return if (holdForeground()) START_STICKY else START_NOT_STICKY
     }
 
     override fun onDestroy() {
         GuidanceTracking.running.value = false
+        foreground = false
         super.onDestroy()
     }
 
+    /**
+     * Tient le premier plan via le runner et journalise les incidents ; `false` = refus,
+     * le service s'est arrêté proprement au lieu de laisser le système tuer le processus.
+     */
+    private fun holdForeground(): Boolean {
+        val held = runner.start()
+        val label = if (held) "premier plan" else "premier plan refusé, sortie propre"
+        runner.incidents.forEach { Log.w(TAG, "$label : $it") }
+        if (!held) {
+            GuidanceTracking.running.value = false
+            stopSelf()
+        }
+        return held
+    }
+
+    // --- ForegroundFx : les effets Android, tous gardés par le runner ---
+
+    /** Canal principal d'abord, secours ensuite ; `false` = principal indisponible. */
+    override fun ensureChannel(): Boolean {
+        val manager = getSystemService(Context.NOTIFICATION_SERVICE) as? NotificationManager
+        ForegroundChannels.ensure(
+            manager,
+            GuidanceNotification.FALLBACK_CHANNEL_ID,
+            GuidanceNotification.fallbackChannelName(),
+        )
+        return ForegroundChannels.ensure(
+            manager,
+            GuidanceNotification.CHANNEL_ID,
+            GuidanceNotification.channelName(),
+        )
+    }
+
+    override fun enterForeground(fallback: Boolean) {
+        val channelId = if (fallback) {
+            GuidanceNotification.FALLBACK_CHANNEL_ID
+        } else {
+            GuidanceNotification.CHANNEL_ID
+        }
+        startForeground(
+            GuidanceNotification.NOTIFICATION_ID,
+            notification(channelId),
+            ServiceInfo.FOREGROUND_SERVICE_TYPE_LOCATION,
+        )
+        foreground = true
+    }
+
+    override fun exitForeground() {
+        foreground = false
+        stopForeground(STOP_FOREGROUND_REMOVE)
+        stopSelf()
+    }
+
+    override fun isForeground(): Boolean = foreground
+
     /** Notification permanente obligatoire d'un service de premier plan. */
-    private fun showForeground() {
+    private fun notification(channelId: String): Notification {
         val stop = PendingIntent.getService(
             this,
             0,
@@ -59,8 +130,7 @@ class GuidanceTrackingService : Service() {
             FLAGS,
         )
         val back = PendingIntent.getActivity(this, 0, Intent(this, MainActivity::class.java), FLAGS)
-        createChannel()
-        val notification = NotificationCompat.Builder(this, GuidanceNotification.CHANNEL_ID)
+        return NotificationCompat.Builder(this, channelId)
             .setSmallIcon(android.R.drawable.ic_menu_mylocation)
             .setContentTitle(GuidanceNotification.title())
             .setContentText(GuidanceNotification.contentText(destinationLabel))
@@ -68,29 +138,11 @@ class GuidanceTrackingService : Service() {
             .setContentIntent(back)
             .addAction(0, GuidanceNotification.stopLabel(), stop)
             .build()
-        if (Build.VERSION.SDK_INT >= 29) {
-            startForeground(
-                GuidanceNotification.NOTIFICATION_ID,
-                notification,
-                ServiceInfo.FOREGROUND_SERVICE_TYPE_LOCATION,
-            )
-        } else {
-            startForeground(GuidanceNotification.NOTIFICATION_ID, notification)
-        }
-    }
-
-    /** Canal unique du guidage, créé une fois par installation. */
-    private fun createChannel() {
-        val manager = getSystemService(Context.NOTIFICATION_SERVICE) as NotificationManager
-        val channel = NotificationChannel(
-            GuidanceNotification.CHANNEL_ID,
-            GuidanceNotification.channelName(),
-            NotificationManager.IMPORTANCE_LOW,
-        )
-        manager.createNotificationChannel(channel)
     }
 
     companion object {
+        private const val TAG = "GuidanceTracking"
+
         /** Destination affichée dans la notification (optionnelle). */
         const val EXTRA_DESTINATION = "dev.sam3vision.app.voicenav.DESTINATION"
 
@@ -100,23 +152,25 @@ class GuidanceTrackingService : Service() {
         /**
          * Démarre le maintien en fond ; no-op si déjà vivant (idempotent,
          * la notification est simplement rafraîchie avec la destination).
+         * Ne lève jamais : un démarrage refusé en arrière-plan (Android 12+) est
+         * rejoué à la reprise visible ([GuidanceLifecycle]).
          */
         fun start(context: Context, destinationLabel: String? = null) {
             val intent = Intent(context, GuidanceTrackingService::class.java)
                 .putExtra(EXTRA_DESTINATION, destinationLabel)
-            if (Build.VERSION.SDK_INT >= 26) {
-                context.startForegroundService(intent)
-            } else {
-                context.startService(intent)
-            }
+            runCatching { context.startForegroundService(intent) }
         }
 
-        /** Arrête le maintien en fond ; no-op s'il ne tourne pas. */
+        /**
+         * Arrête le maintien en fond ; no-op s'il ne tourne pas. Par `stopService` (et
+         * non par `startService(ACTION_STOP)` : démarrer un service depuis l'arrière-plan
+         * est interdit sur Android 8+ et ferait planter l'appelant).
+         */
         fun stop(context: Context) {
             if (!GuidanceTracking.running.value) return
-            val intent = Intent(context, GuidanceTrackingService::class.java)
-                .setAction(GuidanceNotification.ACTION_STOP)
-            context.startService(intent)
+            runCatching {
+                context.stopService(Intent(context, GuidanceTrackingService::class.java))
+            }
         }
     }
 }

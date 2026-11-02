@@ -1,6 +1,6 @@
 package dev.sam3vision.app.glasses
 
-import android.app.NotificationChannel
+import android.app.Notification
 import android.app.NotificationManager
 import android.app.PendingIntent
 import android.app.Service
@@ -8,8 +8,12 @@ import android.content.Context
 import android.content.Intent
 import android.content.pm.ServiceInfo
 import android.os.IBinder
+import android.util.Log
 import androidx.core.app.NotificationCompat
+import dev.sam3vision.app.ForegroundChannels
 import dev.sam3vision.app.MainActivity
+import dev.sam3vision.app.voicenav.ForegroundFx
+import dev.sam3vision.app.voicenav.GuidanceServiceRunner
 import kotlinx.coroutines.flow.MutableSharedFlow
 import kotlinx.coroutines.flow.MutableStateFlow
 
@@ -24,9 +28,22 @@ import kotlinx.coroutines.flow.MutableStateFlow
  * le processus vivant ; le démarrage/arrêt est piloté par le pont lunettes
  * ([GlassesSessionLifecycle], idempotents).
  */
-class GlassesSessionService : Service() {
+class GlassesSessionService : Service(), ForegroundFx {
+
+    private lateinit var runner: GuidanceServiceRunner
+
+    /** Vrai entre `startForeground` tenu et la sortie : garde d'idempotence du runner. */
+    private var foreground = false
 
     override fun onBind(intent: Intent?): IBinder? = null
+
+    override fun onCreate() {
+        super.onCreate()
+        runner = GuidanceServiceRunner(this)
+        // Premier plan tenu au plus tôt : l'obligation de cinq secondes ne dépend pas
+        // de l'arrivée de `onStartCommand`.
+        holdForeground()
+    }
 
     override fun onStartCommand(intent: Intent?, flags: Int, startId: Int): Int {
         if (intent?.action == GlassesSessionNotification.ACTION_STOP) {
@@ -37,22 +54,67 @@ class GlassesSessionService : Service() {
                 GlassesSessionKeepAlive.stopRequests.tryEmit(Unit)
             }
             GlassesSessionKeepAlive.running.value = false
-            stopForeground(STOP_FOREGROUND_REMOVE)
-            stopSelf()
+            runner.stop() // gardé : le chemin d'arrêt ne peut pas lever
             return START_NOT_STICKY
         }
         GlassesSessionKeepAlive.running.value = true
-        showForeground()
-        return START_STICKY
+        return if (holdForeground()) START_STICKY else START_NOT_STICKY
     }
 
     override fun onDestroy() {
         GlassesSessionKeepAlive.running.value = false
+        foreground = false
         super.onDestroy()
     }
 
+    /**
+     * Tient le premier plan via le runner et journalise les incidents ; `false` = refus,
+     * le service s'est arrêté proprement au lieu de laisser le système tuer le processus.
+     */
+    private fun holdForeground(): Boolean {
+        val held = runner.start()
+        val label = if (held) "premier plan" else "premier plan refusé, sortie propre"
+        runner.incidents.forEach { Log.w(TAG, "$label : $it") }
+        if (!held) {
+            GlassesSessionKeepAlive.running.value = false
+            stopSelf()
+        }
+        return held
+    }
+
+    // --- ForegroundFx : les effets Android, tous gardés par le runner ---
+
+    /** Canal principal d'abord, secours ensuite ; `false` = principal indisponible. */
+    override fun ensureChannel(): Boolean {
+        val manager = getSystemService(Context.NOTIFICATION_SERVICE) as? NotificationManager
+        ForegroundChannels.ensure(manager, FALLBACK_CHANNEL_ID, FALLBACK_CHANNEL_NAME)
+        return ForegroundChannels.ensure(
+            manager,
+            GlassesSessionNotification.CHANNEL_ID,
+            GlassesSessionNotification.channelName(),
+        )
+    }
+
+    override fun enterForeground(fallback: Boolean) {
+        val channelId = if (fallback) FALLBACK_CHANNEL_ID else GlassesSessionNotification.CHANNEL_ID
+        startForeground(
+            GlassesSessionNotification.NOTIFICATION_ID,
+            notification(channelId),
+            ServiceInfo.FOREGROUND_SERVICE_TYPE_CONNECTED_DEVICE,
+        )
+        foreground = true
+    }
+
+    override fun exitForeground() {
+        foreground = false
+        stopForeground(STOP_FOREGROUND_REMOVE)
+        stopSelf()
+    }
+
+    override fun isForeground(): Boolean = foreground
+
     /** Notification permanente obligatoire d'un service de premier plan. */
-    private fun showForeground() {
+    private fun notification(channelId: String): Notification {
         val stop = PendingIntent.getService(
             this,
             0,
@@ -61,8 +123,7 @@ class GlassesSessionService : Service() {
             FLAGS,
         )
         val back = PendingIntent.getActivity(this, 0, Intent(this, MainActivity::class.java), FLAGS)
-        createChannel()
-        val notification = NotificationCompat.Builder(this, GlassesSessionNotification.CHANNEL_ID)
+        return NotificationCompat.Builder(this, channelId)
             .setSmallIcon(android.R.drawable.stat_sys_data_bluetooth)
             .setContentTitle(GlassesSessionNotification.title())
             .setContentText(GlassesSessionNotification.contentText())
@@ -70,25 +131,16 @@ class GlassesSessionService : Service() {
             .setContentIntent(back)
             .addAction(0, GlassesSessionNotification.stopLabel(), stop)
             .build()
-        startForeground(
-            GlassesSessionNotification.NOTIFICATION_ID,
-            notification,
-            ServiceInfo.FOREGROUND_SERVICE_TYPE_CONNECTED_DEVICE,
-        )
-    }
-
-    /** Canal unique de la session, créé une fois par installation. */
-    private fun createChannel() {
-        val manager = getSystemService(Context.NOTIFICATION_SERVICE) as NotificationManager
-        val channel = NotificationChannel(
-            GlassesSessionNotification.CHANNEL_ID,
-            GlassesSessionNotification.channelName(),
-            NotificationManager.IMPORTANCE_LOW,
-        )
-        manager.createNotificationChannel(channel)
     }
 
     companion object {
+        private const val TAG = "GlassesSession"
+
+        /** Canal de secours : un canal principal absent ne doit jamais faire échouer le premier plan. */
+        const val FALLBACK_CHANNEL_ID = "lunettes_isee_fallback"
+
+        private const val FALLBACK_CHANNEL_NAME = "Session lunettes (secours)"
+
         /** Drapeaux d'un PendingIntent autorisé depuis Android 12. */
         const val FLAGS = PendingIntent.FLAG_IMMUTABLE or PendingIntent.FLAG_UPDATE_CURRENT
 

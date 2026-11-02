@@ -6,6 +6,7 @@ import dev.sam3vision.app.TRANSPORT_WS
 import dev.sam3vision.core.distance.DistanceReading
 import dev.sam3vision.core.live.FrameTimings
 import dev.sam3vision.core.live.GuidancePulse
+import dev.sam3vision.core.live.OutageStep
 import dev.sam3vision.core.live.SteeringCap
 import dev.sam3vision.core.live.SteeringCue
 import dev.sam3vision.core.model.Detection
@@ -115,6 +116,22 @@ data class LiveProbeState(
     val scanLines: CrosswalkScanLines? = null,
     /** Le conteneur Modal est en train de démarrer (30-50 s au premier appel). */
     val warming: Boolean = false,
+    /**
+     * État du **lien** ([ProbeLinkState]) : nature (froid, chaud, silencieux), âge de la
+     * dernière réponse aboutie, échecs consécutifs et reprises. Lu par la notice
+     * ([liveProbeNotice]), par le panneau ([liveProbeLinkLine]) et par la voix : c'est le
+     * seul champ qui dit « le réseau ne répond plus » au lieu de « le GPU se réveille ».
+     */
+    val link: ProbeLinkState = ProbeLinkState(),
+    /**
+     * Panne du direct en cours ([OutageStep]) : `null` = rien à signaler. Écrit par la
+     * sonde à chaque frame (voir `ProbeLink.outageStep`), lu par la ligne de statut
+     * ([outageLineOf]) — c'est ce qui empêche l'écran de montrer des masques figés
+     * comme s'ils étaient vivants.
+     */
+    val outage: OutageStep? = null,
+    /** Instant de la dernière écriture de [outage] : sert à retirer le « Back online ». */
+    val outageAtMs: Long = 0L,
     val error: String? = null,
     /**
      * Chiffres mouvement V1 (fond contre boîte) de la dernière frame (`null` = pas
