@@ -33,6 +33,19 @@ class CrossingVerdictWiringTest {
         },
     )
 
+    /**
+     * Chauffe le moteur avec [count] frames identiques sans objet : depuis le
+     * 02/11/2026 le verdict a une MÉMOIRE — 3 verts sur les 5 dernières frames
+     * avant « Cross. », 4 frames sans boîte avant de conclure à l'absence, et
+     * rien n'est prononcé tant qu'aucune preuve n'est lisible (pas de
+     * « Don't cross. » suivi de « Cross. » 100 ms plus tard).
+     */
+    private fun CrossingVerdictEngine.warm(count: Int): CrossingVerdictFrame {
+        var out = onFrame(frame(), emptyList(), "", -1_000L)
+        repeat(count - 1) { out = onFrame(frame(), emptyList(), "", -1_000L + (it + 1) * 100L) }
+        return out
+    }
+
     @Test
     fun `le rouge publie don't cross niveau 100 avec overlay rouge`() {
         val posted = mutableListOf<CrossingPost>()
@@ -51,8 +64,9 @@ class CrossingVerdictWiringTest {
 
     @Test
     fun `le vert sans voiture publie cross avec overlay vert`() {
-        val out = engine(CrossingLight(listOf(0.1f, 0.1f, 0.2f, 0.3f), CrossingState.Green))
-            .onFrame(frame(), emptyList(), "", 0L)
+        val engine = engine(CrossingLight(listOf(0.1f, 0.1f, 0.2f, 0.3f), CrossingState.Green))
+        engine.warm(2)
+        val out = engine.onFrame(frame(), emptyList(), "", 0L)
         assertEquals(CrossingVerdict.Cross, out.verdict)
         assertEquals("Cross.", out.posts.single().text)
         assertEquals(CrossingState.Green, out.overlay)
@@ -62,8 +76,9 @@ class CrossingVerdictWiringTest {
 
     @Test
     fun `sans feu et sans voiture on traverse`() {
-        val out = engine(CrossingLight(null, CrossingState.Red))
-            .onFrame(frame(), emptyList(), "", 0L)
+        val engine = engine(CrossingLight(null, CrossingState.Red))
+        engine.warm(3)
+        val out = engine.onFrame(frame(), emptyList(), "", 0L)
         assertEquals(CrossingVerdictLight.Absent, out.light)
         assertEquals(CrossingVerdict.Cross, out.verdict)
     }
@@ -72,6 +87,7 @@ class CrossingVerdictWiringTest {
     fun `une voiture qui approche sur vert laisse traverser quand meme`() {
         val green = CrossingLight(listOf(0.1f, 0.1f, 0.2f, 0.3f), CrossingState.Green)
         val engine = engine(green)
+        engine.warm(2)
         val first = engine.onFrame(frame(car(box = listOf(100f, 100f, 200f, 200f))), emptyList(), "", 0L)
         assertEquals(CrossingVerdict.Cross, first.verdict)
         val second = engine.onFrame(
@@ -89,6 +105,7 @@ class CrossingVerdictWiringTest {
         val green = CrossingLight(listOf(0.1f, 0.1f, 0.2f, 0.3f), CrossingState.Green)
         val engine = engine(green)
         val box = listOf(100f, 100f, 200f, 200f)
+        engine.warm(2)
         engine.onFrame(frame(car(box = box)), emptyList(), "", 0L)
         val second = engine.onFrame(frame(car(box = box)), emptyList(), "", 200L)
         assertFalse(second.carMoving)
@@ -99,6 +116,7 @@ class CrossingVerdictWiringTest {
     fun `un bus qui approche ne tranche pas, voiture uniquement`() {
         val green = CrossingLight(listOf(0.1f, 0.1f, 0.2f, 0.3f), CrossingState.Green)
         val engine = engine(green)
+        engine.warm(2)
         engine.onFrame(frame(car("bus", listOf(100f, 100f, 200f, 200f))), emptyList(), "", 0L)
         val second = engine.onFrame(
             frame(car("bus", listOf(50f, 50f, 300f, 300f))), emptyList(), "", 200L,
@@ -111,8 +129,9 @@ class CrossingVerdictWiringTest {
     fun `un veto trafic sur feu vert interdit Cross a la voix`() {
         // D7 : le veto voiture n'atteignait pas la voix — haptique rouge,
         // voix « Cross. ». Un veto présent interdit désormais tout feu vert.
-        val out = engine(CrossingLight(listOf(0.1f, 0.1f, 0.2f, 0.3f), CrossingState.Green))
-            .onFrame(frame(), emptyList(), "", 0L, carVeto = true)
+        val engine = engine(CrossingLight(listOf(0.1f, 0.1f, 0.2f, 0.3f), CrossingState.Green))
+        engine.warm(3) // vert confirmé (le premier « Cross. » est déjà passé)
+        val out = engine.onFrame(frame(), emptyList(), "", 0L, carVeto = true)
         assertEquals(CrossingVerdict.DontCross, out.verdict)
         assertEquals("Don't cross.", out.posts.single().text)
         assertTrue(out.carVeto)
@@ -158,8 +177,9 @@ class CrossingVerdictWiringTest {
         val posted = mutableListOf<CrossingPost>()
         val human = CrossingPost(CrossingLevels.HUMAN, "Person at 12.", null)
         val curb = CrossingPost(CrossingLevels.CURB, "Curb ahead.", null)
-        val out = engine(CrossingLight(null, CrossingState.Red), posted)
-            .onFrame(frame(), emptyList(), "", 0L, human = human, curb = curb)
+        val engine = engine(CrossingLight(null, CrossingState.Red), posted)
+        engine.warm(3)
+        val out = engine.onFrame(frame(), emptyList(), "", 0L, human = human, curb = curb)
         assertEquals(3, out.posts.size)
         assertEquals(CrossingLevels.VERDICT, out.posts[0].level)
         assertEquals(CrossingLevels.HUMAN, out.posts[1].level)
@@ -191,6 +211,7 @@ class CrossingVerdictWiringTest {
         val absent = CrossingLight(null, CrossingState.Red)
         val engine = engine(absent)
         val box = listOf(100f, 100f, 200f, 200f)
+        engine.warm(3)
         engine.onFrame(frame(car(box = box)), emptyList(), "", 0L)
         val second = engine.onFrame(frame(car(box = box)), emptyList(), "", 200L)
         assertFalse(second.carMoving)
@@ -204,6 +225,7 @@ class CrossingVerdictWiringTest {
         val absent = CrossingLight(null, CrossingState.Red)
         val engine = engine(absent)
         val pan = FrameMotion(MotionSample(0.75f, 0f, 1f, 0.9f), 96, 96, 100L)
+        engine.warm(3)
         val first = engine.onFrame(frame(car(box = listOf(270f, 204f, 370f, 264f))), emptyList(), "", 0L, motion = pan)
         assertEquals("Cross.", first.posts.single().text)
         val second = engine.onFrame(
@@ -221,6 +243,7 @@ class CrossingVerdictWiringTest {
         val absent = CrossingLight(null, CrossingState.Red)
         val engine = engine(absent)
         val static = FrameMotion(MotionSample(0f, 0f, 1f, 1f), 96, 96, 100L)
+        engine.warm(3)
         engine.onFrame(frame(car(box = listOf(270f, 204f, 370f, 264f))), emptyList(), "", 0L, motion = static)
         val second = engine.onFrame(
             frame(car(box = listOf(265f, 201f, 375f, 267f))), emptyList(), "", 100L, motion = static,
