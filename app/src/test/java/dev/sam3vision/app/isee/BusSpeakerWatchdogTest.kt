@@ -3,6 +3,7 @@ package dev.sam3vision.app.isee
 import dev.sam3vision.app.PlaybackEnd
 import dev.sam3vision.app.SpeechPlayer
 import dev.sam3vision.app.speech.VoicePack
+import dev.sam3vision.core.crossing.CrossingLevels
 import dev.sam3vision.core.settings.Settings
 import dev.sam3vision.core.speech.SpeechLanguage
 import java.io.File
@@ -11,8 +12,11 @@ import kotlinx.coroutines.CompletableDeferred
 import kotlinx.coroutines.test.advanceTimeBy
 import kotlinx.coroutines.test.runCurrent
 import kotlinx.coroutines.test.runTest
+import org.junit.After
 import org.junit.Assert.assertEquals
+import org.junit.Assert.assertFalse
 import org.junit.Assert.assertTrue
+import org.junit.Before
 import org.junit.Test
 
 /**
@@ -20,26 +24,46 @@ import org.junit.Test
  * lecteur figés, observé sur appareil : paroles acceptées sans issue, niveau
  * actif épinglé, plus ni voix ni texte) est jetée à son budget et rend le
  * bus — la parole suivante parle. Temps virtuel (`runTest`), faux puits.
+ *
+ * Sans coupe intempestive (même fichier : c'est le [BusSpeaker] qu'on
+ * teste) : re-post identique + lecteur occupé = ni coupe ni rejou (le son
+ * continue, le bus reste tenu) ; remplaçante injouable + lecteur occupé =
+ * jet sans coupe ; au repos tout se joue comme avant ; contenu nouveau =
+ * coupe + jeu (préemption préservée). Le lecteur JVM ne joue jamais
+ * (`MediaPlayer` indisponible) : l'occupation passe par la sonde `isBusy`,
+ * les coupes par les événements `stop` du vrai lecteur.
  */
 class BusSpeakerWatchdogTest {
 
     /** Puits qui fige la lecture (`hang = true`) ou la réussit aussitôt. */
     private class FakeSink(var hang: Boolean = true) : ClipSink {
         val slices: MutableList<String> = mutableListOf()
-        override suspend fun playFile(file: File): Result<Unit> = Result.success(Unit)
+        val plain: MutableList<String> = mutableListOf()
+        var queued = 0
+        override suspend fun playFile(file: File): Result<Unit> {
+            plain += file.name
+            return Result.success(Unit)
+        }
         override suspend fun playSlice(file: File, sliceMs: Long): Result<Unit> {
             slices += file.name
             if (hang) CompletableDeferred<Result<Unit>>().await()
             return Result.success(Unit)
         }
-        override suspend fun playQueued(bytes: ByteArray): Result<PlaybackEnd> =
-            Result.success(PlaybackEnd.Done)
+        override suspend fun playQueued(bytes: ByteArray): Result<PlaybackEnd> {
+            queued += 1
+            return Result.success(PlaybackEnd.Done)
+        }
         override fun stop() = Unit
     }
 
-    private class Rig(val sink: FakeSink = FakeSink()) {
+    private class Rig(
+        val sink: FakeSink = FakeSink(),
+        userHoldsMic: Boolean = false,
+        extraClips: List<String> = emptyList(),
+    ) {
         val dir: File = Files.createTempDirectory("vigile").toFile()
-        val player = SpeechPlayer(dir)
+        val playerEvents: MutableList<String> = mutableListOf()
+        val player = SpeechPlayer(dir, onEvent = playerEvents::add)
         val voiceId = "rachel-test"
         val pack = VoicePack(
             filesDir = dir,
@@ -48,11 +72,30 @@ class BusSpeakerWatchdogTest {
         )
         val spoken: MutableList<String> = mutableListOf()
         val clips = IseeClipPlayer(pack, { voiceId }, sink, spoken::add)
-        val proximity = ProximityVoice(player, { Settings.Default })
+        val proximity = ProximityVoice(player, { Settings.Default }, userSpeaking = { userHoldsMic })
 
         init {
             pack.put("guide_left", SpeechLanguage.En, voiceId, "audio".toByteArray())
+            extraClips.forEach { pack.put(it, SpeechLanguage.En, voiceId, "audio".toByteArray()) }
         }
+    }
+
+    private var savedSpeaker: VoiceBusSpeaker? = null
+    private var savedIdle: (() -> Unit)? = null
+
+    @Before
+    fun sauverBus() {
+        savedSpeaker = VoiceBus.speaker
+        savedIdle = VoiceBus.onIdle
+        VoiceBus.reset()
+    }
+
+    @After
+    fun rendreBus() {
+        VoiceBus.speaker = savedSpeaker
+        VoiceBus.onIdle = savedIdle
+        VoiceBus.onSpeechIdle()
+        VoiceBus.reset()
     }
 
     @Test
@@ -94,5 +137,148 @@ class BusSpeakerWatchdogTest {
             VoiceBus.onSpeechIdle()
             VoiceBus.reset()
         }
+    }
+
+    @Test
+    fun `repost identique occupe — ni coupe ni rejou, bus tenu puis rendu par la vigile`() = runTest {
+        val rig = Rig()
+        rig.sink.hang = false
+        VoiceBus.speaker = BusSpeaker(backgroundScope, rig.player, rig.clips, rig.proximity, isBusy = { true })
+
+        VoiceBus.post(OutdoorLevel.HUMAN, "Left.", "guide_left")
+        runCurrent()
+        assertEquals(1, rig.sink.slices.size)
+        assertEquals(listOf("stop"), rig.playerEvents)
+
+        // Re-post accepté (niveau égal) : rien n'est coupé ni rejoué.
+        VoiceBus.post(OutdoorLevel.HUMAN, "Left.", "guide_left")
+        runCurrent()
+        assertEquals(1, rig.sink.slices.size)
+        assertEquals(listOf("stop"), rig.playerEvents)
+        // Rien ne s'est terminé : le bus reste tenu (pas de onSpeechIdle).
+        assertFalse(VoiceBus.post(OutdoorLevel.FALLBACK, "repli"))
+
+        // La vigile suit le jeton le plus récent : pas de fuite de hold.
+        advanceTimeBy(RELEASE_TIMEOUT_MS + 1_000L)
+        runCurrent()
+        assertTrue(VoiceBus.post(OutdoorLevel.FALLBACK, "repli"))
+    }
+
+    @Test
+    fun `verdict repete apres done — reparle (repos, pas de doublon)`() = runTest {
+        val rig = Rig(extraClips = listOf("verdict_cross"))
+        rig.sink.hang = false
+        VoiceBus.speaker = BusSpeaker(backgroundScope, rig.player, rig.clips, rig.proximity, isBusy = { false })
+
+        repeat(2) {
+            VoiceBus.post(CrossingLevels.VERDICT, "Cross.", "verdict_cross")
+            runCurrent()
+            VoiceBus.onSpeechIdle()
+        }
+
+        assertEquals(2, rig.sink.plain.size)
+        assertEquals(listOf("stop", "stop"), rig.playerEvents)
+    }
+
+    @Test
+    fun `contenu nouveau occupe — coupe et joue (preemption preservee)`() = runTest {
+        val rig = Rig()
+        rig.sink.hang = false
+        VoiceBus.speaker = BusSpeaker(backgroundScope, rig.player, rig.clips, rig.proximity, isBusy = { true })
+
+        VoiceBus.post(OutdoorLevel.HUMAN, "Left.", "guide_left")
+        runCurrent()
+        VoiceBus.post(OutdoorLevel.HUMAN, "Left.", clipId = null, clips = listOf("guide_left"))
+        runCurrent()
+
+        assertEquals(1, rig.sink.slices.size)
+        assertEquals(1, rig.sink.queued)
+        assertEquals(listOf("stop", "stop"), rig.playerEvents)
+    }
+
+    @Test
+    fun `sequence inconnue occupee — jet sans coupe, bus tenu`() = runTest {
+        val rig = Rig()
+        rig.sink.hang = false
+        VoiceBus.speaker = BusSpeaker(backgroundScope, rig.player, rig.clips, rig.proximity, isBusy = { true })
+
+        VoiceBus.post(OutdoorLevel.HUMAN, "Left.", "guide_left")
+        runCurrent()
+        assertEquals(1, rig.sink.slices.size)
+
+        VoiceBus.post(OutdoorLevel.HUMAN, "Left.", "guide_left", clips = listOf("clip-inexistant-xyz"))
+        runCurrent()
+
+        assertEquals(listOf("stop"), rig.playerEvents)
+        assertEquals(0, rig.sink.queued)
+        assertEquals(1, rig.sink.slices.size)
+        assertFalse(VoiceBus.post(OutdoorLevel.FALLBACK, "repli"))
+    }
+
+    @Test
+    fun `clip inconnu sans repli occupe — jet sans coupe, bus tenu`() = runTest {
+        val rig = Rig()
+        rig.sink.hang = false
+        VoiceBus.speaker = BusSpeaker(backgroundScope, rig.player, rig.clips, rig.proximity, isBusy = { true })
+
+        VoiceBus.post(OutdoorLevel.HUMAN, "Left.", "guide_left")
+        runCurrent()
+        assertEquals(1, rig.sink.slices.size)
+
+        VoiceBus.post(OutdoorLevel.HUMAN, "Phrase sans clip ni catalogue.", "clip-inexistant-xyz")
+        runCurrent()
+
+        assertEquals(listOf("stop"), rig.playerEvents)
+        assertEquals(1, rig.sink.slices.size)
+        assertFalse(VoiceBus.post(OutdoorLevel.FALLBACK, "repli"))
+    }
+
+    @Test
+    fun `parole user — remplaçante sans clip tuee sans coupe`() = runTest {
+        val rig = Rig(userHoldsMic = true)
+        rig.sink.hang = false
+        VoiceBus.speaker = BusSpeaker(backgroundScope, rig.player, rig.clips, rig.proximity, isBusy = { true })
+
+        VoiceBus.post(OutdoorLevel.HUMAN, "Left.", "guide_left")
+        runCurrent()
+        assertEquals(1, rig.sink.slices.size)
+
+        // Test unitaire de la porte : en prod le bus rejetterait avant (micro tenu).
+        VoiceBus.post(OutdoorLevel.HUMAN, "Phrase sans clip ni catalogue.", "clip-inexistant-xyz")
+        runCurrent()
+
+        assertEquals(listOf("stop"), rig.playerEvents)
+        assertEquals(1, rig.sink.slices.size)
+    }
+
+    @Test
+    fun `injouable au repos — tentative puis bus rendu comme avant`() = runTest {
+        val rig = Rig()
+        rig.sink.hang = false
+        VoiceBus.speaker = BusSpeaker(backgroundScope, rig.player, rig.clips, rig.proximity, isBusy = { false })
+
+        VoiceBus.post(OutdoorLevel.HUMAN, "Phrase sans clip ni catalogue.", "clip-inexistant-xyz")
+        runCurrent()
+
+        // Au repos, rien à protéger : la parole tente (stop sans effet) et le
+        // jet rend le bus par le chemin historique (pas par la vigile : aucun
+        // temps virtuel n'a passé).
+        assertEquals(listOf("stop"), rig.playerEvents)
+        assertTrue(VoiceBus.post(OutdoorLevel.FALLBACK, "repli"))
+    }
+
+    @Test
+    fun `niveau GPS sans clip occupe — tentative tout de meme (synthese possible)`() = runTest {
+        val rig = Rig()
+        rig.sink.hang = false
+        VoiceBus.speaker = BusSpeaker(backgroundScope, rig.player, rig.clips, rig.proximity, isBusy = { true })
+
+        VoiceBus.post(OutdoorLevel.GPS_EVENT, "Tournez à droite.", "clip-inexistant-xyz")
+        runCurrent()
+
+        // La synthèse reste possible : le doute joue (ici tts-non-configure,
+        // donc jet après tentative — sans réseau en test).
+        assertEquals(listOf("stop"), rig.playerEvents)
+        assertTrue(VoiceBus.post(OutdoorLevel.FALLBACK, "repli"))
     }
 }

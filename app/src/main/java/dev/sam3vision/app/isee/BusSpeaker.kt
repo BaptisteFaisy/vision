@@ -59,9 +59,16 @@ internal class SpeechPlayerClipSink(private val player: SpeechPlayer) : ClipSink
  * Coupe d'abord le lecteur partagé (préemption physique, chat compris — la
  * tranche coupée attend sa reprise), puis parle sous mutex : une séquence en
  * cours ne bloque jamais une parole plus prioritaire (la coupe la libère,
- * pas d'interblocage). Génération ([generation]) : seule la parole la plus
- * récente rend le repos — une séquence coupée ne libère pas le niveau de sa
- * remplaçante. Les lectures simples libèrent par le rappel du lecteur
+ * pas d'interblocage). Quand le lecteur est occupé, un re-post identique
+ * (même niveau, texte, clip et clips — [lastWish]) ne coupe ni ne rejoue
+ * (le son en cours va au bout), et une remplaçante injouable ([canPlay] :
+ * séquence incomplète au catalogue, clip inconnu sans repli proximité
+ * certain) ne coupe pas (jet tracé comme après lecture) — au repos, tout
+ * se joue comme avant (un verdict répété après `done` reparle).
+ * Génération ([generation]) : seule la parole la plus récente rend le repos
+ * — une séquence coupée ne libère pas le niveau de sa remplaçante (une
+ * parole sautée ne prend pas de génération : la parole en cours reste la
+ * plus récente). Les lectures simples libèrent par le rappel du lecteur
  * ([VoiceBus.onSpeechIdle]) ; les séquences (sans rappel) et les jets
  * libèrent ici.
  *
@@ -79,7 +86,15 @@ internal class BusSpeaker(
     private val clips: IseeClipPlayer,
     private val proximity: ProximityVoice,
     private val sayTimeoutMs: Long = SAY_TIMEOUT_MS,
+    /**
+     * Sonde « lecteur occupé » (`null` = le vrai lecteur ([idle] inversé) —
+     * faux en test JVM où `MediaPlayer` n'existe pas, donc jamais occupé).
+     */
+    private val isBusy: (() -> Boolean)? = null,
 ) : VoiceBusSpeaker {
+
+    /** Vœu confié au lecteur : l'égalité décide du doublon (re-post identique). */
+    private data class SpokenWish(val level: Int, val text: String, val clipId: String?, val clips: List<String>)
 
     /** Parole en cours sous mutex : une seule lecture du bus à la fois. */
     private val speech = Mutex()
@@ -87,7 +102,14 @@ internal class BusSpeaker(
     /** Compteur des paroles : seule la plus récente rend le repos. */
     private var generation = 0L
 
+    /** Dernier vœu confié à une parole (sautés exclus) : re-post identique + lecteur occupé = no-op. */
+    @Volatile
+    private var lastWish: SpokenWish? = null
+
     override fun idle(): Boolean = player.position() == null
+
+    /** Lecteur occupé : sonde injectée en test, vrai lecteur en prod. */
+    private fun playerBusy(): Boolean = isBusy?.invoke() ?: !idle()
 
     override fun say(level: Int, text: String, clipId: String?, clips: List<String>) {
         // Lue sous le verrou de post() : c'est bien la parole acceptée.
@@ -96,15 +118,24 @@ internal class BusSpeaker(
             val alive = scope.coroutineContext[Job]?.isActive ?: false
             android.util.Log.d(TAG_MUTE, "bus-parole level=$level texte=[$text] scope-actif=$alive loc=${hashCode()}")
         }
-        // Superviseur de restitution (frère, pas enfant : il survit à la
-        // parole elle-même — une lecture figée ne rend jamais le bus).
-        scope.launch {
-            delay(RELEASE_TIMEOUT_MS)
-            if (VoiceBus.holds(heldLevel, heldToken)) {
-                android.util.Log.w(TAG_MUTE, "bus-sans-retour level=$level texte=[$text] ms=$RELEASE_TIMEOUT_MS")
-                VoiceBus.onSpeechIdle()
+        watchRelease(heldLevel, heldToken, level, text)
+        val wish = SpokenWish(level, text, clipId, clips)
+        if (playerBusy()) {
+            if (wish == lastWish) {
+                // Re-post identique pendant la lecture : ni coupe ni rejou —
+                // le son en cours va au bout et rend le bus (rien ne s'est
+                // terminé : aucun onSpeechIdle, aucune fuite de jeton).
+                if (BuildConfig.DEBUG) android.util.Log.d(TAG_MUTE, "bus-doublon level=$level texte=[$text]")
+                return
+            }
+            if (!canPlay(level, text, clipId, clips)) {
+                // Remplaçante injouable : le son en cours continue (aucun
+                // stop), le jet est tracé comme après lecture.
+                logPreStopJet(level, text, clipId, clips)
+                return
             }
         }
+        lastWish = wish
         scope.launch {
             // Hors mutex : la coupe libère la séquence qui le tient.
             player.stop()
@@ -121,6 +152,57 @@ internal class BusSpeaker(
                 if (current == generation) VoiceBus.onSpeechIdle()
             }
         }
+    }
+
+    /**
+     * Superviseur de restitution (frère, pas enfant : il survit à la parole
+     * elle-même — une lecture figée ne rend jamais le bus). Lancé pour
+     * chaque parole acceptée, sautée comprise : il suit le jeton le plus
+     * récent — sans lui, le superviseur de la parole en cours regarderait
+     * un jeton périmé et le bus fuirait sur lecture coincée.
+     */
+    private fun watchRelease(heldLevel: Int, heldToken: Long, level: Int, text: String) {
+        scope.launch {
+            delay(RELEASE_TIMEOUT_MS)
+            if (VoiceBus.holds(heldLevel, heldToken)) {
+                android.util.Log.w(TAG_MUTE, "bus-sans-retour level=$level texte=[$text] ms=$RELEASE_TIMEOUT_MS")
+                VoiceBus.onSpeechIdle()
+            }
+        }
+    }
+
+    /**
+     * Vrai si la remplaçante peut jouer (sondé AVANT toute coupe) : séquence
+     * complète (tous les clips au catalogue — [IseeClipPlayer] tait une
+     * phrase incomplète sans rien jouer), clip seul connu, ou repli
+     * proximité possible (hors parole user sauf niveau 0, clip pack ou
+     * niveau GPS — porte, moteur et réseau se décident à la lecture, comme
+     * avant). Conservateur : le doute joue (comportement inchangé) — seule
+     * l'impasse certaine épargne la coupe.
+     */
+    private fun canPlay(level: Int, text: String, clipId: String?, clips: List<String>): Boolean {
+        if (clips.isNotEmpty()) return clips.all { IseeClipsEn.all.containsKey(it) }
+        val id = clipId ?: spokenClipId(text)
+        if (id != null && IseeClipsEn.all.containsKey(id)) return true
+        if (text.isBlank()) return false
+        if (level != OutdoorLevel.CAR_MOVING && proximity.userIsSpeaking()) return false
+        if (recordedClipId(text) != null) return true
+        return level == OutdoorLevel.GPS_REMINDER || level == OutdoorLevel.GPS_EVENT
+    }
+
+    /**
+     * Jet sans coupe (remplaçante injouable, lecteur occupé) : mêmes traces
+     * qu'une parole jetée après lecture (séquence : `bus-seq ok=false` ;
+     * sinon `SpeechLog.fail` + warning `PAROLE JETEE`) — le son en cours
+     * continue et rend le bus lui-même (aucun `onSpeechIdle` ici).
+     */
+    private fun logPreStopJet(level: Int, text: String, clipId: String?, clips: List<String>) {
+        if (clips.isNotEmpty()) {
+            if (BuildConfig.DEBUG) android.util.Log.d(TAG_MUTE, "bus-seq level=$level ok=false n=${clips.size}")
+            return
+        }
+        SpeechLog.fail("bus", "clip+synthèse KO")
+        muteOutcome(level, text, clipId, clipId ?: spokenClipId(text), clipOk = false, proxOk = false)
     }
 
     /**
