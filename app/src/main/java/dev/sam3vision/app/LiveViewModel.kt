@@ -483,7 +483,6 @@ class LiveViewModel(app: Application) : AndroidViewModel(app) {
     override fun onCleared() {
         client?.close()
         voice.release()
-        traverse.close()
         super.onCleared()
     }
 
