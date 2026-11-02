@@ -3,6 +3,30 @@
 Le journal part du 2026-10-26 après 19 h : le commit de départ, puis une entrée par fait
 livré et ses preuves (tâche, fichiers, chiffres) dans l'arbre.
 
+## 2026-11-02 — iSee Traversée : une garée ne dit plus « Don't cross. » sur gigue 1-frame (branche `fix/traverser-garee-vs-circulation`)
+
+- **Demande** : la voix du verdict (SPEC v4) disait « Don't cross. » devant une voiture garée.
+- **Cause** : `movingThisFrame` (lu par le verdict) exigeait 1 seule frame de croissance —
+  la gigue SAM réelle (±7 % de surface, S1) suffisait ; `MotionSample.Zero` (frames
+  identiques) portait confiance 0, donc un arrêt prouvé se lisait UNKNOWN partout.
+- **Fait** :
+  - `core/traverse/VehicleState.kt` : preuve forte (tau/latéral frais) immédiate, zéro
+    retard danger ; croissance seule en run-2 (~400 ms à 5 ips), lu dans l'armement
+    existant (aucune mémoire ajoutée, zéro nouveau seuil).
+  - `core/motion/MotionSample.kt` : `Zero` = arrêt prouvé, confiance 1.
+  - `core/motion/BlockMotionSource.kt` : `provenZero()` — Zéro prouvé seulement si
+    texturé (sonde diagonale), scène plate = muet (pan sur mur blanc : mêmes frames).
+  - Tests : nouveau `VehicleParkedVsTrafficTest` (garée silencieuse, gigue isolée,
+    run-2 fail-safe, approche annoncée, Zero prouve l'arrêt) + fakes partagés
+    (`TraverseTestFakes`) ; 5 attentes de l'ancien contrat 1-frame recadrées.
+- **Preuves** : `:core` complet vert, `:app` complet vert (2 210 tests / 0 échec),
+  build-serveur r630 sur arbre rebasé `1e4e9f01` ; UBS 0 finding (module kotlin
+  partiel — erreur pré-existante, prouvée sur le fichier master intact).
+- **Non vérifié** : recette isee-sim — l'émulateur segfaulte sur `videofile:`
+  (4 essais, 2 vidéos, crash à vide sans APK ; sans caméra il tient) ; recette
+  téléphone à faire avant merge.
+- **NE PAS MERGER sans feu vert user** (sécurité piéton).
+
 ## 2026-11-02 — iSee : balayage bas = GPS, balayage droite = « quoi chercher ? » (branche `feat/isee-gestes-bas-droite`)
 
 - **Demande** (user, 02/11 22:55) : « quand je slide vers le bas cela active le mode gps
