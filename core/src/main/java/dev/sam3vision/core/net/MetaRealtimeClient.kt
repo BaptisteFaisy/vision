@@ -94,7 +94,8 @@ class MetaRealtimeSession(
             ) && transport.send(museHandshake(apiKey, model))
         }
         if (!opened) {
-            synchronized(lock) { dead = true }
+            // Poignée ouverte mais envoi refusé : le socket est refermé aussi (voir [die]).
+            die(ApiError.Network(WS_UNREACHABLE))
             return Result.failure(ApiError.Network(WS_UNREACHABLE))
         }
         // Tri-état : ack, mort avec sa cause, ou vrai silence (délai).
@@ -211,7 +212,9 @@ class MetaRealtimeSession(
 
     /**
      * Première mort signalée : une erreur trame + la fermeture qui suit = un
-     * seul appel, **hors verrou** (le rappel appartient à l'appelant).
+     * seul appel, **hors verrou** (le rappel appartient à l'appelant). Le socket
+     * est toujours refermé : une session morte sans `close()` laissait un socket
+     * ouvert jusqu'au délai idle serveur.
      */
     private fun die(cause: ApiError) {
         val notify = synchronized(lock) {
@@ -224,6 +227,7 @@ class MetaRealtimeSession(
                 born && !done
             }
         }
+        runCatching { transport.close() }
         if (notify) onError(cause)
     }
 

@@ -78,6 +78,7 @@ class IseeStreamDictationTest {
             h.death!!()
 
             assertEquals(1, h.fallbacks)
+            assertTrue("le socket de la session morte est refermé", h.session.aborted)
             assertEquals("le moteur final retombe sur le batch", h.batch, h.stream.finalClient(h.batch))
             assertEquals("", h.state.value.liveTranscript)
             assertFalse(h.state.value.userSpeaking)

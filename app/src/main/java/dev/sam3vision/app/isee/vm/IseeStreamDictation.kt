@@ -102,7 +102,10 @@ class IseeStreamDictation(
     private fun onDeath(attempt: Long) {
         if (attempt != generation) return
         generation++
+        // Le socket de la session morte est refermé, pas seulement oublié.
+        val dead = session
         session = null
+        dead?.abort()
         val retry = fallback
         fallback = null
         setChunkListener(null)
