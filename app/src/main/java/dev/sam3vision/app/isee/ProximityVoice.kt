@@ -9,6 +9,7 @@ import dev.sam3vision.core.net.ElevenLabsTtsClient
 import dev.sam3vision.core.settings.Settings
 import dev.sam3vision.core.speech.SpeechLanguage
 import kotlinx.coroutines.ensureActive
+import kotlinx.coroutines.withTimeoutOrNull
 import kotlin.coroutines.coroutineContext
 
 /**
@@ -44,6 +45,9 @@ import kotlin.coroutines.coroutineContext
 /** Étiquette des diagnostics du mutisme spontané (`logcat -s VoiceMute:*`). */
 private const val TAG_MUTE = "VoiceMute"
 
+/** Plafond d'une synthèse proximité : au-delà, panne réseau (repli système). */
+private const val PROX_SYNTH_TIMEOUT_MS = 5_000L
+
 class ProximityVoice(
     private val player: SpeechPlayer,
     private val settings: () -> Settings,
@@ -57,6 +61,7 @@ class ProximityVoice(
     private val systemBusy: () -> Boolean = { false },
     private val userSpeaking: () -> Boolean = { false },
     private val system: SystemTtsEngine? = null,
+    private val onOfflineSpoken: () -> Unit = {},
 ) {
 
     /** Dernière phrase parlée (`null` si aucune : le stop ne se répète jamais). */
@@ -96,8 +101,17 @@ class ProximityVoice(
         markSpoken(phrase)
         SpeechLog.play("repli-système", phrase)
         SpeechLog.done(phrase)
+        runCatching { onOfflineSpoken() }
         return true
     }
+
+    /**
+     * Synthèse plafonnée : le moteur doux sous [PROX_SYNTH_TIMEOUT_MS], sinon
+     * [ApiError.Timeout] (chemin panne réseau : repli système s'il est câblé).
+     */
+    private suspend fun synthBound(apiKey: String, voiceId: String, text: String): Result<ByteArray> =
+        withTimeoutOrNull(PROX_SYNTH_TIMEOUT_MS) { synthesize(apiKey, voiceId, text) }
+            ?: Result.failure(ApiError.Timeout())
 
     /** Nouvelle session : le stop se redira, la coupe user est ré-armée. */
     fun reset() {
@@ -170,7 +184,7 @@ class ProximityVoice(
         if (level != OutdoorLevel.GPS_REMINDER && level != OutdoorLevel.GPS_EVENT)
             return mute(ou, text, level, "sans-clip")
         if (!current.ttsConfigured) return mute(ou, text, level, "tts-non-configure")
-        val bytes = synthesize(current.ttsApiKey, current.ttsVoiceId, text).getOrElse { error ->
+        val bytes = synthBound(current.ttsApiKey, current.ttsVoiceId, text).getOrElse { error ->
             val down = isNetworkVoiceDown(error)
             if (down && speakOffline(text, current)) return true
             return mute(ou, text, level, if (down) "panne-reseau" else "synthese-echec")
@@ -219,7 +233,7 @@ class ProximityVoice(
         if (level != OutdoorLevel.GPS_REMINDER && level != OutdoorLevel.GPS_EVENT)
             return mute(ou, text, level, "sans-clip")
         if (!current.ttsConfigured) return mute(ou, text, level, "tts-non-configure")
-        val bytes = synthesize(current.ttsApiKey, current.ttsVoiceId, text).getOrElse { error ->
+        val bytes = synthBound(current.ttsApiKey, current.ttsVoiceId, text).getOrElse { error ->
             val down = isNetworkVoiceDown(error)
             if (down && speakOffline(text, current)) return true
             return mute(ou, text, level, if (down) "panne-reseau" else "synthese-echec")

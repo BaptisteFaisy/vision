@@ -117,7 +117,7 @@ class IseeViewModel(app: Application) : AndroidViewModel(app) {
     private val proximity = ProximityVoice(
         player, { settings }, ::speakAnnouncement, clips = voicePack,
         systemBusy = { systemTts.speaking }, userSpeaking = { _state.value.holding || _state.value.transcribing },
-        system = systemTts,
+        system = systemTts, onOfflineSpoken = { VoiceBus.onSpeechIdle() },
     )
     /** Lecteur des clips anglais : séquences et clips seuls, joués par le bus. */
     private val clipPlayer = IseeClipPlayer(voicePack, { settings.ttsVoiceId }, SpeechPlayerClipSink(player), ::speakAnnouncement)
