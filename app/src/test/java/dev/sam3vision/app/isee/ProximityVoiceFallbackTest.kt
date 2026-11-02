@@ -96,10 +96,10 @@ class ProximityVoiceFallbackTest {
     }
 
     @Test
-    fun `panne reseau sans moteur, phrase jetee`() = runTest {
+    fun `panne reseau GPS sans moteur, phrase jetee`() = runTest {
         val rig = Rig(system = null)
 
-        assertFalse(rig.voice().speak("Bordure détectée."))
+        assertFalse(rig.voice().speak("Bordure détectée.", level = OutdoorLevel.GPS_EVENT))
 
         assertEquals(listOf("Bordure détectée."), rig.attempts)
         assertTrue(rig.driver.heard.isEmpty())
