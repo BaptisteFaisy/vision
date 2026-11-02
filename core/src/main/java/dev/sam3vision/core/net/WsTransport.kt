@@ -75,6 +75,11 @@ class OkHttpWsTransport(client: OkHttpClient) : WsTransport {
         .callTimeout(0, TimeUnit.MILLISECONDS)
         .pingInterval(30, TimeUnit.SECONDS)
         .build()
+    /**
+     * Visible de trois threads (envoi, `stop()` sur Main, rappels du lecteur OkHttp) :
+     * lecture/écriture sous verrou, jamais à nu.
+     */
+    @Volatile
     private var socket: WebSocket? = null
 
     override fun open(
@@ -86,13 +91,19 @@ class OkHttpWsTransport(client: OkHttpClient) : WsTransport {
     ): Boolean {
         // Poignée construite DANS le `try` : une URL malformée refuse l'ouverture
         // (`false`, bascule HTTP par l'appelant) au lieu de planter.
-        socket = try {
+        val fresh = try {
             client.newWebSocket(
                 request(url, userAgent = LIVE_USER_AGENT, headers = headers),
                 Listener(onText, onClosed, onOpen),
             )
         } catch (e: IllegalArgumentException) {
             return false
+        }
+        synchronized(this) {
+            // Jamais deux sockets vivants : l'ancien (reprise après coupure, `stop()`
+            // pendant un handshake) est fermé proprement avant d'être oublié.
+            socket?.close(NORMAL_CLOSE, "remplacé")
+            socket = fresh
         }
         return true
     }
@@ -103,8 +114,8 @@ class OkHttpWsTransport(client: OkHttpClient) : WsTransport {
         socket?.send(bytes.toByteString()) ?: false
 
     override fun close() {
-        socket?.close(NORMAL_CLOSE, "fin du direct")
-        socket = null
+        val closing = synchronized(this) { socket.also { socket = null } }
+        closing?.close(NORMAL_CLOSE, "fin du direct")
     }
 
     /** Traduit les rappels OkHttp en `onOpen` / `onText` / `onClosed(error?)`. */
