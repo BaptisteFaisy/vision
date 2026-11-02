@@ -154,22 +154,33 @@ class ThresholdParityTest(unittest.TestCase):
 
     def test_micro_bonhomme_bas_vert(self):
         # 48x48, barre 3x4 en bas : fraction 0,0052, dans l'ancienne bande.
-        # 02/11 (W5) : 3 px de large au lieu de 2 — le plancher de largeur
-        # (5 % de 48 = 2,4 px) refuse desormais une barre de 2 px (test
-        # suivant, miroir du test JVM `PedLightGateTest`).
+        # 02/11 (W12 pt1) : plancher de largeur 0,04 de 48 = 1,92 px, mesure
+        # sur la plus large composante verte.
         px = [BLACK] * (48 * 48)
         for y in range(44, 48):
             for x in (23, 24, 25):
                 px[y * 48 + x] = GREEN
         self.assertEqual(lf.verdict(px, 48, 48), "Green")
 
-    def test_micro_bonhomme_2px_refuse_par_largeur(self):
-        # Meme forme, 2 px de large : 2 < 2,4 -> refusee par la largeur.
+    def test_micro_bonhomme_2px_accepte_par_largeur(self):
+        # Meme forme, 2 px de large : 2 >= 1,92 -> acceptee. C'est la taille de
+        # l'ancre `feuxfr3/tel_g02` (composante de 2 px sur 18x48) : les 33
+        # ancres interdisent un plancher > 2/48 = 0,0417. Miroir du test JVM
+        # `largeur - micro bonhomme de 2 px sur 48 - accepte`.
         px = [BLACK] * (48 * 48)
         for y in range(44, 48):
             for x in (23, 24):
                 px[y * 48 + x] = GREEN
-        self.assertEqual(lf.verdict(px, 48, 48), "Red")
+        self.assertEqual(lf.verdict(px, 48, 48), "Green")
+
+    def test_deux_bandes_de_1px_refusees(self):
+        # Audit W12 pt1 : l'etendue X valait 86 px pour deux bandes de 1 px.
+        px = [BLACK] * (96 * 96)
+        for y in range(56, 96):
+            px[y * 96 + 48] = GREEN
+        for y in range(30, 70):
+            px[y * 96 + 90] = GREEN
+        self.assertFalse(lf.accept_green(px, 96, 96))
 
 
 class LoadPpmTest(unittest.TestCase):

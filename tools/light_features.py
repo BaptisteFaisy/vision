@@ -29,10 +29,22 @@ ELONGATION_MIN = 1.0  # 31/10, ordre user : suit PedLightGate.kt (détection au 
 # 01/11 : tache plus large que haute = disque de face, sauf si elle est ajourée.
 # Un disque allumé remplit 0,75-0,88 de sa boîte, un bonhomme large 0,09-0,16.
 WIDE_FILL_MAX = 0.35
-# 02/11 (W5) : la tache verte doit faire >= 5 % du plus grand cote du crop.
+# 02/11 (W5) : une tache verte doit faire >= 5 % du plus grand cote du crop.
 # En FRACTION et non en pixels : le corpus est a 48 px, la prod a 96 px ;
 # a 96 px les faux verts sont des bandes de 1-4 px, les vrais verts >= 7 px.
-GREEN_MIN_WIDTH_FRACTION = 0.05
+# 02/11 (W12 pt1) : 0,05 -> 0,04, borne haute compatible avec les 33 ancres
+# (`feuxfr3/tel_g02` : composante verte de 2 px sur un crop de 48 = 0,0417).
+# La largeur mesuree est celle de la plus LARGE composante 8-connexe, pas
+# l'etendue X de tous les pixels verts (deux bandes de 1 px opposees
+# cumulaient 86 px d'etendue). Voir PedLightGate.kt et fixa/RAPPORT.md.
+GREEN_MIN_WIDTH_FRACTION = 0.04
+# 02/11 (W12 pt1) : la largeur mesuree est celle de la plus LARGE composante
+# 8-connexe du masque vert, pas l'etendue X de tous les pixels verts (deux
+# bandes de 1 px opposees cumulaient 86 px d'etendue). Voir PedLightGate.kt.
+# Le modele de couleur de la PORTE est la projection signee (pas la teinte) :
+# `_scan` et le nuage doivent lire la meme chose que `PedLightGate.scan`.
+GREEN_PROJECTION_MIN = 0.30  # (G - R) / max(R,G,B) >= 0,30 (PedLightColor)
+RED_PROJECTION_MAX = -0.50
 BBOX_MIN_PX = 3
 GREEN_BOTTOM_MIN = 0.35
 R1B_BOTTOM_FLOOR = 0.15  # 01/11, ordre user : suit PedLightGate.kt (jitter boite)
@@ -88,6 +100,23 @@ def _is_red(h: float) -> bool:
 
 def _is_green(h: float) -> bool:
     return GREEN_HUE_MIN <= h <= GREEN_HUE_MAX
+
+
+def projection(px: int) -> float:
+    """Projection signee (G - R) / max(R,G,B) : +1 vert, 0 bleu/blanc, -1 rouge."""
+    r, g, b = _rgb(px)
+    mx = max(r, g, b)
+    return 0.0 if mx <= 0 else (g - r) / float(mx)
+
+
+def _is_red_proj(px: int) -> bool:
+    """Cote rouge de la porte — meme seuil que PedLightColor.RED_PROJECTION_MAX."""
+    return projection(px) <= RED_PROJECTION_MAX
+
+
+def _is_green_proj(px: int) -> bool:
+    """Cote vert de la porte — meme seuil que PedLightColor.GREEN_PROJECTION_MIN."""
+    return projection(px) >= GREEN_PROJECTION_MIN
 
 
 def _lit(px: int) -> bool:
@@ -161,10 +190,10 @@ def _scan(argb: list, w: int, h: int) -> dict:
     for i, px in enumerate(argb):
         if not _lit(px):
             continue
-        hue = hue_deg(px)
-        if _is_red(hue):
+        proj = projection(px)
+        if proj <= RED_PROJECTION_MAX:
             red += 1
-        elif _is_green(hue):
+        elif proj >= GREEN_PROJECTION_MIN:
             green += 1
             x, y = i % w, i // w
             if y >= half:
@@ -173,6 +202,44 @@ def _scan(argb: list, w: int, h: int) -> dict:
             miny, maxy = min(miny, y), max(maxy, y)
     return {"red": red, "green": green, "green_bot": green_bot,
             "minx": minx, "maxx": maxx, "miny": miny, "maxy": maxy}
+
+
+def _green_mask(argb: list) -> list:
+    """Masque vert de la porte : mêmes pixels que `_scan` (lit + projection)."""
+    return [_lit(px) and _is_green_proj(px) for px in argb]
+
+
+def widest_component(mask: list, w: int, h: int) -> int:
+    """Etendue X de la plus large composante 8-connexe du masque (iteratif).
+
+    Miroir de `PedLightGate.widestComponent` : ce que mesure le plancher de
+    largeur. Deux bandes de 1 px opposees ont chacune une largeur de 1, alors
+    que leur boite englobante mesure la distance qui les separe.
+    """
+    seen = bytearray(len(mask))
+    best = 0
+    for start in range(len(mask)):
+        if not mask[start] or seen[start]:
+            continue
+        seen[start] = 1
+        stack = [start]
+        minx = maxx = start % w
+        while stack:
+            i = stack.pop()
+            x, y = i % w, i // w
+            minx, maxx = min(minx, x), max(maxx, x)
+            for ny in (y - 1, y, y + 1):
+                if ny < 0 or ny >= h:
+                    continue
+                for nx in (x - 1, x, x + 1):
+                    if nx < 0 or nx >= w:
+                        continue
+                    j = ny * w + nx
+                    if mask[j] and not seen[j]:
+                        seen[j] = 1
+                        stack.append(j)
+        best = max(best, maxx - minx + 1)
+    return best
 
 
 def _cloud_elongation(xs: list, ys: list) -> float:
@@ -224,7 +291,8 @@ def accept_green(argb: list, w: int, h: int) -> bool:
         return False
     if float(bh) < bw * ELONGATION_MIN and s["green"] > bw * bh * WIDE_FILL_MAX:
         return False
-    if bw < GREEN_MIN_WIDTH_FRACTION * max(w, h):
+    # W12 pt1 : la largeur exigee est celle d'UNE tache, pas l'etendue de toutes.
+    if widest_component(_green_mask(argb), w, h) < GREEN_MIN_WIDTH_FRACTION * max(w, h):
         return False
     bottom = s["green_bot"] / s["green"]
     if bottom >= GREEN_BOTTOM_MIN:
@@ -233,7 +301,7 @@ def accept_green(argb: list, w: int, h: int) -> bool:
         return False
     xs, ys = [], []
     for i, px in enumerate(argb):
-        if _lit(px) and _is_green(hue_deg(px)):
+        if _lit(px) and _is_green_proj(px):
             xs.append(i % w)
             ys.append(i // w)
     if not xs:

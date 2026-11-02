@@ -47,10 +47,11 @@ class PedLightGateLimitsTest {
     @Test
     fun `fraction verte - 19px refuse, 20px accepte sur 100x100`() {
         // 02/11 (W5) : nuage de 5 px de large — le plancher de largeur vaut
-        // 5 px sur 100 et refuse la ligne de 1 px d'origine, qui ne testait
-        // donc plus la frontière 0,002 par elle-même. 4 lignes espacées de
-        // 5 px : 20 px verts = 0,002 exactement ; la 4e ligne à 4 px donne
-        // 19 px = 0,0019, refusé par le seul plancher de fraction.
+        // 4 px sur 100 depuis le correctif W12 §1 (0,04 de 100, mesuré sur la
+        // plus large composante) et refuse la ligne de 1 px d'origine, qui ne
+        // testait donc plus la frontière 0,002 par elle-même. 4 lignes
+        // espacées de 5 px : 20 px verts = 0,002 exactement ; la 4e ligne à
+        // 4 px donne 19 px = 0,0019, refusé par le seul plancher de fraction.
         assertFalse(PedLightGate.acceptGreen(sparseColumn(19), 100, 100))
         assertTrue(PedLightGate.acceptGreen(sparseColumn(20), 100, 100))
     }
