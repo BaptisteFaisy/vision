@@ -7,7 +7,7 @@ import org.junit.Test
 /**
  * Spec v4 — routeur dictée et recherche d'objet dedans (find).
  *
- * Contrat pur : 10 ordres « mode … » (tout le reste = question LLM),
+ * Contrat pur : 11 ordres « mode … » (tout le reste = question LLM),
  * recherche « mode find my X » ouverte à tout objet, trouvé parlé au
  * cadran. La mission routeur-dictée implémente ce découpage en prod ; la
  * mission find-indoor porte la chasse et ses phrases.
@@ -56,7 +56,7 @@ class IseeSpecV4RouterFindTest {
     }
 
     @Test
-    fun `routeur = les 10 ordres mode`() {
+    fun `routeur = les 11 ordres mode`() {
         assertEquals(Order.Outdoor, route("mode outdoor"))
         assertEquals(Order.Indoor, route("mode indoor"))
         assertEquals(Order.CrossingOn, route("mode crossing on"))

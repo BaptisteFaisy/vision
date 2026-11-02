@@ -15,10 +15,12 @@ package dev.sam3vision.core.speech
  * barrières), 5 (bordures), 6 (escaliers jalons 4/2/1 + marches), 7 (poteaux,
  * mobilier, divers), 8 (passage), 10 (trottoirs, comportement actuel), 12
  * (repli gauche/droite/tout droit), verdicts traversée (+ Here, Don't go,
- * Ready, Mixed lights, Ahead), confirmations des 10 ordres dictée, recherche
- * dedans (10 objets + trouvé + cadran), nombres (5, 10, 15, 20 mètres + 1 à
- * 12 + heures 1 à 12 + chaînables 1 à 20 + step/steps/steps left), No glasses,
- * No guidance. Le GPS (noms rues/lieux) et le chat restent en synthèse réseau.
+ * Ready, Mixed lights, Ahead), confirmations des 11 ordres dictée (sauf
+ * « mode GPS » sans destination, redemandé en synthèse : « Où aller ? »),
+ * recherche dedans (10 objets + trouvé + cadran), nombres (5, 10, 15, 20
+ * mètres + 1 à 12 + heures 1 à 12 + chaînables 1 à 20 + step/steps/steps
+ * left), No glasses, No guidance. Le GPS (noms rues/lieux) et le chat
+ * restent en synthèse réseau.
  *
  * Pur Kotlin : testé en JVM, aucune dépendance Android.
  */

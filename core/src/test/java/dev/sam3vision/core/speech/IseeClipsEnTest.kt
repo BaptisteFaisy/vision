@@ -84,7 +84,7 @@ class IseeClipsEnTest {
     }
 
     @Test
-    fun `confirmations des 10 ordres présentes`() {
+    fun `confirmations des ordres presentes`() {
         val all = IseeClipsEn.all
         assertEquals("Outdoor mode on.", all[IseeClipsEn.OUTDOOR_ON])
         assertEquals("Indoor mode on.", all[IseeClipsEn.INDOOR_ON])
