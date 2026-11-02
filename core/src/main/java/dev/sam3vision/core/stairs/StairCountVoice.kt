@@ -22,6 +22,9 @@ import dev.sam3vision.core.speech.SpeechLanguage
  *
  * Pur JVM et testé.
  */
+/** Compte dit : phrase (texte) + chaîne MP3 (vide = phrase seule). */
+data class StairCountSaid(val phrase: String, val clips: List<String>)
+
 class StairCountVoice {
 
     /** Dernier compte dit ([NO_COUNT] = aucun : la prochaine détection parle). */
@@ -31,16 +34,16 @@ class StairCountVoice {
     private var lastSaidAtMs: Long = NO_INSTANT
 
     /**
-     * Compte vu à [nowMs] : la phrase à dire (« 5 marches. »), ou `null`
-     * (pas d'escalier, pas de compteur, même compte dit il y a moins de
-     * [REPEAT_MS], ou 300 ms pas écoulées depuis un autre compte).
+     * Compte vu à [nowMs] : phrase + chaîne à dire (« 5 marches. »), ou
+     * `null` (pas d'escalier, pas de compteur, même compte dit il y a moins
+     * de [REPEAT_MS], ou 300 ms pas écoulées depuis un autre compte).
      */
     fun onTick(
         detected: Boolean,
         count: Int,
         nowMs: Long,
         language: SpeechLanguage = SpeechLanguage.Fr,
-    ): String? {
+    ): StairCountSaid? {
         if (!detected || count <= 0) {
             lastCount = NO_COUNT
             return null
@@ -48,13 +51,17 @@ class StairCountVoice {
         if (count == lastCount) {
             if (lastSaidAtMs == NO_INSTANT || nowMs - lastSaidAtMs < REPEAT_MS) return null
             lastSaidAtMs = nowMs
-            return StairText.stepCount(count, language)
+            return said(count, language)
         }
         if (lastSaidAtMs != NO_INSTANT && nowMs - lastSaidAtMs < COUNT_MS) return null
         lastCount = count
         lastSaidAtMs = nowMs
-        return StairText.stepCount(count, language)
+        return said(count, language)
     }
+
+    /** Phrase + chaîne MP3 du compte (chaîne vide hors pack EN). */
+    private fun said(count: Int, language: SpeechLanguage): StairCountSaid =
+        StairCountSaid(StairText.stepCount(count, language), StairChain.countClips(count, language))
 
     /** Oublie le compte et l'instant (nouvelle séance de direct). */
     fun reset() {
