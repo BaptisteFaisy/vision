@@ -118,6 +118,16 @@ class IseePortraitTest {
     }
 
     @Test
+    fun `en guidage, la rue grandit et la phrase garde sa place dessous`() {
+        for ((w, h) in listOf(360f to 720f, 1080f to 2400f)) {
+            val g = portraitGeometry(w, h, 1f, 1f, guiding = true)
+            assertEquals(h * IseePortrait.PICTURE_GUIDING_H, g.pictureH, 0.01f)
+            assertTrue(g.pictureH > h * IseePortrait.PICTURE_SPEAKING_H)
+            assertTrue(g.textTop < h)
+        }
+    }
+
+    @Test
     fun `l'enveloppe de voix est figee echantillon par echantillon`() {
         assertEquals(0f, voiceEnvelope(0f), 0f)
         assertEquals(0.138603f, voiceEnvelope(1f), 1e-4f)

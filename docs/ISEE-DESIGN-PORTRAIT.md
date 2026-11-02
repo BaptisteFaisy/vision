@@ -23,16 +23,18 @@
   restants restent blanc laiteux. Shader AGSL sur API 33+,
   repli en dégradés en dessous. **Aucun pixel sur la boule, aucun satellite.**
 - **Caméra = la rue en haut**, sans cadre ni carte (`IseePortraitCamera`) :
-  elle occupe toujours 50 % du haut quand elle est affichée (la taille
-  parole, `PICTURE_SPEAKING_H`), et **se fond dans le blanc** sur
-  ses 34 % du bas (`FADE`, courbe `pictureAlpha`). À l'ouverture elle arrive
-  **floue et agrandie** (×1,05, flou max 24) puis devient nette (`focusPull`).
+  elle occupe 50 % du haut quand elle est affichée (la taille parole,
+  `PICTURE_SPEAKING_H`), 60 % en guidage (`PICTURE_GUIDING_H`, la boule
+  s'efface entre la rue et la carte, la phrase reste), et **se fond dans
+  le blanc** sur ses 34 % du bas (`FADE`, courbe `pictureAlpha`). À l'ouverture
+  elle arrive **floue et agrandie** (×1,05, flou max 24) puis devient nette (`focusPull`).
   Elle reste visible **tant qu'une capture est vivante** (`captureLive`),
   quel que soit l'état (tenir le micro sous vidéo ne la cache pas).
 - **La boule respire** (respiration + ombre de contact). Au repos : centrée à
   40 % de la hauteur (`REST_Y`), rayon 33,5 % de la largeur (`REST_R`).
-  Caméra ouverte : elle rétrécit et reste **entièrement sous l'image**, couronne
-  comprise (`CAM_R` 20 % de la largeur, plafonné selon la hauteur disponible).
+  Caméra ouverte : elle rétrécit et reste **entièrement sous l'image** (sauf en guidage,
+  où elle s'efface), couronne comprise (`CAM_R` 20 % de la largeur, plafonné
+  selon la hauteur disponible).
   Son ombre superpose une pénombre large, une ombre portée et un cœur de
   contact fin. Les dégradés elliptiques et le léger décalage vers la droite
   suivent la lumière venant du haut-gauche. L'ombre accompagne la respiration

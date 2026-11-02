@@ -3,6 +3,18 @@
 Le journal part du 2026-10-26 après 19 h : le commit de départ, puis une entrée par fait
 livré et ses preuves (tâche, fichiers, chiffres) dans l'arbre.
 
+## 2026-11-02 — iSee : en guidage caméra ouverte, la boule s'efface et la rue grandit (branche `fix/isee-guidage-sans-bulle-camera-grande`)
+
+- **Demande** : quand la caméra et la carte sont affichées, ne plus montrer
+  la bulle d'iSee entre les deux, et agrandir l'image caméra — tout en
+  gardant la phrase d'iSee affichée en direct entre la rue et la carte.
+- **Fait** : `hideGuidanceOrb` (boule effacée en guidage caméra ouverte,
+  phrase gardée sous la rue, transcript du user inchangé) ; rue à 60 %
+  en guidage (`PICTURE_GUIDING_H`) contre 50 % sinon.
+- **Preuve** : `IseeGuidanceMapTest` (+3) et `IseePortraitTest` (+1) verts,
+  `:core` complet vert ; `check-kotlin-limits.py` et `check-isee-design.py`
+  verts. Recette téléphone **non mesurée**.
+
 ## 2026-11-01 — iSee : la rue reparle au lancement, dehors est le défaut (branche `fix/voix-dehors-defaut`)
 
 - **Demande** : « mon app isee ne me parle plus » après mise à jour —

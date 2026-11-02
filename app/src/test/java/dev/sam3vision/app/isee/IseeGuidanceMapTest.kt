@@ -33,16 +33,33 @@ class IseeGuidanceMapTest {
     }
 
     @Test
-    fun `en guidage sans parole, la boule reste au milieu`() {
+    fun `en guidage sans parole, aucun transcript au milieu`() {
         assertFalse(showGuidanceTranscript(guiding, IseeUiState()))
         assertFalse(showGuidanceTranscript(guiding, IseeUiState(holding = true, userSpeaking = false, liveTranscript = "où")))
     }
 
     @Test
-    fun `en guidage, parole sans transcript — la boule reste, rien a afficher`() {
+    fun `en guidage, parole sans transcript — aucun transcript, rien a afficher`() {
         val silent = IseeUiState(holding = true, userSpeaking = true, liveTranscript = "   ")
 
         assertFalse(showGuidanceTranscript(guiding, silent))
+    }
+
+    @Test
+    fun `en guidage camera ouverte, la boule s'efface entre la rue et la carte`() {
+        assertTrue(hideGuidanceOrb(guiding, true))
+    }
+
+    @Test
+    fun `en guidage camera fermee, la boule reste au milieu`() {
+        assertFalse(hideGuidanceOrb(guiding, false))
+    }
+
+    @Test
+    fun `hors guidage, la camera ne cache jamais la boule`() {
+        assertFalse(hideGuidanceOrb(VoiceNavUiState.Idle, true))
+        assertFalse(hideGuidanceOrb(VoiceNavUiState.Confirming("la gare", null, true, null), true))
+        assertFalse(hideGuidanceOrb(VoiceNavUiState.Arrived("la gare", null), true))
     }
 
     @Test

@@ -28,11 +28,11 @@ import dev.sam3vision.core.nav.NavRoute
  * Le guidage GPS sur l'accueil iSee, sous la caméra et tout en bas de
  * l'écran : carte réduite (tracé + position, repli schéma si les tuiles
  * échouent) et instruction en cours, sans le reste du trajet (ni km ni
- * temps). La boule reste affichée entre la caméra et la carte — sauf
- * quand le user parle : son transcript prend alors la place de la boule
- * au milieu ([showGuidanceTranscript]). La caméra et la sonde continuent
- * (évitement d'obstacles préservé). L'arrêt se fait à la voix
- * (« arrête le guidage »).
+ * temps). Caméra ouverte, la boule s'efface entre la rue et la carte
+ * ([hideGuidanceOrb]) et la phrase d'iSee garde sa place — sauf quand
+ * le user parle : son transcript prend le milieu ([showGuidanceTranscript]).
+ * La caméra et la sonde continuent (évitement préservé). L'arrêt
+ * se fait à la voix (« arrête le guidage »).
  *
  * Affichée par `IseeScenePane` quand la session est en
  * [VoiceNavUiState.Guiding] ; rien sans tracé (la carte ne se compose pas,
@@ -73,12 +73,12 @@ private fun GuidanceInstruction(state: VoiceNavUiState.Guiding) {
 /**
  * Tout en bas de l'écran : la navigation quand elle a un objectif (calcul
  * d'itinéraire, ou guidage avec carte suivie), sinon la boule et la
- * phrase ([orb]). Pendant le guidage, la boule reste affichée entre la
- * caméra et la carte, sauf quand le user parle (son transcript prend sa
- * place, voir [showGuidanceTranscript]). Le choix vit ici (état de
- * session observé) pour garder `PortraitScene` sous le plafond de 50
- * lignes. La barre du bas s'efface pendant le guidage
- * ([isGuidanceOverlay]) : pas de recouvrement.
+ * phrase ([orb]). Pendant le guidage, caméra ouverte, la boule s'efface
+ * entre la rue agrandie et la carte (la phrase reste, le transcript du
+ * user la remplace quand il parle) : voir [hideGuidanceOrb] et
+ * [showGuidanceTranscript]. Le choix vit ici (état de session observé)
+ * pour garder `PortraitScene` sous le plafond de 50 lignes. La barre du
+ * bas s'efface pendant le guidage ([isGuidanceOverlay]) : pas de recouvrement.
  */
 @Composable
 internal fun BoxWithConstraintsScope.SceneGuidanceLayer(
@@ -89,7 +89,7 @@ internal fun BoxWithConstraintsScope.SceneGuidanceLayer(
     val placed = Modifier.align(Alignment.BottomCenter).padding(bottom = navInsetDp() + 10.dp).padding(horizontal = 16.dp)
     when (val nav = navState) {
         is VoiceNavUiState.Guiding -> {
-            // La boule reste entre la caméra et la carte (la carte passe par-dessus).
+            // L'orb décide : transcript, phrase seule, ou boule et phrase.
             orb()
             IseeGuidanceBlock(nav, viewModel::debugNavSnapshot, placed)
         }
@@ -100,16 +100,27 @@ internal fun BoxWithConstraintsScope.SceneGuidanceLayer(
 
 /**
  * Le guidage recouvre-t-il la scène (calcul d'itinéraire ou carte suivie) :
- * la carte prend le bas de l'écran et la barre du bas s'efface (la boule
- * et la phrase restent). Pure : même état, même réponse, testée sur JVM.
+ * la carte prend le bas de l'écran et la barre du bas s'efface. Caméra
+ * ouverte, la boule s'efface aussi ([hideGuidanceOrb]). Pure : même état,
+ * même réponse, testée sur JVM.
  */
 internal fun isGuidanceOverlay(navState: VoiceNavUiState): Boolean =
     navState is VoiceNavUiState.Guiding || navState is VoiceNavUiState.Confirming
 
 /**
+ * En guidage, la boule s'efface-t-elle entre la rue et la carte : oui
+ * quand la caméra est ouverte (la rue grandit, la phrase reste), non
+ * sinon (sans caméra, la boule reste au milieu). Le transcript du user
+ * garde sa place ([showGuidanceTranscript]). Pure : même état, même
+ * réponse, testée sur JVM.
+ */
+internal fun hideGuidanceOrb(navState: VoiceNavUiState, cameraOpen: Boolean): Boolean =
+    navState is VoiceNavUiState.Guiding && cameraOpen
+
+/**
  * En guidage (caméra en haut, carte en bas), le transcript du user prend-il
- * la place de la boule au milieu : oui quand le user parle avec un
- * transcript à afficher, sinon la boule reste. Hors guidage : jamais (la
+ * le milieu (phrase ou boule) : oui quand le user parle avec un
+ * transcript à afficher, sinon non. Hors guidage : jamais (la phrase
  * phrase reste sous la boule). Pure : même état, même réponse, testée
  * sur JVM.
  */
