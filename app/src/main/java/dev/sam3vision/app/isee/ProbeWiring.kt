@@ -165,7 +165,9 @@ internal fun LiveProbe.ensureConcept(settings: Settings, label: String, sensorLe
  * parlent pas ici (niveaux 2 et 7). La parole du user passe par le bus
  * ([VoiceBus.userSpeaking], câblé au ViewModel), pas par un coupeur local.
  * Dehors uniquement : dedans, stop et repli se taisent (chaîne dedans :
- * find, user, humain, chat, porte et murs).
+ * find, user, humain, chat, porte et murs). Un `spoken` qui n'est ni stop
+ * ni mot de guidage (avis de réveil sans-frame, sans clip et synthèse
+ * interdite hors GPS) est jeté sans EXPECT orphelin.
  */
 internal fun LiveProbe.observeSpoken(
     scope: CoroutineScope,
@@ -185,8 +187,15 @@ internal fun LiveProbe.observeSpoken(
                 VoiceBus.post(OutdoorLevel.FENCE, text, spokenClipId(text), antiRepeatKey = AntiRepeat.KEY_FENCE)
             }
         } else {
-            SpeechLog.expect("repli", text)
-            FallbackVoice.offer(text)
+            // Repli 12 guidance-only : on n'attend au journal que ce que le
+            // bus a retenu (peut jouer — la lecture reste asynchrone, l'EXPECT
+            // précède toujours le PLAY). Les avis de réveil sans-frame (« Waking
+            // the server… », « Server still waking… ») ne sont pas des mots de
+            // guidage : jetés par le repli sans EXPECT orphelin — silence sans
+            // clip ni synthèse hors GPS, pas de spam.
+            if (FallbackVoice.offer(text)) SpeechLog.expect("repli", text)
+            // Dernier mot connu : nourrit le keepalive (positionnement PUSH).
+            GuidanceWord.fromText(text)?.let { KeepaliveVoice.report(it) }
         }
     }
 }

@@ -24,12 +24,13 @@ internal object FallbackVoice {
 
     /**
      * Propose [text] au repli : posté niveau 12 si mot de guidage et silence
-     * de 300 ms à [nowMs]. Rend true si posté (le bus peut encore l'écraser).
+     * de 300 ms à [nowMs]. Rend le verdict du bus (retenu = peut jouer ;
+     * un avis de réveil sans-frame n'est pas un mot de guidage : jeté ici,
+     * jamais attendu au journal).
      */
     fun offer(text: String?, nowMs: Long = System.currentTimeMillis()): Boolean {
         if (text.isNullOrBlank() || !isGuidanceWord(text)) return false
         if (VoiceBus.silenceMs(nowMs) < SILENCE_MS) return false
-        VoiceBus.post(OutdoorLevel.FALLBACK, text, spokenClipId(text))
-        return true
+        return VoiceBus.post(OutdoorLevel.FALLBACK, text, spokenClipId(text))
     }
 }
