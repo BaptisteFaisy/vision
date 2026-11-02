@@ -92,7 +92,7 @@ class AskRequest(BaseModel):
     history: list[HistoryMessage] | None = None
 
 class TrackSessionRequest(BaseModel):
-    """POST /session body (docs/TRACK-SPEC.md): frame 0 plus the concepts to track.
+    """POST /session body (docs/TRACK-PERF.md): frame 0 plus the concepts to track.
 
     ``capacity`` = nombre de frames que le client s'engage à envoyer (le tampon GPU est
     pré-alloué à cette taille : c'est lui qui dimensionne la VRAM de la session, d'où le
