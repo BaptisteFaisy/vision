@@ -78,7 +78,7 @@ Trois remarques qui commandent la suite :
   hors attente de 57,6–78,4 ms à 123,6–141,4 ms (§ 4).
 - `QUEUE` n'est pas un coût technique mais un **coût de politique** : la frame attend un créneau
   d'envoi. Le modèle de campagne prend une attente ≈ intervalle ÷ 2 (phase uniforme) alors que la
-  cadence prudente de cet arbre est de **350 / 500 / 900 ms** (`core/live/LiveSession.kt:35`) : les
+  cadence prudente de cet arbre est de **350 / 500 / 900 ms** (`core/live/LiveSession.kt:37`) : les
   lignes cloud du § 4 sont donc des **bornes basses**, pas des promesses. C'est le seul étage que le
   passage au local supprime intégralement (0 ms).
 - `DECODE` a perdu son coût d'allocation (3,4 Mo/frame → 0 octet, mesuré sur JVM) mais garde un coût
@@ -442,7 +442,7 @@ Ce que cette campagne change et ne change pas :
 | fait vérifiable ici | où | valeur / conséquence |
 |---|---|---|
 | transport du Direct | `core/net/LiveClientFactory.kt`, `core/net/WsLiveClient.kt` | **WebSocket** vers `/live/ws`, pas de `POST` par frame |
-| gain du WebSocket sur le `POST`, mesuré côté serveur | `core/net/WsLiveClient.kt:13` (commentaire daté) | 50,3 ms contre 81,4 ms — ~31 ms gagnés par frame |
+| gain du WebSocket sur le `POST`, mesuré côté serveur | `core/net/WsLiveClient.kt:15` (commentaire daté) | 50,3 ms contre 81,4 ms — ~31 ms gagnés par frame |
 | cadence prudente du Direct | `core/live/LiveSession.kt:37` (`Cadence.Direct`) | 350 / 500 / 900 ms → l'attente réelle est **plus haute** que l'hypothèse du § 4 |
 | ce que cet arbre refuse d'affirmer | `docs/PERF.md` § 1 et § 3 | latences, fps, réveil de conteneur : « non mesuré ici » |
 | instrument côté client | `core/live/LiveStats.kt`, banc JVM `LiveFrameBudgetTest` | coûts CPU mesurés en microsecondes, hors JPEG et hors radio |
