@@ -14,7 +14,7 @@ import org.junit.Test
  * aléatoires et entrées poubelle explicites.
  *
  * Invariants : jamais d'exception ; un cap annoncé passant tient l'écart
- * de 0,8 mètre à chaque personne (recalculé ici depuis le cap) ; même
+ * de 1 mètre à chaque personne (recalculé ici depuis le cap) ; même
  * entrée → même sortie ; une entrée poubelle rend `null` ou un résultat
  * fini et borné — jamais de NaN/Infini dans un résultat.
  */
