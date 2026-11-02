@@ -10,8 +10,8 @@ Vérifie, sans clé ni réseau (runnable en CI) :
 4. chaque MP3 attendu existe et n'est pas vide (sauf --allow-missing, pour les
    branches qui codent les clips avant leur génération) ;
 5. assets/vp_voice.txt désigne la voix par défaut de l'app (LAURE_VOICE_ID) ;
-6. les clips à durée contrainte ([DURATIONS]) tiennent leur budget
-   (durée MP3 lue en stdlib, sans ffprobe).
+6. les clips à durée contrainte ([DURATIONS]) tiennent leur budget joué
+   à vitesse de base (durée MP3 lue en stdlib, sans ffprobe).
 
 Usage : python3 tools/check-isee-clips-en.py [--allow-missing]
 """
@@ -28,8 +28,10 @@ CATALOG = "tools/isee-clips-en-catalog.json"
 LEGACY = "tools/voicepack-catalog.json"
 ID_RE = re.compile(r"^[a-z0-9_]+$")
 
-# Budget de durée par clip (secondes) : « Crosswalk. » dit l'annonce du
-# passage devant toutes les 2 s — ordre user du 02/11, moins de 500 ms.
+# Budget joué par clip (secondes, à vitesse de base [base_speed]) :
+# « Crosswalk. » dit l'annonce du passage devant toutes les 2 s — ordre
+# user du 02/11, moins de 500 ms à l'oreille (§ 46 : trim seul, le lecteur
+# accélère déjà ×1,9, jamais d'atempo stocké).
 DURATIONS = {"crosswalk": 0.5}
 
 
@@ -129,8 +131,25 @@ def mp3_duration(path: str) -> float | None:
     return frames * 1152 / rate
 
 
+def base_speed(root: str) -> float | None:
+    """Vitesse de lecture de départ (`DEFAULT_TTS_SPEED`, Settings.kt)."""
+    settings = os.path.join(
+        root, "core/src/main/java/dev/sam3vision/core/settings/Settings.kt")
+    try:
+        with open(settings, encoding="utf-8") as fh:
+            mat = re.search(r"DEFAULT_TTS_SPEED\s*=\s*([0-9.]+)f", fh.read())
+    except OSError:
+        return None
+    return float(mat.group(1)) if mat else None
+
+
 def check_durations(root: str, problems: list) -> None:
-    """Les clips de [DURATIONS] tiennent leur budget (absent = check_mp3)."""
+    """Les clips de [DURATIONS] tiennent leur budget joué à vitesse de
+    base (absent = check_mp3)."""
+    speed = base_speed(root)
+    if not speed:
+        problems.append("DEFAULT_TTS_SPEED illisible dans Settings.kt")
+        return
     for cid, budget in DURATIONS.items():
         mp3 = os.path.join(root, "app/src/main/res/raw", f"vp_{cid}_en.mp3")
         if not (os.path.isfile(mp3) and os.path.getsize(mp3)):
@@ -138,8 +157,9 @@ def check_durations(root: str, problems: list) -> None:
         seconds = mp3_duration(mp3)
         if seconds is None:
             problems.append(f"{cid}: vp_{cid}_en.mp3 illisible")
-        elif seconds >= budget:
-            problems.append(f"{cid}: vp_{cid}_en.mp3 dure {seconds:.2f} s "
+        elif seconds / speed >= budget:
+            problems.append(f"{cid}: vp_{cid}_en.mp3 joué "
+                            f"{seconds / speed:.2f} s à ×{speed:g} "
                             f"(budget {budget:.1f} s : régénérer puis rogner, "
                             "voir docs/VOICEPACK.md)")
 

@@ -78,7 +78,7 @@ qui **précède** le verdict (plus petit nombre = plus forte priorité, donc
 
 ## 5. Proposition du mode (niveau 8)
 
-Le passage piéton < 6 m s'annonce (« Crosswalk. » devant — clip < 500 ms
+Le passage piéton < 6 m s'annonce (« Crosswalk. » devant — joué < 500 ms
 redit toutes les 2 s hors Traversée — « Left. »/« Right. » sur les côtés,
 1 fois par vue), l'alignement se dit **au changement** (« Aligned with the
 crosswalk. »), l'arrivée **1 fois** (« On the crosswalk. »). La pastille
