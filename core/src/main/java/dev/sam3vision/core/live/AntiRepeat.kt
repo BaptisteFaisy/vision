@@ -21,8 +21,8 @@ package dev.sam3vision.core.live
  * - `fence` = 4 s (niveau 4, grillages + murs + barrières < 6 m) ;
  * - `curb` = 2 s (niveau 5, bordures < 6 m) ;
  * - `stairs` = 2 s (niveau 6, escaliers : annonce, jalons, montée) ;
- * - `stairs-count` = 0,5 s (niveau 6, compte des marches — ordre user du
- *   01/11, VOIX-DANGER § 37) ;
+ * - `stairs-count` = 1 s (niveau 6, compte des marches — ordre user du
+ *   02/11, VOIX-DANGER § 41) ;
  * - `pole` = 2 s (niveau 7, poteaux + mobilier vertical < 6 m) ;
  * - `misc` = 2 s (niveau 7, divers : animal, poubelle, souvenirs < 6 m) ;
  * - `crosswalk-announce` = 1 fois par vue (niveau 8, annonce du passage) ;
@@ -85,9 +85,9 @@ object AntiRepeat {
     const val KEY_STAIRS = "stairs"
 
     /**
-     * Niveau 6 : compte des marches (« N marches. ») — 0,5 s (ordre user
-     * du 01/11). Clé paramétrée `stairs-count:<compte>` : le changement
-     * parle aussitôt, le même compte attend 0,5 s.
+     * Niveau 6 : compte des marches (« N marches. ») — 1 s (ordre user
+     * du 02/11). Clé paramétrée `stairs-count:<compte>` : le changement
+     * parle aussitôt, le même compte attend 1 s.
      */
     const val KEY_STAIRS_COUNT = "stairs-count"
 
@@ -171,7 +171,7 @@ object AntiRepeat {
         KEY_FENCE -> 4_000L
         KEY_CURB -> 2_000L
         KEY_STAIRS -> 2_000L
-        KEY_STAIRS_COUNT -> 500L
+        KEY_STAIRS_COUNT -> 1_000L
         KEY_POLE -> 2_000L
         KEY_MISC -> 2_000L
         KEY_SIDEWALK -> 10_000L

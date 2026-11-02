@@ -82,12 +82,12 @@ class IseeSpecV4AntiRepeatTest {
     }
 
     @Test
-    fun `compte des marches = 0,5s`() {
+    fun `compte des marches = 1s`() {
         val gate = SpecAntiRepeat()
 
         assertTrue(gate.allow("stairs-count", 0L))
-        assertFalse(gate.allow("stairs-count", 499L))
-        assertTrue(gate.allow("stairs-count", 500L))
+        assertFalse(gate.allow("stairs-count", 999L))
+        assertTrue(gate.allow("stairs-count", 1_000L))
     }
 
     @Test
@@ -163,7 +163,7 @@ class IseeSpecV4AntiRepeatTest {
             "fence" to 4_000L,
             "curb" to 2_000L,
             "stairs" to 2_000L,
-            "stairs-count" to 500L,
+            "stairs-count" to 1_000L,
             "pole" to 2_000L,
             "sidewalk" to 10_000L,
             "verdict" to 2_000L,

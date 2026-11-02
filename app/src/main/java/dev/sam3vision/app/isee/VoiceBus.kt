@@ -41,12 +41,16 @@ interface VoiceBusSpeaker {
  * (un niveau 12 ne coupe jamais une réponse en cours). L'antirépétition vit
  * en amont ([dev.sam3vision.core.live.AntiRepeat], côté producteurs) : le bus n'arbitre que l'instant.
  *
- * Exception (ordre user du 02/11/2026) : des escaliers en cours (niveau 6)
- * vont au bout — le niveau 0 (voitures en mouvement, re-posté à chaque
- * frame) attend la fin de la phrase au lieu de la couper, et la Traversée
- * (100+, déjà non préemptive sur 6) attend aussi. Les autres niveaux
- * gardent l'écrasement pur : humains, GPS, grillages, bordures et
- * escaliers re-détectés (dernier gagnant) coupent toujours.
+ * Exception (ordre user du 02/11/2026, VOIX-DANGER § 42) : les escaliers
+ * (niveau 6, compte des marches) sont prioritaires sur tout — ils coupent
+ * la parole en cours (voitures, humains, bordures, chat compris) et vont
+ * au bout, personne ne les coupe (ni le niveau 0 re-posté à chaque frame,
+ * ni la Traversée 100+, ni les niveaux 2 à 5) — sauf un mot de guidage en
+ * cours (GPS 3/11, incoupable lui aussi : respect mutuel, § 41). Seule la
+ * parole du user (niveau 1, micro tenu) passe devant : les escaliers
+ * l'attendent. Entre deux comptes (1 s), l'esquive (mots continus
+ * humains, repli 12) re-poste et parle dans le silence — au milieu du
+ * cycle, jamais par-dessus le compte.
  *
  * Exception (ordre user du 02/11/2026) : un mot de guidage en cours
  * (manœuvre 11, rappel 3 — clips offline ≤0,5 s) va au bout lui aussi :
@@ -106,12 +110,20 @@ object VoiceBus {
             android.util.Log.w(TAG_MUTE, "bus-jet motif=micro-user level=$level texte=[$text]")
             return
         }
-        if (activeLevel == OutdoorLevel.STAIRS && level == OutdoorLevel.CAR_MOVING) {
-            android.util.Log.w(TAG_MUTE, "bus-jet motif=escaliers-en-cours level=$level texte=[$text]")
-            return
-        }
+        val nowMs = System.currentTimeMillis()
+        if (stairsBusStuck(activeLevel, nowMs, lastSayMs)) activeLevel = IDLE_LEVEL
         if (guidanceSpeaking() && level != OutdoorLevel.USER_SPEECH) {
             android.util.Log.w(TAG_MUTE, "bus-jet motif=mot-guidage-en-cours level=$level texte=[$text]")
+            return
+        }
+        if (level == OutdoorLevel.STAIRS) {
+            activeLevel = level
+            lastSayMs = nowMs
+            target.say(level, text, clipId, clips)
+            return
+        }
+        if (activeLevel == OutdoorLevel.STAIRS) {
+            android.util.Log.w(TAG_MUTE, "bus-jet motif=escaliers-en-cours level=$level texte=[$text]")
             return
         }
         if (activeLevel != IDLE_LEVEL && level > activeLevel) {
@@ -119,7 +131,7 @@ object VoiceBus {
             return
         }
         activeLevel = level
-        lastSayMs = System.currentTimeMillis()
+        lastSayMs = nowMs
         target.say(level, text, clipId, clips)
     }
 
@@ -204,3 +216,16 @@ object VoiceBus {
         lastSayMs = 0L
     }
 }
+
+/**
+ * Bus bloqué sur des escaliers : niveau 6 en cours depuis plus de
+ * [STAIRS_BUS_TTL_MS] sans parole acceptée (lecteur pendu, synthèse
+ * jamais revenue — sinon chaque compte rafraîchit l'horodatage).
+ * Sans cette garde, un niveau 6 orphelin tairait toute la voix,
+ * les forts comme les doux. Pur, testé en JVM.
+ */
+internal fun stairsBusStuck(activeLevel: Int, nowMs: Long, lastSayMs: Long): Boolean =
+    activeLevel == OutdoorLevel.STAIRS && nowMs - lastSayMs > STAIRS_BUS_TTL_MS
+
+/** Silence maximal sous un niveau 6 (4 s : 4 comptes manqués, jamais en direct normal). */
+internal const val STAIRS_BUS_TTL_MS = 4_000L

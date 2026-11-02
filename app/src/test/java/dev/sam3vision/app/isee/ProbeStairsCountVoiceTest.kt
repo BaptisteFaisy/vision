@@ -3,6 +3,8 @@ package dev.sam3vision.app.isee
 import dev.sam3vision.app.depth.DepthMeter
 import dev.sam3vision.core.distance.DistanceReading
 import dev.sam3vision.core.live.AntiRepeat
+import dev.sam3vision.core.live.PlacedLabel
+import dev.sam3vision.core.live.SteeringCap
 import dev.sam3vision.core.local.LumaPlane
 import dev.sam3vision.core.model.LiveFrame
 import dev.sam3vision.core.model.MASK_ENCODING_NONE
@@ -28,8 +30,9 @@ import org.junit.Test
  * Voix du compteur de marches (SPEC v4, niveau 6) : quand SAM nomme
  * l'escalier et que la caméra voit des marches fraîches, le battement
  * 300 ms poste le compte (« N marches. »), une fois par compte puis répété
- * toutes les 0,5 s — devant le chat (6 < 9) ; sans escalier nommé, sans
- * compte frais ou en Traversée : silence.
+ * toutes les 1 s — prioritaire sur tout (VOIX-DANGER § 41), jusque dans
+ * l'esquive ; sans escalier nommé, sans compte frais ou en Traversée :
+ * silence.
  *
  * Jamais `advanceUntilIdle` ici : le battement est une boucle infinie, seul
  * `advanceTimeBy` avance sans boucler (miroir `ProbePulse`).
@@ -96,7 +99,7 @@ class ProbeStairsCountVoiceTest {
     private fun textes(): List<String> = speaker.said.map { it.text }
 
     @Test
-    fun `meme compte se repete toutes les 0,5 s`() = runTest {
+    fun `meme compte se repete toutes les 1 s`() = runTest {
         val (probe, fake, scope) = harness(this)
         try {
             StairCannyCount.offerLuma(stairsLuma(50, 58, 66, 74, 82, 90))
@@ -113,16 +116,48 @@ class ProbeStairsCountVoiceTest {
             assertEquals(OutdoorLevel.STAIRS, speaker.said.first().level)
             assertTrue(textes().all { it == "$offered marches." })
 
-            // 1,1 s puis 1,2 s, bornes hors temps de battement : 2
-            // répétitions pile par fenêtre (le dit à +600/+1200 du
-            // dernier, le suivant à +1800 hors fenêtre).
+            // 1,1 s puis 1,2 s, bornes hors temps de battement : 1
+            // répétition pile par fenêtre (le dit à +1200 du dernier
+            // sur la grille 300 ms, le suivant hors fenêtre).
             advanceTimeBy(1_100L)
             runCurrent()
-            assertEquals(first + 2, speaker.said.size)
+            assertEquals(first + 1, speaker.said.size)
 
             advanceTimeBy(1_200L)
             runCurrent()
-            assertEquals(first + 4, speaker.said.size)
+            assertEquals(first + 2, speaker.said.size)
+            assertTrue(textes().all { it == "$offered marches." })
+        } finally {
+            scope.cancel()
+        }
+    }
+
+    @Test
+    fun `compte traverse l esquive humaine`() = runTest {
+        val (probe, fake, scope) = harness(this)
+        try {
+            StairCannyCount.offerLuma(stairsLuma(50, 58, 66, 74, 82, 90))
+            val offered = StairCannyCount.lineCount()
+            assertTrue(offered > 0)
+
+            respond(probe, fake, "A")
+            assertTrue(stairsFoundOf(probe.state.value).detected)
+            runCurrent()
+
+            // Couloir bouché (personne plein axe à 1 m) : l'esquive est
+            // en cours, le compte parle quand même (ordre du 02/11).
+            probe.voice.guide = true
+            probe.voice.phrase(
+                5_000L, listOf(PlacedLabel("personne", 0.5f, 0.5f, 1.0f)), SteeringCap.Straight,
+            )
+            assertTrue(probe.stairsYieldToAvoidance())
+            val before = speaker.said.size
+
+            advanceTimeBy(2_500L)
+            runCurrent()
+
+            assertTrue(probe.stairsYieldToAvoidance())
+            assertTrue(speaker.said.size > before)
             assertTrue(textes().all { it == "$offered marches." })
         } finally {
             scope.cancel()

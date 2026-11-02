@@ -11,10 +11,11 @@ import dev.sam3vision.core.speech.SpeechLanguage
  * déclenche pas la répétition).
  *
  * La voix synthétise en ~1 s : répéter à 300 ms l'étoufferait et bloquerait
- * les urgences — d'où le silence d'une demi-seconde entre deux répétitions
- * (ordre user du 01/11, amende SPEC v4 : escaliers 2 s — le bus écrase,
- * dernier gagnant), et deux comptes différents espacés d'au moins
- * [COUNT_MS] (un pic isolé du compteur Canny ne fait pas bégayer). Un compte
+ * les urgences — d'où le silence d'une seconde entre deux répétitions
+ * (ordre user du 02/11, amende SPEC v4 : escaliers 2 s — le compte est
+ * prioritaire et l'esquive parle entre deux comptes), et deux comptes
+ * différents espacés d'au moins [COUNT_MS] (un pic isolé du compteur
+ * Canny ne fait pas bégayer). Un compte
  * à 0 sur un positif = compteur indisponible (voie labels SAM, qui nomme sans
  * compter) : silence, comme [StairWatcher] — 0 n'est pas « zéro marche »,
  * c'est « non compté ».
@@ -66,10 +67,11 @@ class StairCountVoice {
         const val COUNT_MS = 300L
 
         /**
-         * Silence avant de redire le même compte : 0,5 s (ordre user du
-         * 01/11) — dans l'escalier, le compte suit chaque pas.
+         * Silence avant de redire le même compte : 1 s (ordre user du
+         * 02/11) — dans l'escalier, le compte suit chaque pas et
+         * l'esquive parle au milieu.
          */
-        const val REPEAT_MS = 500L
+        const val REPEAT_MS = 1_000L
 
         /** Aucun compte dit encore (ou escalier perdu de vue). */
         private const val NO_COUNT = -1
