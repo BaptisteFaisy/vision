@@ -44,6 +44,7 @@ import dev.sam3vision.core.nav.NavRoute
 import dev.sam3vision.core.net.MetaImageClient
 import dev.sam3vision.core.settings.Settings
 import dev.sam3vision.core.speech.SettingsVoiceCommand
+import dev.sam3vision.core.voicenav.NavClarifyText
 import dev.sam3vision.core.settings.SettingsStore
 import dev.sam3vision.core.settings.SettingsStoreFactory
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -228,6 +229,7 @@ class IseeViewModel(app: Application) : AndroidViewModel(app) {
             navSpeaker.speakNavigation(confirm)
         },
         gpsGo = { destination -> voiceNav.run("I want to go to " + destination) },
+        gpsAsk = { navSpeaker.speakNetwork(NavClarifyText.ask(settings.speechLanguage)) },
         gpsOff = { voiceNav.runOrder("disable the GPS") },
         glasses = { glassesOrder.run("iSee") },
     ))
@@ -353,8 +355,6 @@ class IseeViewModel(app: Application) : AndroidViewModel(app) {
             update { it.cutSpeaking() }
         }
     }
-
-
 
     /** Texte entendu (lunettes ou dictée) : ordres locaux d'abord, sinon question au LLM. */
     private suspend fun answerHeard(text: String, pcm: ByteArray) {

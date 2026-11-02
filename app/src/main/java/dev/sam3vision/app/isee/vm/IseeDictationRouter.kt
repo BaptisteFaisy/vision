@@ -5,7 +5,7 @@ import dev.sam3vision.core.speech.DictationOrders
 import dev.sam3vision.core.speech.SpeechLanguage
 
 /**
- * Les 10 effets des ordres de dictée (spec v4), exécutés par le câblage
+ * Les 11 effets des ordres de dictée (spec v4), exécutés par le câblage
  * ([IseeViewModel]) : le routeur ne fait que décider, chaque effet parle
  * aux collaborateurs existants (modes, traversée, picto, GPS, lunettes).
  * Un effet confirme à voix haute par le chemin navigation, comme les
@@ -27,8 +27,11 @@ interface DictationActions {
     /** « mode find off » : arrêter la recherche d'objet en cours. */
     suspend fun onFindOff()
 
-    /** « mode GPS I want to go to X » : guider vers [destination]. */
+    /** « mode GPS … X » : guider vers [destination]. */
     suspend fun onGpsGo(destination: String)
+
+    /** « mode GPS » sans destination comprise : redemander où aller. */
+    suspend fun onGpsAsk()
 
     /** « mode GPS off » : couper le guidage GPS. */
     suspend fun onGpsOff()
@@ -39,7 +42,7 @@ interface DictationActions {
 
 /**
  * Routeur de dictée iSee (spec v4 : ordres « mode … » uniquement) : « mode … »
- * en tête de phrase ⇒ l'un des 10 ordres ([DictationActions]) ; tout le
+ * en tête de phrase ⇒ l'un des 11 ordres ([DictationActions]) ; tout le
  * reste ⇒ `false`, l'appelant envoie le texte au LLM comme question. Sans
  * état et sans condition de mode : la dictée reste active partout, traversée
  * comprise — un ordre dit en traversée est routé comme ailleurs.
@@ -65,6 +68,7 @@ class IseeDictationRouter(
             is DictationOrder.Find -> { actions.onFind(order.label); true }
             DictationOrder.FindOff -> { actions.onFindOff(); true }
             is DictationOrder.GpsGo -> { actions.onGpsGo(order.destination); true }
+            DictationOrder.GpsAsk -> { actions.onGpsAsk(); true }
             DictationOrder.GpsOff -> { actions.onGpsOff(); true }
             DictationOrder.GlassesOn -> { actions.onGlasses(true); true }
             DictationOrder.GlassesOff -> { actions.onGlasses(false); true }

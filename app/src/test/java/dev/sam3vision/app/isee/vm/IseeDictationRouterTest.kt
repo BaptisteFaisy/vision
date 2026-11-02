@@ -7,7 +7,7 @@ import org.junit.Assert.assertTrue
 import org.junit.Test
 
 /**
- * Routeur de dictée (spec v4 : ordres « mode … » uniquement) : les 10 ordres
+ * Routeur de dictée (spec v4 : ordres « mode … » uniquement) : les 11 ordres
  * appellent leur effet, une fois ; tout le reste rend `false` sans rien
  * appeler — l'appelant envoie le texte au LLM comme question.
  */
@@ -22,6 +22,7 @@ class IseeDictationRouterTest {
         override suspend fun onFind(label: String) { calls += "find:$label" }
         override suspend fun onFindOff() { calls += "find-off" }
         override suspend fun onGpsGo(destination: String) { calls += "gps:$destination" }
+        override suspend fun onGpsAsk() { calls += "gps-ask" }
         override suspend fun onGpsOff() { calls += "gps-off" }
         override suspend fun onGlasses(on: Boolean) { calls += if (on) "glasses-on" else "glasses-off" }
     }
@@ -29,7 +30,7 @@ class IseeDictationRouterTest {
     private val router = IseeDictationRouter(actions)
 
     @Test
-    fun `les 10 ordres sont consommes une fois chacun`() = runTest {
+    fun `les 11 ordres sont consommes une fois chacun`() = runTest {
         val cases = listOf(
             "mode outdoor" to "outdoor",
             "mode indoor" to "indoor",
@@ -39,6 +40,9 @@ class IseeDictationRouterTest {
             "mode find my mug" to "find:mug",
             "mode find off" to "find-off",
             "mode GPS I want to go to gare Montparnasse" to "gps:gare Montparnasse",
+            "mode GPS je veux aller à la gare" to "gps:la gare",
+            "mode GPS gare de Lyon" to "gps:gare de Lyon",
+            "mode GPS" to "gps-ask",
             "mode GPS off" to "gps-off",
             "mode glasses on" to "glasses-on",
             "mode glasses off" to "glasses-off",
@@ -104,7 +108,8 @@ class IseeDictationRouterTest {
             "mode self destruct",
             "mode outdoor please",
             "mode find my",
-            "mode GPS I want to go to",
+            "mode GPS off please",
+            "mode GPS où est la gare",
             "s'il te plaît mode outdoor",
             "où est la gare",
             "where is the exit",

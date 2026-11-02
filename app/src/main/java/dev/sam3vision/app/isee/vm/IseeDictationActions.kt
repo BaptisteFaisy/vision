@@ -12,6 +12,7 @@ internal class IseeDictationActions(
     private val onCrossingChanged: () -> Unit,
     private val confirmFindStopped: suspend () -> Unit,
     private val gpsGo: suspend (String) -> Unit,
+    private val gpsAsk: suspend () -> Unit,
     private val gpsOff: suspend () -> Unit,
     private val glasses: suspend () -> Unit,
 ) : DictationActions {
@@ -38,6 +39,10 @@ internal class IseeDictationActions(
 
     override suspend fun onGpsGo(destination: String) {
         gpsGo(destination)
+    }
+
+    override suspend fun onGpsAsk() {
+        gpsAsk()
     }
 
     override suspend fun onGpsOff() {
