@@ -40,7 +40,11 @@ import org.junit.Test
 @OptIn(ExperimentalCoroutinesApi::class)
 class ProbeStairsCountVoiceTest {
 
-    /** Porte-parole faux : dits enregistrés (niveau, texte). */
+    /**
+     * Porte-parole faux : dits enregistrés (niveau, texte). La lecture finit
+     * aussitôt ([VoiceBus.onSpeechIdle]) : ce banc verrouille la cadence du
+     * producteur, pas la file des escaliers (voir `StairsUncuttableTest`).
+     */
     private class FakeBusSpeaker : VoiceBusSpeaker {
         data class Said(val level: Int, val text: String)
 
@@ -48,6 +52,7 @@ class ProbeStairsCountVoiceTest {
         override fun idle(): Boolean = true
         override fun say(level: Int, text: String, clipId: String?, clips: List<String>) {
             said += Said(level, text)
+            VoiceBus.onSpeechIdle()
         }
 
         override fun cut() = Unit

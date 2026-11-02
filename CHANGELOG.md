@@ -3,6 +3,27 @@
 Le journal part du 2026-10-26 après 19 h : le commit de départ, puis une entrée par fait
 livré et ses preuves (tâche, fichiers, chiffres) dans l'arbre.
 
+## 2026-11-02 — iSee : le compte des marches ne se coupe plus lui-même (branche `fix/isee-marches-incoupables`)
+
+- **Demande** : « quand il détecte un escalier et qu'il doit dire le nombre de
+  marches, il se coupe en permanence et donc n'arrive pas à dire le nombre de
+  marches ».
+- **Cause** : le niveau 6 était protégé de tous les autres niveaux (§ 40, § 43)
+  mais pas de lui-même — annonce (2 s), compte (300 ms) et battement (700 ms)
+  postent tous au niveau 6, et chaque post refaisait `player.stop()` : avec une
+  phrase d'environ 0,7 s, un `stop()` tombait dans chaque fenêtre audible. Le
+  compteur Canny oscillant d'une frame à l'autre aggravait la rafale.
+- **Fait** (`:app`) : `VoiceBus` retient la phrase escaliers suivante dans une
+  place unique (dernier gagnant) et la joue à `onSpeechIdle`, TTL 1,5 s ;
+  abandon sur parole du user ; `reset()` purge la place. `:core` :
+  `StairCountVoice` dit la **médiane des 3 derniers ticks** (900 ms) — le
+  compteur Canny est photométriquement volatil (mesuré), un pic d'un tick ne
+  parle plus ; première détection et répétition 1 s inchangées.
+- **Preuve** : `:core` + `:app` tests JVM, 0 échec ; `check-kotlin-limits.py`
+  OK. `StairsUncuttableTest` amendé (+4), `StairCountVoiceTest` +3. Recette
+  téléphone non mesurée (logcat `bus-escaliers-en-attente` /
+  `bus-escaliers-enchaine`).
+
 ## 2026-11-02 — iSee : contourner les humains à 1 m minimum (branche `evitement-humains-1m`)
 
 - **Demande** : « dès qu'un humain est reconnu, quand il doit dire gauche et

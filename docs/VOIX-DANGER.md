@@ -528,3 +528,47 @@ clips, rues/distances absentes, noms entiers), `VoiceNavSpeakerTest`
 Recette téléphone : guidage avec rappel — un mot toutes les 15 s de
 près, jamais par-dessus une autre voix, jamais coupé — **non mesuré**,
 exige un APK sur appareil réel (preuves par `logcat`).
+
+## 44. Le compte des marches ne se coupe plus lui-même (ordre user du 03/11)
+
+Le user, dans l'escalier : « quand il détecte un escalier et qu'il doit dire
+le nombre de marches, il se coupe en permanence et donc n'arrive pas à dire
+le nombre de marches. » Le § 43 protégeait le niveau 6 de **tous les autres**
+niveaux, mais pas de lui-même : trois producteurs postent au niveau 6
+(annonce `Escalier montant.` à 2 s, compte `N marches.` à 300 ms, battement
+700 ms), et chaque post refaisait `player.stop()` (`BusSpeaker.say`) —
+le compte changeait donc de phrase avant d'avoir fini la précédente.
+
+- **règle** : une phrase de niveau 6 en cours **n'est jamais interrompue par
+  une autre phrase de niveau 6**. La nouvelle est retenue dans une **place
+  unique** (la plus récente écrase les précédentes), jouée à la fin de la
+  phrase courante (`VoiceBus.onSpeechIdle`), et abandonnée si elle a plus de
+  [1,5 s] (`STAIRS_PENDING_TTL_MS`) — un compte de l'image d'avant ne se dit
+  pas, le tick suivant repostera le compte courant. Les autres niveaux sont
+  inchangés : ils attendent tous la fin des escaliers (§ 40, § 43) ;
+- **compte lissé** : le compte dit est la **médiane des 3 derniers ticks**
+  (`StairCountVoice.WINDOW_TICKS`, 900 ms) — mesuré le 03/11, le compteur
+  Canny est volatil pour des raisons photométriques (grain ±10 → 8 à 12
+  marches fantômes, exposition ×1,4 → 8 à 11, contraste bas → 8 à 4) et
+  suivre le brut faisait redémarrer la phrase toutes les 300 ms. Un pic
+  d'un tick ne parle jamais, deux ticks d'accord (une vraie marche) si. La
+  première détection parle tout de suite ; la répétition d'un même compte
+  reste à 1 s (§ 43), et deux comptes différents restent espacés d'au moins
+  1 s ;
+- **coupes** : la parole du user, une sortie d'écran, l'intro ou l'arrêt du
+  lecteur de clips (`VoiceBus.onSpeechIdle(cut = true)`) abandonnent la
+  phrase retenue — son tour d'antirépétition est rendu, le tick suivant
+  repostera le compte — au lieu de la dire par-dessus la raison de la
+  coupe ;
+- **garde anti-blocage inchangée** : `stairsBusStuck` (4 s) rend le bus si un
+  niveau 6 orphelin ne parle plus.
+
+Verrouillé par `StairsUncuttableTest` (amendé : « escaliers re-détectés
+dernier gagnant **sans couper** » ; +4 : place unique dernier gagnant,
+compte périmé, abandon sur parole user) et `StairCountVoiceTest` (+3 :
+médiane de 3 ticks, oscillation du compteur, montée réelle ; 2 amendés).
+
+Recette téléphone : monter un escalier avec iSee — chaque compte dit en
+entier, jamais de syllabe répétée, jamais de silence prolongé — **non
+mesuré**, exige un APK sur appareil réel (preuves par `logcat` : `VoiceMute`
+`bus-escaliers-en-attente` / `bus-escaliers-enchaine`).

@@ -170,11 +170,90 @@ class StairsUncuttableTest {
     }
 
     @Test
-    fun `escaliers re-detectes dernier gagnant`() {
+    fun `escaliers re-detectes dernier gagnant sans couper`() {
         VoiceBus.post(OutdoorLevel.STAIRS, "5 marches.")
         VoiceBus.post(OutdoorLevel.STAIRS, "4 marches.")
 
+        // La phrase en cours va au bout ; la suivante attend son tour.
+        assertEquals(1, speaker.said.size)
+        VoiceBus.onSpeechIdle()
+        assertEquals(
+            listOf(
+                StairsFakeSpeaker.Said(OutdoorLevel.STAIRS, "5 marches."),
+                StairsFakeSpeaker.Said(OutdoorLevel.STAIRS, "4 marches."),
+            ),
+            speaker.said,
+        )
+    }
+
+    @Test
+    fun `un seul compte en attente, le dernier gagne`() {
+        VoiceBus.post(OutdoorLevel.STAIRS, "5 marches.")
+        VoiceBus.post(OutdoorLevel.STAIRS, "6 marches.")
+        VoiceBus.post(OutdoorLevel.STAIRS, "7 marches.")
+
+        assertEquals(1, speaker.said.size)
+        VoiceBus.onSpeechIdle()
         assertEquals(2, speaker.said.size)
+        assertEquals(StairsFakeSpeaker.Said(OutdoorLevel.STAIRS, "7 marches."), speaker.said[1])
+    }
+
+    @Test
+    fun `un compte perime ne se dit pas`() {
+        val now = longArrayOf(1_000L)
+        VoiceBus.clock = { now[0] }
+        VoiceBus.post(OutdoorLevel.STAIRS, "5 marches.")
+        VoiceBus.post(OutdoorLevel.STAIRS, "6 marches.")
+
+        now[0] = 3_000L
+        VoiceBus.onSpeechIdle()
+
+        assertEquals(1, speaker.said.size)
+        // Le bus est rendu : le niveau 6 ne tait plus tout le monde.
+        VoiceBus.post(OutdoorLevel.HUMAN, "Gauche.")
+        assertEquals(2, speaker.said.size)
+    }
+
+    @Test
+    fun `une coupe abandonne le compte en attente`() {
+        VoiceBus.post(OutdoorLevel.STAIRS, "5 marches.")
+        VoiceBus.post(OutdoorLevel.STAIRS, "6 marches.")
+
+        VoiceBus.onSpeechIdle(cut = true)
+
+        assertEquals(1, speaker.said.size)
+        // Le bus est rendu : le compte abandonné ne tait plus rien.
+        VoiceBus.post(OutdoorLevel.HUMAN, "Gauche.")
+        assertEquals(2, speaker.said.size)
+    }
+
+    @Test
+    fun `deux repos d affilee ne parlent pas deux fois`() {
+        VoiceBus.post(OutdoorLevel.STAIRS, "5 marches.")
+        VoiceBus.post(OutdoorLevel.STAIRS, "6 marches.")
+
+        VoiceBus.onSpeechIdle()
+        VoiceBus.onSpeechIdle()
+
+        assertEquals(
+            listOf(
+                StairsFakeSpeaker.Said(OutdoorLevel.STAIRS, "5 marches."),
+                StairsFakeSpeaker.Said(OutdoorLevel.STAIRS, "6 marches."),
+            ),
+            speaker.said,
+        )
+    }
+
+    @Test
+    fun `la parole du user abandonne le compte en attente`() {
+        VoiceBus.post(OutdoorLevel.STAIRS, "5 marches.")
+        VoiceBus.post(OutdoorLevel.STAIRS, "6 marches.")
+
+        VoiceBus.userSpeaking(true)
+        VoiceBus.userSpeaking(false)
+        VoiceBus.onSpeechIdle()
+
+        assertEquals(1, speaker.said.size)
     }
 
 }
