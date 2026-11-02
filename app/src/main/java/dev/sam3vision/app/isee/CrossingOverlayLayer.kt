@@ -12,6 +12,7 @@ import androidx.compose.ui.geometry.Size
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.drawscope.Stroke
 import androidx.compose.ui.platform.LocalDensity
+import androidx.compose.ui.text.TextLayoutResult
 import androidx.compose.ui.text.TextStyle
 import androidx.compose.ui.text.drawText
 import androidx.compose.ui.text.font.FontWeight
@@ -55,15 +56,7 @@ internal fun CrossingOverlayLayer(
         val marker = lightMarker(box, frameWidth, frameHeight, boxW, boxH) ?: return@BoxWithConstraints
         val accent = Color(crossingAccent(active, state))
         val stroke = with(LocalDensity.current) { STROKE_DP.dp.toPx() }
-        val measurer = rememberTextMeasurer()
-        // Mesuré une fois par étiquette, pas à chaque composition.
-        val laid = remember(measurer, tag, boxW, boxH) {
-            measurer.measure(
-                tag,
-                TextStyle(color = Color.White, fontSize = TAG_FONT_SP.sp, fontWeight = FontWeight.Bold),
-                maxLines = 1,
-            )
-        }
+        val laid = rememberMeasuredTag(tag, TAG_FONT_SP, boxW, boxH)
         val laidH = laid.size.height.toFloat()
         val laidW = laid.size.width.toFloat()
         val tagW = laidW + TAG_PAD_H_DP * 2
@@ -106,15 +99,7 @@ internal fun TraverseVerdictBanner(
     BoxWithConstraints(modifier.fillMaxSize()) {
         val boxW = constraints.maxWidth.toFloat()
         val boxH = constraints.maxHeight.toFloat()
-        val measurer = rememberTextMeasurer()
-        // Mesuré une fois par verdict, pas à chaque composition.
-        val laid = remember(measurer, tag, boxW, boxH) {
-            measurer.measure(
-                tag,
-                TextStyle(color = Color.White, fontSize = VERDICT_FONT_SP.sp, fontWeight = FontWeight.Bold),
-                maxLines = 1,
-            )
-        }
+        val laid = rememberMeasuredTag(tag, VERDICT_FONT_SP, boxW, boxH)
         val plate = verdictRect(
             laid.size.width.toFloat() + VERDICT_PAD_H_PX * 2,
             laid.size.height.toFloat() + VERDICT_PAD_V_PX * 2,
@@ -131,6 +116,27 @@ internal fun TraverseVerdictBanner(
             )
             drawText(laid, topLeft = Offset(plate.left + VERDICT_PAD_H_PX, plate.top + VERDICT_PAD_V_PX))
         }
+    }
+}
+
+/**
+ * Étiquette blanche en gras, mesurée une fois par texte (pas à chaque
+ * composition) : le feu et le verdict partagent la même mesure.
+ */
+@Composable
+private fun rememberMeasuredTag(
+    tag: String,
+    fontSizeSp: Float,
+    boxW: Float,
+    boxH: Float,
+): TextLayoutResult {
+    val measurer = rememberTextMeasurer()
+    return remember(measurer, tag, boxW, boxH) {
+        measurer.measure(
+            tag,
+            TextStyle(color = Color.White, fontSize = fontSizeSp.sp, fontWeight = FontWeight.Bold),
+            maxLines = 1,
+        )
     }
 }
 
