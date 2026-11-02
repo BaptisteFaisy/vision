@@ -33,6 +33,9 @@ class LiveStats(maxSamples: Int = RollingStat.DEFAULT_WINDOW) {
      */
     val p95Ms: Long get() = stat.percentile(Percentiles.P95)
 
+    /** Maximum de la session (jamais fenêtré), 0 si aucune mesure. */
+    val maxMs: Long get() = stat.max
+
     /** Oublie les mesures de la séance précédente. */
     fun reset() = stat.reset()
 }

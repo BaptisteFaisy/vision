@@ -85,6 +85,18 @@ class LiveStatsTest {
     }
 
     @Test
+    fun `max de session ignore la fenetre, reset l'oublie`() {
+        val stats = LiveStats(maxSamples = 2)
+        stats.record(100L)
+        stats.record(500L)
+        stats.record(10L) // 500 sort de la fenêtre, pas du max
+        assertEquals(2, stats.samples)
+        assertEquals(500L, stats.maxMs)
+        stats.reset()
+        assertEquals(0L, stats.maxMs)
+    }
+
+    @Test
     fun `ecarts negatifs bornes et non finis jetes`() {
         val stats = MotionGapStats()
         stats.record(-4f)
