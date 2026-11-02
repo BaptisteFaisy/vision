@@ -6,6 +6,7 @@ import dev.sam3vision.core.net.ApiError
 import dev.sam3vision.core.net.ElevenLabsTtsClient
 import dev.sam3vision.core.settings.Settings
 import java.io.File
+import java.io.FileNotFoundException
 
 /**
  * Voix de l'app : **ElevenLabs uniquement** (pas de moteur TTS système).
@@ -73,12 +74,13 @@ class VoiceAnnouncer {
 
     /**
      * Lit un MP3 local (clip embarqué résolu par l'appelant). Vitesse des
-     * réglages ; fichier absent = échec silencieux (jamais de synthèse).
+     * réglages ; fichier absent = échec tracé (jamais de synthèse).
      */
     suspend fun sayFile(settings: Settings, file: File): Result<Unit> {
+        onEvent("EXPECT")
         player.speed = settings.ttsSpeed
-        if (!file.isFile) return Result.failure(java.io.FileNotFoundException(file.path))
-        return player.play(file)
+        if (!file.isFile) return fail(FileNotFoundException(file.path))
+        return player.play(file).onFailure { onEvent("FAIL") }
     }
 
     fun stop() = player.stop()
