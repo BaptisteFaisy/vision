@@ -29,7 +29,7 @@ class AntiRepeatTest {
         assertEquals(4_000L, AntiRepeat.durationMs(AntiRepeat.KEY_FENCE))
         assertEquals(2_000L, AntiRepeat.durationMs(AntiRepeat.KEY_CURB))
         assertEquals(2_000L, AntiRepeat.durationMs(AntiRepeat.KEY_STAIRS))
-        assertEquals(500L, AntiRepeat.durationMs(AntiRepeat.KEY_STAIRS_COUNT))
+        assertEquals(1_000L, AntiRepeat.durationMs(AntiRepeat.KEY_STAIRS_COUNT))
         assertEquals(2_000L, AntiRepeat.durationMs(AntiRepeat.KEY_POLE))
         assertEquals(0L, AntiRepeat.durationMs(AntiRepeat.KEY_POLE_AVOID))
         assertEquals(2_000L, AntiRepeat.durationMs(AntiRepeat.KEY_MISC))
