@@ -112,14 +112,14 @@ class AntiRepeatTest {
     }
 
     @Test
-    fun `verdict = 3 s, changement immediat par etat`() {
+    fun `verdict = 2 s, changement immediat par etat`() {
         assertTrue(AntiRepeat.allow("verdict:cross", 1_000L))
-        assertFalse(AntiRepeat.allow("verdict:cross", 3_999L))
-        assertTrue(AntiRepeat.allow("verdict:cross", 4_000L))
+        assertFalse(AntiRepeat.allow("verdict:cross", 2_999L))
+        assertTrue(AntiRepeat.allow("verdict:cross", 3_000L))
 
-        assertTrue("état nouveau : parle aussitôt", AntiRepeat.allow("verdict:dont-cross", 4_100L))
-        assertFalse(AntiRepeat.allow("verdict:dont-cross", 4_200L))
-        assertFalse("l'autre état garde son tour", AntiRepeat.allow("verdict:cross", 4_200L))
+        assertTrue("état nouveau : parle aussitôt", AntiRepeat.allow("verdict:dont-cross", 3_100L))
+        assertFalse(AntiRepeat.allow("verdict:dont-cross", 3_200L))
+        assertFalse("l'autre état garde son tour", AntiRepeat.allow("verdict:cross", 3_200L))
     }
 
     @Test
