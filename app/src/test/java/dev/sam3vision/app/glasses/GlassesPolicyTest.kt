@@ -236,4 +236,14 @@ class GlassesPolicyTest {
         )
         assertEquals(GlassesMessages.registrationLost(), lost)
     }
+
+    @Test
+    fun `le balayage droit connecte quand le bouton le pourrait`() {
+        assertTrue(shouldSwipeConnect(state(phase = SessionPhase.IDLE)))
+        assertTrue(shouldSwipeConnect(state(phase = SessionPhase.STOPPED)))
+        // Ni coupure d'un direct, ni rejou d'une ouverture, ni session sans app enregistrée.
+        assertFalse(shouldSwipeConnect(state(phase = SessionPhase.STARTED)))
+        assertFalse(shouldSwipeConnect(state(phase = SessionPhase.STARTING)))
+        assertFalse(shouldSwipeConnect(state(registered = false)))
+    }
 }

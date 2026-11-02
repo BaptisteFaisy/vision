@@ -6,6 +6,7 @@ import android.content.pm.PackageManager
 import android.content.res.Configuration
 import android.os.Build
 import android.os.Bundle
+import android.util.Log
 import android.view.ViewGroup.LayoutParams.MATCH_PARENT
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
@@ -25,6 +26,7 @@ import dev.sam3vision.app.glasses.EXTRA_GLASSES_MOCK_CONNECT
 import dev.sam3vision.app.glasses.EXTRA_GLASSES_TALK
 import dev.sam3vision.app.glasses.GlassesController
 import dev.sam3vision.app.glasses.GlassesSessionLifecycle
+import dev.sam3vision.app.glasses.shouldSwipeConnect
 import dev.sam3vision.app.glasses.bench.BenchEntryPoint
 import dev.sam3vision.app.glasses.bench.EXTRA_ANALYZE
 import dev.sam3vision.app.glasses.bench.EXTRA_MOCK
@@ -197,7 +199,7 @@ class MainActivity : ComponentActivity() {
         onSingleTap = isee.gestures::onSingleTap
         onSwipeUp = isee.gestures::onSwipeUp
         onSwipeDown = isee.gestures::onSwipeDown
-        onSwipeRight = isee.gestures::onSwipeRight
+        onSwipeRight = { swipeRight() }
         pictoZone = { isee.picto.chipZone() }
         crossingZone = { isee.modeChips.crossing.zone() }
         placeModeZone = { isee.modeChips.place.zone() }
@@ -207,6 +209,19 @@ class MainActivity : ComponentActivity() {
             MATCH_PARENT,
             MATCH_PARENT,
         )
+    }
+
+    /**
+     * Balayage droit : la session lunettes quand elle est joignable (bouton « Start the
+     * session »), sinon le « Quoi chercher ? » d'avant — le geste ne coupe jamais un direct.
+     */
+    private fun swipeRight() {
+        if (shouldSwipeConnect(glasses.state.value)) {
+            Log.i("GlassesChain", "swipe connect")
+            glasses.connect()
+        } else {
+            isee.gestures.onSwipeRight()
+        }
     }
 
     /** Fond : grâce 60 s iSee (pas d'extinction immédiate) ou coupure directe hors sonde. */
