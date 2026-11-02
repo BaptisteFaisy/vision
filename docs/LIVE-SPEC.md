@@ -253,45 +253,39 @@ du conteneur
 pool 8 connexions inactives / 5 min (`Http.kt:56-67`). Le corps d'une frame est **one-shot** :
 OkHttp ne le rejoue jamais, donc pas de seconde inférence facturée (`Http.kt:98-112`).
 
-## 5. Concepts suivis : 21 (plafond 22)
+## 5. Concepts suivis : 16 dehors + 10 dedans (plafond 22, spec v4)
 
-- Liste par défaut : `["person", "car", "bus", "bicycle", "motorcycle",
-  "pedestrian traffic light", "pedestrian signal head", "curb", "sidewalk",
-  "crosswalk", "pole", "stairs", "keys", "gate", "souvenir shop", "beanie",
-  "socks", "wall", "stroller", "child", "dog"]`
-  (**21 concepts extérieurs**, ordres user des 28/10-01/11 : la tête du feu
-  piéton suit le caisson depuis le 31/10, la couleur s'y lit en local ; les
-  murs depuis le 31/10 ; les souvenirs et les corps de la foule depuis le
-  01/11 ; **fence et electric scooter sont sortis le 01/11 ; bus,
-  vélo, moto et trottoir sont revenus** — le trottoir sert de rail de maintien
-  (`SidewalkKeep`), pas d'obstacle — la Traversée les rétablit quand elle s'arme, via
-  `VehicleConcepts.promptsFor` + curb/sidewalk). Plafond client **et** serveur :
-  **22** (marge pour « mode find my X »), un serveur resté à 18 refuserait la
-  frame —
-  `core/src/main/java/dev/sam3vision/core/live/LivePrompts.kt`.
-- Preset extérieur : `["person", "pole", "street lamp", "bollard", "fence", "barrier",
-  "gate", "sign", "tree", "trash can", "sidewalk", "crosswalk", "animal",
-  "pedestrian traffic light", "pedestrian signal head", "stroller", "child",
-  "electric scooter"]` (18 concepts de cheminement : mobilier +
-  trottoir, animaux, feu piéton et sa tête — détecté en permanence hors
-  traversée ; pastille « Extérieur » du direct, `LivePrompts.outdoor`).
-- Liste d'intérieur : `["person", "stroller", "door", "chair", "table", "stairs",
-  "wall", "window", "crosswalk", "keys"]` (10 objets d'appartement,
-  `LivePrompts.indoor`) — la sonde iSee
+- Liste dehors : `["person", "car", "pedestrian traffic light", "curb",
+  "sidewalk", "crosswalk", "pole", "stairs", "fence", "wall", "barrier",
+  "sign", "street lamp", "animal", "trash can", "souvenir shop"]`
+  (**16 concepts**, spec v4 : listes verrouillées, deux mondes — sortis de la
+  détection : bus, vélo, camion, moto, clés dehors, borne, arbre, portail, bateau,
+  tête du feu, trottinette, poussette, enfant, chien, bonnet)
+  (`core/src/main/java/dev/sam3vision/core/live/LivePrompts.kt:29-33`).
+- Preset extérieur : replié sur la liste dehors (`LivePrompts.outdoor = default`,
+  spec v4, détection unifiée à 16 concepts). Gardé pour la pastille « Outdoor »
+  du direct, qui envoie la même liste que « Street ».
+- Liste d'intérieur : `["keys", "medicine box", "glasses", "glasses case",
+  "phone", "shoes", "door", "wall", "person", "socks"]` (10 objets,
+  `LivePrompts.indoor`, `LivePrompts.kt:45-48`) — la sonde iSee
   la suit quand le monde est « dedans » (`Settings.outdoorMode = false`,
   `LivePrompts.forMode`) ; une liste vide ou un défaut passé à
   `configureFrom` bascule sur le monde, une liste explicite (Traversée,
   champ « Suivre ») traverse inchangée
   (`app/src/main/java/dev/sam3vision/app/isee/ProbeWiring.kt`). V1 : seuls
-  les prompts basculent, la portée reste 4 m dans les deux mondes.
-- Plafond : `LivePrompts.MAX = 18`. Le client n'en envoie jamais plus ;
-  le backend suit (`MAX_PROMPTS = 18` sur `/live`, `PROMPT_LIMIT = 18`
-  côté tracker).
-- Longueur maximale d'un concept : 32 caractères (`LivePrompts.kt:37`).
+  les prompts basculent, la portée reste 4 m dans les deux mondes
+  (`Guidance.RANGE_METERS`, `Guidance.kt:82`).
+- Plafond : `LivePrompts.MAX = 22` (`LivePrompts.kt:73`). Le client n'en envoie
+  jamais plus ; le backend suit (`MAX_PROMPTS = 22` sur `/live`
+  (`segmentation.py:31`), `PROMPT_LIMIT = 22` côté tracker (`tracking.py:54`)) ;
+  un serveur resté en arrière **refuse** la frame, il ne tronque pas. La marge
+  sert à « Find my X », pas à allonger le suivi au repos.
+- Longueur maximale d'un concept : 32 caractères (`LivePrompts.MAX_LENGTH`,
+  `LivePrompts.kt:76`).
 - `normalize()` retire les espaces, les vides et les doublons, rejette les concepts trop
   longs, borne à `MAX`, et retombe sur la liste par défaut si le résultat est vide
-  (`LivePrompts.kt:44-52`). La liste est normalisée **une fois** par session
-  (`LiveSession.kt:83`).
+  (`LivePrompts.kt:83-91`). La liste est normalisée à l'ouverture de la session
+  (`LiveSession.kt:118`, lazy).
 
 ## 6. Les identités stables sont reconstruites sur le téléphone
 
