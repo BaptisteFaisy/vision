@@ -1,5 +1,6 @@
 package dev.sam3vision.core.live
 
+import dev.sam3vision.core.cycle.CycleConcepts
 import dev.sam3vision.core.distance.DistanceText
 import dev.sam3vision.core.model.Detection
 import dev.sam3vision.core.model.SeenObject
@@ -133,7 +134,8 @@ object PositionText {
     /**
      * Phrase annoncée, ou `null` s'il n'y a rien à dire. Un label répété à la même
      * heure n'est cité qu'une fois ; au-delà de [maxObjects] objets cités, le reste
-     * est résumé (« et 2 autres objets » / « and 2 other objects »).
+     * est résumé (« et 2 autres objets » / « and 2 other objects »). Les cycles
+     * (vélo, trottinette) ne sont jamais nommés (ordre user du 02/11 : virés).
      */
     fun phrase(
         labels: List<PlacedLabel>,
@@ -142,6 +144,7 @@ object PositionText {
     ): String? {
         val cleaned = labels
             .filter { it.label.isNotBlank() }
+            .filter { !CycleConcepts.isCycle(it.label) }
             .map { it.copy(label = it.label.trim()) }
             // La signature reste française : elle ne dépend pas de la langue de la voix.
             .distinctBy { it.label.lowercase() to it.position }
