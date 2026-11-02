@@ -4,7 +4,6 @@ import androidx.lifecycle.LifecycleOwner
 import dev.sam3vision.app.MicBus
 import dev.sam3vision.app.SpeechPlayer
 import dev.sam3vision.core.net.ApiError
-import dev.sam3vision.core.net.TtsClient
 import java.io.File
 import java.nio.file.Files
 import kotlinx.coroutines.ExperimentalCoroutinesApi
@@ -131,9 +130,7 @@ class TapSessionTest {
             video = video,
             announcements = AnnouncementPlayer(
                 dir = File(tmp, "announcements"),
-                tts = object : TtsClient {
-                    override suspend fun synthesize(text: String) = Result.failure<ByteArray>(ApiError.Network())
-                },
+                bundled = TapBundled { _, _ -> false },
                 player = player,
                 scope = scope,
             ),
