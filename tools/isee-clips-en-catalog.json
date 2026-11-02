@@ -462,21 +462,6 @@
       "id": "cross_off"
     },
     {
-      "en": "Crosswalk ahead.",
-      "for": "passage annonce devant",
-      "id": "cross_approach_ahead"
-    },
-    {
-      "en": "Crosswalk to the left.",
-      "for": "passage annonce gauche",
-      "id": "cross_approach_left"
-    },
-    {
-      "en": "Crosswalk to the right.",
-      "for": "passage annonce droite",
-      "id": "cross_approach_right"
-    },
-    {
       "en": "On the crosswalk.",
       "for": "passage arrivée",
       "id": "cross_arrived"
