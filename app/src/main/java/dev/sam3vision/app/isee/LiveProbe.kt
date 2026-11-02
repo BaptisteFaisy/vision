@@ -211,7 +211,7 @@ class LiveProbe(
         }
     }
 
-    /** Réveil explicite via la fabrique injectée (faux client en test, patient en prod) ; `/health` OK = carte chaude, on bascule sans attendre la frame (un vol froid peut coexister avec les vols chauds : transitoire, borné). */
+    /** Réveil explicite via la fabrique injectée (faux client en test, patient en prod) ; `/health` OK = carte chaude, on bascule sans attendre la frame (la jambe suit le bit `ws_binary`, le délai froid retombe). */
     internal fun fireWake(url: String) {
         scope.launch { GpuWake.wake(url, health = { openClient(it, COLD_TIMEOUT_SECONDS, null).health().map { h -> session?.useBinaryWs(h.wsBinary); h.ok } }, onResult = { if (it.getOrNull() == true && !warmed) goWarm() }) }
     }
