@@ -40,9 +40,9 @@ private class GpsVoiceLauncher : NavigationLauncher {
 }
 
 /**
- * Voix GPS dédiée SPEC v4 (JUnit seul, pur JVM) : rappel 15 s (dernière
- * consigne + distance restante), garde voix-route sur le lecteur réel,
- * aucun repli Google Maps.
+ * Voix GPS dédiée SPEC v4 (JUnit seul, pur JVM) : rappel 15 s (mot seul
+ * redit de près), garde voix-route sur le lecteur réel, aucun repli
+ * Google Maps.
  */
 class VoiceNavGpsVoiceTest {
 
@@ -65,30 +65,6 @@ class VoiceNavGpsVoiceTest {
         engineStart = { _, _ -> true },
         autoStartOnVoice = autoStart,
     )
-
-    @Test
-    fun `le rappel repete la consigne et la distance restante`() {
-        assertEquals(
-            "Turn right, rue de la Paix. 450 meters left.",
-            gpsReminderPhrase("Turn right, rue de la Paix", 450),
-        )
-    }
-
-    @Test
-    fun `le rappel rogne le point et couvre le singulier`() {
-        assertEquals(
-            "Destination in 200 meters. 1 meter left.",
-            gpsReminderPhrase("Destination in 200 meters.", 1),
-        )
-    }
-
-    @Test
-    fun `le rappel sans consigne dit tout droit`() {
-        assertEquals(
-            "Straight on. 120 meters left.",
-            gpsReminderPhrase("   ", 120),
-        )
-    }
 
     @Test
     fun `le rappel bat a 15 secondes`() {

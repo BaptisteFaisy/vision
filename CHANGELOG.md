@@ -21,6 +21,22 @@ livré et ses preuves (tâche, fichiers, chiffres) dans l'arbre.
 - **Preuve** : `:core` 3 253 tests, `:app` 1 900 tests, 0 échec ;
   `check-kotlin-limits.py` OK. Nouveaux : `LateralNudgePersonTest` (4),
   face-à-face + bond impossible (`PersonTrackTest`).
+## 2026-11-02 — iSee : consignes atomiques mot seul « Left. »/« Right. », incoupables (branche `fix-consignes-atomiques`)
+
+- **Demande** : le guidage vocal ne dit plus que « Left. » / « Right. » au
+  moment de tourner (mot seul, le plus vite possible, jamais coupé en pleine
+  instruction) ; silence si loin ou tout droit.
+- **Cause** : phrases longues avec distances, coupées à mi-mot par l'écrasement
+  pur du bus (niveau 0 re-posté à chaque frame) et redites par la porte.
+- **Fait** : `maneuverWord` (mot seul proche, silence sinon) ; manœuvres
+  silencieuses tuées avant la porte ; moteur : départ/suite ignorés, rappel
+  15 s de près en mot seul, distances supprimées ; `VoiceBus.post` jette tout
+  pendant un mot de guidage (11, 3) sauf la parole user (1) ; producteurs
+  frame tus en amont (`guidanceHolds`, tours intacts). Écran inchangé.
+- **Preuve** : `GpsUncuttableTest` (+6, nouveau) vert ; `:app` + `:core`
+  5 145 tests, 0 échec ; `check-kotlin-limits.py` vert ; clips
+  `guide_left`/`guide_right` relus au catalogue (`clipIdFor`). Recette rue
+  **non mesurée** (preuves par `logcat`).
 
 ## 2026-11-02 — iSee : annonces des marches incoupables, niveau 0 et Traversée attendent (branche `fix/isee-marches-incoupables`)
 

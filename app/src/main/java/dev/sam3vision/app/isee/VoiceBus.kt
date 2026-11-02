@@ -47,6 +47,12 @@ interface VoiceBusSpeaker {
  * (100+, déjà non préemptive sur 6) attend aussi. Les autres niveaux
  * gardent l'écrasement pur : humains, GPS, grillages, bordures et
  * escaliers re-détectés (dernier gagnant) coupent toujours.
+ *
+ * Exception (ordre user du 02/11/2026) : un mot de guidage en cours
+ * (manœuvre 11, rappel 3 — clips offline ≤0,5 s) va au bout lui aussi :
+ * tout le monde attend la fin du mot sauf la parole user (1, le micro
+ * garde son silence), re-posts GPS compris (un « left » frais ne coupe
+ * pas le « left » en cours : la redite 15 s couvre le tour perdu).
  */
 object VoiceBus {
     /** Aucune parole en cours : tout niveau parle. */
@@ -104,6 +110,10 @@ object VoiceBus {
             android.util.Log.w(TAG_MUTE, "bus-jet motif=escaliers-en-cours level=$level texte=[$text]")
             return
         }
+        if (guidanceSpeaking() && level != OutdoorLevel.USER_SPEECH) {
+            android.util.Log.w(TAG_MUTE, "bus-jet motif=mot-guidage-en-cours level=$level texte=[$text]")
+            return
+        }
         if (activeLevel != IDLE_LEVEL && level > activeLevel) {
             android.util.Log.w(TAG_MUTE, "bus-jet motif=ecrase level=$level actif=$activeLevel chat=$chatReads texte=[$text]")
             return
@@ -120,6 +130,15 @@ object VoiceBus {
      */
     @Synchronized
     fun stairsSpeaking(): Boolean = activeLevel == OutdoorLevel.STAIRS
+
+    /**
+     * Vrai quand un mot de guidage parle (manœuvre 11, rappel 3 — ≤0,5 s) :
+     * les producteurs frame s'y taisent en amont (même motif que
+     * [stairsSpeaking]) au lieu d'être jetés par [post].
+     */
+    @Synchronized
+    fun guidanceSpeaking(): Boolean =
+        activeLevel == OutdoorLevel.GPS_EVENT || activeLevel == OutdoorLevel.GPS_REMINDER
 
     /**
      * Silence écoulé depuis la dernière parole acceptée (repli 12 : parler
