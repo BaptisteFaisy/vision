@@ -210,4 +210,25 @@ class IseeVoiceSpineTest {
             posted,
         )
     }
+
+    @Test
+    fun `gps reporte au silence sous un trottoir`() = runTest {
+        val voice = spineDehors(this)
+        VoiceBus.post(OutdoorLevel.SIDEWALK, "Trottoir à gauche.")
+
+        voice.speakGps("Tournez à droite.", OutdoorLevel.GPS_EVENT)
+        runCurrent()
+        assertEquals(listOf(OutdoorLevel.SIDEWALK to "Trottoir à gauche."), posted)
+
+        VoiceBus.onSpeechIdle()
+        advanceTimeBy(500L)
+        runCurrent()
+        assertEquals(
+            listOf(
+                OutdoorLevel.SIDEWALK to "Trottoir à gauche.",
+                OutdoorLevel.GPS_EVENT to "Tournez à droite.",
+            ),
+            posted,
+        )
+    }
 }

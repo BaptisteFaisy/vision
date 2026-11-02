@@ -58,6 +58,20 @@ class ProbeStairsCountVoiceTest {
         override fun cut() = Unit
     }
 
+    /**
+     * Porte-parole qui tient : dits enregistrés, bus jamais rendu — le
+     * trottoir posté dessus reste « en cours » jusqu'au `onSpeechIdle`.
+     */
+    private class HoldSpeaker : VoiceBusSpeaker {
+        val said = mutableListOf<String>()
+        override fun idle(): Boolean = false
+        override fun say(level: Int, text: String, clipId: String?, clips: List<String>) {
+            said += text
+        }
+
+        override fun cut() = Unit
+    }
+
     private val speaker = FakeBusSpeaker()
 
     @Before
@@ -163,6 +177,42 @@ class ProbeStairsCountVoiceTest {
 
             assertTrue(probe.stairsYieldToAvoidance())
             assertTrue(speaker.said.size > before)
+            assertTrue(textes().all { it == "$offered marches." })
+        } finally {
+            scope.cancel()
+        }
+    }
+
+    @Test
+    fun `compte attendu sous un trottoir, tour intact`() = runTest {
+        val (probe, fake, scope) = harness(this)
+        try {
+            StairCannyCount.offerLuma(stairsLuma(50, 58, 66, 74, 82, 90))
+            val offered = StairCannyCount.lineCount()
+            assertTrue(offered > 0)
+
+            respond(probe, fake, "A")
+            assertTrue(stairsFoundOf(probe.state.value).detected)
+            runCurrent()
+            val before = speaker.said.size
+            assertTrue(before > 0)
+            StairCannyCount.offerLuma(stairsLuma(50, 58, 66, 74, 82, 90))
+
+            // Trottoir tenu : le compte se tait (ni dit, ni tour mangé).
+            val hold = HoldSpeaker()
+            VoiceBus.speaker = hold
+            VoiceBus.post(OutdoorLevel.SIDEWALK, "Trottoir à gauche.")
+            advanceTimeBy(1_500L)
+            runCurrent()
+            assertEquals(listOf("Trottoir à gauche."), hold.said)
+            assertEquals(before, speaker.said.size)
+
+            // Fin du trottoir : le compte parle au battement suivant.
+            VoiceBus.onSpeechIdle()
+            VoiceBus.speaker = speaker
+            advanceTimeBy(300L)
+            runCurrent()
+            assertEquals(before + 1, speaker.said.size)
             assertTrue(textes().all { it == "$offered marches." })
         } finally {
             scope.cancel()
