@@ -80,9 +80,9 @@ class WsLiveClientTest {
     }
 
     @Test
-    fun `les jalons reseau datent en-tetes puis corps`() = runBlocking {
-        // Le transport appelle onOpen au handshake et le client onBody à la réception :
-        // la chronologie de l'écran peut alors séparer l'attente de la descente.
+    fun `seul le corps est date, le handshake ne pollue plus la frame`() = runBlocking {
+        // Le handshake (1x/session) n'attribue plus ses en-têtes à la frame courante :
+        // seul onBody date, à la réception — le split HEADERS/BODY reste HTTP seul.
         val seen = mutableListOf<String>()
         val marks = object : WireMarks {
             override fun onHeaders() { seen += "headers" }
@@ -93,23 +93,24 @@ class WsLiveClientTest {
 
         client.live("QQ==", null, 640, 4).getOrThrow()
 
-        assertEquals(listOf("headers", "body"), seen)
+        assertEquals(listOf("body"), seen)
     }
 
     @Test
-    fun `un message orphelin ne pose pas de jalon corps`() = runBlocking {
+    fun `un message orphelin ne pose aucun jalon`() = runBlocking {
         val seen = mutableListOf<String>()
         val marks = object : WireMarks {
             override fun onHeaders() { seen += "headers" }
             override fun onBody() { seen += "body" }
         }
-        // Réponse portant un id qu'aucune requête n'attend : ignorée, donc non datée.
+        // Réponse portant un id qu'aucune requête n'attend : ignorée, donc non datée —
+        // et le handshake ne date plus rien non plus (1x/session, pas 1x/frame).
         val transport = ContractWsTransport { listOf("{\"id\":99,\"elapsed_ms\":1}") }
         val client = WsLiveClient(base, transport, 1_000, RecordingLiveClient(), marks = marks, binaryWs = false)
 
         client.live("QQ==", null, 640, 4)
 
-        assertEquals(listOf("headers"), seen)
+        assertEquals(emptyList<String>(), seen)
     }
 
     @Test

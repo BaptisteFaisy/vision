@@ -234,9 +234,10 @@ class WsLiveClient(
             webSocketUrl(baseUrl, LIVE_WS_PATH),
             { text -> onText(text) },
             { error -> onClosed(error, gen) },
-            // Handshake accepté : poste « en-têtes » de la session (absent en WebSocket
-            // pour les frames suivantes — un socket déjà ouvert n'a plus d'en-têtes à lire).
-            { marks?.onHeaders() },
+            // Handshake accepté : aucun poste daté — attribuer ces en-têtes uniques
+            // (1x/session) à la frame courante serait trompeur ; le split
+            // HEADERS/BODY reste réservé au HTTP, `sentToHeadersMs` vaut `-1` ici.
+            { },
         )
         if (opened) {
             connected = true
