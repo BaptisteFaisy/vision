@@ -58,7 +58,10 @@ private val ANNEX_B_START = byteArrayOf(0, 0, 0, 1)
  * Format H.265 mémorisé : stable par session (les deux décodeurs — direct et
  * pont — lisent le même flux), donc la première détection tranche pour toutes
  * les poussées suivantes. `null` = indécis (oublié par [resetAnnexBMemo]).
+ * Volatile : écrit depuis les deux fils décodeurs (valeurs idempotentes, une
+ * détection redondante au pire en cas de course).
  */
+@Volatile
 private var annexBStable: Boolean? = null
 
 /**
