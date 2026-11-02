@@ -303,7 +303,9 @@ class Sam3LiveService:
                           flush=True)
                     reply = error_message(stuck, 503, "inference timeout, retry")
             text = json.dumps(reply, separators=(",", ":"))
-            print(f"ws id={reply.get('id')} in={len(raw) if raw else 0}B "
+            err = reply.get("error")
+            status = err.get("status", "ok") if isinstance(err, dict) else "ok"
+            print(f"ws id={reply.get('id')} status={status} in={len(raw) if raw else 0}B "
                   f"out={len(text)}B objs={len(reply.get('objects', []))}", flush=True)
             if len(text) > WS_MAX_REPLY_BYTES:
                 print(f"ws id={reply.get('id')}: {len(text)}B > "
@@ -313,8 +315,10 @@ class Sam3LiveService:
             await websocket.send_text(text)
             return True
         except WebSocketDisconnect:
+            print("ws: client parti avant la réponse (disconnect)", flush=True)
             return False
         except Exception:  # noqa: BLE001 — client parti entre réception et réponse
+            print("ws: client parti avant la réponse (envoi KO)", flush=True)
             return False
 
     async def _ws_loop(self, websocket, idle_seconds=WS_IDLE_SECONDS,
@@ -340,6 +344,7 @@ class Sam3LiveService:
                     message = await asyncio.wait_for(websocket.receive(),
                                                      timeout=idle_seconds)
                     if message["type"] == "websocket.disconnect":
+                        print("ws: disconnect client (fin propre côté app)", flush=True)
                         return
                     raw = message.get("text", message.get("bytes"))
                 except asyncio.TimeoutError:
@@ -347,6 +352,7 @@ class Sam3LiveService:
                     await websocket.close(code=1011, reason="idle")
                     return
                 except WebSocketDisconnect:
+                    print("ws: disconnect client en réception", flush=True)
                     return
                 except Exception:  # noqa: BLE001 — socket déjà fermé
                     raw = None
@@ -487,6 +493,7 @@ class Sam3LiveService:
         async def live_ws(websocket: WebSocket):
             """Même pipeline que POST /live : un message texte JSON ou binaire (M1) par frame."""
             await websocket.accept()
+            print("ws: accept /live/ws", flush=True)
             await service._ws_loop(websocket)
 
         return api
