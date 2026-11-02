@@ -131,7 +131,7 @@ object Guidance {
      * encombré ([freerSide], ancien comportement : géométrie incomplète, voie
      * sans issue, ou aucun obstacle à portée). Trou de grillage ([holeSide],
      * localisé par l'appelant) : sur ce repli seul, on part vers le trou
-     * quand il garantit 80 cm à toute personne ([PeoplePath.clearsSide]) —
+     * quand il garantit 1 m à toute personne ([PeoplePath.clearsSide]) —
      * sinon l'évitement générique s'applique (l'humain prime toujours :
      * jamais vers quelqu'un). Bordure au contact, cap droit,
      * + obstacle mesuré au contact (≤ [CONTACT_METERS]) = stop ([contactStop],
@@ -373,7 +373,7 @@ object Guidance {
 
     /**
      * Repli quand le chemin optimal échoue : vers le trou ([holeSide]) quand
-     * il garantit 80 cm à toute personne ([PeoplePath.clearsSide]), sinon le
+     * il garantit 1 m à toute personne ([PeoplePath.clearsSide]), sinon le
      * côté le moins encombré ([freerSide]) — l'évitement des humains prime
      * sur le trou, toujours.
      */
@@ -389,7 +389,7 @@ object Guidance {
     }
 
     /**
-     * Côté le moins encombré : 80 cm garantis d'abord (un seul côté dégagé :
+     * Côté le moins encombré : 1 m garantis d'abord (un seul côté dégagé :
      * lui), sinon sans personne (on ne contourne jamais vers quelqu'un),
      * sinon moins d'objets, sinon obstacle le plus loin, sinon décalage. À
      * égalité de personnes des deux côtés, l'ancien départage s'applique :
@@ -423,7 +423,7 @@ object Guidance {
 
     /**
      * Passage conseillé quand un cap latéral est bouché : parmi les secteurs
-     * à 80 cm garantis quand il y en a, sinon parmi les deux autres secteurs
+     * à 1 m garantis quand il y en a, sinon parmi les deux autres secteurs
      * (sans personne d'abord, sinon moins d'objets à portée, sinon obstacle
      * connu le plus loin), le centre en premier à égalité.
      */
@@ -448,7 +448,7 @@ object Guidance {
         )
     }
 
-    /** Secteur à 80 cm garantis : côté dégagé, ou axe dégagé pour le centre. */
+    /** Secteur à 1 m garantis : côté dégagé, ou axe dégagé pour le centre. */
     private fun clearsSector(
         labels: List<PlacedLabel>,
         cap: SteeringCap,

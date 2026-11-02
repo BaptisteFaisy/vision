@@ -89,7 +89,7 @@ internal class ProbeVoice(
      * ([LensSpec.widthFovDeg], axe vertical en portrait) : le trait, le
      * décalage chiffré et le chemin optimal s'y projettent. Le trou de
      * grillage ouvert ([FenceOpeningSignal.holeSide]) oriente la sortie sur
-     * couloir bouché, sauf humain à moins de 80 cm de ce côté.
+     * couloir bouché, sauf humain à moins de 1 m de ce côté.
      */
     fun phrase(
         atMs: Long,

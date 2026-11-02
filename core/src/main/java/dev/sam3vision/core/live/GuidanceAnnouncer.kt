@@ -118,7 +118,7 @@ class GuidanceAnnouncer(
      * serveur, obstacle chiffré du téléphone ; `null` (backend antérieur) =
      * décision locale. [holeSide] est le côté du trou de grillage (ouvert,
      * proche, localisé par l'appelant) : sur couloir bouché sans chemin
-     * optimal, on part vers lui sauf humain à moins de 80 cm — sinon
+     * optimal, on part vers lui sauf humain à moins de 1 m — sinon
      * l'évitement générique. Direction stable : redite toutes les [repeatMs]
      * millisecondes, sauf overwrite (mot nouveau aussitôt) ; jamais de stop.
      * [ageMs] est l'âge de la mesure (ms) : vieille ([Timing.isStale]),
@@ -271,8 +271,8 @@ class GuidanceAnnouncer(
      * Décision lue dans le passage SAM : bouché et côté viennent du serveur
      * (les mêmes boîtes, jugées à pleine résolution), l'obstacle chiffré des
      * mesures du téléphone. Sans côté (contrat rompu), la gauche — comme
-     * l'égalité côté serveur. Veto local 80 cm : si le côté serveur ne
-     * garantit pas 80 cm à une personne et que l'autre côté les garantit,
+     * l'égalité côté serveur. Veto local 1 m : si le côté serveur ne
+     * garantit pas 1 m à une personne et que l'autre côté les garantit,
      * on bascule (la sécurité locale prime sur le juge lointain).
      */
     private fun samDecision(
@@ -374,8 +374,8 @@ class GuidanceAnnouncer(
     }
 
     /**
-     * Ordre de retour trottoir garanti 80 cm : si le retour va vers une
-     * personne à moins de 80 cm, on marche le cap au lieu de revenir vers
+     * Ordre de retour trottoir garanti 1 m : si le retour va vers une
+     * personne à moins de 1 m, on marche le cap au lieu de revenir vers
      * elle (le cap lui-même n'est jamais corrigé ici — le couloir s'en
      * charge quand il est bouché).
      */
