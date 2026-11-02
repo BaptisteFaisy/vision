@@ -9,18 +9,18 @@ import dev.sam3vision.core.model.MASK_ENCODING_NONE
 import okhttp3.OkHttpClient
 
 /**
- * Ancien délai dédié du direct (10 s), **conservé pour compatibilité** : il tuait la 1re
- * frame quand le conteneur Modal se réveillait (26,8 s mesurés). Le direct utilise
- * désormais [liveHttpClient] (read 60 s, sans `callTimeout`) ; le budget de la frame reste
- * appliqué par [WsLiveClient] (`withTimeoutOrNull`), qui sait elle seule ce qu'une frame vaut.
+ * Délai normal d'une frame du direct (5 s, ~60× le p99 serveur de 83 ms) : une frame qui
+ * dépasse a un problème réseau, pas GPU — l'abandon rapide rend la main à la suivante et
+ * les stats récupèrent 2× plus vite. La 1re frame (réveil Modal 30-50 s) passe par le
+ * délai froid (60 s, sonde iSee) ; le budget est appliqué par [WsLiveClient].
  */
-const val LIVE_TIMEOUT_SECONDS: Long = 10L
+const val LIVE_TIMEOUT_SECONDS: Long = 5L
 
 /**
  * `/health` sert aussi de bouton « démarre la GPU » : la requête qui réveille un
  * conteneur Modal froid attend le démarrage (image + poids ≈ 30-50 s mesurés, jusqu'à
- * ~150 s si l'image doit être reconstruite). Avec le délai de 10 s du direct, chaque
- * réveil échouait avant la fin du démarrage : délai patient dédié.
+ * ~150 s si l'image doit être reconstruite). Avec le délai de 5 s du direct, chaque
+ * réveil échouerait avant la fin du démarrage : délai patient dédié.
  */
 const val WAKE_TIMEOUT_SECONDS: Long = 180L
 
