@@ -182,9 +182,11 @@ internal fun LiveProbe.observeSpoken(
             if (!VoiceBus.stairsSpeaking() &&
                 AntiRepeat.allow(AntiRepeat.KEY_FENCE, System.currentTimeMillis())
             ) {
-                VoiceBus.post(OutdoorLevel.FENCE, text, spokenClipId(text))
+                SpeechLog.expect("FENCE", text)
+                VoiceBus.post(OutdoorLevel.FENCE, text, spokenClipId(text), antiRepeatKey = AntiRepeat.KEY_FENCE)
             }
         } else {
+            SpeechLog.expect("repli", text)
             FallbackVoice.offer(text)
         }
     }
@@ -215,7 +217,7 @@ internal fun LiveProbe.observeFenceOpening(
                 System.currentTimeMillis(),
             )
             if (AntiRepeat.allow(cue.antiRepeatKey, System.currentTimeMillis())) {
-                VoiceBus.post(cue.level, cue.phrase)
+                VoiceBus.post(cue.level, cue.phrase, antiRepeatKey = cue.antiRepeatKey)
             }
         }
     }
@@ -370,7 +372,7 @@ internal fun LiveProbe.observeSidewalk(
                 System.currentTimeMillis(),
             )
             if (AntiRepeat.allow(cue.antiRepeatKey, System.currentTimeMillis())) {
-                VoiceBus.post(cue.level, cue.phrase)
+                VoiceBus.post(cue.level, cue.phrase, antiRepeatKey = cue.antiRepeatKey)
             }
         }
     }

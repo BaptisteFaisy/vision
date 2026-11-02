@@ -18,9 +18,11 @@ fun iseeVoicePlayer(
     app: Application,
     onComplete: () -> Unit,
     onPlaybackError: (String) -> Unit,
+    onEvent: (String) -> Unit = {},
 ): SpeechPlayer = SpeechPlayer(
     dir = File(app.cacheDir, "isee-play"),
     onComplete = onComplete,
     onPlaybackError = onPlaybackError,
     output = { GlassesVoiceRoute.current(app) },
+    onEvent = onEvent,
 )
