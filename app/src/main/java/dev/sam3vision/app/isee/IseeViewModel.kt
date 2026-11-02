@@ -43,7 +43,6 @@ import dev.sam3vision.core.nav.NavFix
 import dev.sam3vision.core.nav.NavRoute
 import dev.sam3vision.core.net.MetaImageClient
 import dev.sam3vision.core.settings.Settings
-import dev.sam3vision.core.speech.IseeClipsEn
 import dev.sam3vision.core.speech.SettingsVoiceCommand
 import dev.sam3vision.core.settings.SettingsStore
 import dev.sam3vision.core.settings.SettingsStoreFactory
@@ -95,7 +94,7 @@ class IseeViewModel(app: Application) : AndroidViewModel(app) {
     private val pitch = PitchMeter(app, probe.distances) // IMU → pose, null sans capteur
 
     /** Ordres cap/Traversée + guidage auto, extraits du ViewModel (limite 500). */
-    private val steering = IseeSteeringOrders(probe, { settings }, ::speakNavigation, ::update, phoneLens = { camera?.lensSpec }, glassesLens = lensFeeds::mire)
+    private val steering = IseeSteeringOrders(probe, { settings }, { navSpeaker.speakNavigation(it) }, ::update, phoneLens = { camera?.lensSpec }, glassesLens = lensFeeds::mire)
 
     /** Repères visuels : photo → picto Muse (même clé que l'ASR) → overlay temps réel. */
     val picto = IseePicto(
@@ -182,8 +181,8 @@ class IseeViewModel(app: Application) : AndroidViewModel(app) {
      * Navigation vocale in-app ([IseeVoiceNav], paresseuse) : active dès que
      * `routeBaseUrl` est seedée — coût nul sans URL Valhalla.
      */
-    private val voiceNav = IseeVoiceNav(getApplication(), { settings }, viewModelScope, ::speakNavigation,
-        speakNetwork = ::speakNetwork,
+    private val voiceNav = IseeVoiceNav(getApplication(), { settings }, viewModelScope, { navSpeaker.speakNavigation(it) },
+        speakNetwork = { navSpeaker.speakNetwork(it) },
         speakRoute = { text, level -> spine.speakGps(text, level) },
         // Fin de guidage : le lecteur est coupé (une coupe ne termine
         // jamais : pas de `onComplete`) — l'état parlant et le bus sont rendus ici.
@@ -213,10 +212,10 @@ class IseeViewModel(app: Application) : AndroidViewModel(app) {
     fun dismissVoiceNav() = voiceNav.dismiss()
 
     /** Ordres de mode (lieu, picto), rejoués par le routeur sous leurs phrases canoniques. */
-    private val modes = IseeModeOrders({ settings }, ::speakNavigation, ::update, { label -> runFindOrder(probe, settings, camera?.lensSpec, lensFeeds, picto, label) }, { _state.value.placeMode }, onFindOff = { picto.cancelHunt() }, onPlaceMode = (IseePlaceSync({ settings }, { settings = it }, viewModelScope, prefs::save, ::syncProbe))::onPlaceMode, post = { level, text, clip -> VoiceBus.post(level, text, clip) })
+    private val modes = IseeModeOrders({ settings }, { navSpeaker.speakNavigation(it) }, ::update, { label -> runFindOrder(probe, settings, camera?.lensSpec, lensFeeds, picto, label) }, { _state.value.placeMode }, onFindOff = { picto.cancelHunt() }, onPlaceMode = (IseePlaceSync({ settings }, { settings = it }, viewModelScope, prefs::save, ::syncProbe))::onPlaceMode, post = { level, text, clip -> VoiceBus.post(level, text, clip) })
 
     /** Colonne vocale v4 : bus, bascule Traversée, parole GPS, reprise chat, trouvé (voir [IseeVoiceSpine]). */
-    private val spine: IseeVoiceSpine = IseeVoiceSpine(viewModelScope, { probe.state.value.crossingActive }, { _state.value.placeMode }, ::cutSpeech, voiceNav::stopVoice, { playback.speakPending() }, ::speakNavigation, { settings })
+    private val spine: IseeVoiceSpine = IseeVoiceSpine(viewModelScope, { probe.state.value.crossingActive }, { _state.value.placeMode }, ::cutSpeech, voiceNav::stopVoice, { playback.speakPending() }, { navSpeaker.speakNavigation(it) }, { settings })
 
     /** Routeur de la dictée (SPEC v4) : « mode … » ⇒ ordre exécuté ; le reste ⇒ question au LLM (voir [IseeDictationActions]). */
     private val dictationRouter = IseeDictationRouter(IseeDictationActions(
@@ -226,7 +225,7 @@ class IseeViewModel(app: Application) : AndroidViewModel(app) {
         confirmFindStopped = { picto.cancelHunt()
             val confirm = DictationRouterText.findStopped(settings.speechLanguage)
             update { it.copy(picto = it.picto.copy(phase = PictoPhase.Idle, hits = emptyList()), status = confirm) }
-            speakNavigation(confirm)
+            navSpeaker.speakNavigation(confirm)
         },
         gpsGo = { destination -> voiceNav.run("I want to go to " + destination) },
         gpsOff = { voiceNav.runOrder("disable the GPS") },
@@ -234,7 +233,7 @@ class IseeViewModel(app: Application) : AndroidViewModel(app) {
     ))
     private val glassesInbox = IseeGlassesInbox(viewModelScope, shots, { _state.value }, ::update, ::silenceForGlasses, ::answerHeard, cameraOps::stopVideo, probe::stop, { cameraOps.startVideo(); syncProbe() })
     private val holdTalk = IseeHoldTalk(viewModelScope, { active }, ::silenceForGlasses, shots, { _state.value }, ::update, haptics, dictation, liveDictation, streamDictation, { settings }, cameraOps, ::transcribeAndAnswer, glassesInbox::onTap, { _state.value.placeMode }, modes::applyPlace, System::currentTimeMillis)
-    private val glassesOrder = IseeGlassesOrder(::speakNavigation, ::update, { glassesSession })
+    private val glassesOrder = IseeGlassesOrder({ navSpeaker.speakNavigation(it) }, ::update, { glassesSession })
 
     /** Ordre vocal de vitesse : réglage persisté, confirmation à la nouvelle vitesse. */
     private val speedOrder = IseeSpeedOrder({ settings }, { updated -> settings = updated; viewModelScope.launch { runCatching { prefs.save(settings) } } }, { player.speed = it }, ::dropHeard, viewModelScope, voice::synthesize, { text, bytes -> playback.speakBytes(SPEED_BUBBLE_ID, text, bytes) })
@@ -461,22 +460,11 @@ class IseeViewModel(app: Application) : AndroidViewModel(app) {
         update { it.copy(speakingEntryId = if (text.isBlank()) null else ANNOUNCEMENT_BUBBLE_ID, speakingText = text) }
     }
 
-    /** Annonce de navigation : clip MP3 anglais si connu, silence sinon (zéro synthèse réseau). */
-    private suspend fun speakNavigation(text: String): Unit {
-        val clipId = IseeClipsEn.idForText(text)
-        if (clipId == null) {
-            android.util.Log.w("VoiceMute", "nav-jet motif=sans-clip texte=[$text]")
-            return
+    /** Parole navigation (clips + noms GPS réseau) : paresseuse (champs construits après usage). */
+    private val navSpeaker by lazy {
+        IseeNavSpeaker(clipPlayer, voice, player, ::speakAnnouncement) {
+            update { it.copy(speakingEntryId = null, speakingText = "") }
         }
-        clipPlayer.speak(clipId, urgent = false)
-    }
-
-    /** Voix réseau iSee : noms GPS dynamiques seuls (exception ElevenLabs). */
-    private suspend fun speakNetwork(text: String): Unit {
-        val audio = voice.synthesize(text)
-        if (audio.isEmpty()) return
-        speakAnnouncement(text)
-        player.playSlice(audio).onFailure { update { it.copy(speakingEntryId = null, speakingText = "") } }
     }
 
     /** Sécurité FIFO silencieuse après chaque écriture de fichier multimédia. */
