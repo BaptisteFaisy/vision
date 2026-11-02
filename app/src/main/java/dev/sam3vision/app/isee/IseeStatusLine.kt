@@ -12,13 +12,14 @@ import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import dev.sam3vision.core.picto.PictoPlaceMode
 
 /** Ce qu'on écrit quand iSee réfléchit sans avoir de message précis à montrer. */
 private const val THINKING_LINE = "Thinking…"
 
 /**
- * Le bas de l'écran : la ligne de statut, seule (si elle a quelque chose à
- * dire) — la pill d'instructions « Tap see / Hold ask » est retirée.
+ * Le bas de l'écran : le témoin de lieu, persistant, puis la ligne de statut
+ * (si elle a quelque chose à dire) — la pill « Tap see / Hold ask » est retirée.
  *
  * La ligne existe parce que `IseeUiState.status` était écrit de partout (échec de
  * question, clé LLM absente, micro indisponible, rien entendu…) et lu par aucun
@@ -28,6 +29,7 @@ private const val THINKING_LINE = "Thinking…"
 @Composable
 internal fun SceneBottomBar(state: IseeUiState, modifier: Modifier = Modifier) {
     Column(modifier.padding(horizontal = 18.dp), horizontalAlignment = Alignment.CenterHorizontally) {
+        PlaceChip(placeLabelOf(state.placeMode), Modifier.padding(bottom = 6.dp))
         statusLineOf(state)?.let { StatusLine(it) }
     }
 }
@@ -42,6 +44,13 @@ internal fun statusLineOf(state: IseeUiState): String? {
     return status ?: THINKING_LINE.takeIf { state.thinking }
 }
 
+/**
+ * Témoin de lieu : le mot « INDOOR »/« OUTDOOR », en anglais comme le
+ * reste de l'interface. Pur : même lieu, même mot, testable sur JVM.
+ */
+internal fun placeLabelOf(placeMode: PictoPlaceMode): String =
+    if (placeMode.pictoEnabled) "INDOOR" else "OUTDOOR"
+
 /** Petit texte discret sur fond translucide arrondi : lisible sans crier. */
 @Composable
 internal fun StatusLine(text: String, modifier: Modifier = Modifier) {
@@ -55,5 +64,19 @@ internal fun StatusLine(text: String, modifier: Modifier = Modifier) {
         modifier = modifier
             .background(IseeSceneColors.instructBg.copy(alpha = 0.86f), RoundedCornerShape(50))
             .padding(horizontal = 14.dp, vertical = 6.dp),
+    )
+}
+
+/** Pastille de lieu, persistante : le statut défile, le lieu reste. */
+@Composable
+private fun PlaceChip(label: String, modifier: Modifier = Modifier) {
+    Text(
+        label,
+        color = IseeSceneColors.label,
+        fontSize = 10.sp,
+        textAlign = TextAlign.Center,
+        modifier = modifier
+            .background(IseeSceneColors.instructBg.copy(alpha = 0.6f), RoundedCornerShape(50))
+            .padding(horizontal = 12.dp, vertical = 4.dp),
     )
 }

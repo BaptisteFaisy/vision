@@ -20,7 +20,7 @@ import dev.sam3vision.core.settings.Settings
  * Spec v4 : « mode indoor/outdoor » est le seul interrupteur dedans-dehors
  * (l'ordre « maison » est retiré de la chaîne : « maison » part au LLM).
  * [onFindOff] efface la chasse pendante (find off, sortie de dedans) ;
- * [post] porte les clips find (signature de VoiceBus : niveau, texte,
+ * [post] porte les clips find et lieu (signature de VoiceBus : niveau, texte,
  * clip), branché sur VoiceBus en production (snippet au parent).
  */
 class IseeModeOrders(
@@ -37,7 +37,9 @@ class IseeModeOrders(
     onPlaceMode: (PictoPlaceMode) -> Unit = {},
 ) {
 
-    private val place = PlaceModeOrder(settings, speak, update, onLeaveIndoor = onFindOff, onPlaceMode = onPlaceMode)
+    // Lieu : confirmation par clip hors-ligne ([post]) — la synthèse
+    // réseau ([speak]) est neutralisée pour ne pas doubler le clip.
+    private val place = PlaceModeOrder(settings, speak = { _ -> }, update, onLeaveIndoor = onFindOff, onPlaceMode = onPlaceMode, post = post)
     private val find = FindIndoorVoice(update, onFind = onFind, onFindOff = onFindOff, placeMode = placeMode, post = post)
     private val picto = IseePictoVoice(pictoLabels, settings, speak, update, onFind = onFind, onCreate = onCreate, hits = pictoHits, placeMode = placeMode)
 
