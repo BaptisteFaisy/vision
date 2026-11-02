@@ -23,8 +23,8 @@ class GuideMapStyleTest {
     ) = MapOverlays(route, destination, position, accuracyM, crossings, maneuvers)
 
     @Test
-    fun `style OpenFreeMap Liberty par URL https sans cle`() {
-        assertEquals("https://tiles.openfreemap.org/styles/liberty", OPENFREEMAP_STYLE_URL)
+    fun `style OpenFreeMap Positron par URL https sans cle`() {
+        assertEquals("https://tiles.openfreemap.org/styles/positron", OPENFREEMAP_STYLE_URL)
         assertTrue(OPENFREEMAP_STYLE_URL.startsWith("https://"))
         assertFalse("key" in OPENFREEMAP_STYLE_URL.lowercase())
     }
