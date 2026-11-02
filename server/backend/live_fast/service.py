@@ -69,12 +69,20 @@ class Sam3LiveService:
     """
 
     def __init__(self) -> None:
+        """Constructeur direct (Baseten, tests) : l'état vient d'``init_state``."""
+        self.init_state()
+
+    def init_state(self) -> None:
         """État de disponibilité par conteneur : créneaux, compteurs, chien de garde.
 
         Créé ici (et pas au chargement du modèle) pour que ``/health`` et les
         garde-fous répondent même avant ``load_container`` — un conteneur en boot
-        n'est pas une panne, mais il n'est pas prêt non plus.
+        n'est pas une panne, mais il n'est pas prêt non plus. Idempotent :
+        Modal l'appelle depuis ``@modal.enter`` (post-restauration, verrou frais),
+        où un constructeur custom est interdit (rejet ``_validate_construction_mechanism``).
         """
+        if getattr(self, "_gpu_lock", None) is not None:  # déjà initialisé : ne rien refaire
+            return
         self._gpu_lock = threading.Lock()
         self.slots = Slots()
         self.ws = new_ws_metrics()

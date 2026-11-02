@@ -417,12 +417,12 @@ RUNNERS = (
     ("déploiement : leviers du script", "timing", weights_tests.test_deploy_script),
     ("fusion : contrat de load_cpu", "fast_core", merge_tests.test_load_cpu),
     ("fusion : conteneur (snapshot + latence)", "live_app_fast", merge_tests.test_fusion_live_app),
-    # Portage live_fast (déployé) : poids locaux + snapshot + double phase.
     ("live_fast : poids locaux (module déployé)", "timing", weights_tests.test_live_fast_weights),
     ("live_fast : image (poids + snapshot déployés)", "timing", weights_tests.test_live_fast_image),
     ("live_fast : split snap CPU / GPU", "timing", weights_tests.test_live_fast_split),
     ("live_fast : logs boot_cpu", "timing", weights_tests.test_boot_cpu_logs),
     ("live_fast : règle restored", "timing", boot_tests.test_restored_rule),
+    ("live_fast : Modal sans constructeur", "timing", boot_tests.test_modal_sans_constructeur),
     ("live_fast : forme boot /health", "timing", boot_tests.test_health_boot_shape),
     ("graphe : pas de faute CUDGraph", "timing", weights_tests.test_no_cudagraph_typo),
     ("concepts : table déployée synchronisée", "timing", weights_tests.test_concepts_sync),
