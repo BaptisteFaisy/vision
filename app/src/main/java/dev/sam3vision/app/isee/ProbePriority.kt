@@ -7,6 +7,7 @@ import dev.sam3vision.core.hazard.HazardKind
 import dev.sam3vision.core.crossing.CrossingLevels
 import dev.sam3vision.core.live.AntiRepeat
 import dev.sam3vision.core.live.GuidanceWord
+import dev.sam3vision.core.speech.DynamicClipChain
 
 /**
  * Échelle voix dehors SPEC v4 : 13 niveaux, le plus petit gagne —
@@ -89,25 +90,32 @@ internal fun decideFrame(wishes: List<VoiceWish?>): VoiceWish? =
  * Vœu danger : transfère le niveau et la clé du guetteur ([HazardCue.level],
  * [HazardCue.antiRepeatKey] — personne 2, grillages/murs/barrières 4,
  * poteaux et divers 7, imminent déjà clé `human-imminent`) ; le mot imminent
- * part en clip. En Traversée, la personne seule parle (niveau 101). Pur,
- * testé en JVM.
+ * part en clip. En Traversée, la personne seule parle (niveau 101). Le doux
+ * anglais part en séquence de clips ([DynamicClipChain.hazardWishClips],
+ * objet + cadran, personne + distance) : sans elle, la porte GPS tait la
+ * phrase (P1 silence — le texte, lui, est inchangé). Pur, testé en JVM.
  */
 internal fun hazardWish(cue: HazardCue?, crossingActive: Boolean = false): VoiceWish? {
     if (cue == null) return null
     if (crossingActive && cue.kind != HazardKind.PERSON) return null
     val level = if (crossingActive) CrossingLevels.HUMAN else cue.level
     val clip = GuidanceWord.clipIdFor(cue.phrase).takeIf { cue.urgent }
-    return VoiceWish(level, cue.phrase, cue.antiRepeatKey, clip)
+    val clips = if (cue.urgent) emptyList() else DynamicClipChain.hazardWishClips(cue.phrase, cue.meters)
+    return VoiceWish(level, cue.phrase, cue.antiRepeatKey, clip, clips)
 }
 
 /**
- * Vœu bordure : niveau 5 dehors, 102 en Traversée. Pur, testé en JVM.
+ * Vœu bordure : niveau 5 dehors, 102 en Traversée. Les sensées anglaises
+ * (« Step up/down… ») partent en séquence ([DynamicClipChain.curbClips]) :
+ * sans elle, la porte GPS tait la phrase (P1 silence — le texte, lui, est
+ * inchangé). Pur, testé en JVM.
  */
 internal fun curbWish(cue: CurbCue?, crossingActive: Boolean = false): VoiceWish? {
     if (cue == null) return null
     return VoiceWish(
         if (crossingActive) CrossingLevels.CURB else OutdoorLevel.CURB,
         cue.phrase, AntiRepeat.KEY_CURB,
+        clips = DynamicClipChain.curbClips(cue.phrase),
     )
 }
 
