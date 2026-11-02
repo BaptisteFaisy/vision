@@ -92,3 +92,21 @@ arrêt et stationnement (« Voiture à l'arrêt, à 2 mètres. »), pluriel gén
 1. L'écrire dans le Kotlin d'abord (seule source parlée).
 2. L'ajouter au catalogue (`parts` si composée en code).
 3. Régénérer le pack, `check-voicepack.py`, commiter MP3 + catalogue.
+
+## Clips à durée contrainte (ordre user du 02/11)
+
+Certains clips ont un budget de durée (`DURATIONS` dans
+`tools/check-isee-clips-en.py`, aujourd'hui `crosswalk` < 500 ms) : la
+synthèse brute le dépasse (Laure parle lentement), donc le MP3 embarqué est
+post-traité après génération — rogner les silences puis accélérer (pitch
+conservé), même format que le pack :
+
+```bash
+ffmpeg -i vp_crosswalk_en.mp3 -af "silenceremove=start_periods=1:start_duration=0:start_threshold=-50dB,areverse,silenceremove=start_periods=1:start_duration=0:start_threshold=-50dB,areverse" -b:a 128k -ar 44100 trim.mp3
+ffmpeg -i trim.mp3 -af "atempo=2.0" -b:a 128k -ar 44100 vp_crosswalk_en.mp3
+ffprobe -v error -show_entries format=duration -of csv=p=0 vp_crosswalk_en.mp3  # < 0.5
+python3 tools/check-isee-clips-en.py  # dont le budget de durée (§ 6)
+```
+
+Un `--regenerate` restaure la version lente : repasser la recette et la
+garde avant de commiter.

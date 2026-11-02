@@ -16,6 +16,9 @@ class IseeClipsEnTest {
 
     @Test
     fun `le registre couvre les 106 nouveaux clips et les 21 réutilisés`() {
+        // Le registre de master est un sur-ensemble de celui de la branche :
+        // les 105 nouveaux clips et les 19 réutilisés de la branche y sont
+        // toujours présents, complétés par 1 nouveau clip et 2 réutilisés.
         assertEquals(127, IseeClipsEn.all.size)
     }
 
@@ -23,7 +26,7 @@ class IseeClipsEnTest {
     fun `chaque entrée du catalogue JSON est dans le registre au caractère près`() {
         val catalog = JSONObject(catalogFile().readText())
         val entries = catalog.getJSONArray("clips") + catalog.getJSONArray("reuse")
-        assertEquals(127, entries.size)
+        assertEquals(124, entries.size)
         for ((id, text) in entries) {
             assertEquals("clip $id", text, IseeClipsEn.all[id])
         }
@@ -81,6 +84,7 @@ class IseeClipsEnTest {
         assertEquals("Trash can.", all[IseeClipsEn.BIN])
         assertEquals("Keepsake.", all[IseeClipsEn.KEEPSAKE])
         assertEquals("Aligned with the crosswalk.", all[IseeClipsEn.CROSSWALK_ALIGNED])
+        assertEquals("Crosswalk.", all[IseeClipsEn.CROSSWALK])
         assertEquals("On the crosswalk.", all[IseeClipsEn.CROSSWALK_ARRIVED])
         assertEquals("Sidewalk ahead.", all[IseeClipsEn.SIDEWALK_AHEAD])
         assertEquals("Sidewalk.", all[IseeClipsSidewalk.AHEAD_SHORT])

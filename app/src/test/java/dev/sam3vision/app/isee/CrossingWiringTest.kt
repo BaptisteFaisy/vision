@@ -291,7 +291,15 @@ class CrossingWiringTest {
         // l'atome direction avec les clips existants (arbitrage user).
         assertEquals(listOf(IseeClipsEn.GO_LEFT), crossingApproachClips("Left, 2 meters."))
         assertEquals(listOf(IseeClipsEn.GO_RIGHT), crossingApproachClips("Right, 1 meter."))
-        assertEquals(listOf(IseeClipsEn.AHEAD), crossingApproachClips("Ahead, 50 centimeters."))
+    }
+
+    @Test
+    fun `repli approche devant dit Crosswalk, avec ou sans distance`() {
+        // Ordre user du 02/11 : devant, le mot dit quoi, pas où —
+        // « Crosswalk. », clip < 500 ms, redit toutes les 2 s hors Traversée.
+        assertEquals(listOf(IseeClipsEn.CROSSWALK), crossingApproachClips("Ahead, 50 centimeters."))
+        assertEquals(listOf(IseeClipsEn.CROSSWALK), crossingApproachClips("Ahead."))
+        assertEquals(IseeClipsEn.CROSSWALK, IseeClipsEn.idForText("Crosswalk."))
     }
 
     @Test
@@ -300,7 +308,6 @@ class CrossingWiringTest {
         // par la branche clip du bus) : le repli ne s'en mêle pas.
         assertEquals(emptyList<String>(), crossingApproachClips("Left."))
         assertEquals(emptyList<String>(), crossingApproachClips("Right."))
-        assertEquals(emptyList<String>(), crossingApproachClips("Ahead."))
         assertEquals(IseeClipsEn.GO_LEFT, IseeClipsEn.idForText("Left."))
         assertEquals(IseeClipsEn.AHEAD, IseeClipsEn.idForText("Ahead."))
     }
@@ -339,6 +346,35 @@ class CrossingWiringTest {
             assertTrue(
                 "jamais d'annonce avec distance sans clips (le bug R1)",
                 speaker.calls.none { it.second == "Left, 2 meters." && it.third.isEmpty() },
+            )
+        } finally {
+            VoiceBus.speaker = null
+            VoiceBus.reset()
+            AntiRepeat.reset()
+            CrossingLateralWatch.reset()
+        }
+    }
+
+    @Test
+    fun `voix annonce devant poste clip Crosswalk, texte inchange`() = runTest {
+        val speaker = ApproachFakeSpeaker()
+        AntiRepeat.reset()
+        VoiceBus.reset()
+        CrossingLateralWatch.reset()
+        VoiceBus.speaker = speaker
+        try {
+            observeCrossingVoice(backgroundScope)
+            val box = listOf(156f, 700f, 356f, 1000f)
+            val objects = listOf(obj("crosswalk", box))
+            val readings = listOf(reading("crosswalk", 3.0f, box))
+            CrossingLateralWatch.update(objects, 512, 1138, readings, null, LensSpec.Default, 0L, SpeechLanguage.En)
+            runCurrent()
+            CrossingLateralWatch.update(objects, 512, 1138, readings, null, LensSpec.Default, 200L, SpeechLanguage.En)
+            runCurrent()
+
+            assertTrue(
+                "annonce devant = clip Crosswalk",
+                speaker.calls.any { it == Triple(null, "Ahead, 3 meters.", listOf(IseeClipsEn.CROSSWALK)) },
             )
         } finally {
             VoiceBus.speaker = null
