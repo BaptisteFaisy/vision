@@ -1,104 +1,99 @@
 package dev.sam3vision.app.tap
 
 import dev.sam3vision.app.SpeechPlayer
-import dev.sam3vision.core.net.TtsClient
 import java.io.File
 import kotlinx.coroutines.CoroutineScope
-import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.async
 import kotlinx.coroutines.awaitAll
-import kotlinx.coroutines.coroutineScope
 import kotlinx.coroutines.launch
-import kotlinx.coroutines.withContext
-import kotlinx.coroutines.withTimeoutOrNull
-
-/** Bilan d'un préchauffage : clips déjà présents, clips générés, clips impossibles. */
-data class PrewarmReport(val ready: Int, val generated: Int, val missing: List<String>)
 
 /**
- * Les trois mots du mode tap, en anglais, via ElevenLabs — jamais le TTS système et
- * jamais autre chose : [Announcement] est un type fermé et [speak] refuse tout texte
- * hors liste blanche ([announcementAllowed]).
+ * MP3 embarqués (voix Laure) du mode tap : copie le clip de [word] vers
+ * [file] ; `false` si aucun clip. Couture écran : pack voix.
+ */
+fun interface TapBundled {
+    fun fill(word: Announcement, file: File): Boolean
+}
+
+/** Bilan d'un pré-chauffage : prêts, copiés, impossibles (dans l'ordre des mots). */
+data class AnnouncementPrewarm(val ready: Int, val generated: Int, val missing: List<Announcement>)
+
+/**
+ * Annonces du mode tap (zéro synthèse réseau : MP3 embarqués uniquement).
+ * Liste strictement fermée ([TapConfig.words]) : tout mot hors liste est un
+ * bug d'appel (rejet [IllegalArgumentException]). Durée de vie = l'écran de
+ * capture : [close] coupe la lecture et oublie les mots tués.
  *
- * Stratégie de latence (budget réseau [TapConfig.NETWORK_LATENCY_BUDGET_MS]) :
- * 1. clip déjà en cache local → lecture immédiate, zéro réseau ;
- * 2. clip absent → synthèse bornée au budget ; réussie dans les temps → lecture + cache ;
- *    trop lente → le mot est tu **cette fois** (aucun son qui arrive après coup et couvre
- *    la piste audio) et la génération continue en arrière-plan pour le prochain tap.
- *
- * Les clips vivent dans un dossier privé par voix ([TapConfig.clipDir]), relus par
- * [SpeechPlayer.playFile] : le moteur est partagé, la liste blanche et le dossier ne le sont pas.
+ * Cache (`filesDir/tap-<voix>/`) + TTL ([TapConfig.voiceTtlMs], 500 ms) :
+ * passé le délai, le mot est re-copié depuis l'embarqué plutôt que rejoué.
+ * Pré-chauffage parallèle à l'ouverture de l'écran.
  */
 class AnnouncementPlayer(
     private val dir: File,
-    private val tts: TtsClient,
+    private val bundled: TapBundled,
     private val player: SpeechPlayer,
     private val scope: CoroutineScope,
-    private val now: () -> Long = System::currentTimeMillis,
-    private val latencyBudgetMs: Long = TapConfig.NETWORK_LATENCY_BUDGET_MS,
 ) {
-    /** Génère à l'avance les clips manquants : appelé à l'ouverture de l'écran tap. */
-    suspend fun prewarm(words: List<Announcement> = TapConfig.words): PrewarmReport = withContext(Dispatchers.IO) {
-        // Synthèses en parallèle (3 mots max) : 3×RTT → 1×RTT quand le cache est vide.
-        // L'ordre du bilan suit l'ordre d'entrée, comme en série.
-        val outcomes = coroutineScope {
-            words.map { word ->
-                async {
-                    when {
-                        freshClip(word) != null -> Triple(1, 0, null as String?)
-                        writeClip(word, synthesize(word)) != null -> Triple(0, 1, null)
-                        else -> Triple(0, 0, word.spoken)
-                    }
-                }
-            }.awaitAll()
-        }
-        var ready = 0
-        var generated = 0
-        val missing = mutableListOf<String>()
-        outcomes.forEach { (r, g, m) ->
-            ready += r
-            generated += g
-            if (m != null) missing += m
-        }
-        PrewarmReport(ready, generated, missing)
-    }
+    /** Mots tués (« cette fois ») : [play] les tait sans les oublier du cache. */
+    private val muted = mutableSetOf<Announcement>()
 
     /**
-     * Prononce [word] si possible, immédiatement. Renvoie `false` quand le mot a été tu
-     * (pas de clip et réseau trop lent) — l'appelant n'affiche alors qu'un libellé texte.
+     * Copie les mots manquants depuis les MP3 embarqués (en parallèle), dans
+     * l'ordre de [TapConfig.words] comme en série. À appeler à l'ouverture de
+     * l'écran ; les appels suivants ne coûtent qu'une vérification de présence.
      */
-    suspend fun speak(word: Announcement): Boolean {
-        if (!announcementAllowed(word.spoken)) return false
-        freshClip(word)?.let { return player.playFile(it).isSuccess }
-        val bytes = synthesize(word, timeoutMs = latencyBudgetMs)
-        if (bytes == null) {
-            scope.launch { writeClip(word, synthesize(word)) } // le cache se remplira pour la fois suivante
-            return false
+    suspend fun prewarm(): AnnouncementPrewarm = scope.async {
+        TapConfig.words.map { word ->
+            async {
+                val file = clipFile(word)
+                if (fresh(file)) {
+                    Triple(word, true, false)
+                } else {
+                    Triple(word, false, bundled.fill(word, file))
+                }
+            }
+        }.awaitAll().fold(AnnouncementPrewarm(0, 0, emptyList())) { acc, (word, ready, ok) ->
+            when {
+                ready -> acc.copy(ready = acc.ready + 1)
+                ok -> acc.copy(generated = acc.generated + 1)
+                else -> acc.copy(missing = acc.missing + word)
+            }
         }
-        val clip = writeClip(word, bytes) ?: return false
-        return player.playFile(clip).isSuccess
+    }.await()
+
+    /**
+     * Dit [Announcement] : clip copié au préchauffage, rejoué tel quel.
+     * Mot tué (« cette fois ») : silence. Clip périmé : silence maintenant,
+     * re-copie depuis l'embarqué en fond.
+     */
+    fun play(word: Announcement) {
+        require(word in TapConfig.words) { "mot tap inconnu : $word" }
+        if (word in muted) return
+        val file = clipFile(word)
+        if (fresh(file)) player.play(file) else scope.launch { bundled.fill(word, file) }
     }
 
-    /** Arrête la lecture en cours (écran quitté, app en arrière-plan). */
-    fun stop() = player.stop()
-
-    /** Synthèse ElevenLabs, éventuellement bornée ; `null` sur erreur ou dépassement. */
-    private suspend fun synthesize(word: Announcement, timeoutMs: Long? = null): ByteArray? {
-        val block = suspend { tts.synthesize(word.spoken).getOrNull() }
-        return if (timeoutMs == null) block() else withTimeoutOrNull(timeoutMs) { block() }
+    /** Tait [word] « cette fois » seulement (le cache est conservé). */
+    fun muteOnce(word: Announcement) {
+        muted += word
     }
 
-    /** Clip utilisable sur disque : existant, non vide, plus vieux que [TapConfig.CLIP_TTL_MS]. */
-    private fun freshClip(word: Announcement): File? {
-        val clip = File(dir, word.clipFile)
-        val usable = clip.isFile && clip.length() > 0 && now() - clip.lastModified() < TapConfig.CLIP_TTL_MS
-        return clip.takeIf { usable }
+    /** Oublie les mots tués. */
+    fun unmuteAll() {
+        muted.clear()
     }
 
-    /** Écrit [bytes] dans le clip de [word] ; `null` si rien à écrire. */
-    private fun writeClip(word: Announcement, bytes: ByteArray?): File? {
-        if (bytes == null || bytes.isEmpty()) return null
-        dir.mkdirs()
-        return File(dir, word.clipFile).apply { writeBytes(bytes) }
+    /** Coupe la lecture et oublie les mots tués (fin de vie de l'écran). */
+    fun close() {
+        player.stop()
+        muted.clear()
     }
+
+    /** Fichier cache du mot (`launched.mp3`, …). */
+    private fun clipFile(word: Announcement): File = File(dir, word.clipFile)
+
+    /** Clip présent et frais (écrit il y a moins de [TapConfig.voiceTtlMs]). */
+    private fun fresh(file: File): Boolean =
+        file.isFile && file.length() > 0L &&
+            System.currentTimeMillis() - file.lastModified() < TapConfig.voiceTtlMs
 }
