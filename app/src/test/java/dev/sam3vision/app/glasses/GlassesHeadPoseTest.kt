@@ -106,6 +106,83 @@ class GlassesHeadPoseTest {
         feed.stop()
     }
 
+    @Test
+    fun `10 orientations nulles previennent une seule fois`() = runTest {
+        val motion = FakeMotion()
+        val notes = ArrayList<GlassesMessage>()
+        val feed = GlassesHeadPose(this, onNote = { notes += it })
+        feed.start(attach = { motion }, detach = {})
+        runCurrent()
+
+        repeat(12) {
+            motion.emit(MotionSample(1L, null, null, null, null, MotionSource.GLASSES))
+            runCurrent()
+        }
+
+        assertNull(GlassesVideoLink.headPose.value)
+        assertEquals(1, notes.size)
+        assertEquals(GlassesMessages.headPoseNoFusion(), notes.single())
+        feed.stop()
+    }
+
+    @Test
+    fun `une orientation recue reamorce l'alerte sans fusion`() = runTest {
+        val motion = FakeMotion()
+        var notes = 0
+        val feed = GlassesHeadPose(this, onNote = { notes += 1 })
+        feed.start(attach = { motion }, detach = {})
+        runCurrent()
+
+        repeat(10) {
+            motion.emit(MotionSample(1L, null, null, null, null, MotionSource.GLASSES))
+            runCurrent()
+        }
+        assertEquals(1, notes)
+
+        motion.emit(MotionSample(1L, null, null, null, Quaternion(-0.258819f, 0f, 0f, 0.9659258f), MotionSource.GLASSES))
+        runCurrent()
+        assertTrue(GlassesVideoLink.headPose.value != null)
+
+        repeat(10) {
+            motion.emit(MotionSample(1L, null, null, null, null, MotionSource.GLASSES))
+            runCurrent()
+        }
+        assertEquals(2, notes)
+        feed.stop()
+    }
+
+    @Test
+    fun `la hauteur des yeux reglee est portee par la pose`() = runTest {
+        val motion = FakeMotion()
+        val feed = GlassesHeadPose(this, onNote = {}, eyeHeightM = { 1.8f })
+        feed.start(attach = { motion }, detach = {})
+        runCurrent()
+
+        motion.emit(MotionSample(1L, null, null, null, Quaternion(-0.258819f, 0f, 0f, 0.9659258f), MotionSource.GLASSES))
+        runCurrent()
+
+        val pose = GlassesVideoLink.headPose.value
+        assertTrue(pose != null && pose.heightMeters == 1.8f)
+        feed.stop()
+    }
+
+    @Test
+    fun `le log de validation n'empeche pas la pose`() = runTest {
+        val motion = FakeMotion()
+        val feed = GlassesHeadPose(this, onNote = {})
+        feed.start(attach = { motion }, detach = {})
+        runCurrent()
+
+        // Plusieurs échantillons : le log 1 Hz passe au premier sans bloquer.
+        repeat(3) {
+            motion.emit(MotionSample(1L, null, null, null, Quaternion(-0.258819f, 0f, 0f, 0.9659258f), MotionSource.GLASSES))
+            runCurrent()
+        }
+
+        assertTrue(GlassesVideoLink.headPose.value != null)
+        feed.stop()
+    }
+
     /** Faux Motion : `samples` piloté à la main, `errors` au repos puis pilotées. */
     private class FakeMotion : Motion {
         private val _samples = MutableSharedFlow<MotionSample>()

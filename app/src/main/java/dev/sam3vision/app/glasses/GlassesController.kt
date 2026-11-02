@@ -15,6 +15,7 @@ import com.meta.wearable.dat.core.types.RegistrationState
 import com.meta.wearable.dat.core.types.WearablesError
 import dev.sam3vision.app.BuildConfig
 import dev.sam3vision.app.PcmSource
+import dev.sam3vision.app.pose.EyeHeightStore
 import dev.sam3vision.app.speechClient
 import dev.sam3vision.core.glasses.CaptureAction
 import dev.sam3vision.core.settings.Settings
@@ -367,7 +368,7 @@ class GlassesController(
             autoListen.arm()
         }
         inputs = GlassesInputs(created, scope, clock, ::onGesture, ::note).also { it.start() }
-        GlassesVideoLink.attachHeadPose(scope, ::note, created)
+        GlassesVideoLink.attachHeadPose(scope, ::note, created, EyeHeightStore(context)::get)
     }
 
     private suspend fun ensureCameraPermission(): Boolean {

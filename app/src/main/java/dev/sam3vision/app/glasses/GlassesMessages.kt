@@ -60,6 +60,15 @@ object GlassesMessages {
         "Head pose unavailable: glasses distances run pinhole-only.",
     )
 
+    /**
+     * Orientation nulle persistante (paire gen1 / sans fusion) : sténopé seul
+     * durable, dit une fois — distinct du refus d'attache [headPoseUnavailable].
+     */
+    fun headPoseNoFusion() = GlassesMessage(
+        MessageKind.WARNING,
+        "Head pose has no fusion (gen1 ?): glasses distances run pinhole-only.",
+    )
+
     fun micPermissionMissing() = GlassesMessage(MessageKind.ERROR, permissionPath("Microphone not allowed"))
 
     fun audioRefused(hertz: Int, reason: String) = GlassesMessage(
