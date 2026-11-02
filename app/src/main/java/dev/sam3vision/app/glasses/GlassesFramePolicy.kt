@@ -68,7 +68,7 @@ internal data class CropRect(val x: Int, val y: Int, val width: Int, val height:
  * orientation). En production, le 16:9 ne garde que 720×405 : 68 % de la hauteur
  * coupée — le sol et l'horizon sont perdus. Ne plus utiliser : [cropTo4x3]
  * (720×960) garde trois quarts de la hauteur ; bascule à faire dans
- * `GlassesFrameConvert.cropToLandscape` (hors propriété de ce correctif).
+ * `GlassesFrameConvert.cropAndScale` (hors propriété de ce correctif).
  *
  * @return `null` quand l'image est déjà au 16:9 exact (rien à couper), quand
  *   ses dimensions sont inexploitables, ou quand le côté coupé tomberait à zéro
