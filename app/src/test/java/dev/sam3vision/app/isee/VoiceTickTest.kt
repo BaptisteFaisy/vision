@@ -168,11 +168,9 @@ class VoiceTickTest {
         try {
             val calls = mutableListOf<Long>()
             var crossing = false
-            VoiceTick.report(
-                VoiceTick.SRC_SIDEWALK,
-                VoiceWish(OutdoorLevel.SIDEWALK, "Trottoir à gauche.", "test-voicetick-boucle"),
-                testScheduler.currentTime,
-            )
+            fun say(src: String, level: Int, text: String) =
+                VoiceTick.report(src, VoiceWish(level, text, "test-voicetick-boucle"), testScheduler.currentTime)
+            say(VoiceTick.SRC_SIDEWALK, OutdoorLevel.SIDEWALK, "Trottoir à gauche.")
             voiceTickJob(
                 scope,
                 { crossing },
@@ -190,22 +188,14 @@ class VoiceTickTest {
             assertEquals(1, calls.size)
 
             // Vœu plus prioritaire : parlé au battement suivant.
-            VoiceTick.report(
-                VoiceTick.SRC_FENCE,
-                VoiceWish(OutdoorLevel.FENCE, "Passage au milieu.", "test-voicetick-boucle"),
-                testScheduler.currentTime,
-            )
+            say(VoiceTick.SRC_FENCE, OutdoorLevel.FENCE, "Passage au milieu.")
             advanceTimeBy(350)
             runCurrent()
             assertEquals(2, calls.size)
 
             // Traversée : silence, même un vœu nouveau.
             crossing = true
-            VoiceTick.report(
-                VoiceTick.SRC_STAIRS,
-                VoiceWish(OutdoorLevel.STAIRS, "Escalier devant.", "test-voicetick-boucle"),
-                testScheduler.currentTime,
-            )
+            say(VoiceTick.SRC_STAIRS, OutdoorLevel.STAIRS, "Escalier devant.")
             advanceTimeBy(1_050)
             runCurrent()
             assertEquals(2, calls.size)
