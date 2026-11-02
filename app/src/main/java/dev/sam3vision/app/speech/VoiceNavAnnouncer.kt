@@ -1,6 +1,7 @@
 package dev.sam3vision.app.speech
 
 import dev.sam3vision.core.live.AnnouncementGate
+import dev.sam3vision.core.live.SteeringCap
 import dev.sam3vision.core.settings.Settings
 import dev.sam3vision.core.speech.SpeechLanguage
 
@@ -65,9 +66,24 @@ class VoiceNavAnnouncer(
         language: SpeechLanguage = SpeechLanguage.DEFAULT,
     ): String? {
         if (event is VoiceNavEvent.Started && event.destination.isBlank()) return null
+        // Mot seul (ordre user 02/11) : loin et tout droit = silence pur,
+        // avant la porte (rien consommé : un proche <3 s après un loin parle).
+        if (isSilentManeuver(event)) return null
         val key = VoiceNavPolicy.key(event)
         if (!gate.admit(atMs, key, urgent = VoiceNavPolicy.isUrgent(event))) return null
         return VoiceNavPhrases.phrase(event, language)
+    }
+
+    /**
+     * Manœuvre tue par le mot seul (ordre user 02/11) : virage franc
+     * loin ([VoiceNavPolicy.TURN_NOW_M]), cap droit, ligne droite —
+     * silence pur, la porte ne voit rien.
+     */
+    private fun isSilentManeuver(event: VoiceNavEvent): Boolean = when (event) {
+        is VoiceNavEvent.Turn ->
+            event.cap == SteeringCap.Straight || !VoiceNavPolicy.isTurnNow(event.meters)
+        is VoiceNavEvent.ContinueStraight -> true
+        else -> false
     }
 
     /**

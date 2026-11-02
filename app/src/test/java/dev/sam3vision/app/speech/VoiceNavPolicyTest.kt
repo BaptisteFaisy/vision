@@ -22,9 +22,9 @@ class VoiceNavPolicyTest {
     }
 
     @Test
-    fun `virage lointain dit la direction`() {
+    fun `virage lointain silencieux`() {
         assertEquals(
-            "Straight on.",
+            "",
             VoiceNavPhrases.phrase(VoiceNavEvent.Turn(SteeringCap.Left, 100f)),
         )
     }
@@ -32,27 +32,27 @@ class VoiceNavPolicyTest {
     @Test
     fun `virage sans distance`() {
         assertEquals(
-            "Turn right.",
+            "Right.",
             VoiceNavPhrases.phrase(VoiceNavEvent.Turn(SteeringCap.Right)),
         )
     }
 
     @Test
-    fun `virage proche dit l'ordre sec`() {
+    fun `virage proche dit le mot seul`() {
         assertEquals(
-            "Turn left.",
+            "Left.",
             VoiceNavPhrases.phrase(VoiceNavEvent.Turn(SteeringCap.Left, 20f)),
         )
         assertEquals(
-            "Turn left, rue de Rivoli.",
+            "Left.",
             VoiceNavPhrases.phrase(VoiceNavEvent.Turn(SteeringCap.Left, 20f, "rue de Rivoli")),
         )
     }
 
     @Test
-    fun `virage lointain avec rue`() {
+    fun `virage lointain avec rue silencieux`() {
         assertEquals(
-            "Straight on, rue de Rivoli.",
+            "",
             VoiceNavPhrases.phrase(VoiceNavEvent.Turn(SteeringCap.Left, 60f, "rue de Rivoli")),
         )
     }
@@ -73,17 +73,17 @@ class VoiceNavPolicyTest {
     }
 
     @Test
-    fun `virage tout droit se dit ligne droite`() {
+    fun `virage tout droit silencieux`() {
         assertEquals(
-            "Straight on.",
+            "",
             VoiceNavPhrases.phrase(VoiceNavEvent.Turn(SteeringCap.Straight)),
         )
     }
 
     @Test
-    fun `ligne droite avec distance`() {
+    fun `ligne droite silencieuse`() {
         assertEquals(
-            "Straight on.",
+            "",
             VoiceNavPhrases.phrase(VoiceNavEvent.ContinueStraight(200f)),
         )
     }
@@ -138,21 +138,21 @@ class VoiceNavPolicyTest {
     }
 
     @Test
-    fun `virage lointain ne dit jamais la distance`() {
+    fun `virage lointain silencieux quelle que soit la distance`() {
         assertEquals(
-            "Straight on.",
+            "",
             VoiceNavPhrases.phrase(VoiceNavEvent.Turn(SteeringCap.Left, 127f)),
         )
     }
 
     @Test
-    fun `kilometres au-dela d'un kilometre`() {
+    fun `grandes distances silencieuses`() {
         assertEquals(
-            "Straight on.",
+            "",
             VoiceNavPhrases.phrase(VoiceNavEvent.Turn(SteeringCap.Left, 1250f)),
         )
         assertEquals(
-            "Straight on.",
+            "",
             VoiceNavPhrases.phrase(VoiceNavEvent.ContinueStraight(2000f)),
         )
     }
@@ -162,11 +162,11 @@ class VoiceNavPolicyTest {
     @Test
     fun `phrases anglaises`() {
         assertEquals(
-            "Straight on.",
+            "",
             VoiceNavPhrases.phrase(VoiceNavEvent.Turn(SteeringCap.Left, 100f), SpeechLanguage.En),
         )
         assertEquals(
-            "Turn right, Main Street.",
+            "Right.",
             VoiceNavPhrases.phrase(VoiceNavEvent.Turn(SteeringCap.Right, 20f, "Main Street"), SpeechLanguage.En),
         )
         assertEquals(
@@ -183,7 +183,7 @@ class VoiceNavPolicyTest {
         )
         assertEquals("Stopped.", VoiceNavPhrases.phrase(VoiceNavEvent.Stopped, SpeechLanguage.En))
         assertEquals(
-            "Straight on.",
+            "",
             VoiceNavPhrases.phrase(VoiceNavEvent.ContinueStraight(1250f), SpeechLanguage.En),
         )
     }
@@ -219,41 +219,71 @@ class VoiceNavPolicyTest {
     // ── Déclencheur : nouveauté, délai, urgence ──
 
     @Test
-    fun `un evenement emis une fois se dit`() {
+    fun `un evenement proche emis une fois se dit`() {
         val announcer = VoiceNavAnnouncer()
 
-        val phrase = announcer.onEvent(0L, VoiceNavEvent.Turn(SteeringCap.Left, 100f))
+        val phrase = announcer.onEvent(0L, VoiceNavEvent.Turn(SteeringCap.Left, 20f))
 
-        assertEquals("Straight on.", phrase)
+        assertEquals("Left.", phrase)
         assertEquals(phrase, announcer.lastPhrase)
+    }
+
+    @Test
+    fun `un evenement lointain ne se dit pas`() {
+        val announcer = VoiceNavAnnouncer()
+
+        assertNull(announcer.onEvent(0L, VoiceNavEvent.Turn(SteeringCap.Left, 100f)))
+        assertNull(announcer.lastPhrase)
     }
 
     @Test
     fun `repetition immediate silencieuse`() {
         val announcer = VoiceNavAnnouncer()
-        val turn = VoiceNavEvent.Turn(SteeringCap.Left, 100f)
+        val turn = VoiceNavEvent.Turn(SteeringCap.Left, 20f)
         announcer.onEvent(0L, turn)
 
         assertNull(announcer.onEvent(1_000L, turn))
     }
 
     @Test
-    fun `virage proche reparle apres le delai`() {
+    fun `virage proche se dit une seule fois meme apres le delai`() {
         val announcer = VoiceNavAnnouncer()
-        announcer.onEvent(0L, VoiceNavEvent.Turn(SteeringCap.Left, 100f))
+        assertEquals("Left.", announcer.onEvent(0L, VoiceNavEvent.Turn(SteeringCap.Left, 20f)))
 
         assertNull(announcer.onEvent(1_000L, VoiceNavEvent.Turn(SteeringCap.Left, 20f)))
+        // Nouveauté : même clé dite = muette, même après le délai —
+        // la redite passe par le rappel 15 s du moteur, hors porte.
+        assertNull(announcer.onEvent(5_000L, VoiceNavEvent.Turn(SteeringCap.Left, 20f)))
+    }
+
+    @Test
+    fun `cle differente reparle apres le delai`() {
+        val announcer = VoiceNavAnnouncer()
+        announcer.onEvent(0L, VoiceNavEvent.Turn(SteeringCap.Left, 20f))
+
+        assertNull(announcer.onEvent(1_000L, VoiceNavEvent.Turn(SteeringCap.Right, 20f)))
         assertEquals(
-            "Turn left.",
-            announcer.onEvent(5_000L, VoiceNavEvent.Turn(SteeringCap.Left, 20f)),
+            "Right.",
+            announcer.onEvent(5_000L, VoiceNavEvent.Turn(SteeringCap.Right, 20f)),
         )
     }
 
     @Test
-    fun `preavis lointain dit une seule fois`() {
+    fun `lointain ne consomme pas le delai du proche`() {
         val announcer = VoiceNavAnnouncer()
         announcer.onEvent(0L, VoiceNavEvent.Turn(SteeringCap.Left, 100f))
 
+        assertEquals(
+            "Left.",
+            announcer.onEvent(1_000L, VoiceNavEvent.Turn(SteeringCap.Left, 20f)),
+        )
+    }
+
+    @Test
+    fun `preavis lointain toujours silencieux`() {
+        val announcer = VoiceNavAnnouncer()
+
+        assertNull(announcer.onEvent(0L, VoiceNavEvent.Turn(SteeringCap.Left, 100f)))
         assertNull(announcer.onEvent(5_000L, VoiceNavEvent.Turn(SteeringCap.Left, 60f)))
         assertNull(announcer.onEvent(9_000L, VoiceNavEvent.Turn(SteeringCap.Left, 40f)))
     }

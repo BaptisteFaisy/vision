@@ -8,6 +8,7 @@ import dev.sam3vision.app.speech.AndroidTtsDriver
 import dev.sam3vision.app.speech.VoiceNavAnnouncer
 import dev.sam3vision.app.speech.VoiceNavEvent
 import dev.sam3vision.app.speech.VoiceNavPhrases
+import dev.sam3vision.app.speech.VoiceNavPolicy
 import dev.sam3vision.app.speech.VoiceNavSpeaker
 import dev.sam3vision.core.live.SteeringCap
 import dev.sam3vision.core.model.RoutePoint
@@ -72,8 +73,7 @@ internal const val WALK_METERS_PER_SECOND = 1.3
  * L'arrivée ne passe PAS par le haut-parleur : [onUpdate] la signale et la
  * session annonce (« Arrivée à destination », une seule voix).
  * Rappel toutes les 15 s ([PeriodicGuidance], au premier fix qui suit
- * l'échéance) : dernière consigne répétée + distance restante
- * ([gpsReminderPhrase], anglais) ; une annonce moteur recale la cadence.
+ * l'échéance) : mot seul redit de près ; une annonce moteur recale la cadence.
  *
  * Traversée : le moteur remplace l'annonce par [NavEvent.CrossingAhead]
  * quand la cible est un passage protégé — simple préavis parlé (« Crosswalk
@@ -113,9 +113,8 @@ class VoiceNavEngineDriver(
     private val periodic = PeriodicGuidance(PeriodicTuning(repeatMs = GPS_REMINDER_MS))
     /** Un événement moteur a parlé sur le fix en cours : le rappel se tait, cadence recalée. */
     private var fixHadEvent = false
-    /** Dernière consigne écran + reste : le rappel 15 s les répète ([gpsReminderPhrase]). */
+    /** Dernier mot de manœuvre (« Left. »/« Right. »/«») : le rappel 15 s le redit de près. */
     private var lastInstruction: String? = null
-    private var lastRemainingMeters: Long = 0
 
     @Volatile
     private var legs: GuidingLegs? = null
@@ -158,7 +157,6 @@ class VoiceNavEngineDriver(
         }
         legs = GuidingLegs(nav, tailDistances(nav.maneuvers), RoutePoint(place.latitude, place.longitude))
         lastInstruction = null
-        lastRemainingMeters = 0
         detourReroute.reset()
         periodic.reset()
         fixHadEvent = false
@@ -197,7 +195,6 @@ class VoiceNavEngineDriver(
     fun stop() {
         legs = null
         lastInstruction = null
-        lastRemainingMeters = 0
         rerouting = false
         runCatching { onRouteCap(null) }
         runCatching { stopRoute() }
@@ -274,8 +271,9 @@ class VoiceNavEngineDriver(
         }
     }
 
-    /** Virage franc au cap parlé, le reste en phrase littérale du moteur. */
+    /** Virage franc au cap parlé, le reste en phrase littérale du moteur — sauf les lignes droites moteur (départ, suite : silence, ordre user 02/11). */
     private fun speakManeuver(event: NavEvent.ManeuverAhead) {
+        if (event.action == ManeuverAction.Start || event.action == ManeuverAction.Continue) return
         val cap = event.action.toSteeringCap()
         if (cap == null) {
             val phrase = VoiceNavPhrases.ahead(event.action, event.street, event.distM)
@@ -311,30 +309,32 @@ class VoiceNavEngineDriver(
         }
         if (tracker.state != NavState.Guiding) return
         val target = runCatching { tracker.nextManeuver() }.getOrNull() ?: return
+        // Mot seul de près (ordre user 02/11) : un « left » à 200 m sans
+        // distance ferait tourner trop tôt — le rappel se tait au-delà du
+        // rayon d'ordre sec, avant la cadence (tick non consommé).
+        val nearM = NavGeo.haversineMeters(fix.lat, fix.lon, target.lat, target.lon)
+        if (!nearM.isFinite() || nearM > VoiceNavPolicy.TURN_NOW_M) return
         val directive = periodic.onFix(fix, target) ?: return
-        speakPeriodic(directive, fix, target)
+        speakPeriodic(directive)
     }
 
     /**
-     * Parole du rappel 15 s ([gpsReminderPhrase], anglais) : voix réseau
-     * quand elle est câblée ([speakRoute], hors porte — le rappel redit
-     * exprès, la porte ne sait pas ; l'aval arbitre : user, lecteur
-     * occupé, doublon récent), sinon voix système ([VoiceNavSpeaker.onRepeat],
-     * silence seul). Non urgent, ne lève jamais.
+     * Parole du rappel 15 s (mot seul de près) : voix réseau quand elle est
+     * câblée ([speakRoute], hors porte — le rappel redit exprès, la porte ne
+     * sait pas ; l'aval arbitre : user, lecteur occupé, doublon récent),
+     * sinon voix système ([VoiceNavSpeaker.onRepeat], silence seul).
+     * Consigne blanche (ligne droite) : silence. Ne lève jamais.
      */
-    private fun speakPeriodic(directive: WalkDirective, fix: NavFix, target: NavManeuver) {
+    private fun speakPeriodic(directive: WalkDirective) {
         val instruction = lastInstruction?.takeIf { it.isNotBlank() }
             ?: VoiceNavPhrases.phrase(periodicEventOf(directive), SpeechLanguage.En)
-        val remaining = remainingFromFix(fix, target) ?: lastRemainingMeters
-        val phrase = gpsReminderPhrase(instruction, remaining)
-
-
+        if (instruction.isBlank()) return
         val laure = speakRoute
         if (laure == null) {
-            runCatching { speaker.onRepeat(phrase) }
+            runCatching { speaker.onRepeat(instruction) }
             return
         }
-        scope.launch { runCatching { laure(phrase, OutdoorLevel.GPS_REMINDER) } }
+        scope.launch { runCatching { laure(instruction, OutdoorLevel.GPS_REMINDER) } }
     }
 
     /** Traversée passée : annonce, le guidage reprend. */
@@ -343,20 +343,28 @@ class VoiceNavEngineDriver(
     }
 
     /** État écran : instruction + « dans X » + reste estimé du trajet. */
-    private fun updateFor(event: NavEvent.ManeuverAhead): GuidanceUpdate =
-        buildUpdate(
+    private fun updateFor(event: NavEvent.ManeuverAhead): GuidanceUpdate {
+        // Mot vocal redit par le rappel : virage franc proche (« Left. »),
+        // «» sinon — l'écran garde ahead() dans tous les cas.
+        val word = VoiceNavPhrases.maneuverWord(
+            event.action.toSteeringCap(),
+            VoiceNavPolicy.isTurnNow(event.distM),
+        )
+        return buildUpdate(
             VoiceNavPhrases.ahead(event.action, event.street, event.distM),
             event.distM,
+            word,
         )
+    }
 
     /** État écran d'une traversée : préavis + « dans X » + reste estimé. */
     private fun updateForCrossing(distM: Double): GuidanceUpdate =
-        buildUpdate(VoiceNavPhrases.crossingAhead(distM), distM)
+        // Mot de manœuvre gardé : la traversée a ses propres verdicts (100+).
+        buildUpdate(VoiceNavPhrases.crossingAhead(distM), distM, null)
 
     /** État écran : instruction + « dans X » + reste estimé du trajet. */
-    private fun buildUpdate(instruction: String, distM: Double): GuidanceUpdate {
-        lastInstruction = instruction
-        lastRemainingMeters = remainingMeters(distM)
+    private fun buildUpdate(instruction: String, distM: Double, voiceWord: String?): GuidanceUpdate {
+        if (voiceWord != null) lastInstruction = voiceWord
         val near = distM.toLong().coerceAtLeast(0)
         val remaining = remainingMeters(distM)
         return GuidanceUpdate(
@@ -373,19 +381,6 @@ class VoiceNavEngineDriver(
         val index = legs.route.maneuvers.indexOf(runCatching { tracker.nextManeuver() }.getOrNull())
         if (index < 0) return distM.toLong().coerceAtLeast(0)
         return (distM + legs.tails[index]).toLong().coerceAtLeast(0)
-    }
-
-    /**
-     * Reste estimé depuis [fix] vers [target] : vol d'oiseau + queue des
-     * manœuvres suivantes, `null` sans tracé. Pur calcul, ne lève jamais.
-     */
-    private fun remainingFromFix(fix: NavFix, target: NavManeuver): Long? {
-        val legs = legs ?: return null
-        val index = legs.route.maneuvers.indexOf(target)
-        if (index < 0) return null
-        val toTarget = NavGeo.haversineMeters(fix.lat, fix.lon, target.lat, target.lon)
-        if (!toTarget.isFinite()) return null
-        return (toTarget + legs.tails[index]).toLong().coerceAtLeast(0)
     }
 
     /** Recalcul sérialisé : un seul à la fois, le moteur réémettra sinon. */

@@ -362,3 +362,37 @@ attend, 2/5 coupent, 6 dernier gagnant, voiture tue sans tour mangé).
 Recette téléphone : escalier + voiture qui passe — la phrase des marches
 entière, « Car. » juste après — **non mesuré**, exige un APK sur appareil
 réel (preuves par `logcat`, jamais à l'oreille côté agent).
+
+## 41. Consignes atomiques : mot seul « Left. »/« Right. », incoupable (ordre user du 02/11)
+
+Le user marche : les consignes de guidage sont coupées en pleine phrase
+(« Tournez à… » mangé par « Car. »), et les préavis lointains avec distances
+arrivent trop tard pour servir. Nouveau contrat : **mot anglais seul** —
+« Left. » / « Right. » dits au moment de tourner, silence partout ailleurs,
+et le mot en cours va toujours au bout.
+
+- **phrases** : `VoiceNavPhrases.maneuverWord` (mot seul si virage franc
+  proche, `TURN_NOW_M`, sinon blanc) ; `ContinueStraight` et caps droits =
+  silence, écran inchangé (`ahead()`, « dans X », reste) ;
+- **porte** : `VoiceNavAnnouncer.isSilentManeuver` tait les manœuvres
+  silencieuses avant la porte (rien consommé : un proche <3 s après un
+  loin parle) ; même clé dite = muette (nouveauté), la redite passe par
+  le rappel 15 s du moteur, hors porte ;
+- **moteur** : `speakManeuver` ignore départ/suite, `tickPeriodic` ne
+  rappelle que de près (`nearM ≤ TURN_NOW_M`), `lastInstruction` = mot
+  seul (`gpsReminderPhrase` et distances supprimés) ;
+- **bus** : `VoiceBus.post` jette tout pendant un mot de guidage (11, 3 —
+  `guidanceSpeaking`), sauf la parole user (1) ; les producteurs frame
+  se taisent en amont (`guidanceHolds`, tours d'antirépétition intacts) ;
+- **clips** : « Left. »/« Right. » = `guide_left`/`guide_right`
+  (`GuidanceWord.clipIdFor`, <100 ms, jamais en synthèse).
+
+Verrouillé par `GpsUncuttableTest` (+6, nouveau : voiture/humain/verdict
+attendent, rappel et manœuvre ne se coupent pas, re-post GPS attend,
+parole user coupe, frame tue sans tour mangé) + mots seuls dans
+`VoiceNavPolicyTest`, `VoiceNavSpeakerTest`, `VoiceNavAnnouncerTest`,
+`PeriodicVoiceTest`, `VoiceNavGpsVoiceTest`.
+
+Recette téléphone : guidage vers un virage — « Left. » sec au moment de
+tourner, rien avant, jamais coupé — **non mesuré**, exige un APK sur
+appareil réel (preuves par `logcat`, jamais à l'oreille côté agent).

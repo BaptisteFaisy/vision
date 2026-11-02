@@ -1,11 +1,9 @@
 package dev.sam3vision.app.speech
 
-import dev.sam3vision.core.distance.DistanceText
 import dev.sam3vision.core.live.SteeringCap
 import dev.sam3vision.core.nav.ManeuverAction
 import dev.sam3vision.core.nav.NavEvent
 import dev.sam3vision.core.speech.SpeechLanguage
-import java.util.Locale
 
 /**
  * Événement de guidage vocal embarqué : un virage, une arrivée, une sortie de
@@ -67,30 +65,26 @@ sealed interface VoiceNavEvent {
 }
 
 /**
- * Phrases du guidage vocal, dans la langue de la voix ([SpeechLanguage]).
+ * Phrases du guidage vocal, dans la langue de la voix ([SpeechLanguage]) —
+ * sauf les manœuvres : mot anglais seul (ordre user 02/11), « Left. » /
+ * « Right. » dits au moment de tourner ([VoiceNavPolicy.TURN_NOW_M]),
+ * silence si loin ou tout droit. Le mot part en clip offline (<100 ms),
+ * jamais en synthèse : il ne peut pas être coupé à moitié.
  *
- * Français (contrat minimal 700 ms, miroirs `nav_voice_*` dans `strings.xml`) :
- * « Tout droit[, rue X]. » de loin (rues et distances : résiduels, non bornés),
- * « À gauche[, rue X]. » de près (jamais de distance de virage —
- * [VoiceNavPolicy.TURN_NOW_M]), « Tout droit. », « Arrivé[ à X]. », « Hors route. »,
- * « Nouvelle route. », « Guidage coupé. », « De retour. » (+ littérales moteur).
- * Rues, destinations et littérales moteur : résiduels (non bornés, tranche ×3).
- * Distances des manœuvres abandonnées (la tranche prime sur la durée).
- * Anglais : mêmes formes minimales (« Straight on. », « Off route. », …).
- *
- * Distances prononcées via [DistanceText.spoken] (singuliers et décimales
- * déjà réglés), arrondies vers le bas ([roundNavMeters]) et en kilomètres
- * au-delà d'un kilomètre — on n'annonce jamais plus loin que le réel.
+ * Le reste est inchangé : « Arrivé[ à X]. », « Hors route. »,
+ * « Nouvelle route. », « Guidage coupé. », « De retour. »
+ * (+ littérales moteur : traversée, demi-tour, giratoire).
  * Pures et sans Android : testées en JVM.
  */
 object VoiceNavPhrases {
 
-    /** Phrase prononcée pour [event], jamais blanche. */
+    /** Phrase prononcée pour [event] : blanche = silence (loin, tout droit). */
     fun phrase(event: VoiceNavEvent, language: SpeechLanguage = SpeechLanguage.DEFAULT): String =
         when (event) {
             is VoiceNavEvent.Started -> started(event.destination, language)
-            is VoiceNavEvent.Turn -> turn(event, language)
-            is VoiceNavEvent.ContinueStraight -> continueStraight(event.meters, language)
+            is VoiceNavEvent.Turn -> turn(event)
+            // Lignes droites : silence (l'écran garde le cap, le rappel confirme les virages).
+            is VoiceNavEvent.ContinueStraight -> ""
             is VoiceNavEvent.Arrival -> arrival(event.destination, language)
             VoiceNavEvent.OffRoute -> offRoute(language)
             VoiceNavEvent.Rerouted -> rerouted(language)
@@ -107,35 +101,24 @@ object VoiceNavPhrases {
         }
 
     /**
-     * Virage franc : préavis directionnel de loin, ordre sec sans distance
-     * de près ([VoiceNavPolicy.TURN_NOW_M]) ; cap droit = ligne droite.
+     * Mot parlé d'une manœuvre (ordre user 02/11) : « Left. » / « Right. »
+     * si virage franc proche, «» sinon (loin, tout droit : silence).
+     * Anglais imposé comme les annonces de monde : le pack voix est EN
+     * seul, et ces mots exacts partent en clips offline (<100 ms) via
+     * [dev.sam3vision.core.live.GuidanceWord] — jamais en synthèse.
      */
-    private fun turn(event: VoiceNavEvent.Turn, language: SpeechLanguage): String {
-        if (event.cap == SteeringCap.Straight) return continueStraight(event.meters, language)
-        val side = if (event.cap == SteeringCap.Left) sideWord(Side.Left, language) else sideWord(Side.Right, language)
-        val street = event.street?.trim().orEmpty()
-        val tail = if (street.isEmpty()) "." else ", $street."
-        if (!VoiceNavPolicy.isTurnNow(event.meters)) return turnAhead(tail, language)
-        return when (language) {
-            SpeechLanguage.Fr -> "À $side$tail"
-            SpeechLanguage.En -> "Turn $side$tail"
+    internal fun maneuverWord(cap: SteeringCap?, near: Boolean): String {
+        if (!near) return ""
+        return when (cap) {
+            SteeringCap.Left -> "Left."
+            SteeringCap.Right -> "Right."
+            else -> ""
         }
     }
 
-    /** Préavis lointain d'un virage franc : la direction, jamais la distance. */
-    private fun turnAhead(tail: String, language: SpeechLanguage): String = when (language) {
-        SpeechLanguage.Fr -> "Tout droit$tail"
-        SpeechLanguage.En -> "Straight on$tail"
-    }
-
-    /** « Tout droit. » (distance abandonnée : tranche 700 ms). */
-    private fun continueStraight(meters: Float?, language: SpeechLanguage): String {
-        val distance = navDistance(meters, language)
-        return when (language) {
-            SpeechLanguage.Fr -> "Tout droit."
-            SpeechLanguage.En -> "Straight on."
-        }
-    }
+    /** Virage : mot seul de près, silence sinon ([maneuverWord]). */
+    private fun turn(event: VoiceNavEvent.Turn): String =
+        maneuverWord(event.cap, VoiceNavPolicy.isTurnNow(event.meters))
 
     /** « Arrivé à X. » (vide = « Arrivé. »). */
     private fun arrival(destination: String, language: SpeechLanguage): String {
@@ -169,33 +152,6 @@ object VoiceNavPhrases {
         SpeechLanguage.Fr -> "De retour."
         SpeechLanguage.En -> "Back on route."
     }
-
-    /** Distance prononcée, `null` si inconnue : mètres puis kilomètres. */
-    private fun navDistance(meters: Float?, language: SpeechLanguage): String? {
-        val rounded = VoiceNavPolicy.roundNavMeters(meters) ?: return null
-        if (rounded < 1_000f) return DistanceText.spoken(rounded, language)
-        return kilometers(rounded, language)
-    }
-
-    /** « 1,2 kilomètre », « 2 kilomètres » (toujours arrondi vers le bas). */
-    private fun kilometers(rounded: Float, language: SpeechLanguage): String {
-        val tenth = ((rounded / 1_000f) * 10).toInt()
-        val locale = if (language == SpeechLanguage.Fr) Locale.FRANCE else Locale.US
-        val text = String.format(locale, "%.1f", tenth / 10f)
-        return when (language) {
-            SpeechLanguage.Fr -> "$text ${if (tenth < 20) "kilomètre" else "kilomètres"}"
-            SpeechLanguage.En -> "$text ${if (tenth == 10) "kilometer" else "kilometers"}"
-        }
-    }
-
-    /** Gauche/droite prononcée, dans la langue de la voix. */
-    private fun sideWord(side: Side, language: SpeechLanguage): String = when (language) {
-        SpeechLanguage.Fr -> if (side == Side.Left) "gauche" else "droite"
-        SpeechLanguage.En -> if (side == Side.Left) "left" else "right"
-    }
-
-    /** Côté de virage, sans le cap droit (traité comme ligne droite). */
-    private enum class Side { Left, Right }
 
     // ── Événements moteur (NavEvent) : formes minimales 700 ms ──
     // « Off route. », « Back on route. », « Arrived[ at X] »,

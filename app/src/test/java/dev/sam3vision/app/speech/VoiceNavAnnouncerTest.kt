@@ -75,16 +75,16 @@ class VoiceNavAnnouncerTest {
     @Test
     fun `admission sans marquage, marquage confirme la parole moteur`() {
         val announcer = VoiceNavAnnouncer()
-        val turn = VoiceNavEvent.Turn(SteeringCap.Left, 100f)
+        val turn = VoiceNavEvent.Turn(SteeringCap.Left, 20f)
 
-        assertEquals("Straight on.", announcer.admitEvent(0L, turn))
+        assertEquals("Left.", announcer.admitEvent(0L, turn))
         // Non marquée : ré-admise (moteur en échec, la réémission reparle).
-        assertEquals("Straight on.", announcer.admitEvent(1_000L, turn))
+        assertEquals("Left.", announcer.admitEvent(1_000L, turn))
         assertNull(announcer.lastPhrase)
 
-        announcer.markSpoken(turn, 1_000L, "Straight on.")
+        announcer.markSpoken(turn, 1_000L, "Left.")
 
-        assertEquals("Straight on.", announcer.lastPhrase)
+        assertEquals("Left.", announcer.lastPhrase)
         assertNull(announcer.admitEvent(2_000L, turn))
     }
 
