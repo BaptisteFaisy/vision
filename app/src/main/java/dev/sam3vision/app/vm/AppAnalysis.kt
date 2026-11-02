@@ -29,7 +29,6 @@ class AppAnalysis(
     private val llm: (Settings) -> LlmClient,
     private val sam: (Settings) -> SamClient?,
     private val overlays: suspend (List<SegObject>) -> List<Bitmap>,
-    private val announce: (List<SegObject>, Settings) -> Unit,
     /** Issue de l'appel SAM vers le moniteur GPU (endpoint appelé + résultat). */
     private val noteSam: (String, Result<SegmentResult>) -> Unit = { _, _ -> },
     /** Jalons de chronologie (`sam`, `analyse`, `overlays`) : inerte par défaut. */
@@ -56,7 +55,7 @@ class AppAnalysis(
         result.fold(onSuccess = { ready(settings, it, samFailure) }, onFailure = { failed(it) })
     }
 
-    /** Analyse reçue : masques, note de segmentation, chat remis à zéro, puis annonce. */
+    /** Analyse reçue : masques, note de segmentation, chat remis à zéro. */
     private suspend fun ready(settings: Settings, analysis: Analysis, samFailure: Throwable?) {
         val drawn = overlays(analysis.objects)
         mark("overlays")
@@ -70,7 +69,6 @@ class AppAnalysis(
                 chat = emptyList(),
             )
         }
-        announce(analysis.objects, settings)
     }
 
     private fun failed(error: Throwable) = update {

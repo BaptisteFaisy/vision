@@ -254,27 +254,14 @@ class PositionTextTest {
     }
 
     @Test
-    fun `murs jamais nommes, cote d'esquive seul`() {
-        assertEquals("Left.", PositionText.phrase(listOf(placed("wall", 0.5f))))
-        assertEquals("Gauche.", PositionText.phrase(listOf(placed("mur", 0.5f)), language = SpeechLanguage.Fr))
-        assertEquals("Right.", PositionText.phrase(listOf(placed("wall", 0.4f))))
-        assertEquals(
-            "Personne at 9 o'clock.",
-            PositionText.phrase(listOf(placed("wall", 0.5f), placed("personne", 0.1f))),
-        )
-        assertNull(PositionText.phrase(listOf(placed("wall", 0.2f))))
-        assertNull(PositionText.phrase(listOf(placed("mur", 0.9f)), language = SpeechLanguage.Fr))
-    }
-
-    @Test
-    fun `murs nommes sur demande explicite - chasse, photo`() {
+    fun `murs nommes pour la chasse`() {
         assertEquals(
             "Wall at 12 o'clock.",
-            PositionText.phrase(listOf(placed("wall", 0.5f)), nameWalls = true),
+            PositionText.phrase(listOf(placed("wall", 0.5f))),
         )
         assertEquals(
             "Mur à midi.",
-            PositionText.phrase(listOf(placed("mur", 0.5f)), language = SpeechLanguage.Fr, nameWalls = true),
+            PositionText.phrase(listOf(placed("mur", 0.5f)), language = SpeechLanguage.Fr),
         )
     }
 }

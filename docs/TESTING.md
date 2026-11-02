@@ -311,8 +311,7 @@ le script jetable n'est pas versionné.
 - `bash scripts/test_scripts.sh` : **177 tests, 177 ok**.
 - `python3 tools/check-voicepack.py` : **OK** (114 clips EN, 0 FR, 0 surplus).
 - Voix ElevenLabs sans clé : `VoiceAnnouncer.say()` rend `InvalidKey`
-  (`app/VoiceAnnouncer.kt:32-33`), mais l'annonce des positions
-  (`app/AppViewModel.kt:216,225`) et les bandeaux ignorent le résultat —
+  (`app/VoiceAnnouncer.kt:32-33`), mais les bandeaux ignorent le résultat —
   **rien ne s'affiche**. Mettre une clé ou lire le log.
 - GPU Modal : **une seule carte à la fois**, toutes apps confondues ; sur cette machine,
   `~/bin/sam3-gpu status|busy` avant toute manœuvre, et ne rien redéployer.

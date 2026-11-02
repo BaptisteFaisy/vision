@@ -13,7 +13,6 @@ import kotlinx.coroutines.test.advanceUntilIdle
 import kotlinx.coroutines.test.runTest
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
-import org.junit.Assert.assertNotNull
 import org.junit.Assert.assertTrue
 import org.junit.Test
 
@@ -91,7 +90,7 @@ class LiveProbeGuidanceTest {
     }
 
     @Test
-    fun `mots doux et positions non urgents, stop seul urgent`() = runTest {
+    fun `mots doux non urgents, stop seul urgent`() = runTest {
         val (probe, fake) = harness(this, guide = true)
         probe.onFrame("A", captureAtNs = 8_000_000L)
         advanceUntilIdle()
@@ -112,19 +111,6 @@ class LiveProbeGuidanceTest {
 
         assertEquals("left.", probe.state.value.spoken)
         assertFalse(probe.state.value.spokenUrgent)
-
-        val (sonde, faux) = harness(this, guide = false, announce = true)
-        sonde.onFrame("A", captureAtNs = 8_000_000L)
-        advanceUntilIdle()
-        sonde.onFrame("B", captureAtNs = 14_000_000L)
-        advanceUntilIdle()
-        faux.respond("A", frame(listOf(personne())))
-        advanceUntilIdle()
-        faux.respond("B", frame(listOf(personne())))
-        advanceUntilIdle()
-
-        assertNotNull(sonde.state.value.spoken)
-        assertFalse(sonde.state.value.spokenUrgent)
     }
 
     @Test
@@ -181,7 +167,7 @@ class LiveProbeGuidanceTest {
 
     @Test
     fun `sans guidage la voie libre ne dit que l_avis d_armement`() = runTest {
-        val (probe, fake) = harness(this, guide = false, announce = true)
+        val (probe, fake) = harness(this, guide = false)
         probe.onFrame("A", captureAtNs = 8_000_000L)
         advanceUntilIdle()
         probe.onFrame("B", captureAtNs = 14_000_000L)
@@ -195,7 +181,7 @@ class LiveProbeGuidanceTest {
     }
 
     /** Sonde branchée sur un faux client : les réponses SAM sont livrées par le test. */
-    private fun harness(scope: TestScope, guide: Boolean, announce: Boolean = false): Pair<LiveProbe, FakeLiveClient> {
+    private fun harness(scope: TestScope, guide: Boolean): Pair<LiveProbe, FakeLiveClient> {
         val fake = FakeLiveClient()
         val probe = LiveProbe(
             scope = scope,
@@ -203,7 +189,7 @@ class LiveProbeGuidanceTest {
             background = StandardTestDispatcher(scope.testScheduler),
             clientFor = { _, _, marks -> fake.also { it.marks = marks } },
         )
-        probe.configure("https://sam.test", announce = announce, guide = guide)
+        probe.configure("https://sam.test", guide = guide)
         probe.begin()
         // Scheduler coupé : ce test verrouille le guidage, pas les keyframes (voir LiveAdaptiveTest).
         probe.adaptive.configure(uploadEnabled = false, keyframesEnabled = false)

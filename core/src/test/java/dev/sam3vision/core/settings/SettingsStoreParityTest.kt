@@ -30,7 +30,6 @@ class SettingsStoreParityTest {
         asrApiKey = "cle-complete-asr",
         asrModel = "modele-asr-complet",
         liveLlmApiKey = "cle-narration-complete",
-        ttsAnnouncePositions = false,
         ttsGuidanceStraight = false,
         introEnabled = false,
         introPlayed = true,

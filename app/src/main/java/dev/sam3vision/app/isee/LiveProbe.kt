@@ -169,7 +169,6 @@ class LiveProbe(
     fun configure(
         baseUrl: String,
         prompts: List<String> = LivePrompts.default,
-        announce: Boolean = false,
         guide: Boolean = false,
         lens: LensSpec = LensSpec.Default,
         distancesOn: Boolean = true,
@@ -184,7 +183,6 @@ class LiveProbe(
         openSessions(clean, prompts, maxObjects)
         rotation.usePrompts(prompts)
         voice.guide = guide
-        voice.announce = announce
         voice.language = language
         speechLanguage = language
         distances.enabled = distancesOn

@@ -43,7 +43,7 @@ plus l'arbre — bandeau ajouté).
 | `docs/OPTIMISATIONS.md` | **inexacte → corrigée** (27/10) | Jobs CI 5 → **4** (contredisait le §11), note de datation ajoutée : les chiffres « Après » sont ceux de la fin de campagne (26/10), pas de cet arbre |
 | `docs/T8-PREDICTION.md` | **périmée → corrigée** (27/10) | §4 réécrit : le module **est** branché derrière `Settings.boxPredictionEnabled` (`LiveViewModel.kt:94,235,368,373`), §1/§6 recalés |
 | `docs/TRACK-PERF.md` | **à jour** (relu 27/10) | `TrackClient`/`TrackRunner`, constantes de cadence, `FrameGate` — relus à l'identique ; chiffres serveur marqués « relevé antérieur » |
-| `docs/VOIX-POSITIONS.md` | **périmée → corrigée** (27/10) | `LiveProbe.phraseOf` → `:418-423`, `Settings.kt:28` → `:36`, `:148` → `:184` ; seuils, machine d'annonce et 5 suites de tests relus à l'identique |
+| `docs/VOIX-POSITIONS.md` | **supprimée** (02/11) | Mode annonce viré (ordre user) : réglage, voix du direct et de la photo, recette ; la chasse nommée garde le mécanisme |
 | `docs/DEPTH.md` | **réécrit** (01/11) | Profondeur = serveur GPU seul ; inférence embarquée, modèle `.ort`, banc et réglage `depthBackend` supprimés (PR du 01/11) |
 | `docs/VOICE_NAV_PROXY.md` | **à jour** (28/10) | URL = fumée du workflow, volume et rollback vérifiés ; câblage app relu (`routeBaseUrlDefault`, `ROUTE_BASE_URL`, `routeBaseUrl`, `HttpRouteClient`) |
 | `docs/RECETTE-NAVIGATION-VOCALE.md` | **cohérent** (28/10) | Cites vérifiées (`handleDictated`, `NavigationHook`, `nav_confirm_destination`, sha ancêtre de `master`) ; non rejoué sur appareil (le doc le dit) |

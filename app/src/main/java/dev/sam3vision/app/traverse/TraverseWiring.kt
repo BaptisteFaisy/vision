@@ -178,27 +178,22 @@ class TraverseWiring(
         scope: CoroutineScope,
         prompts: List<String>,
         relaunch: (List<String>) -> Unit,
-        quiet: () -> Unit,
     ) {
         if (active == this.active) return
         if (active) {
             this.active = true
-            quiet()
             val application = requireNotNull(app)
             cropLogger = if (settings.collectLightCrops) LightCropLogger(File(application.filesDir, "lightcrops"), BuildConfig.VERSION_NAME) else null
             relaunch(attach(application, settings, scope, prompts))
             log("traversee mode=ON")
         } else {
-            deactivate(quiet)
+            deactivate()
             relaunch(LivePrompts.default)
         }
     }
 
-    /**
-     * Coupe le mode : voix détachée, moteur fermé, pipeline effacé, puis
-     * [quiet] (la voix des positions se tait avec le mode).
-     */
-    fun deactivate(quiet: () -> Unit) {
+    /** Coupe le mode : voix détachée, moteur fermé, pipeline effacé. */
+    fun deactivate() {
         active = false
         log("traversee mode=OFF")
         pipeline.voice = null
@@ -209,7 +204,6 @@ class TraverseWiring(
         light = null
         cropLogger = null
         lastBackgroundMoving = null
-        quiet()
     }
 
     /** Oublie pistes, veto, vert, annonces et verdict fond (nouvelle séance). */

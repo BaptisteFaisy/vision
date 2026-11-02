@@ -8,7 +8,6 @@ import dev.sam3vision.core.hazard.FenceOpeningSignal
 import dev.sam3vision.core.live.GuidanceAnnouncer
 import dev.sam3vision.core.live.GuidanceDecision
 import dev.sam3vision.core.live.PlacedLabel
-import dev.sam3vision.core.live.PositionAnnouncer
 import dev.sam3vision.core.live.SteeringCap
 import dev.sam3vision.core.live.SteeringCue
 import dev.sam3vision.core.model.Passage
@@ -17,8 +16,8 @@ import dev.sam3vision.core.speech.SpeechLanguage
 
 /**
  * Voix de la sonde, extraite de [LiveProbe] (limite 500 lignes) : le guidage
- * (cap route, sinon cap manuel) prime sur l'annonce des positions — une seule
- * phrase par frame, jamais les deux.
+ * (cap route, sinon cap manuel) parle seul — guidage coupé, silence (le
+ * mode annonce est viré : il ne servait à rien).
  *
  * [routeCap] est le cap de l'itinéraire (moteur Valhalla, poussé par la sonde
  * via `setRouteCap`) : tant qu'il est renseigné, le couloir marché est celui
@@ -33,14 +32,10 @@ import dev.sam3vision.core.speech.SpeechLanguage
  */
 internal class ProbeVoice(
     private val guidance: GuidanceAnnouncer = GuidanceAnnouncer(),
-    private val positions: PositionAnnouncer = PositionAnnouncer(),
 ) {
 
-    /** Guidage actif (Réglages « Guider tout droit ») : prime sur l'annonce. */
+    /** Guidage actif (Réglages « Guider tout droit »). */
     var guide: Boolean = false
-
-    /** Annonce des positions (Réglages) : parlée quand le guidage est coupé. */
-    var announce: Boolean = false
 
     /** Langue de la voix (Réglages). */
     var language: SpeechLanguage = SpeechLanguage.DEFAULT
@@ -77,8 +72,8 @@ internal class ProbeVoice(
     val lastDecision: GuidanceDecision? get() = guidance.lastDecision
 
     /**
-     * Phrase à dire pour la frame, ou `null` (muet) : guidage d'abord, sinon
-     * positions, sinon silence. [manualCap] est le cap demandé à la voix.
+     * Phrase à dire pour la frame, ou `null` (muet) : le guidage, sinon
+     * silence. [manualCap] est le cap demandé à la voix.
      * Le trottoir vu caméra ([SidewalkKeep]) peut suspendre le cap : l'ordre
      * de retour prime alors sur la consigne, jamais sur le danger.
      * Le passage piéton est filtré avant le guidage ([withoutCrosswalk]) : le
@@ -98,19 +93,16 @@ internal class ProbeVoice(
         passage: Passage? = null,
         hfovDeg: Float = LensSpec.DEFAULT_H_FOV_DEG,
     ): String? {
-        if (guide) {
-            val safe = placed.withoutCrosswalk()
-            val sidewalk = SidewalkKeep.positionOf(safe)
-            val hole = FenceOpeningSignal.ofPlaced(safe, hfovDeg).holeSide()
-            return guidance.onFrame(
-                atMs, safe, language, manualCap, routeCap,
-                sidewalk = sidewalk, samPassage = passage, hfovDeg = hfovDeg, holeSide = hole,
-                // Rail trottoir en mètres (bordure) : deux paliers, 50 cm et 30 cm.
-                rail = SidewalkRail.of(safe, hfovDeg),
-            )
-        }
-        if (!announce) return null
-        return positions.onFrame(atMs, placed, language)
+        if (!guide) return null
+        val safe = placed.withoutCrosswalk()
+        val sidewalk = SidewalkKeep.positionOf(safe)
+        val hole = FenceOpeningSignal.ofPlaced(safe, hfovDeg).holeSide()
+        return guidance.onFrame(
+            atMs, safe, language, manualCap, routeCap,
+            sidewalk = sidewalk, samPassage = passage, hfovDeg = hfovDeg, holeSide = hole,
+            // Rail trottoir en mètres (bordure) : deux paliers, 50 cm et 30 cm.
+            rail = SidewalkRail.of(safe, hfovDeg),
+        )
     }
 
     /**
@@ -132,6 +124,5 @@ internal class ProbeVoice(
     /** Nouvelle session : voix et détour oubliés. */
     fun reset() {
         guidance.reset()
-        positions.reset()
     }
 }

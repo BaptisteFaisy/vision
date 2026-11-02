@@ -225,7 +225,7 @@ internal fun seedAsr(loaded: Settings, build: BuildDefaults): Settings {
     return loaded.copy(asrApiKey = build.asrApiKey)
 }
 
-/** Clé ElevenLabs de build : voix du chat, de la dictée et de l'annonce des positions. */
+/** Clé ElevenLabs de build : voix du chat, de la dictée et de la chasse picto. */
 internal fun seedVoice(loaded: Settings, build: BuildDefaults): Settings {
     if (loaded.ttsApiKey.isNotBlank() || build.ttsApiKey.isBlank()) return loaded
     return loaded.copy(

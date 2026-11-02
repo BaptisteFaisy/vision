@@ -90,7 +90,7 @@ data class LiveUiState(
      * identifiée, dans la couleur de son masque (`null` = rien à tracer).
      */
     val trails: TrailLayer? = null,
-    /** Dernière phrase dite par la voix (positions ou picto) : affichée comme sous-titre. */
+    /** Dernière phrase dite par la voix (chasse picto) : affichée comme sous-titre. */
     val spoken: String? = null,
     /** Porteur de la dernière frame JPEG (identité seule : rien à copier d'une frame à l'autre). */
     val latestFrame: LatestFrame = LatestFrame(),
@@ -271,7 +271,7 @@ fun focusLabel(
 /** Fenêtre du journal envoyée au LLM : 30 s suffisent pour « il y a 5 s ». */
 internal const val MEMORY_WINDOW_MS = 30_000L
 
-/** Dossier audio de l'annonce des positions : distinct de celui des bandeaux. */
+/** Dossier audio de la chasse nommée : distinct de celui des bandeaux. */
 internal const val POSITION_VOICE_DIR = "positions"
 
 /**

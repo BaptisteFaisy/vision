@@ -16,9 +16,8 @@ import dev.sam3vision.core.model.Passage
  * les concepts reconnus, les distances mesurées, et les chiffres qui disent si ça
  * rame (cadence, latence moyenne et p95, durée serveur, taille de frame, GPU).
  *
- * [spoken] est la phrase que la voix doit dire (« Tout droit. » en guidage,
- * « Personne à 9 heures, à 1,4 mètre » en annonce des positions) : elle reste dans
- * l'état (rien ne se perd si l'écran se recompose). [spokenSeq] compte ses
+ * [spoken] est la phrase que la voix doit dire (« Tout droit. », « Gauche. ») :
+ * elle reste dans l'état (rien ne se perd si l'écran se recompose). [spokenSeq] compte ses
  * émissions : une direction stable redite à l'identique garde le même [spoken]
  * mais incrémente [spokenSeq], pour que la voix la redise au lieu de l'avaler
  * (`distinctUntilChanged`). [steering] est le chemin calculé pour la dernière
