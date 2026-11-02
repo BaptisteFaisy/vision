@@ -17,7 +17,11 @@ import json
 # reste un zombie, fermé ici en 1011 ; le client rouvre paresseusement à la
 # frame suivante (WsLiveClient.openLocked). 30 < 45 : ne jamais inverser.
 WS_IDLE_SECONDS = 45.0  # sans message : pair considéré mort, fermeture 1011 (zombie ≤ 45 s)
-WS_FRAME_SECONDS = 180.0  # inférence max par frame : au-delà, erreur 503, connexion gardée
+# Borne inférence (F4) : le client abandonne à 10 s (steady) / 60 s (froid) mais
+# l'inférence abandonnée gardait le verrou GPU et bloquait les frames suivantes.
+# 75 s = juste au-dessus du COLD 60 s + marge (aucune frame légitime tuée) ; une
+# frame qui dépasse rend 503, la connexion est gardée (recovery 180 → 75 s).
+WS_FRAME_SECONDS = 75.0  # inférence max par frame : au-delà, erreur 503, connexion gardée
 WS_MAX_REPLY_BYTES = 4_000_000  # réponse plus grosse : fermeture 1009 avant le proxy
 
 
