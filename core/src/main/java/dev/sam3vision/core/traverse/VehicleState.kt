@@ -45,17 +45,15 @@ data class VehicleStateCue(
  *
  * Arbitrage fond ([arbitrateBackground], défaut vrai) : le mouvement se
  * prouve contre le défilement du décor — une piste qui suit la caméra ne
- * conclut pas. À faux (voix iSee dehors, ordre user du 02/11 : les voitures
- * ne confirmaient jamais en marchant), le mouvement se juge sur la boîte
- * brute — une garée qui défile parle « Car. », assumé. Dehors (spec v4,
- * niveau 0 = mouvement seul), le cablage passe `announceStopped = false` et
- * `movingMeters = OUTDOOR_MOVING_METERS` (20 m) : l'arret et le
- * stationnement se taisent mais restent suivis ; en Traversee, le defaut
- * (`announceStopped = true`) garde l'arret utilisable.
+ * conclut pas. À faux, le mouvement se juge sur la boîte brute — une
+ * garée qui défile parle « Car. », assumé (plus aucun câblage prod ne le
+ * passe : les voitures ne parlent qu'en Traversée, ordre user du 02/11).
+ * Dehors, le guetteur est décâblé (niveau 0 sans producteur) ; en
+ * Traversée, le défaut (`announceStopped = true`) garde l'arrêt utilisable.
  *
- * Les cycles (vélo, trottinette) sont exclus ici : `CycleWatcher` les
- * annonce (« Attention, vélo en mouvement… »), sans double annonce. Le
- * mouvement se voit (boîtes) : il parle jusqu'à [MOVING_METERS] (sauf [update] : sans-feu = infini),
+ * Les cycles (vélo, trottinette) sont exclus ici : muets partout (ordre
+ * user du 02/11). Le mouvement se voit (boîtes) : il parle jusqu'à
+ * [MOVING_METERS] (sauf [update] : sans-feu = infini),
  * mesuré ou non — toute voiture vue se dit, en mouvement ou à l'arrêt. **Mais un mobile ne
  * dit jamais son emplacement** (ni distance ni heure) : ce qu'on situerait serait faux avant
  * la fin de la phrase (ordre user du 01/11/2026). L'arrêt et le stationnement gardent leur

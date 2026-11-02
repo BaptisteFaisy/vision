@@ -29,7 +29,6 @@ import dev.sam3vision.app.depth.DepthMeter
 import dev.sam3vision.app.live.LiveAdaptive
 import dev.sam3vision.app.live.LiveFrameCadence
 import dev.sam3vision.app.live.LiveLatencyLog
-import dev.sam3vision.app.live.MotionLog
 import dev.sam3vision.core.model.LiveFrame
 import dev.sam3vision.core.traverse.TraverseVeto
 import dev.sam3vision.core.net.ApiError
@@ -269,7 +268,6 @@ resetPipeline()
 _state.update { it.cleared() }
         pulse.stop()
         ProbeBackgroundMotion.reset()
-        MotionLog.reset()
     }
 
     /**
@@ -297,7 +295,6 @@ _state.update { it.cleared() }
         adaptive.reset()
         rotation.reset()
         ProbeBackgroundMotion.reset()
-        MotionLog.reset()
     }
 
     /** L'app part derrière : les frames sont jetées jusqu'au retour (aucun envoi SAM). */

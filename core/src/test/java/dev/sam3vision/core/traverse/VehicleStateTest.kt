@@ -12,7 +12,7 @@ import org.junit.Test
 /**
  * États des véhicules moteurs : en mouvement (tau confirmé ou croissance), à
  * l'arrêt (dérive compensée, seau stable) jusqu'à 5 m, garé de 5 à 15 m, les
- * cycles exclus (annoncés par `CycleWatcher`). Séquences synthétiques, miroir
+ * cycles exclus (muets partout). Séquences synthétiques, miroir
  * de `VehicleApproachTest`.
  */
 class VehicleStateTest {
@@ -146,7 +146,7 @@ class VehicleStateTest {
     }
 
     @Test
-    fun `cycles confies au CycleWatcher - silence ici`() {
+    fun `cycles exclus - silence ici`() {
         val watcher = VehicleStateWatcher()
         listOf(100f, 110f, 120f).forEachIndexed { index, width ->
             assertNull(

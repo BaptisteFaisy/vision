@@ -1,11 +1,9 @@
 package dev.sam3vision.app.isee
 
-import dev.sam3vision.app.live.MotionLog
-
 /**
  * Remet à zéro les globaux de la **séance** qu'une publication écrit : pistes de
- * personnes ([ProbeTracks]), plan de marches ([StairCannyCount]), pompe fond
- * ([ProbeBackgroundMotion]) et journal de mouvement ([MotionLog]).
+ * personnes ([ProbeTracks]), plan de marches ([StairCannyCount]) et pompe fond
+ * ([ProbeBackgroundMotion]).
  *
  * À appeler dans un `@After` dès qu'un test lance de vraies frames : ces objets
  * sont uniques pour la JVM de test, donc un test qui publie sans nettoyer salit
@@ -21,5 +19,4 @@ import dev.sam3vision.app.live.MotionLog
 internal fun seanceVide() {
     globalsNouvelleSeance()
     ProbeBackgroundMotion.reset()
-    MotionLog.reset()
 }

@@ -3,8 +3,9 @@ package dev.sam3vision.core.cycle
 import dev.sam3vision.core.distance.KnownSizes
 
 /**
- * Concepts des cycles : ce que le [CycleWatcher] suit pour dire « Attention,
- * vélo en mouvement… » ou « Vélo arrêté… ».
+ * Concepts des cycles : taxonomie gardée pour exclure les cycles des voix
+ * (le verdict véhicules les ignore, les positions ne les nomment pas) —
+ * les cycles ne parlent nulle part (ordre user du 02/11).
  *
  * Trois engins, FR/EN : le vélo (`bicycle`, `bike`, `electric bike`,
  * `e-bike`, `bicyclette`), la trottinette (`scooter`, `electric scooter`,
@@ -35,12 +36,6 @@ object CycleConcepts {
 
     private val VELO = CycleName("vélo", "bicycle", "arrêté", "velo")
     private val TROTTINETTE = CycleName("trottinette", "scooter", "arrêtée", "trott")
-
-    /**
-     * Les concepts, une fois chacun (le pack voix s'en sert). « deux-roues »
-     * n'a pas encore de clips : son mouvement retombe en synthèse.
-     */
-    fun names(): List<CycleName> = listOf(VELO, TROTTINETTE, DEUX_ROUES)
 
     private val DEUX_ROUES = CycleName("deux-roues", "two-wheeler", "arrêté", "deuxroues")
 
@@ -78,14 +73,4 @@ object CycleConcepts {
 
     /** Vrai si [label] désigne un cycle suivi (casse, accents, pluriel neutralisés). */
     fun isCycle(label: String): Boolean = nameOf(label) != null
-
-    /**
-     * Clé de suivi d'un cycle entre deux frames (« Bikes » et « bike »
-     * fusionnent) — sert l'association mouvement et le choix de l'annonce.
-     */
-    internal fun keyOf(label: String): String {
-        val key = KnownSizes.canonical(label)
-        if (key.endsWith("s") && key.length > 3) return key.dropLast(1)
-        return key
-    }
 }
