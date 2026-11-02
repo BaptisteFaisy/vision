@@ -125,7 +125,7 @@ internal fun curbWish(cue: CurbCue?, crossingActive: Boolean = false): VoiceWish
 /**
  * Propose un vœu au bus : tu par l'antirépétition ([AntiRepeat]) ou écrasé
  * par le bus ([VoiceBus]) = `false` (jeté, jamais redit) ; sinon posté.
- * Sous un compte (§ 41), seuls les vœux escaliers passent — les autres
+ * Sous un compte (§ 42), seuls les vœux escaliers passent — les autres
  * attendent sans consommer leur tour (le bus les jetterait de toute
  * façon, tour mangé).
  */

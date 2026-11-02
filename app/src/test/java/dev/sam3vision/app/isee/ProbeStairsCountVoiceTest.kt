@@ -30,7 +30,7 @@ import org.junit.Test
  * Voix du compteur de marches (SPEC v4, niveau 6) : quand SAM nomme
  * l'escalier et que la caméra voit des marches fraîches, le battement
  * 300 ms poste le compte (« N marches. »), une fois par compte puis répété
- * toutes les 1 s — prioritaire sur tout (VOIX-DANGER § 41), jusque dans
+ * toutes les 1 s — prioritaire sur tout (VOIX-DANGER § 42), jusque dans
  * l'esquive ; sans escalier nommé, sans compte frais ou en Traversée :
  * silence.
  *

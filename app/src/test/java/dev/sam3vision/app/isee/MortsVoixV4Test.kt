@@ -17,8 +17,9 @@ import org.junit.Test
  * SPEC v4 morts-voix : les portes et files sont supprimées (le bus
  * arbitre), le repli hors-ligne et son signal sont supprimés (sans clé ou
  * voix réseau en panne : silence, jamais de TTS système — seuls les clips
- * parlent sans réseau, et seules les voix GPS + compte escaliers
- * synthétisent, § 41).
+ * parlent sans réseau, et tous les niveaux synthétisent sans clip
+ * (porte D-04 rouverte) — le compte escaliers est verrouillé audible
+ * ici, § 42.
  */
 class MortsVoixV4Test {
 

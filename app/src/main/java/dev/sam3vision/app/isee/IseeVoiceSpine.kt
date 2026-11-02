@@ -51,7 +51,7 @@ internal class IseeVoiceSpine(
      * Parole GPS vers le bus (SPEC v4) : manœuvres au rang 11, rappel au
      * rang 3 — tus en Traversée (le verdict y est propriétaire du son) et
      * dedans (chaîne dedans : find, user, humain, chat, porte et murs).
-     * Sous un compte (§ 41) : reportée au silence (un cycle au plus),
+     * Sous un compte (§ 42) : reportée au silence (un cycle au plus),
      * jamais perdue (une manœuvre ne se re-propose pas).
      */
     fun speakGps(text: String, level: Int) {
@@ -90,5 +90,5 @@ internal class IseeVoiceSpine(
     }
 }
 
-/** Scrutation du silence sous un compte (report GPS, § 41). */
+/** Scrutation du silence sous un compte (report GPS, § 42). */
 private const val GPS_GAP_POLL_MS = 100L

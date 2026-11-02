@@ -250,7 +250,7 @@ class IseePlayback(
 
     /**
      * Escaliers actifs ([VoiceBus.stairsActive]) : la tranche attend la fin
-     * des marches au lieu de couper le compte (§ 41 — une tranche ne tient
+     * des marches au lieu de couper le compte (§ 42 — une tranche ne tient
      * pas dans l'intervalle). Annulable (préemption réponse suivante).
      */
     private suspend fun awaitStairsQuiet() {
@@ -290,7 +290,7 @@ class IseePlayback(
          */
         const val SYNTH_SLICE_TIMEOUT_MS = 25_000L
 
-        /** Scrutation de fin des marches (attente tranche, § 41). */
+        /** Scrutation de fin des marches (attente tranche, § 42). */
         const val STAIRS_POLL_MS = 200L
     }
 }
