@@ -14,9 +14,8 @@ import androidx.camera.video.QualitySelector
 import androidx.camera.video.Recorder
 import androidx.camera.video.VideoCapture
 import androidx.camera.view.PreviewView
-import androidx.core.content.ContextCompat
-import androidx.core.util.Consumer
 import androidx.lifecycle.LifecycleOwner
+import androidx.lifecycle.Observer
 import dev.sam3vision.app.previewResolutionSelector
 import java.util.concurrent.TimeUnit
 import kotlinx.coroutines.Dispatchers
@@ -66,11 +65,8 @@ internal class IseeCameraBinder(
     /** Caméra utilisable à cet instant ; `null` = rien de lié. */
     private var camera: Camera? = null
 
-    /** Écouteur officiel de CameraX, retiré au moindre déliement. */
-    private var stateListener: Consumer<CameraState>? = null
-
-    /** Fil principal : CameraX y poste ses états. */
-    private val mainExecutor = ContextCompat.getMainExecutor(context)
+    /** Observateur de l'état officiel, retiré au moindre déliement. */
+    private var stateListener: Observer<CameraState>? = null
 
     /** Vrai si le système a fermé la caméra (autre app, veille) depuis le dernier lien. */
     var closed: Boolean = false
@@ -168,11 +164,17 @@ internal class IseeCameraBinder(
         return UseCases(image, video, plan.useCases.mapNotNull(byKind::get).toTypedArray())
     }
 
-    /** Observe l'état officiel : une autre app a pris la caméra → on prévient la carte. */
+    /**
+     * Observe l'état officiel : une autre app a pris la caméra → on prévient la carte.
+     *
+     * Via le `LiveData` public `cameraState` : `addCameraStateListener` /
+     * `removeCameraStateListener` sont réservés au groupe androidx.camera
+     * (`RestrictedApi`) et ne font en interne qu'observer ce même `LiveData`.
+     */
     private fun watchState() {
         val current = camera ?: return
-        val listener = Consumer<CameraState> { state ->
-            if (state.type != CameraState.Type.CLOSED) return@Consumer
+        val listener = Observer<CameraState> { state ->
+            if (state.type != CameraState.Type.CLOSED) return@Observer
             // Le capteur n'est plus à nous : `bound` doit dire la vérité avant
             // que la carte ne décide de relier.
             closed = true
@@ -180,7 +182,7 @@ internal class IseeCameraBinder(
             onClosed?.invoke()
         }
         stateListener = listener
-        runCatching { current.cameraInfo.addCameraStateListener(mainExecutor, listener) }
+        runCatching { current.cameraInfo.cameraState.observeForever(listener) }
     }
 
     /**
@@ -190,7 +192,7 @@ internal class IseeCameraBinder(
      */
     fun unbind() {
         stateListener?.let { listener ->
-            runCatching { camera?.cameraInfo?.removeCameraStateListener(listener) }
+            runCatching { camera?.cameraInfo?.cameraState?.removeObserver(listener) }
         }
         stateListener = null
         runCatching { provider?.unbindAll() }
