@@ -9,6 +9,9 @@ import dev.sam3vision.core.crossing.CrossingVerdict
 import dev.sam3vision.core.crossing.CrossingVerdictAnnouncer
 import dev.sam3vision.core.crossing.CrossingVerdictLight
 import dev.sam3vision.core.crossing.CrossingVerdictRule
+import dev.sam3vision.core.crossing.Evidence
+import dev.sam3vision.core.crossing.LightEvidenceGate
+import dev.sam3vision.core.crossing.LightTemporalVote
 import dev.sam3vision.core.distance.DistanceReading
 import dev.sam3vision.core.model.LiveFrame
 import dev.sam3vision.core.model.toDetections
@@ -68,6 +71,16 @@ class CrossingVerdictEngine(
     private val cars: VehicleStateWatcher = VehicleStateWatcher(),
     private val readLight: (LiveFrame, String) -> CrossingLight = ::crossingLightOf,
     private val poster: CrossingVerdictPoster? = null,
+    /**
+     * Porte de preuve lumineuse : une boîte manquante reste [Evidence.Unknown]
+     * tant que l'absence n'est pas prouvée (4 frames de suite sans aucune boîte,
+     * contexte de passage). Tenue du vert déléguée au vote (mesure A5 : 3 verts
+     * sur les 5 dernières frames, +123 ms p50), d'où `minGreenFrames = 1` et
+     * `greenHoldMs = 0` — sinon la latence s'additionnerait (A9 : +0,8 à 1,5 s).
+     */
+    private val gate: LightEvidenceGate = LightEvidenceGate(minGreenFrames = 1, greenHoldMs = 0L),
+    /** Vote temporel du vert (3 preuves sur 5, sortie immédiate sur rouge prouvé). */
+    private val vote: LightTemporalVote = LightTemporalVote(),
 ) {
     /** Dernier verdict vibré (`null` = aucun : le premier verdict parlé vibre). */
     private var felt: CrossingVerdict? = null
@@ -94,7 +107,13 @@ class CrossingVerdictEngine(
         motion: FrameMotion? = null,
         carVeto: Boolean = false,
     ): CrossingVerdictFrame {
-        val light = verdictLightOf(readLight(frame, jpegB64))
+        val read = readLight(frame, jpegB64)
+        val evidence = gate.onFrame(
+            atMs = atMs,
+            sawAnyLightBox = read.box != null,
+            bestState = if (read.box != null) read.state else null,
+        )
+        val light = lightOf(read, evidence)
         val carDetections = frame.objects.toDetections(frame.width, frame.height)
             .filter { CrossingVerdictRule.isCarLabel(it.label) }
         val carReadings = readings.filter { CrossingVerdictRule.isCarLabel(it.label) }
@@ -102,12 +121,21 @@ class CrossingVerdictEngine(
         val moving = cars.movingThisFrame
         val verdict = CrossingVerdictRule.decide(light, moving, carVeto)
         val cue = announcer.onFrame(atMs, verdict)
-        val verdictPost = cue?.let { CrossingPost(CrossingLevels.VERDICT, it.phrase, it.clipId) }
+        // Rien de lisible (boîte manquante, couleur illisible, vert pas encore
+        // confirmé) : on ne PRONONCE rien. Parler « Don't cross. » sur les deux
+        // premières frames d'un vert ferait entendre « Don't cross. » puis
+        // « Cross. » 100 ms plus tard — pire que le silence. L'overlay et
+        // l'haptique restent au rouge (sûr), la phrase attend une preuve.
+        val silent = evidence == Evidence.Unknown
+        if (silent && cue != null) announcer.rearm(atMs)
+        val verdictPost = if (silent) null else cue?.let { CrossingPost(CrossingLevels.VERDICT, it.phrase, it.clipId) }
         val posts = CrossingPriority.order(verdictPost, human, curb)
         publish(posts, verdictPost, atMs)
         val overlay = overlayOf(verdict)
-        val haptic = if (cue != null && felt != verdict) overlay else null
-        if (cue != null) felt = verdict
+        // Pas de vibration sur une frame sans preuve : le front est prononcé avec
+        // la phrase, jamais avant elle.
+        val haptic = if (!silent && cue != null && felt != verdict) overlay else null
+        if (!silent && cue != null) felt = verdict
         return CrossingVerdictFrame(posts, verdict, light, moving, overlay, haptic, carVeto)
     }
 
@@ -125,10 +153,35 @@ class CrossingVerdictEngine(
         }
     }
 
+    /**
+     * Feu vu par le verdict, **avec mémoire** : [LightEvidenceGate] sépare
+     * « aucune preuve » (une frame sans boîte : raté de SAM, camion qui masque,
+     * téléphone baissé) de « absence prouvée » (4 frames sans aucune boîte,
+     * face au passage) — le premier ne doit jamais mener à « Cross. » (A9 §3 D1).
+     * [LightTemporalVote] exige 3 verts sur les 5 dernières frames : un intrus
+     * isolé ne verdit rien, un rouge franc sort tout de suite (A5 : faux verts
+     * 107/580 → 16).
+     */
+    private fun lightOf(read: CrossingLight, evidence: Evidence): CrossingVerdictLight {
+        val seen = if (read.box != null) read.state else null
+        val voted = vote.onFrame(
+            rawState = seen ?: CrossingState.Red,
+            redProven = seen == CrossingState.Red,
+        )
+        if (evidence == Evidence.Unknown) return CrossingVerdictLight.Unknown
+        val light = verdictLightOf(read)
+        if (light == CrossingVerdictLight.Green && voted != CrossingState.Green) {
+            return CrossingVerdictLight.Unknown
+        }
+        return light
+    }
+
     /** Oublie annonce, suivi voitures et front haptique (nouvelle traversée). */
     fun reset() {
         announcer.reset()
         cars.reset()
+        gate.reset()
+        vote.reset()
         felt = null
     }
 }
