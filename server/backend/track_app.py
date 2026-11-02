@@ -1,6 +1,6 @@
-"""Modal backend « sam3-track » : tracker vidéo SAM 3.1 (multiplex) sur B200.
+"""Modal backend « sam3-track » : tracker vidéo SAM 3.1 (multiplex) sur A100.
 
-Routes (contrat docs/TRACK-SPEC.md) : ``GET /health``, ``POST /session`` (frame 0 +
+Routes (contrat docs/TRACK-PERF.md) : ``GET /health``, ``POST /session`` (frame 0 +
 prompts), ``POST /frame`` (une frame du flux, ids stables), ``DELETE /session/{id}`` et
 ``POST /session/close``. La logique tracker (checkpoint, tampon de frames, propagation
 d'une frame) vit dans ``tracking.py`` ; les erreurs et les masques réutilisent
@@ -12,7 +12,7 @@ et donc de perdre l'état en mémoire. Le direct est sérialisé par un verrou :
 simultanées se suivent, elles ne se mélangent pas.
 
 Nom et GPU surchargeables au déploiement (comme ``live_app.py``) :
-``TRACK_GPU=H200 TRACK_APP_NAME=sam3-track-h200 modal deploy backend/track_app.py``.
+``TRACK_GPU=A100 TRACK_APP_NAME=sam3-track modal deploy backend/track_app.py``.
 
 Seul ``modal`` est importé au niveau du module — torch, sam3, fastapi et les helpers sont
 importés dans les fonctions côté conteneur, pour que ce fichier reste importable sans
@@ -34,7 +34,7 @@ import modal
 from http_errors import MAX_DETAIL_CHARS, validation_detail as _validation_detail
 
 APP_NAME = os.environ.get("TRACK_APP_NAME", "sam3-track")
-GPU_TYPE = os.environ.get("TRACK_GPU") or os.environ.get("LIVE_GPU") or "B200"
+GPU_TYPE = os.environ.get("TRACK_GPU") or os.environ.get("LIVE_GPU") or "A100"
 # Mêmes leviers que live_app.py : `region` place le conteneur en Europe, `routing_region`
 # fait sortir le trafic web par Dublin (sinon tout passe par la Virginie, même GPU en EU).
 REGION = os.environ.get("TRACK_REGION") or None
