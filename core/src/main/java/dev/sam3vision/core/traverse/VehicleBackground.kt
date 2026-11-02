@@ -66,11 +66,13 @@ data class FrameMotion(
  * On compare deux vitesses (fractions d'image par seconde) : le fond global
  * ([MotionSample], pixels du plan de luminance) et la boîte suivie (fractions
  * d'image). Le résidu = boîte − fond est le mouvement propre du véhicule :
- * au-delà de [LATERAL_RATIO], il roule ([Verdict.VEHICLE_MOVED]) ; résidu nul
- * et fond franc, la caméra bouge ([Verdict.CAMERA_MOVED]) ; les deux faibles,
- * arrêt ([Verdict.STATIC]). Le reste — confiance sous [TRUST_MIN], fond plat
- * (estimateur muet, `null`), temps ou dimensions invalides, bande de doute —
- * dit [Verdict.UNKNOWN] : on ne tranche jamais sans preuve.
+ * au-delà de [LATERAL_RATIO], il roule ([Verdict.VEHICLE_MOVED]) ; résidu nul,
+ * il est à l'arrêt et le fond dit si la caméra bouge ([Verdict.CAMERA_MOVED],
+ * fond franc) ou non ([Verdict.STATIC]). Un glissement de suivi (résidu entre
+ * [STILL_SPEED] et [LATERAL_RATIO]) sous fond franc reste la caméra. Le
+ * reste — confiance sous [TRUST_MIN], fond plat (estimateur muet, `null`),
+ * temps ou dimensions invalides, glissement sans fond franc — dit
+ * [Verdict.UNKNOWN] : on ne tranche jamais sans preuve.
  *
  * Seuils = priors rue à recaler sur séquences téléphone (rue, parking,
  * embouteillage), direction sûre : une piste jeune,
@@ -159,11 +161,19 @@ object VehicleBackground {
         return speed01ps <= STILL_SPEED
     }
 
-    /** Résidu franc = le véhicule roule ; résidu nul + fond franc = la caméra ; sinon doute ou arrêt. */
+    /**
+     * Arbitrage résidu/fond : le résidu (mouvement propre du véhicule) tranche
+     * d'abord — franc, le véhicule roule ; nul, il est à l'arrêt et le fond
+     * dit si la caméra bouge (franc) ou non. Un glissement de suivi (résidu
+     * entre les deux seuils) sous pan franc reste la caméra : le suivi
+     * imparfait ne fait pas rouler une garée. Ne reste doute que le
+     * glissement sans fond franc (véhicule lent ou gigue SAM, indécidable).
+     */
     private fun classify(residual: Float, ground: Float): Verdict = when {
         residual > LATERAL_RATIO -> Verdict.VEHICLE_MOVED
         residual <= STILL_SPEED && ground > LATERAL_RATIO -> Verdict.CAMERA_MOVED
-        residual <= STILL_SPEED && ground <= STILL_SPEED -> Verdict.STATIC
+        residual <= STILL_SPEED -> Verdict.STATIC
+        ground > LATERAL_RATIO -> Verdict.CAMERA_MOVED
         else -> Verdict.UNKNOWN
     }
 
