@@ -1,10 +1,10 @@
 package dev.sam3vision.app
 
-import android.app.Activity
 import android.content.Context
 import android.graphics.Bitmap
 import android.os.SystemClock
 import android.util.Size
+import androidx.activity.compose.LocalActivity
 import androidx.camera.core.CameraSelector
 import androidx.camera.core.ImageAnalysis
 import androidx.camera.core.ImageProxy
@@ -178,7 +178,7 @@ private fun rememberLivePreview(context: Context, onAttached: (Boolean) -> Unit)
 @Composable
 private fun ForegroundGate(viewModel: LiveViewModel) {
     val lifecycle = LocalLifecycleOwner.current.lifecycle
-    val activity = LocalContext.current as? Activity
+    val activity = LocalActivity.current
     DisposableEffect(lifecycle, viewModel) {
         val observer = LifecycleEventObserver { _, event ->
             // Rotation : l'activité est recréée mais le ViewModel survit — le socket
