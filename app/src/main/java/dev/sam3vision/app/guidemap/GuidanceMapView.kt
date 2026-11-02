@@ -7,8 +7,13 @@ import android.graphics.Paint
 import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.width
+import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.DisposableEffect
@@ -22,6 +27,8 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.geometry.CornerRadius
 import androidx.compose.ui.geometry.Rect
 import androidx.compose.ui.geometry.RoundRect
+import androidx.compose.ui.draw.shadow
+import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.Path
 import androidx.compose.ui.graphics.PathFillType
@@ -57,7 +64,7 @@ import org.maplibre.android.maps.MapView
 import org.maplibre.android.maps.Style
 
 /**
- * Carte de guidage : fond vectoriel OpenFreeMap Liberty (sans clé), caméra
+ * Carte de guidage : fond vectoriel OpenFreeMap Positron (sans clé), caméra
  * pilotée ou auto-cadrée sur le contenu (nulle), surcouches (tracé,
  * arrivée, position + précision, passages, manœuvres).
  * [onTilesError] est appelé une fois si le style ou les tuiles sont
@@ -96,7 +103,7 @@ fun GuidanceMapView(
     GuideMapLoader(mapView, onMap = { map = it }, onStyle = { styleReady = true }, onTilesError = onTilesError)
     val current = map
     val loaded = styleReady
-    Box(modifier) {
+    Box(modifier.shadow(6.dp, RoundedCornerShape(GuideMapCornerRadius))) {
         AndroidView(
             factory = { mapView },
             update = { view ->
@@ -113,7 +120,28 @@ fun GuidanceMapView(
         // Masque composé APRÈS l'AndroidView : le Compose d'avant passerait
         // derrière la carte (vraie View, voir docs/MASQUES-DEBUG.md).
         GuideMapCorners(cornerColor, Modifier.fillMaxSize())
+        GuideVignette(Modifier.fillMaxSize())
         if (showAttribution) GuideAttribution(Modifier.align(Alignment.BottomStart))
+    }
+}
+
+/**
+ * Vignettage « fondu » : les bords de la carte fondent dans le blanc de la
+ * page (écho au fondu de la caméra). Quatre dégradés blancs, dessin seul :
+ * aucun texte, aucune interception du toucher. Composé après les coins
+ * (même règle que [GuideMapCorners] : le Compose d'avant passerait
+ * derrière la carte).
+ */
+@Composable
+private fun GuideVignette(modifier: Modifier = Modifier) {
+    val edge = 28.dp
+    val opaque = Color.White
+    val clear = Color.Transparent
+    Box(modifier) {
+        Box(Modifier.align(Alignment.TopCenter).fillMaxWidth().height(edge).background(Brush.verticalGradient(listOf(opaque, clear))))
+        Box(Modifier.align(Alignment.BottomCenter).fillMaxWidth().height(edge).background(Brush.verticalGradient(listOf(clear, opaque))))
+        Box(Modifier.align(Alignment.CenterStart).fillMaxHeight().width(edge).background(Brush.horizontalGradient(listOf(opaque, clear))))
+        Box(Modifier.align(Alignment.CenterEnd).fillMaxHeight().width(edge).background(Brush.horizontalGradient(listOf(clear, opaque))))
     }
 }
 
@@ -188,7 +216,7 @@ private fun GuideMapLifecycle(mapView: MapView) {
 }
 
 /**
- * Charge la carte et son style Liberty ; signale l'échec des tuiles une
+ * Charge la carte et son style Positron ; signale l'échec des tuiles une
  * fois. Ne lève jamais (l'appelant bascule sur le repli schéma).
  */
 @Composable
@@ -476,11 +504,12 @@ private fun dropRing(map: MapLibreMap, marks: GuideMarks) {
     marks.ring = null
 }
 
-/** Tracé bleu de l'itinéraire (2 points minimum, sinon rien). */
+/** Tracé bleu de l'itinéraire à liseré blanc (2 points minimum, sinon rien). */
 @Suppress("DEPRECATION")
 private fun drawRoute(map: MapLibreMap, route: List<RoutePoint>) {
     val line = route.filter { it.isPlottable() }.map { it.toLatLng() }
     if (line.size < 2) return
+    map.addPolyline(PolylineOptions().addAll(line).color(Color.White.toArgb()).width(9f))
     map.addPolyline(PolylineOptions().addAll(line).color(AppColors.primary.toArgb()).width(5f))
 }
 

@@ -6,12 +6,12 @@ import kotlin.math.cos
 import kotlin.math.sin
 
 /**
- * Style vectoriel OpenFreeMap Liberty (look moderne type Google Maps),
- * chargé par URL directe — sans clé, https uniquement. Le style Liberty
- * est la déclinaison « rues » d'OpenFreeMap (variantes : positron, bright,
+ * Style vectoriel OpenFreeMap Positron (fond clair minimal, look « fondu »),
+ * chargé par URL directe — sans clé, https uniquement. Le style Positron
+ * est la déclinaison la plus épurée d'OpenFreeMap (variantes : liberty, bright,
  * dark, fiord).
  */
-const val OPENFREEMAP_STYLE_URL = "https://tiles.openfreemap.org/styles/liberty"
+const val OPENFREEMAP_STYLE_URL = "https://tiles.openfreemap.org/styles/positron"
 
 /** Mention légale courte, affichée en surimpression permanente sur la carte. */
 const val OSM_ATTRIBUTION_SHORT = "OpenFreeMap © OpenMapTiles © OpenStreetMap contributors"
