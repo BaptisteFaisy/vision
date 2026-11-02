@@ -80,7 +80,7 @@ class VoiceAnnouncer {
         onEvent("EXPECT")
         player.speed = settings.ttsSpeed
         if (!file.isFile) return fail(FileNotFoundException(file.path))
-        return player.play(file).onFailure { onEvent("FAIL") }
+        return player.playFile(file).onFailure { onEvent("FAIL") }
     }
 
     fun stop() = player.stop()
