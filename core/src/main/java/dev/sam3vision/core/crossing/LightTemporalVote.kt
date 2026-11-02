@@ -44,7 +44,9 @@ package dev.sam3vision.core.crossing
  * consécutives et l'état courant — **aucune horloge, aucune allocation par
  * frame**, coût O(1), déterministe.
  *
- * Usage (`app/.../isee/CrossingLightTap.kt`, une instance par feu suivi) :
+ * Usage (`app/.../isee/CrossingVerdictWiring.kt`, une instance par
+ * `CrossingVerdictEngine`, remise à zéro par `CrossingVerdictEngine.reset()` à
+ * l'activation du mode) :
  * ```
  * val vote = LightTemporalVote()               // 3 verts sur 5 frames
  * val decided = vote.onFrame(rawState, LightTemporalVote.redProven(redFraction))

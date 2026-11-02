@@ -3,6 +3,7 @@ package dev.sam3vision.app.isee
 import dev.sam3vision.core.crossing.CrossingAnnouncer
 import dev.sam3vision.core.crossing.CrossingCue
 import dev.sam3vision.core.crossing.CrossingState
+import dev.sam3vision.core.crossing.NoLightGate
 import dev.sam3vision.core.distance.LensSpec
 import dev.sam3vision.core.model.LiveFrame
 import dev.sam3vision.core.model.SegObject
@@ -225,5 +226,37 @@ class CrossingWiringTest {
         assertEquals(CrossingState.Red, light.state)
         assertNull(light.box)
         assertEquals(0, calls)
+    }
+
+    @Test
+    fun `absence de feu confirmee - le veto trafic survit au patch`() {
+        // A9 §3 D7 : dans la branche sans-feu, le 5e argument positionnel est
+        // `noLight` et le veto restait à sa valeur par défaut (`false`) alors
+        // que la voiture proche le rendait vrai — `carVeto` perdu, donc
+        // « Cross. » possible avec un bus qui arrive. Le veto doit traverser.
+        val gate = NoLightGate()
+        val announcer = CrossingAnnouncer()
+        val veto = TraverseVeto()
+        // Voiture qui approche (boîte qui grossit : ni garée ni immobile) et
+        // très proche (≤ 3 m au sténopé) : veto franc dès la première frame.
+        val boxes = listOf(
+            listOf(0f, 0f, 20f, 20f),
+            listOf(0f, 0f, 30f, 30f),
+            listOf(0f, 0f, 40f, 40f),
+            listOf(0f, 0f, 55f, 55f),
+        )
+        var patch: CrossingPatch? = null
+        repeat(NoLightGate.NO_LIGHT_MIN_FRAMES) { i ->
+            val frame = LiveFrame(100, 100, 0L, listOf(SegObject("car", 0.9f, boxes[i], "")))
+            patch = crossingPatchOf(
+                announcer, veto, true, frame, LensSpec.Default, "", i * 200L,
+                SpeechLanguage.Fr, noLightGate = gate,
+            )
+        }
+        val last = patch!!
+        assertTrue("absence de feu confirmée", last.noLight)
+        assertNull("le feu se tait", last.cue)
+        assertEquals(CrossingState.Red, last.state)
+        assertTrue("voiture proche : veto conservé hors branche feu", last.veto)
     }
 }

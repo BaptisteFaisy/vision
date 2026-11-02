@@ -64,11 +64,28 @@ class LightEvidenceGateTest {
     }
 
     @Test
-    fun `un feu vu puis perdu reste inconnu, jamais absent`() {
+    fun `un feu vu puis perdu reste inconnu jusqu'a la borne de rearmement`() {
+        // Trou D3 : la première boîte de la session condamnait `Absent` à ne
+        // plus jamais revenir — silence du verdict à vie. La perte durable
+        // (2 × ABSENT_MIN_FRAMES = 8) rouvre la conclusion.
         val gate = LightEvidenceGate()
         gate.onFrame(0L, sawAnyLightBox = true, bestState = CrossingState.Red)
-        val all = play(gate, 10, sawAnyLightBox = false, bestState = null)
-        assertTrue(all.all { it == Evidence.Unknown })
+        val all = play(gate, LightEvidenceGate.ABSENT_REARM_FRAMES - 1, sawAnyLightBox = false, bestState = null)
+        assertTrue("avant la borne : aucune absence conclue", all.all { it == Evidence.Unknown })
+        assertEquals(Evidence.Absent, gate.onFrame(10_000L, sawAnyLightBox = false, bestState = null))
+    }
+
+    @Test
+    fun `feu vert vu puis perdu douze frames - jamais vert, absence de nouveau concluable`() {
+        // Chemin de panne réel : le feu est aperçu, puis masqué (camion, tête
+        // baissée, feu dépassé). La preuve doit redevenir non verte sans
+        // jamais repasser au vert, et l'absence doit être de nouveau conclue.
+        val gate = LightEvidenceGate(minGreenFrames = 1, greenHoldMs = 0L)
+        assertEquals(Evidence.Green, gate.onFrame(0L, true, CrossingState.Green))
+        val lost = play(gate, 12, sawAnyLightBox = false, bestState = null)
+        assertFalse("aucun vert après la perte", lost.contains(Evidence.Green))
+        assertEquals(Evidence.Absent, lost.last())
+        assertFalse(lost.last().authorizesCrossing)
     }
 
     @Test
@@ -155,11 +172,25 @@ class LightEvidenceGateTest {
     }
 
     @Test
-    fun `un Absent ne produit jamais Cross`() {
-        assertEquals(CrossingVerdictLight.Unknown, Evidence.Absent.toVerdictLight())
+    fun `une preuve manquante ne produit jamais Cross, une absence prouvee suit la SPEC v4`() {
+        // Deux notions distinctes, c'est tout l'objet du module :
+        // - Unknown = aucune preuve (une frame sans boîte, couleur illisible) ⇒
+        //   jamais « Cross. » (A9 §3 D1) ;
+        // - Absent = absence PROUVÉE (4 frames sans aucune boîte, contexte de
+        //   passage) ⇒ SPEC v4 : aucun feu ici, donc les voitures tranchent.
+        assertEquals(CrossingVerdictLight.Unknown, Evidence.Unknown.toVerdictLight())
+        assertEquals(CrossingVerdictLight.Absent, Evidence.Absent.toVerdictLight())
+        assertEquals(
+            CrossingVerdict.Cross,
+            CrossingVerdictRule.decide(Evidence.Absent, carMoving = false),
+        )
         assertEquals(
             CrossingVerdict.DontCross,
-            CrossingVerdictRule.decide(Evidence.Absent, carMoving = false),
+            CrossingVerdictRule.decide(Evidence.Absent, carMoving = false, veto = true),
+        )
+        assertEquals(
+            CrossingVerdict.DontCross,
+            CrossingVerdictRule.decide(Evidence.Absent, carMoving = true),
         )
         assertEquals(
             CrossingVerdict.DontCross,
@@ -177,9 +208,16 @@ class LightEvidenceGateTest {
             CrossingVerdict.Cross,
             CrossingVerdictRule.decide(Evidence.Green, carMoving = false),
         )
+        // Vert piéton contre voiture en mouvement : depuis le 02/11/2026 le
+        // vert GAGNE (ff01d04d, « le vert gagne sur rig clips ») ; ce qui
+        // bloque encore un vert, c'est le veto trafic, pas `carMoving`.
+        assertEquals(
+            CrossingVerdict.Cross,
+            CrossingVerdictRule.decide(Evidence.Green, carMoving = true),
+        )
         assertEquals(
             CrossingVerdict.DontCross,
-            CrossingVerdictRule.decide(Evidence.Green, carMoving = true),
+            CrossingVerdictRule.decide(Evidence.Green, carMoving = true, veto = true),
         )
     }
 }
