@@ -61,10 +61,10 @@ internal fun rememberCameraGlue(viewModel: IseeViewModel): CameraGlue {
     val firstRun = remember(tick) { missingPermissions(context).isNotEmpty() }
     val firstRunHandled = IseePermissionFlow.handled.value
     val host = remember { IseeCameraHost(context) }
-    // L'aperçu est créé ici, **en permanence** : `bind()` exige une PreviewView déjà
-    // attachée, et la carte n'existe qu'une fois l'enregistrement lancé. Sans ça,
-    // le premier tap répondait « Camera not ready » (mesuré sur le téléphone).
-    val preview = remember(host) { host.newPreviewView(context) }
+    // L'aperçu appartient au host dès sa construction : `bind()` ne dépend plus
+    // d'un `remember` externe, qui arrivait après la boucle de liaison
+    // (« Preview not attached yet » en boucle, mesuré sur le téléphone).
+    val preview = host.previewView
     LaunchedEffect(Unit) {
         if (!state.granted && !firstRun) askCamera.launch(Manifest.permission.CAMERA)
     }
