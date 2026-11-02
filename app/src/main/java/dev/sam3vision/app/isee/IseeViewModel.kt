@@ -106,8 +106,6 @@ class IseeViewModel(app: Application) : AndroidViewModel(app) {
         scope = viewModelScope, photoTemplateBox = { file, box -> templateFromPhoto(file, box) },
         onFound = ::postFoundClip,
     )
-    /** Zone tactile publiée par la puce Traversée (exemption d'interception racine). */
-    val crossingChip = CrossingChipZone()
     /** Zones tactiles des boutons navigation sur l'accueil (exemption racine). */
     val navButtons = NavButtonZones()
     // Arbitrage voix : obstacle → TwinLite, sinon SAM (ordre user), sonde + guetteurs + traversée.
@@ -295,12 +293,8 @@ class IseeViewModel(app: Application) : AndroidViewModel(app) {
         )
     }
 
-    /** Bascule du mode Traversée (puce de la carte caméra) : mêmes masques, voix traversée ou retour. */
-    fun toggleCrossing() {
-        steering.toggleCrossing()
-        spine.onCrossingChanged()
-    }
-
+    /** Témoins tactiles Traversée + lieu, extraits du ViewModel (limite 500 lignes). */
+    val modeChips = IseeModeChips(viewModelScope, { _state.value.placeMode }, modes::run, { steering.toggleCrossing(); spine.onCrossingChanged() })
 
     override fun onCleared() {
         liveDictation.stop()

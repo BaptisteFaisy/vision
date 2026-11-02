@@ -25,6 +25,7 @@ import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import dev.sam3vision.core.iseedesign.focusPull
 import dev.sam3vision.core.iseedesign.pictureAlpha
+import dev.sam3vision.core.picto.PictoPlaceMode
 
 /**
  * La caméra du design « Portrait » : la rue occupe le haut, sa hauteur suit la parole et se fond dans
@@ -77,7 +78,7 @@ internal fun BoxWithConstraintsScope.PortraitCamera(
         }
         ProbeNoticeScoped(probe)
         PictureFade(Modifier.fillMaxSize())
-        CrossingToggle(probe, viewModel)
+        ModeToggles(probe, viewModel, state.placeMode)
         // Dense = pas d'inset de barre d'état : posé en haut, le panneau passait sous
         // l'horloge et derrière le wordmark « iSee » (constaté sur l'appareil le
         // 2026-10-29). En bas à gauche, au-dessus du fondu, il ne recouvre plus rien :
@@ -87,17 +88,23 @@ internal fun BoxWithConstraintsScope.PortraitCamera(
 }
 
 /**
- * Bascule manuelle du mode Traversée (sans elle, l'ordre vocal seul l'arme) :
+ * Bascules manuelles Traversée et lieu (sans elles, l'ordre vocal seul les arme) :
  * ex-puce de l'ancienne carte, remontée en haut-centre après le fondu.
  */
 @Composable
-private fun BoxScope.CrossingToggle(probe: LiveProbe, viewModel: IseeViewModel) {
-    // Chip chiffres : état Traversée seul, invisible aux pixels.
+private fun BoxScope.ModeToggles(probe: LiveProbe, viewModel: IseeViewModel, mode: PictoPlaceMode) {
+    // Chips chiffres : Traversée et lieu seuls, invisibles aux pixels.
     CrossingChip(
         probe.collectRest(),
         Modifier.align(Alignment.TopCenter).padding(top = 12.dp),
-        onToggle = { viewModel.toggleCrossing() },
-        onBounds = viewModel.crossingChip::setBounds,
+        onToggle = { viewModel.modeChips.toggleCrossing() },
+        onBounds = viewModel.modeChips.crossing::setBounds,
+    )
+    PlaceModeChip(
+        mode,
+        Modifier.align(Alignment.TopCenter).padding(top = 52.dp),
+        onToggle = { viewModel.modeChips.togglePlace() },
+        onBounds = viewModel.modeChips.place::setBounds,
     )
 }
 
