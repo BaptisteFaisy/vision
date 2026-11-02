@@ -238,10 +238,15 @@ def test_preprocess_equivalence(_module) -> None:
 
 def test_preprocess_deploy(_module) -> None:
     """Le levier est recuit dans l'env de l'image déployée (surchageable au deploy)."""
-    from test_units import check
+    from test_units import BACKEND_DIR, check
 
     app = _fresh("live_app_fast")
     check("preproc : FAST_PREPROCESS dans LEVER_NAMES",
           "FAST_PREPROCESS" in app.LEVER_NAMES, str(app.LEVER_NAMES))
     check("preproc : lever_env() transmet le levier",
           "FAST_PREPROCESS" in app.lever_env(), "absent de lever_env()")
+    script = (BACKEND_DIR.parent / "scripts" / "deploy-live-fast.sh").read_text(encoding="utf-8")
+    check("preproc : FAST_PREPROCESS=fast déployé (FIX-14)",
+          "FAST_PREPROCESS=fast" in script, "absent du script")
+    check("preproc : le contrôle exige preprocess=fast (FIX-14)",
+          '"preprocess": "fast"' in script, "absent du contrôle")
