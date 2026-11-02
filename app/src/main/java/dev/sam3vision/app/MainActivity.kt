@@ -53,9 +53,10 @@ private val SamColorScheme = darkColorScheme(
  *
  * La racine n'est pas le ComposeView mais [IseeRootLayout] : elle voit chaque geste
  * de la surface de l'app — appui long (micro maintenu, transcription Muse, photo
- * filmée jointe), tap simple (vidéo), balayage horizontal (reconnu, sans effet).
- * Double tap et balayage vertical supprimés. Les gestes ne s'appliquent que quand
- * les panneaux iSee sont à l'écran.
+ * filmée jointe), tap simple (vidéo), balayage vers le haut (bascule Traversée),
+ * balayage horizontal (reconnu, sans effet). Double tap et balayage vers le bas
+ * supprimés. Les gestes ne s'appliquent que quand les panneaux iSee sont à
+ * l'écran.
  */
 class MainActivity : ComponentActivity() {
 
@@ -194,6 +195,7 @@ class MainActivity : ComponentActivity() {
         onHoldEnd = isee::onHoldEnd
         onHoldCancel = isee::onHoldCancel
         onSingleTap = isee::onSingleTap
+        onSwipeUp = isee::onSwipeUp
         pictoZone = { isee.picto.chipZone() }
         crossingZone = { isee.modeChips.crossing.zone() }
         placeModeZone = { isee.modeChips.place.zone() }

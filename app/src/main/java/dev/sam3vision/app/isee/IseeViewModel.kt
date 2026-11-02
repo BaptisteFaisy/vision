@@ -390,6 +390,9 @@ class IseeViewModel(app: Application) : AndroidViewModel(app) {
     fun onHoldCancel() = holdTalk.cancel()
     fun onSingleTap() = holdTalk.singleTap()
 
+    /** Balayage vers le haut : même bascule Traversée que la puce (voix traversée ou retour). */
+    fun onSwipeUp() = modeChips.toggleCrossing()
+
     // ————— Appui long : micro → texte → réponse parlée —————
 
     /** Fin de la tenue : transcription, coupe d'intro éventuelle, puis réponse IA. */

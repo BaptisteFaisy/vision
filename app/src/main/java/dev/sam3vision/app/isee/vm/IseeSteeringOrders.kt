@@ -19,7 +19,7 @@ import dev.sam3vision.core.speech.SpeechLanguage
  * crossing on/off »). L'ordre de cap manuel (« va à gauche ») est supprimé
  * (spec v4 : la phrase part au LLM comme question). Le mode Traversée ne
  * s'arme plus seul : ni la vision ni le guidage ne le basculent, seuls la
- * puce et l'ordre vocal le font.
+ * puce, le balayage vers le haut et l'ordre vocal le font.
  * Extrait d'[IseeViewModel] (limite 500 lignes) : la logique ne change pas,
  * elle vit simplement à côté — même motif que `ProbeWiring`, `IseeVoiceNav`
  * et sœurs.
