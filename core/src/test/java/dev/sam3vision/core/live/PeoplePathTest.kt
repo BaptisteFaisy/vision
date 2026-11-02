@@ -12,8 +12,9 @@ import org.junit.Test
 /**
  * Chemin entre humains : le cap optimal passe à côté des corps au lieu de
  * viser le côté le moins encombré — une personne pile en face ouvre un
- * passage à gauche à 0,8 mètre, un mur de personnes avoue qu'il n'y a
- * pas de passage, et le couloir ([Guidance]) suit ce cap quand il existe.
+ * passage à gauche à 1 mètre (ordre user du 02/11), un mur de personnes
+ * avoue qu'il n'y a pas de passage, et le couloir ([Guidance]) suit ce cap
+ * quand il existe.
  */
 class PeoplePathTest {
 
@@ -25,13 +26,13 @@ class PeoplePathTest {
         PlacedLabel(label, (x0 + x1) / 2f, 0.5f, meters, x0, x1)
 
     @Test
-    fun `personne pile en face on passe a gauche a 0,8 metre`() {
+    fun `personne pile en face on passe a gauche a 1 metre`() {
         val path = PeoplePath.plan(listOf(placed("personne", 0.5f, 2f)))!!
 
         assertTrue(path.fits)
         assertEquals(GuidanceSide.Left, path.side)
-        assertEquals(0.103f, path.headingX, 0.02f)
-        assertEquals(0.8f, path.clearanceM, 0.02f)
+        assertEquals(0.028f, path.headingX, 0.02f)
+        assertEquals(1.0f, path.clearanceM, 0.02f)
     }
 
     @Test
@@ -41,7 +42,7 @@ class PeoplePathTest {
         assertTrue(path.fits)
         assertEquals(GuidanceSide.Right, path.side)
         assertTrue(path.headingX > 0.5f)
-        assertEquals(0.8f, path.clearanceM, 0.02f)
+        assertEquals(1.0f, path.clearanceM, 0.02f)
     }
 
     @Test
@@ -51,8 +52,8 @@ class PeoplePathTest {
 
         assertTrue(path.fits)
         assertEquals(GuidanceSide.Left, path.side)
-        assertEquals(0.102f, path.headingX, 0.005f)
-        assertEquals(0.8f, path.clearanceM, 0.01f)
+        assertEquals(0.064f, path.headingX, 0.005f)
+        assertEquals(1.0f, path.clearanceM, 0.01f)
     }
 
     @Test
@@ -72,8 +73,8 @@ class PeoplePathTest {
         val path = PeoplePath.plan(listOf(boxed("personne", 0.4f, 0.6f, 2f)))!!
 
         assertTrue(path.fits)
-        assertEquals(0.098f, path.headingX, 0.02f)
-        assertEquals(0.8f, path.clearanceM, 0.02f)
+        assertEquals(0.022f, path.headingX, 0.02f)
+        assertEquals(1.0f, path.clearanceM, 0.02f)
     }
 
     @Test
@@ -97,7 +98,8 @@ class PeoplePathTest {
 
     @Test
     fun `le couloir suit le cap entre deux personnes`() {
-        val labels = listOf(placed("personne", 0.30f, 4f), placed("personne", 0.55f, 1.5f))
+        // À 1 m, le proche est lu à 2 m : à 1,5 m sa bande couvrirait le champ.
+        val labels = listOf(placed("personne", 0.30f, 4f), placed("personne", 0.55f, 2.0f))
         val decision = Guidance.decide(labels)
 
         assertTrue(decision.blocked)
@@ -126,76 +128,74 @@ class PeoplePathTest {
     }
 
     @Test
-    fun `bruit +10 pourcent personne centree cap stable clearance 0,70`() {
+    fun `bruit +10 pourcent personne centree cap stable clearance 0,89`() {
         val path = PeoplePath.plan(listOf(placed("personne", 0.5f, 2.2f)))!!
 
         assertTrue(path.fits)
         assertEquals(GuidanceSide.Left, path.side)
-        assertEquals(0.140f, path.headingX, 0.005f)
-        assertEquals(0.70f, vraieClearance(listOf(placed("personne", 0.5f, 2f)), path.headingX), 0.01f)
+        assertEquals(0.071f, path.headingX, 0.005f)
+        assertEquals(0.89f, vraieClearance(listOf(placed("personne", 0.5f, 2f)), path.headingX), 0.01f)
     }
 
     @Test
-    fun `bruit +30 pourcent personne centree clearance 0,56`() {
+    fun `bruit +30 pourcent personne centree clearance 0,71`() {
         val path = PeoplePath.plan(listOf(placed("personne", 0.5f, 2.6f)))!!
 
-        assertEquals(0.195f, path.headingX, 0.005f)
-        assertEquals(0.56f, vraieClearance(listOf(placed("personne", 0.5f, 2f)), path.headingX), 0.01f)
+        assertEquals(0.137f, path.headingX, 0.005f)
+        assertEquals(0.71f, vraieClearance(listOf(placed("personne", 0.5f, 2f)), path.headingX), 0.01f)
     }
 
     @Test
-    fun `bruit centre 0,03 personne centree clearance 0,72 des deux cotes`() {
+    fun `bruit centre 0,03 personne centree clearance 0,92 des deux cotes`() {
         val gauche = PeoplePath.plan(listOf(placed("personne", 0.53f, 2f)))!!
 
-        assertEquals(0.133f, gauche.headingX, 0.005f)
+        assertEquals(0.058f, gauche.headingX, 0.005f)
         val droite = PeoplePath.plan(listOf(placed("personne", 0.47f, 2f)))!!
 
         assertEquals(GuidanceSide.Right, droite.side)
-        assertEquals(0.867f, droite.headingX, 0.005f)
+        assertEquals(0.942f, droite.headingX, 0.005f)
         val vrais = listOf(placed("personne", 0.5f, 2f))
 
-        assertEquals(0.72f, vraieClearance(vrais, gauche.headingX), 0.01f)
-        assertEquals(0.72f, vraieClearance(vrais, droite.headingX), 0.01f)
+        assertEquals(0.92f, vraieClearance(vrais, gauche.headingX), 0.01f)
+        assertEquals(0.92f, vraieClearance(vrais, droite.headingX), 0.01f)
     }
 
     @Test
-    fun `bruit combine +30 pourcent et centre personne centree clearance 0,48`() {
+    fun `bruit combine +30 pourcent et centre personne centree clearance 0,63`() {
         val path = PeoplePath.plan(listOf(placed("personne", 0.53f, 2.6f)))!!
 
-        assertEquals(0.225f, path.headingX, 0.005f)
-        assertEquals(0.48f, vraieClearance(listOf(placed("personne", 0.5f, 2f)), path.headingX), 0.01f)
+        assertEquals(0.167f, path.headingX, 0.005f)
+        assertEquals(0.63f, vraieClearance(listOf(placed("personne", 0.5f, 2f)), path.headingX), 0.01f)
     }
 
     @Test
-    fun `sous-estimation -30 pourcent aucun passage a 0,8 m`() {
+    fun `sous-estimation -30 pourcent aucun passage a 1 m`() {
         val path = PeoplePath.plan(listOf(placed("personne", 0.5f, 1.4f)))!!
 
-        // À 1,4 m lus, 1,05 m de chaque côté ne tiennent pas dans le champ :
+        // À 1,4 m lus, 1,25 m de chaque côté ne tiennent pas dans le champ :
         // le planificateur avoue, le couloir garde son côté historique.
         assertFalse(path.fits)
     }
 
     @Test
-    fun `deux personnes +30 pourcent cap stable clearance 0,56`() {
+    fun `deux personnes +30 pourcent plus de passage a 1 m`() {
         val path = PeoplePath.plan(listOf(placed("personne", 0.35f, 2.6f), placed("personne", 0.75f, 2.6f)))!!
 
-        assertEquals(GuidanceSide.Left, path.side)
-        assertEquals(0.045f, path.headingX, 0.005f)
-        val vrais = listOf(placed("personne", 0.35f, 2f), placed("personne", 0.75f, 2f))
-
-        assertEquals(0.56f, vraieClearance(vrais, path.headingX), 0.01f)
+        // Lus comme vrais, deux corps à ~2 m bouchent le champ à 1 m : le
+        // plan avoue, le couloir garde son côté historique (repli).
+        assertFalse(path.fits)
     }
 
     @Test
     fun `deux personnes lues ecartees faux creneau falaise`() {
-        val path = PeoplePath.plan(listOf(placed("personne", 0.24f, 2.6f), placed("personne", 0.86f, 2.6f)))!!
+        val path = PeoplePath.plan(listOf(placed("personne", 0.18f, 2.6f), placed("personne", 0.92f, 2.6f)))!!
 
         assertTrue(path.fits)
-        assertEquals(0.545f, path.headingX, 0.005f) // Créneau fantôme.
-        assertEquals(0.8f, path.clearanceM, 0.01f) // Annonce fausse et confiante.
+        assertEquals(0.543f, path.headingX, 0.005f) // Créneau fantôme.
+        assertEquals(1.0f, path.clearanceM, 0.01f) // Annonce fausse et confiante.
         val vrais = listOf(placed("personne", 0.30f, 2f), placed("personne", 0.75f, 2f))
 
-        assertEquals(0.29f, vraieClearance(vrais, path.headingX), 0.01f)
+        assertEquals(0.30f, vraieClearance(vrais, path.headingX), 0.01f)
     }
 
     @Test
@@ -206,51 +206,56 @@ class PeoplePathTest {
     }
 
     @Test
-    fun `discriminant proche +10 pourcent cap a gauche clearance 0,70`() {
-        val labels = listOf(placed("personne", 0.30f, 4f), placed("personne", 0.55f, 1.65f))
+    fun `discriminant proche +10 pourcent cap a gauche clearance 0,89`() {
+        // À 1 m le proche est à 1,7 m vrais (1,87 lus) : à 1,5 m sa bande
+        // couvrirait le champ et il n'y aurait plus de cap à juger.
+        val labels = listOf(placed("personne", 0.30f, 4f), placed("personne", 0.55f, 1.87f))
         val path = PeoplePath.plan(labels)!!
 
         assertEquals(GuidanceSide.Left, path.side)
-        assertEquals(0.069f, path.headingX, 0.005f)
-        val vrais = listOf(placed("personne", 0.30f, 4f), placed("personne", 0.55f, 1.5f))
+        assertEquals(0.045f, path.headingX, 0.005f)
+        val vrais = listOf(placed("personne", 0.30f, 4f), placed("personne", 0.55f, 1.7f))
 
-        assertEquals(0.70f, vraieClearance(vrais, path.headingX), 0.01f)
+        assertEquals(0.89f, vraieClearance(vrais, path.headingX), 0.01f)
     }
 
     @Test
-    fun `discriminant proche +30 pourcent reste a gauche clearance 0,64`() {
+    fun `discriminant proche +30 pourcent reste a gauche clearance 0,72`() {
         val labels = listOf(placed("personne", 0.30f, 4f), placed("personne", 0.55f, 1.95f))
         val path = PeoplePath.plan(labels)!!
 
         assertEquals(GuidanceSide.Left, path.side)
-        assertEquals(0.102f, path.headingX, 0.005f)
-        assertEquals(0.8f, path.clearanceM, 0.01f) // Annonce : 0,8 mesurés, 0,64 vrais.
+        assertEquals(0.064f, path.headingX, 0.005f)
+        assertEquals(1.0f, path.clearanceM, 0.01f) // Annonce : 1 mesuré, 0,72 vrais.
         val vrais = listOf(placed("personne", 0.30f, 4f), placed("personne", 0.55f, 1.5f))
 
-        assertEquals(0.64f, vraieClearance(vrais, path.headingX), 0.01f)
+        assertEquals(0.72f, vraieClearance(vrais, path.headingX), 0.01f)
     }
 
     @Test
-    fun `discriminant lointain +0,03 cap colle au bord clearance 0,80`() {
-        val labels = listOf(placed("personne", 0.33f, 4f), placed("personne", 0.55f, 1.5f))
+    fun `discriminant lointain +0,03 cap colle au bord clearance 0,93`() {
+        // À 1 m le proche est à 2 m (lus et vrais) : à 1,5 m sa bande
+        // couvrirait le champ, sans cap à coller au bord.
+        val labels = listOf(placed("personne", 0.33f, 4f), placed("personne", 0.55f, 2.0f))
         val path = PeoplePath.plan(labels)!!
 
-        assertEquals(0.021f, path.headingX, 0.005f)
-        val vrais = listOf(placed("personne", 0.30f, 4f), placed("personne", 0.55f, 1.5f))
+        assertEquals(0.078f, path.headingX, 0.005f)
+        val vrais = listOf(placed("personne", 0.30f, 4f), placed("personne", 0.55f, 2.0f))
 
-        assertEquals(0.80f, vraieClearance(vrais, path.headingX), 0.01f)
+        assertEquals(0.93f, vraieClearance(vrais, path.headingX), 0.01f)
     }
 
     @Test
     fun `discriminant proche centre -0,03 plus de passage, +0,03 valide`() {
-        val vrais = listOf(placed("personne", 0.30f, 4f), placed("personne", 0.55f, 1.5f))
-        val vers = PeoplePath.plan(listOf(placed("personne", 0.30f, 4f), placed("personne", 0.52f, 1.5f)))!!
+        // Frontière passée de 0,55 à 0,66 : 1 m demande de la place.
+        val vrais = listOf(placed("personne", 0.30f, 4f), placed("personne", 0.66f, 1.5f))
+        val vers = PeoplePath.plan(listOf(placed("personne", 0.30f, 4f), placed("personne", 0.63f, 1.5f)))!!
 
         assertFalse(vers.fits)
-        val loin = PeoplePath.plan(listOf(placed("personne", 0.30f, 4f), placed("personne", 0.58f, 1.5f)))!!
+        val loin = PeoplePath.plan(listOf(placed("personne", 0.30f, 4f), placed("personne", 0.69f, 1.5f)))!!
 
-        assertEquals(0.051f, loin.headingX, 0.005f)
-        assertEquals(0.74f, vraieClearance(vrais, loin.headingX), 0.01f)
+        assertEquals(0.061f, loin.headingX, 0.005f)
+        assertEquals(0.94f, vraieClearance(vrais, loin.headingX), 0.01f)
     }
 
     @Test
@@ -305,7 +310,7 @@ class PeoplePathTest {
     fun `egalite de distance le plus grand ecart gagne`() {
         val perX = 2f * 2f * LensSpec.halfTangent(LensSpec.DEFAULT_H_FOV_DEG)
         val labels = listOf(
-            placed("personne", 0.9f - 1.05f / perX, 2f),
+            placed("personne", 0.9f - 1.25f / perX, 2f),
             placed("poteau", 0.1f + 0.25f / perX, 2f),
         )
         val path = PeoplePath.plan(labels)!!

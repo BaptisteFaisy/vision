@@ -61,7 +61,7 @@ class GuidanceSteeringTest {
     }
 
     @Test
-    fun `passage prefere le degage a 80cm au centre`() {
+    fun `passage prefere le degage a 1m au centre`() {
         val bloqueGauche = listOf(placed("personne", 0.2f, 2f))
         val bloqueDroite = listOf(placed("personne", 0.8f, 2f))
 
@@ -182,14 +182,14 @@ class GuidanceSteeringTest {
     }
 
     @Test
-    fun `repli 80cm prefere le cote degage au comptage`() {
+    fun `repli 1m prefere le cote degage au comptage`() {
         val labels = listOf(placed("personne", 0.6f, null), placed("personne", 0.1f, 4f))
 
         assertEquals(GuidanceSide.Left, Guidance.decide(labels).side)
     }
 
     @Test
-    fun `passage lateral prefere le secteur a 80cm garantis`() {
+    fun `passage lateral prefere le secteur a 1m garantis`() {
         val bloque = Guidance.decide(listOf(placed("personne", 0.3f, 1f)), SteeringCap.Left)
 
         assertTrue(bloque.blocked)

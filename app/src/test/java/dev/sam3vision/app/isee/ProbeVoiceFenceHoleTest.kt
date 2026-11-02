@@ -7,7 +7,7 @@ import org.junit.Test
 
 /**
  * Voix de la sonde devant un grillage ouvert : le trou proche oriente la
- * sortie (voix TwinLite), sauf humain à moins de 80 cm de ce côté.
+ * sortie (voix TwinLite), sauf humain à moins de 1 m de ce côté.
  */
 class ProbeVoiceFenceHoleTest {
 
