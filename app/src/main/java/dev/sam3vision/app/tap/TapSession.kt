@@ -112,8 +112,9 @@ class TapSession(
                     fail("camera or microphone permission denied", Announcement.FAILED)
                     return@launch
                 }
-                if (!video.ready && video.bind(owner()).isFailure) {
-                    fail("video camera unavailable", Announcement.FAILED)
+                val bound = if (video.ready) Result.success(Unit) else video.bind(owner())
+                if (bound.isFailure) {
+                    fail(bound.exceptionOrNull()?.message ?: "video camera unavailable", Announcement.FAILED)
                     return@launch
                 }
                 record()

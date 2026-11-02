@@ -3,6 +3,7 @@ package dev.sam3vision.app.tap
 import dev.sam3vision.app.SpeechPlayer
 import java.io.File
 import java.nio.file.Files
+import java.util.Collections
 import kotlinx.coroutines.runBlocking
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
@@ -17,7 +18,8 @@ class AnnouncementPlayerTest {
 
     /** Embarqué factice : écrit un faux mp3, échecs programmables. */
     private class FakeBundled(private val failOn: Set<Announcement> = emptySet()) : TapBundled {
-        val filled = mutableListOf<Announcement>()
+        // `prewarm` remplit en parallèle (`async`) : une liste simple perd des ajouts.
+        val filled: MutableList<Announcement> = Collections.synchronizedList(mutableListOf())
 
         override fun fill(word: Announcement, file: File): Boolean {
             filled += word

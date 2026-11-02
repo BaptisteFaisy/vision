@@ -101,8 +101,14 @@ private fun rememberTapSession(
         if (granted.values.any { !it }) onStatus(TapStatus.Failed("camera or microphone permission refused"))
     }
     LaunchedEffect(dependencies) {
-        dependencies.video.bind(context.findLifecycleOwner()).onFailure {
-            onStatus(TapStatus.Failed(it.message ?: "camera unavailable"))
+        dependencies.video.bind(context.findLifecycleOwner()).onFailure { error ->
+            android.util.Log.e("sam3vision", "tap: initial camera bind failed", error)
+            // Permissions pas encore accordées : le dialogue suit juste après, et le
+            // re-bind à la demande (TapSession.start) échouera explicitement si besoin.
+            // Afficher « Failed » ici ferait croire à un bug sur un premier lancement sain.
+            if (tapPermissionsGranted(context)) {
+                onStatus(TapStatus.Failed(error.message ?: "camera unavailable (no detail)"))
+            }
         }
         dependencies.announcements.prewarm()
         if (!tapPermissionsGranted(context)) permissions.launch(TAP_PERMISSIONS)

@@ -104,6 +104,39 @@ class TapSessionTest {
     }
 
     @Test
+    fun `re-bind impossible remonte la raison du bind`() = runTest {
+        val harness = harness(
+            scope = this,
+            videoReady = false,
+            bindResult = Result.failure(IllegalStateException("video bind impossible: CameraInUse")),
+        )
+
+        harness.session.onTap()
+        advanceUntilIdle()
+
+        assertEquals(
+            TapStatus.Failed("video bind impossible: CameraInUse"),
+            harness.statuses.single(),
+        )
+        assertEquals(0, harness.calls())
+    }
+
+    @Test
+    fun `re-bind sans detail garde le repli generique`() = runTest {
+        val harness = harness(
+            scope = this,
+            videoReady = false,
+            bindResult = Result.failure(IllegalStateException()),
+        )
+
+        harness.session.onTap()
+        advanceUntilIdle()
+
+        assertEquals(TapStatus.Failed("video camera unavailable"), harness.statuses.single())
+        assertEquals(0, harness.calls())
+    }
+
+    @Test
     fun `release sur idle ne fait rien et libere le micro`() = runTest {
         val harness = harness(scope = this, sendBlocked = { "bloqué" })
 
@@ -119,9 +152,11 @@ class TapSessionTest {
         outcome: Result<String> = Result.success("résumé"),
         sendBlocked: () -> String? = { null },
         permissionsGranted: () -> Boolean = { true },
+        videoReady: Boolean = true,
+        bindResult: Result<Unit> = Result.success(Unit),
     ): Harness {
         val statuses = mutableListOf<TapStatus>()
-        val video = FakeVideoRecorder()
+        val video = FakeVideoRecorder(ready = videoReady, bindResult = bindResult)
         var calls = 0
         var now = 0L
         val player = SpeechPlayer(File(tmp, "clips"))
@@ -156,10 +191,12 @@ class TapSessionTest {
             set(value) = setNow(value)
     }
 
-    private class FakeVideoRecorder : TapVideoRecorder {
+    private class FakeVideoRecorder(
+        override val ready: Boolean = true,
+        private val bindResult: Result<Unit> = Result.success(Unit),
+    ) : TapVideoRecorder {
         var started: File? = null
-        override val ready: Boolean get() = true
-        override suspend fun bind(owner: LifecycleOwner?): Result<Unit> = Result.success(Unit)
+        override suspend fun bind(owner: LifecycleOwner?): Result<Unit> = bindResult
         override fun start(file: File, withAudio: Boolean): Result<Unit> {
             started = file
             return Result.success(Unit)
