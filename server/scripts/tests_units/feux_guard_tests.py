@@ -275,6 +275,76 @@ def _crowd(guard, seg, check) -> None:
           "feu piéton" in mixed and "zebra" in mixed, str(mixed))
 
 
+def _stairs_walls_labels(guard, check) -> None:
+    """Familles escalier (11 formes + sens) et mur (miroir VeilPolicy)."""
+    for label in ["stairs", "Stairs", "stair", "staircase", "Staircases",
+                  "steps", "upstairs", "downstairs", "escalier", "Escaliers",
+                  "un escalier", "marche", "marches", "marche d'escalier",
+                  "stairs going up", "escalier descendant"]:
+        check(f"escaliers: label volée reconnu ({label})",
+              guard.is_stairs_label(label), label)
+    # « step » EN reconnu aussi : la table confond « marche » et « step »
+    # (chevauchement curb assumé, bucket curb d'abord).
+    check("escaliers: step reconnu (chevauchement marche/step)",
+          guard.is_stairs_label("step"), "step")
+    for label in ["car", "person", "curb", "sidewalk", "trottoir", "road",
+                  "wall", "mur", "zebra", "feu piéton", "", "   ", None, 42]:
+        check(f"escaliers: pas une volée ({label!r})",
+              not guard.is_stairs_label(label), repr(label))
+    for label in ["wall", "Walls", "WALL", "mur", "Murs", "un muret",
+                  "murets", "le mur"]:
+        check(f"murs: label mur reconnu ({label})",
+              guard.is_wall_label(label), label)
+    for label in ["car", "person", "curb", "bordure", "sidewalk", "trottoir",
+                  "door", "porte", "stairs", "escalier", "zebra", "", "   ",
+                  None, 42]:
+        check(f"murs: pas un mur ({label!r})",
+              not guard.is_wall_label(label), repr(label))
+
+
+def _stairs_walls_guard(guard, seg, check) -> None:
+    """Volée et mur évincés gardés ; tri pur sans famille ou sans place."""
+    import numpy as np
+
+    mask = np.zeros((8, 8), dtype=np.uint8)
+    mask[2:6, 2:6] = 1
+
+    def crowded(extra) -> list:
+        entries = [{"label": f"car{index}", "score": 0.9 - 0.05 * index,
+                    "box": [0.0, 0.0, 8.0, 8.0], "mask": mask} for index in range(5)]
+        for label, score in extra:
+            entries.append({"label": label, "score": score,
+                            "box": [1.0, 1.0, 4.0, 4.0], "mask": mask})
+        return entries
+
+    kept = guard.finalize_guarded(
+        seg.finalize, crowded([("escalier", 0.12)]), (16, 16), 3, "none")
+    check("escaliers: garde réserve la dernière place à la volée",
+          [item["label"] for item in kept["objects"]] == ["car0", "car1", "escalier"],
+          str([item["label"] for item in kept["objects"]]))
+    kept = guard.finalize_guarded(
+        seg.finalize, crowded([("mur", 0.12)]), (16, 16), 3, "none")
+    check("murs: garde réserve la dernière place au mur",
+          [item["label"] for item in kept["objects"]] == ["car0", "car1", "mur"],
+          str([item["label"] for item in kept["objects"]]))
+    slam = guard.finalize_guarded(
+        seg.finalize, crowded([("stairs", 0.12), ("wall", 0.10)]), (16, 16), 4, "none")
+    labels = [item["label"] for item in slam["objects"]]
+    check("escaliers+murs: slam garde les deux familles",
+          "stairs" in labels and "wall" in labels, str(labels))
+    direct = seg.finalize(crowded([]), (16, 16), 3, "none")
+    guarded = guard.finalize_guarded(seg.finalize, crowded([]), (16, 16), 3, "none")
+    check("escaliers+murs: familles absentes -> finalize pur identique",
+          [item["label"] for item in guarded["objects"]]
+          == [item["label"] for item in direct["objects"]],
+          str([item["label"] for item in guarded["objects"]]))
+    tiny = guard.finalize_guarded(
+        seg.finalize, crowded([("escalier", 0.12), ("mur", 0.10)]), (16, 16), 2, "none")
+    check("escaliers+murs: max_objects=2 pour 2 familles -> tri pur",
+          [item["label"] for item in tiny["objects"]] == ["car0", "car1"],
+          str([item["label"] for item in tiny["objects"]]))
+
+
 def test_feux_guard(_) -> None:
     """Garde feux : point d'entrée unique (un seul slot RUNNERS, harnais à 497 l)."""
     from test_units import check
@@ -286,5 +356,7 @@ def test_feux_guard(_) -> None:
     _finalize(guard, _live_fast_module("segmentation"), check)
     _curb(guard, _live_fast_module("segmentation"), check)
     _crowd(guard, _live_fast_module("segmentation"), check)
+    _stairs_walls_labels(guard, check)
+    _stairs_walls_guard(guard, _live_fast_module("segmentation"), check)
     _payload_wiring(check)
     _service_wiring(check)

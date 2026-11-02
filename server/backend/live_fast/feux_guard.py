@@ -1,6 +1,6 @@
 """Garde serveur des feux FR et du passage piéton : petits objets jamais évincés.
 
-Cinq gardes, sans GPU ni poids (testées par ``scripts/tests_units/``) :
+Sept gardes, sans GPU ni poids (testées par ``scripts/tests_units/``) :
 
 * **anti-éviction** — :func:`finalize_guarded` enveloppe ``segmentation.finalize`` :
   si des objets « feu » ou « passage piéton » sont détectés mais qu'aucun n'entre
@@ -19,6 +19,13 @@ Cinq gardes, sans GPU ni poids (testées par ``scripts/tests_units/``) :
   table ``concepts`` laisse passer telles quelles (« zebra crossing », « zebra »,
   « bandes »…) pour l'anti-éviction — sans toucher au routage modèle (le CLIP
   reçoit les prompts inchangés, seule la réserve s'élargit) ;
+* **famille escalier** — :func:`is_stairs_label` reconnaît la volée
+  (« stairs », « staircase », « escalier », « marche » + variantes FR/EN,
+  mot à mot comme le client) pour la même réserve : la volée ne se fait
+  plus évincer par les gros objets en scène chargée ;
+* **famille mur** — :func:`is_wall_label` reconnaît le mur et le muret
+  (« wall », « mur », « muret » + pluriels) pour la même réserve : le mur
+  garde pastille et voix (le voile reste transparent, cf. ``VeilPolicy``) ;
 * **cohérence work_edge** — :func:`coherent_work_edge` ramène le ``work_edge``
   déclaré au plus grand côté de l'image reçue (le resize n'agrandit jamais, donc
   c'est la taille réellement appliquée) et loggue l'écart.
@@ -84,6 +91,35 @@ CROSSWALK_ROUTED = {
     "bandes blanches": "crosswalk",
 }
 
+# Concept « escalier » côté modèle (la table ``concepts`` y mène déjà
+# « escalier(s) » ; « marche » y donne « step », sens bordure — voir
+# ``STAIRS_ROUTED``).
+STAIRS_CONCEPTS = frozenset({"stairs", "stair", "staircase"})
+
+# Variantes brutes reconnues pour la réserve (tri serveur seul). Miroir de
+# ``StairConcepts.STAIRS`` côté client : les 11 formes (EN + FR).
+# « step » recouvre le « step » EN (bordure) autant que la « marche » FR
+# (la table les confond en « step ») : chevauchement assumé — le bucket
+# curb passe d'abord (cf. ``_split_guarded``), la réserve reste d'une
+# place par famille réellement manquante.
+STAIRS_ROUTED = {
+    "staircases": "staircase",
+    "steps": "stairs",
+    "step": "stairs",
+    "upstairs": "stairs",
+    "downstairs": "stairs",
+}
+
+# Concept « mur » côté modèle (la table ``concepts`` y mène déjà
+# « mur(s) » et « muret(s) »).
+WALL_CONCEPTS = frozenset({"wall"})
+
+# Variantes brutes reconnues pour la réserve (tri serveur seul). Miroir du
+# sous-ensemble mur de ``VeilPolicy.BACKGROUND`` côté client.
+WALL_ROUTED = {
+    "walls": "wall",
+}
+
 
 def routed_concept(prompt: str) -> str:
     """Concept modèle d'un prompt, variantes EN « pedestrian light/signal » routées.
@@ -128,6 +164,42 @@ def is_crosswalk_label(label: object) -> bool:
     return CROSSWALK_ROUTED.get(norm, norm) in CROSSWALK_CONCEPTS
 
 
+def _stairs_word(word: str) -> bool:
+    """Mot seul reconnu comme escalier (repli multi-mots, cf. [is_stairs_label])."""
+    concept = model_concept(word)
+    return STAIRS_ROUTED.get(concept, concept) in STAIRS_CONCEPTS
+
+
+def is_stairs_label(label: object) -> bool:
+    """Vrai si [label] désigne un escalier (FR/EN, casse/accents tolérés).
+
+    Miroir de ``StairConcepts`` côté client : les 11 formes (« stair(s) »,
+    « staircase(s) », « steps », « upstairs », « downstairs », « escalier(s) »,
+    « marche(s) ») via la table ``concepts`` + ``STAIRS_ROUTED`` — et, comme
+    le client, mot à mot : « stairs going up » et « escalier descendant »
+    (le sens vient des mots du libellé) restent gardés.
+    """
+    if not isinstance(label, str) or not label.strip():
+        return False
+    norm = model_concept(label)
+    if STAIRS_ROUTED.get(norm, norm) in STAIRS_CONCEPTS:
+        return True
+    return any(_stairs_word(word) for word in norm.split(" ") if word)
+
+
+def is_wall_label(label: object) -> bool:
+    """Vrai si [label] désigne un mur ou un muret (FR/EN, casse/accents tolérés).
+
+    Miroir du sous-ensemble mur de ``VeilPolicy.BACKGROUND`` côté client
+    (« wall(s) », « mur(s) », « muret(s) ») : le mur gardé survit au tri au
+    score — pastille et voix côté app (le voile reste transparent).
+    """
+    if not isinstance(label, str) or not label.strip():
+        return False
+    norm = model_concept(label)
+    return WALL_ROUTED.get(norm, norm) in WALL_CONCEPTS
+
+
 def coherent_work_edge(work: int, image_size) -> int:
     """``work_edge`` déclaré ramené au plus grand côté reçu ; log si incohérent.
 
@@ -148,8 +220,8 @@ def coherent_work_edge(work: int, image_size) -> int:
 
 
 def _split_guarded(entries):
-    """Entrées partagées en (autres, feux, passages, bordures), ordre stable."""
-    others, feu, walk, curb = [], [], [], []
+    """Entrées partagées en (autres, feux, passages, bordures, escaliers, murs)."""
+    others, feu, walk, curb, stairs, walls = [], [], [], [], [], []
     for entry in entries:
         label = entry.get("label")
         if is_feu_label(label):
@@ -158,9 +230,13 @@ def _split_guarded(entries):
             walk.append(entry)
         elif is_curb_label(label):
             curb.append(entry)
+        elif is_stairs_label(label):
+            stairs.append(entry)
+        elif is_wall_label(label):
+            walls.append(entry)
         else:
             others.append(entry)
-    return others, feu, walk, curb
+    return others, feu, walk, curb, stairs, walls
 
 
 def _top_keeps(entries: list[dict], max_objects: int, is_guarded) -> bool:
@@ -173,13 +249,13 @@ def finalize_guarded(finalize, entries: list[dict], image_size, max_objects: int
                      mask_encoding: str, mask_format=None, mask_edge: int = 0) -> dict:
     """``finalize`` + une place réservée par famille gardée qui serait évincée.
 
-    Une famille (feux, passages, bordures) absente des détections, déjà dans
-    le top, ou
-    ``max_objects`` trop petit pour réserver sans tout évincer (≤ une place par
-    famille manquante) : ``finalize`` pur, réponse strictement identique. Sinon
-    un appel par famille manquante (première place de chacune) plus les autres
-    sur le reste, fusionnés par score décroissant — mêmes masques, mêmes
-    ``mask_scale`` RLE, mêmes clés ``depth``.
+    Une famille (feux, passages, bordures, escaliers, murs) absente des
+    détections, déjà dans le top, ou ``max_objects`` trop petit pour réserver
+    sans tout évincer (≤ une place par famille manquante) : ``finalize`` pur,
+    réponse strictement identique. Sinon un appel par famille manquante
+    (première place de chacune) plus les autres sur le reste, fusionnés par
+    score décroissant — mêmes masques, mêmes ``mask_scale`` RLE, mêmes clés
+    ``depth``.
 
     Les familles **déjà** dans le top concourent normalement, dans le même pool
     que les autres objets : les exclure toutes avant de ne réserver qu'aux
@@ -187,8 +263,9 @@ def finalize_guarded(finalize, entries: list[dict], image_size, max_objects: int
     qu'un passage à 0,10 prenait sa place réservée — la garde évinçait
     précisément ce qu'elle protège (reel audit foule 01/11).
     """
-    others, feu, walk, curb = _split_guarded(entries)
-    families = ((feu, is_feu_label), (walk, is_crosswalk_label), (curb, is_curb_label))
+    others, feu, walk, curb, stairs, walls = _split_guarded(entries)
+    families = ((feu, is_feu_label), (walk, is_crosswalk_label), (curb, is_curb_label),
+                (stairs, is_stairs_label), (walls, is_wall_label))
     missing = [fam for fam, is_guarded in families
                if fam and not _top_keeps(entries, max_objects, is_guarded)]
     if not missing or max_objects <= len(missing):
