@@ -67,6 +67,7 @@ Gestes, tous câblés dans `MainActivity.buildRoot` :
 | appui long (300 ms, tolérance 24 px) | dictée micro maintenu + photo filmée jointe | `core/gesture/LongPressTrigger.kt:102,105`, `IseePhotoShot` |
 | balayage vers le haut | bascule du mode Traversée (marche/arrêt, comme la puce) | `IseeGestures.onSwipeUp` → `modeChips.toggleCrossing()` |
 | balayage vers le bas | active la fonction GPS : ordre « active le GPS » (réglage persisté) + accusé parlé | `IseeGestures.onSwipeDown` → `IseeSwipeOrders.gpsOn()` |
+| balayage vers le bas + maintien (300 ms) | micro destination : l'endroit dicté part tel quel, guidage direct au relâchement | `IseeGestures.onSwipeHoldStart/End` → `IseeSwipeOrders.askDestination()/sendDestination()`, `core/gesture/SwipeHoldTrigger.kt` |
 | balayage vers la droite | iSee demande « Find what? », ouvre le micro, puis chasse `mode find my X` avec le mot entendu | `IseeGestures.onSwipeRight` → `IseeSwipeOrders.askToFind()` |
 | balayage vers la gauche | **reconnu mais sans effet** (une seule page, rien à feuilleter) | `core/gesture/IseeGestureBrain.kt` |
 
