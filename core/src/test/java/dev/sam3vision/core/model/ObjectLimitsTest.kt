@@ -37,15 +37,16 @@ class ObjectLimitsTest {
     }
 
     @Test
-    fun `deux slots gardes serveur, feu et passage`() {
-        assertEquals(2, ObjectLimits.GUARDED_SLOTS)
+    fun `cinq slots gardes serveur, feu passage bordure escalier mur`() {
+        assertEquals(5, ObjectLimits.GUARDED_SLOTS)
     }
 
     @Test
     fun `le plafond par defaut couvre la garde, pas les petits plafonds`() {
         assertTrue(ObjectLimits.keepsGuarded(ObjectLimits.DEFAULT_ON_SCREEN))
-        assertTrue(ObjectLimits.keepsGuarded(3))
-        assertFalse(ObjectLimits.keepsGuarded(2))
+        assertTrue(ObjectLimits.keepsGuarded(6))
+        assertFalse(ObjectLimits.keepsGuarded(5))
+        assertFalse(ObjectLimits.keepsGuarded(3))
         assertFalse(ObjectLimits.keepsGuarded(ObjectLimits.MIN_ON_SCREEN))
         assertTrue(ObjectLimits.keepsGuarded(99))
         assertFalse(ObjectLimits.keepsGuarded(0))

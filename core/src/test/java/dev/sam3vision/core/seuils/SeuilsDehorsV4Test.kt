@@ -35,7 +35,7 @@ import org.junit.Test
  *
  * Humains niveau 2 (< 10 m, phrase + cadran + distance, imminent ≤ 2 m =
  * mot immédiat), grillages/murs/barrières niveau 4 (< 6 m, 4 s), bordures
- * niveau 5 (< 6 m, 2 s), escaliers niveau 6 (jalons 4/2/1 + marches dites,
+ * niveau 5 (< 6 m, 2 s), escaliers niveau 6 (jalons 2/1/0,5 + marches dites,
  * 2 s), poteaux/mobilier/divers niveau 7 (< 6 m, 2 s), passages niveau 8
  * (< 6 m, annonce 1 fois par vue + alignement au changement + arrivée
  * 1 fois), trottoirs niveau 10 (inchangés), textes EN voitures (présence
@@ -288,20 +288,20 @@ class SeuilsDehorsV4Test {
     }
 
     @Test
-    fun `escalier jalons 4 2 1 traverses`() {
+    fun `escalier jalons 2 1 05 traverses`() {
         val watcher = StairWatcher()
         val signal = StairSignal(detected = true, confidence = 0.9f, lineCount = 5, roiTop = 0, roiBottom = 0)
-        watcher.onSignal(signal, 1_000L, En, StairDirection.Unknown, null, 5.0f)
-        watcher.onSignal(signal, 1_100L, En, StairDirection.Unknown, null, 5.0f)
-        watcher.onSignal(signal, 1_200L, En, StairDirection.Unknown, null, 3.5f)
-        watcher.onSignal(signal, 1_300L, En, StairDirection.Unknown, null, 3.5f)
-        assertEquals("Stairs ahead at 4 meters.", watcher.onSignal(signal, 1_400L, En, StairDirection.Unknown, null, 3.5f)!!.phrase)
-        watcher.onSignal(signal, 1_500L, En, StairDirection.Unknown, null, 1.8f)
-        watcher.onSignal(signal, 1_600L, En, StairDirection.Unknown, null, 1.8f)
-        assertEquals("Stairs ahead at 2 meters.", watcher.onSignal(signal, 1_700L, En, StairDirection.Unknown, null, 1.8f)!!.phrase)
-        watcher.onSignal(signal, 1_800L, En, StairDirection.Unknown, null, 0.9f)
-        watcher.onSignal(signal, 1_900L, En, StairDirection.Unknown, null, 0.9f)
-        assertEquals("Stairs ahead at 1 meter.", watcher.onSignal(signal, 2_000L, En, StairDirection.Unknown, null, 0.9f)!!.phrase)
+        watcher.onSignal(signal, 1_000L, En, StairDirection.Unknown, null, 2.6f)
+        watcher.onSignal(signal, 1_100L, En, StairDirection.Unknown, null, 2.6f)
+        watcher.onSignal(signal, 1_200L, En, StairDirection.Unknown, null, 1.8f)
+        watcher.onSignal(signal, 1_300L, En, StairDirection.Unknown, null, 1.8f)
+        assertEquals("Stairs 2 m.", watcher.onSignal(signal, 1_400L, En, StairDirection.Unknown, null, 1.8f)!!.phrase)
+        watcher.onSignal(signal, 1_500L, En, StairDirection.Unknown, null, 0.9f)
+        watcher.onSignal(signal, 1_600L, En, StairDirection.Unknown, null, 0.9f)
+        assertEquals("Stairs 1 m.", watcher.onSignal(signal, 1_700L, En, StairDirection.Unknown, null, 0.9f)!!.phrase)
+        watcher.onSignal(signal, 1_800L, En, StairDirection.Unknown, null, 0.4f)
+        watcher.onSignal(signal, 1_900L, En, StairDirection.Unknown, null, 0.4f)
+        assertEquals("Stairs 0.5 m.", watcher.onSignal(signal, 2_000L, En, StairDirection.Unknown, null, 0.4f)!!.phrase)
     }
 
     @Test

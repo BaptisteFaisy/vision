@@ -38,6 +38,14 @@ class DistanceTextTest {
     }
 
     @Test
+    fun `paliers courts voix FR, virgule decimale`() {
+        assertEquals("2 m", DistanceText.shortMeters(2f, SpeechLanguage.Fr))
+        assertEquals("1 m", DistanceText.shortMeters(1f, SpeechLanguage.Fr))
+        assertEquals("0,5 m", DistanceText.shortMeters(0.5f, SpeechLanguage.Fr))
+        assertEquals("1,5 m", DistanceText.shortMeters(1.5f, SpeechLanguage.Fr))
+    }
+
+    @Test
     fun `distance prononcee en francais`() {
         assertEquals("85 centimètres", DistanceText.spoken(0.85f, SpeechLanguage.Fr))
         assertEquals("1 centimètre", DistanceText.spoken(0.01f, SpeechLanguage.Fr))

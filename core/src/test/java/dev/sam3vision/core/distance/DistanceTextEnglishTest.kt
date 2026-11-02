@@ -25,6 +25,14 @@ class DistanceTextEnglishTest {
     }
 
     @Test
+    fun `paliers courts voix EN, point decimal`() {
+        assertEquals("2 m", DistanceText.shortMeters(2f, SpeechLanguage.En))
+        assertEquals("1 m", DistanceText.shortMeters(1f, SpeechLanguage.En))
+        assertEquals("0.5 m", DistanceText.shortMeters(0.5f, SpeechLanguage.En))
+        assertEquals("1.5 m", DistanceText.shortMeters(1.5f, SpeechLanguage.En))
+    }
+
+    @Test
     fun `metres entiers au-dela de dix metres`() {
         assertEquals("12 meters", DistanceText.spoken(12.4f, SpeechLanguage.En))
         assertEquals("23 meters", DistanceText.spoken(23.4f, SpeechLanguage.En))

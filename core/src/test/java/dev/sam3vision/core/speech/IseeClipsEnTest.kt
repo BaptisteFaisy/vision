@@ -114,15 +114,15 @@ class IseeClipsEnTest {
     }
 
     @Test
-    fun `jalons escaliers 4 2 1 dans les deux sens`() {
-        assertEquals(IseeClipsEn.STAIRS_UP_4, IseeClipsEn.stairsUp(4))
-        assertEquals(IseeClipsEn.STAIRS_UP_2, IseeClipsEn.stairsUp(2))
-        assertEquals(IseeClipsEn.STAIRS_UP_1, IseeClipsEn.stairsUp(1))
-        assertEquals(IseeClipsEn.STAIRS_DOWN_4, IseeClipsEn.stairsDown(4))
-        assertEquals(IseeClipsEn.STAIRS_DOWN_2, IseeClipsEn.stairsDown(2))
-        assertEquals(IseeClipsEn.STAIRS_DOWN_1, IseeClipsEn.stairsDown(1))
-        assertNull(IseeClipsEn.stairsUp(3))
-        assertNull(IseeClipsEn.stairsDown(0))
+    fun `jalons escaliers 2 1 05 sans sens`() {
+        assertEquals(IseeClipsEn.STAIRS_2M, IseeClipsEn.stairsMilestone(2f))
+        assertEquals(IseeClipsEn.STAIRS_1M, IseeClipsEn.stairsMilestone(1f))
+        assertEquals(IseeClipsEn.STAIRS_HALF_M, IseeClipsEn.stairsMilestone(0.5f))
+        assertNull(IseeClipsEn.stairsMilestone(4f))
+        assertNull(IseeClipsEn.stairsMilestone(3f))
+        assertEquals("Stairs, 2 meters.", IseeClipsEn.all[IseeClipsEn.STAIRS_2M])
+        assertEquals("Stairs, 1 meter.", IseeClipsEn.all[IseeClipsEn.STAIRS_1M])
+        assertEquals("Stairs, half a meter.", IseeClipsEn.all[IseeClipsEn.STAIRS_HALF_M])
         assertEquals("Steps.", IseeClipsEn.all[IseeClipsEn.STAIRS_STEPS])
     }
 
@@ -187,7 +187,9 @@ class IseeClipsEnTest {
         assertEquals(IseeClipsEn.TL_STRAIGHT, IseeClipsEn.idForText("straight ahead."))
         assertEquals(IseeClipsEn.TL_STOP, IseeClipsEn.idForText("obstacle, stop."))
         assertNull(IseeClipsEn.idForText("Trottoir à gauche."))
-        assertNull(IseeClipsEn.idForText("Stairs up at 4 meters."))
+        assertEquals(IseeClipsEn.STAIRS_2M, IseeClipsEn.idForText("Stairs, 2 meters."))
+        // Phrase producteur (« Stairs 2 m. », résolue par StairClips), pas texte catalogue.
+        assertNull(IseeClipsEn.idForText("Stairs 2 m."))
         assertNull(IseeClipsEn.idForText(""))
     }
 
