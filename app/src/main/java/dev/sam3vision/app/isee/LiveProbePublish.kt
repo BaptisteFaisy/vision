@@ -116,6 +116,7 @@ internal fun LiveProbe.computeRest(
     val phrase = phraseOf(placed, readings, frame, at, speechLanguage,
         distances.lensSpec.widthFovDeg(frame.width, frame.height))
     feedCrossingLateral(_state.value.crossingActive, frame.objects, frame.width, frame.height, readings, distances.effectivePose(), distances.lensSpec, at, speechLanguage)
+    feedCrosswalkLost(_state.value.crossingActive, frame.objects, at, speechLanguage)
     pulse.feed(at, voice.lastDecision, placed)
     // Compteur de marches : le masque exact borne les frames suivantes (repli boîte sinon).
     StairCannyCount.setMaskPlane(stairsMaskPlaneOf(frame.objects, frame.width, frame.height, grays))
