@@ -10,15 +10,15 @@ package dev.sam3vision.core.live
  * concept anglais) : chaque famille est donc listée dans les deux langues,
  * miroir des alias serveur (`mur`, `murs`, `muret`, `murets` → `wall`).
  * Sans elles, le mur tapé en français voilait encore la rue en deux (01/11).
- * Le sol plein-champ dehors (trottoir, bordure, passage piéton) coupait la
- * rue du même trait horizontal persistant (02/11) : même remède.
+ * Le sol plein-champ dehors (trottoir, passage piéton) coupait la rue du
+ * même trait horizontal persistant (02/11) : même remède. La bordure, elle,
+ * voile : détectée, elle reste visible à la caméra (ordre user du 02/11).
  */
 object VeilPolicy {
 
     /** Labels de décor : suivis comme les autres, jamais voilés. */
     private val BACKGROUND = setOf(
         "wall", "walls", "mur", "murs", "muret", "murets",
-        "curb", "curbs", "bordure", "bordures",
         "sidewalk", "sidewalks", "trottoir", "trottoirs",
         "crosswalk", "crosswalks",
         "passage piéton", "passages piétons", "passage pieton", "passages pietons",
