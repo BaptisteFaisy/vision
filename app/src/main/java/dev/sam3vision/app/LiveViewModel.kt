@@ -213,11 +213,7 @@ class LiveViewModel(app: Application) : AndroidViewModel(app) {
         wake.arm().also { viewModelScope.launch { GpuWake.wake(base) } }
     }
 
-    /**
-     * Session courante refermée avant d'être oubliée : un `start()` répété
-     * (reprise, bascule SAM/tracker) écrasait le client sans `close()`, laissant
-     * le vieux socket parallèle jusqu'au idle serveur (45 s).
-     */
+    /** Session refermée avant d'être oubliée (sinon vieux socket parallèle 45 s). */
     private fun closeCurrentSession() {
         session?.close()
         session = null
