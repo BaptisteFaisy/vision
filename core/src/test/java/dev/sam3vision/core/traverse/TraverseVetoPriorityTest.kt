@@ -11,11 +11,13 @@ import org.junit.Assert.assertTrue
 import org.junit.Test
 
 /**
- * Le veto prime sur le vert : compléments à [TraverseVetoTest].
+ * Le veto force l'attente hors vert ; sur vert, le vert gagne (ordre user du
+ * 02/11) : compléments à [TraverseVetoTest].
  *
  * Verrouille le mot d'ordre exact (« attendez », jamais « prêt » ni
- * « traversez » sous veto), la projection veto→rouge vue par l'annonceur,
- * la chaîne veto→phrase « Don't cross yet » et les littéraux FR préchauffés.
+ * « traversez » sous veto), l'ALERTE au flip vert-rouge avec trafic, la
+ * projection veto→rouge vue par l'annonceur, la chaîne veto→phrase
+ * « Don't cross yet » et les littéraux FR préchauffés.
  *
  * Logique de [TraverseVeto] lue telle quelle (SCORE_MIN 0,35 strict, approche
  * confirmée, ALERTE puis reconfirmation) : ce fichier la vérifie, il ne la change pas.
@@ -31,10 +33,10 @@ class TraverseVetoPriorityTest {
         Detection(label, score, box, width = 640, height = 480)
 
     @Test
-    fun `veto plus vert donne attendez - mot d ordre exact`() {
+    fun `veto plus rouge donne attendez - mot d ordre exact`() {
         val veto = TraverseVeto()
         veto.update(false, listOf(detection("car", 0.9f, smallBox)), focalPx)
-        val decision = veto.update(true, listOf(detection("car", 0.9f, nearBox)), focalPx)
+        val decision = veto.update(false, listOf(detection("car", 0.9f, nearBox)), focalPx)
         assertTrue(decision.veto)
         assertEquals(TraversePhase.ATTENDRE, decision.state)
         assertEquals("wait", decision.cue)
@@ -43,23 +45,22 @@ class TraverseVetoPriorityTest {
     }
 
     @Test
-    fun `veto prime sur vert prepare - PRET puis ALERTE`() {
+    fun `flip vert-rouge sur PRET - ALERTE`() {
         val veto = TraverseVeto()
         assertEquals(TraversePhase.PRET, veto.update(true, listOf(detection("car", 0.9f, smallBox)), focalPx).state)
-        val alert = veto.update(true, listOf(detection("car", 0.9f, nearBox)), focalPx)
+        val alert = veto.update(false, listOf(detection("car", 0.9f, nearBox)), focalPx)
         assertEquals(TraversePhase.ALERTE, alert.state)
         assertEquals("wait", alert.cue)
         assertTrue(alert.veto)
     }
 
     @Test
-    fun `veto prime sur traversee - ALERTE puis reconfirmation PRET`() {
+    fun `flip vert-rouge en traversee - ALERTE puis reconfirmation`() {
         val veto = TraverseVeto()
         veto.update(true, emptyList(), focalPx)
         veto.update(true, emptyList(), focalPx)
         assertEquals(TraversePhase.TRAVERSER, veto.currentState)
-        veto.update(true, listOf(detection("car", 0.8f, smallBox)), focalPx)
-        val alert = veto.update(true, listOf(detection("car", 0.8f, nearBox)), focalPx)
+        val alert = veto.update(false, listOf(detection("car", 0.8f, nearBox)), focalPx)
         assertEquals(TraversePhase.ALERTE, alert.state)
         assertEquals("wait", alert.cue)
         assertEquals(TraversePhase.PRET, veto.update(true, emptyList(), focalPx).state)
@@ -91,15 +92,15 @@ class TraverseVetoPriorityTest {
     @Test
     fun `score limite - 0_35 ignore, 0_36 bloque`() {
         val weak = TraverseVeto()
-        weak.update(true, listOf(detection("car", 0.35f, smallBox)), focalPx)
-        val ignored = weak.update(true, listOf(detection("car", 0.35f, nearBox)), focalPx)
+        weak.update(false, listOf(detection("car", 0.35f, smallBox)), focalPx)
+        val ignored = weak.update(false, listOf(detection("car", 0.35f, nearBox)), focalPx)
         assertFalse(ignored.veto)
-        assertEquals(TraversePhase.TRAVERSER, ignored.state)
+        assertEquals(TraversePhase.ATTENDRE, ignored.state)
         val strong = TraverseVeto()
-        strong.update(true, listOf(detection("car", 0.36f, smallBox)), focalPx)
-        val blocked = strong.update(true, listOf(detection("car", 0.36f, nearBox)), focalPx)
+        strong.update(false, listOf(detection("car", 0.36f, smallBox)), focalPx)
+        val blocked = strong.update(false, listOf(detection("car", 0.36f, nearBox)), focalPx)
         assertTrue(blocked.veto)
-        assertEquals(TraversePhase.ALERTE, blocked.state)
+        assertEquals(TraversePhase.ATTENDRE, blocked.state)
         assertEquals("wait", blocked.cue)
     }
 
@@ -120,16 +121,16 @@ class TraverseVetoPriorityTest {
     }
 
     @Test
-    fun `veto plus vert parle rouge en chaine jusqu a la voix`() {
+    fun `flip vert-rouge parle rouge en chaine jusqu a la voix`() {
         val veto = TraverseVeto()
         val announcer = CrossingAnnouncer()
         val first = veto.update(true, listOf(detection("car", 0.9f, smallBox)), focalPx)
         assertEquals(CrossingState.Green, first.crossingState())
         assertEquals("You can cross", announcer.onFrame(0L, first.crossingState())?.phrase)
-        val second = veto.update(true, listOf(detection("car", 0.9f, nearBox)), focalPx)
+        val second = veto.update(false, listOf(detection("car", 0.9f, nearBox)), focalPx)
         assertEquals(CrossingState.Red, second.crossingState())
         assertNull("rouge pas encore confirmé", announcer.onFrame(200L, second.crossingState()))
-        val third = veto.update(true, listOf(detection("car", 0.9f, listOf(0f, 0f, 220f, 220f))), focalPx)
+        val third = veto.update(false, listOf(detection("car", 0.9f, listOf(0f, 0f, 220f, 220f))), focalPx)
         val cue = announcer.onFrame(400L, third.crossingState())
         assertEquals("Don't cross yet", cue?.phrase)
         assertTrue("retour au rouge après vert : urgent", cue?.urgent ?: false)

@@ -21,9 +21,9 @@ class CrossingVerdictTest {
     }
 
     @Test
-    fun `le vert tranche aux voitures`() {
+    fun `le vert dit cross, voitures ou pas`() {
         assertEquals(
-            CrossingVerdict.DontCross,
+            CrossingVerdict.Cross,
             CrossingVerdictRule.decide(CrossingVerdictLight.Green, carMoving = true),
         )
         assertEquals(

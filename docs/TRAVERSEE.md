@@ -12,8 +12,10 @@
 Règle, dans cet ordre :
 
 1. **Feu piéton rouge = « Don't cross. »**, quoi que fassent les voitures.
-2. **Feu vert ou absent** : une voiture en mouvement ? **« Don't cross. »**
-   : **« Cross. »**.
+2. **Feu vert confirmé = « Cross. »**, même avec des voitures en mouvement
+   (ordre user du 02/11/2026) ; **sans feu** : une voiture en mouvement ?
+   **« Don't cross. »** : **« Cross. »** (le premier sans feu exige 3 s de
+   calme, voir plus bas).
 3. **Véhicules = voiture uniquement** (`car`, `cars`, `voiture`,
    `voitures`) : bus, vélo, camion, moto ne tranchent jamais.
 
@@ -103,8 +105,9 @@ venait de passer libérait le verdict aussitôt.
   phrase véhicules sur calme (« à l'arrêt ») recule le délai sans la
   rouvrir. « Attendez. » inchangé (2 frames, coupe le délai après un
   « Traversez. », redit toutes les 2 s comme le verdict) ;
-- **avec feu** : inchangé — le vert confirmé + veto trafic décide, cette
-  règle ne couvre que la branche sans-feu ;
+- **avec feu** : le vert confirmé décide seul (« Cross. » même avec des
+  voitures en mouvement) ; hors vert, le veto trafic s'applique comme
+  avant — cette règle ne couvre que la branche sans-feu ;
 - **preuves** : `NoLightCrossingTest` :core (silence avant 3 s, fenêtre
   rouverte par un danger, phrase calme qui ne rouvre pas). Le câblage
   :app (`NoLightCrossingVoice`, supprimé par la v4) n'est plus testé.

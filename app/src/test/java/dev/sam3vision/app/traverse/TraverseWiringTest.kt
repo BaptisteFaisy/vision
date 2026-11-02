@@ -193,6 +193,23 @@ class TraverseWiringTest {
     }
 
     @Test
+    fun `vert maintenu avec voiture qui approche - Vert parle quand meme`() = runBlocking {
+        // Ordre user du 02/11 : le vert gagne sur le trafic, même en approche.
+        // Boîtes croissantes (sinon l'arrêt prouvé exempt dès la 3e frame et
+        // le test ne verrouille rien).
+        val tts = FakeTts()
+        val wiring = voicedWiring(tts)
+        wiring.updateLight(CrossingState.Green)
+        listOf(100f, 120f, 140f, 160f, 180f).forEachIndexed { i, w ->
+            val h = w * 0.6f
+            val box = listOf(320f - w / 2f, 240f - h / 2f, 320f + w / 2f, 240f + h / 2f)
+            wiring.at(listOf(SegObject("car", 0.9f, box, "")), i + 1)
+        }
+
+        assertEquals(listOf("Vert.", "Vert.", "Vert."), tts.asked)
+    }
+
+    @Test
     fun `sans vert - traversez jamais parle`() = runBlocking {
         val tts = FakeTts()
         val wiring = voicedWiring(tts)

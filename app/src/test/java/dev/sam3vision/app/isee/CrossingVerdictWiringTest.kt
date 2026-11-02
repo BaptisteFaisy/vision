@@ -69,7 +69,7 @@ class CrossingVerdictWiringTest {
     }
 
     @Test
-    fun `une voiture qui approche sur vert fait attendre aussitot`() {
+    fun `une voiture qui approche sur vert laisse traverser quand meme`() {
         val green = CrossingLight(listOf(0.1f, 0.1f, 0.2f, 0.3f), CrossingState.Green)
         val engine = engine(green)
         val first = engine.onFrame(frame(car(box = listOf(100f, 100f, 200f, 200f))), emptyList(), "", 0L)
@@ -78,9 +78,10 @@ class CrossingVerdictWiringTest {
             frame(car(box = listOf(50f, 50f, 300f, 300f))), emptyList(), "", 200L,
         )
         assertTrue(second.carMoving)
-        assertEquals(CrossingVerdict.DontCross, second.verdict)
-        assertEquals("Don't cross.", second.posts.single().text)
-        assertEquals(CrossingState.Red, second.haptic)
+        assertEquals(CrossingVerdict.Cross, second.verdict)
+        assertTrue("verdict maintenu : silence", second.posts.isEmpty())
+        assertNull(second.haptic)
+        assertEquals(CrossingState.Green, second.overlay)
     }
 
     @Test

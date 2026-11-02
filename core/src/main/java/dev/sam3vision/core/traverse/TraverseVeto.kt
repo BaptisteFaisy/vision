@@ -78,7 +78,7 @@ data class TraverseDecision(
     val state: TraversePhase,
     /** Mot d'ordre (« wait », « ready », « cross ») — la voix l'habille. */
     val cue: String,
-    /** Vrai quand un véhicule force l'attente malgré un vert éventuel. */
+    /** Vrai quand un véhicule force l'attente (hors vert : le vert gagne toujours). */
     val veto: Boolean,
     /** Libellé du véhicule bloquant, `null` sans veto. */
     val blockingLabel: String?,
@@ -95,10 +95,14 @@ data class TraverseDecision(
 )
 
 /**
- * Veto trafic de la traversée : un véhicule qui approche ou qui est proche force
- * « attendez », même sur vert confirmé.
+ * Veto trafic de la traversée, actif hors vert : sans vert confirmé, un
+ * véhicule qui approche ou qui est proche force « attendez ». Sur vert
+ * confirmé, le vert gagne toujours (ordre user du 02/11) — le suivi
+ * continue (instantané + pistes tenues chaudes) pour trancher dès le flip
+ * rouge, et le guidage obstacles reste actif devant un objet proche.
  *
- * Un véhicule bloque quand son score dépasse [SCORE_MIN] **et** qu'il approche
+ * Un véhicule bloque (hors vert) quand son score dépasse [SCORE_MIN] **et**
+ * qu'il approche
  * (surface de boîte croissante sur deux frames) **ou** qu'il est proche (distance
  * sténopé sous [VETO_METERS]). L'approche se lit sur les boîtes seules — sans
  * focale, elle reste le seul critère ; la distance réutilise [KnownSizes] (déjà
@@ -146,7 +150,8 @@ class TraverseVeto {
     }
 
     /**
-     * Décision pour une frame. [lightGreen] dit si le vert est confirmé,
+     * Décision pour une frame. [lightGreen] dit si le vert est confirmé
+     * (sur vert, pas de veto : le vert gagne toujours, suivi tenu chaud),
      * [detections] porte les boîtes SAM, [focalPx] la focale en pixels de l'image
      * analysée (≤ 0 : distance indisponible, seule l'approche compte), [atMs]
      * la date de la frame (< 0 : suivi temporel désactivé, veto instantané seul).
@@ -169,14 +174,17 @@ class TraverseVeto {
         previousAreas = vehicleAreas(detections)
         previousStill = stillMemoryOf(detections, focalPx, atMs)
         val tracked = approachVerdict(detections, atMs, motion, depthByBox)
-        val veto = blocking != null || tracked.approaching
+        // Vert confirmé : le vert gagne toujours (ordre user du 02/11). Le
+        // suivi (instantané + pistes) tourne quand même, tenu chaud pour
+        // trancher dès le flip rouge ; seule la sortie veto est tue.
+        val veto = (blocking != null || tracked.approaching) && !lightGreen
         currentState = nextState(lightGreen, veto)
         return TraverseDecision(
             state = currentState,
             cue = cueOf(currentState),
             veto = veto,
-            blockingLabel = blocking?.label,
-            blockingMeters = blocking?.meters,
+            blockingLabel = blocking?.label.takeIf { veto },
+            blockingMeters = blocking?.meters.takeIf { veto },
             approachTtcSeconds = tracked.ttcSeconds,
             keepObstacleGuidance = hasNearObject(detections, focalPx),
         )
@@ -324,7 +332,7 @@ class TraverseVeto {
             if (meters != null) meters < VETO_METERS else VehicleConcepts.isVehicle(detection.label)
         }
 
-    /** Transition : le veto prime sur le vert, l'alerte exige une reconfirmation. */
+    /** Transition : hors vert, le veto prime ; l'alerte exige une reconfirmation. */
     private fun nextState(lightGreen: Boolean, veto: Boolean): TraversePhase = when {
         veto && (currentState == TraversePhase.PRET || currentState == TraversePhase.TRAVERSER) ->
             TraversePhase.ALERTE
