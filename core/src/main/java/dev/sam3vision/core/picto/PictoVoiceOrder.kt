@@ -88,21 +88,6 @@ object PictoVoiceText {
         SpeechLanguage.En -> if (active) "Picto demo on." else "Picto demo off."
     }
 
-    /**
-     * La question du balayage vers la droite : iSee demande l'objet à chercher
-     * avant d'ouvrir le micro (`IseeSwipeOrders`).
-     */
-    fun askWhatToFind(language: SpeechLanguage = SpeechLanguage.DEFAULT): String = when (language) {
-        SpeechLanguage.Fr -> "Quoi chercher ?"
-        SpeechLanguage.En -> "What are you looking for?"
-    }
-
-    /** Rien n'a été entendu à cette question : le dire, ne rien chercher. */
-    fun nothingHeard(language: SpeechLanguage = SpeechLanguage.DEFAULT): String = when (language) {
-        SpeechLanguage.Fr -> "Je n'ai rien entendu."
-        SpeechLanguage.En -> "I didn't hear anything."
-    }
-
     /** L'ordre « mode find my X » part : SAM suit X, son pictogramme se crée. */
     fun findStarted(label: String, language: SpeechLanguage = SpeechLanguage.Fr): String = when (language) {
         SpeechLanguage.Fr -> "Cherche $label."

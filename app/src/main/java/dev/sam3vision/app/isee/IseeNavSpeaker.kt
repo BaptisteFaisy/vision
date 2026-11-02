@@ -27,6 +27,14 @@ internal class IseeNavSpeaker(
         clipPlayer.speak(clipId, urgent = false)
     }
 
+    /**
+     * Clip du pack, **attendu jusqu'à sa fin** : la question du balayage vers
+     * la droite s'ouvre au micro juste après, elle ne doit pas s'y enregistrer.
+     * `false` = clip inconnu ou manquant (silence, l'appelant continue).
+     */
+    suspend fun speakClipAndWait(clipId: String): Boolean =
+        clipPlayer.speakSequence(listOf(clipId), urgent = false)
+
     /** Voix réseau iSee : noms GPS dynamiques seuls (exception ElevenLabs). */
     suspend fun speakNetwork(text: String): Unit {
         val audio = voice.synthesize(text)

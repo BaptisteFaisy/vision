@@ -15,15 +15,15 @@ import org.junit.Test
 class IseeClipsEnTest {
 
     @Test
-    fun `le registre couvre les 99 nouveaux clips et les 19 réutilisés`() {
-        assertEquals(118, IseeClipsEn.all.size)
+    fun `le registre couvre les 104 nouveaux clips et les 19 réutilisés`() {
+        assertEquals(123, IseeClipsEn.all.size)
     }
 
     @Test
     fun `chaque entrée du catalogue JSON est dans le registre au caractère près`() {
         val catalog = JSONObject(catalogFile().readText())
         val entries = catalog.getJSONArray("clips") + catalog.getJSONArray("reuse")
-        assertEquals(118, entries.size)
+        assertEquals(123, entries.size)
         for ((id, text) in entries) {
             assertEquals("clip $id", text, IseeClipsEn.all[id])
         }
@@ -49,6 +49,13 @@ class IseeClipsEnTest {
                 assertTrue("atome $id ponctué : $text", !text.endsWith("."))
             } else if (id == IseeClipsEn.CONNECTED || id == IseeClipsEn.WHERE_TO) {
                 assertTrue("système $id", text == "connected" || text == "Where to?")
+            } else if (id == IseeClipsEn.GPS_ENABLED || id == IseeClipsEn.GPS_DISABLED) {
+                // Textes du pack existant (reuse), non ponctués : on ne réécrit pas
+                // l'audio pour un point.
+                assertTrue("système $id", text == "GPS enabled" || text == "GPS disabled")
+            } else if (id == IseeClipsEn.FIND_ASK) {
+                // Question posée par le geste : elle se ponctue comme une question.
+                assertEquals("What are you looking for?", text)
             } else {
                 assertTrue("texte $id sans point : $text", text.endsWith("."))
             }

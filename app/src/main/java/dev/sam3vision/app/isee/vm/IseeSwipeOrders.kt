@@ -4,9 +4,8 @@ import dev.sam3vision.core.picto.FindAskPolicy
 import dev.sam3vision.core.picto.FindAskStep
 import dev.sam3vision.core.picto.FindLabelFromSpeech
 import dev.sam3vision.core.picto.PictoPlaceMode
-import dev.sam3vision.core.picto.PictoVoiceText
-import dev.sam3vision.app.speech.VoiceNavPhrases
 import dev.sam3vision.core.settings.Settings
+import dev.sam3vision.core.speech.IseeClipsEn
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
@@ -44,11 +43,10 @@ interface FindListening {
  * la question ([asking]) : l'appui long et le tap sont ignorés, sinon deux
  * gestes se disputeraient le même micro.
  *
- * La question et le « rien entendu » passent par la **synthèse réseau**
- * ([speak], `IseeNavSpeaker.speakNetwork`) : aucun clip du pack anglais ne
- * porte ces deux phrases, et l'accusé doit s'entendre avant que le micro ne
- * s'ouvre. Les figer en clips (`tools/gen-isee-clips-en.py`) les ramènerait
- * hors-ligne, comme le reste de la voix v4.
+ * Les deux phrases du geste et les accusés GPS sont des **clips du pack
+ * anglais** (`IseeClipsEn.FIND_ASK`, `FIND_NOTHING`, `GPS_ENABLED`…) : zéro
+ * synthèse réseau, la voix reste hors-ligne comme le reste de la v4. La
+ * question est jouée **jusqu'à sa fin** avant que le micro ne s'ouvre.
  */
 class IseeSwipeOrders(
     private val scope: CoroutineScope,
@@ -56,10 +54,10 @@ class IseeSwipeOrders(
     private val runGpsOrder: suspend (String) -> Boolean,
     private val dictation: FindListening,
     private val voiceDetected: () -> Boolean,
-    private val speaking: () -> Boolean,
     private val settings: () -> Settings,
     private val placeMode: () -> PictoPlaceMode,
-    private val speak: suspend (String) -> Unit,
+    /** Joue un clip du pack et attend sa fin (voir `IseeNavSpeaker.speakClipAndWait`). */
+    private val sayClip: suspend (String) -> Unit,
     private val update: StateUpdate,
     private val clock: () -> Long = System::currentTimeMillis,
 ) {
@@ -72,20 +70,13 @@ class IseeSwipeOrders(
     fun asking(): Boolean = listening
 
     /**
-     * Balayage vers le bas : « active le GPS », puis l'accusé **audible**.
-     *
-     * L'ordre vocal est le même chemin que la voix (réglage persisté) ; son
-     * accusé à lui est muet depuis la v4 (aucun clip ne porte « GPS enabled »,
-     * `IseeNavSpeaker.speakNavigation` se tait), donc le geste le dit par la
-     * synthèse réseau — un balayage qui ne répondrait rien serait un geste
-     * mort pour un utilisateur non-voyant. Ne lève jamais : la session GPS
-     * peut refuser, l'accusé est alors absent, pas l'erreur.
+     * Balayage vers le bas : « active le GPS », exactement l'ordre vocal —
+     * réglage `navigationGuidanceEnabled` persisté et accusé parlé, le clip
+     * `GPS_ENABLED` portant désormais le texte de l'ordre. Ne lève jamais : la
+     * session GPS peut refuser, l'accusé est alors absent, pas l'erreur.
      */
     fun gpsOn() {
-        scope.launch {
-            val handled = runCatching { runGpsOrder(GPS_ENABLE_ORDER) }.getOrDefault(false)
-            if (handled) runCatching { speak(VoiceNavPhrases.GPS_ENABLED) }
-        }
+        scope.launch { runCatching { runGpsOrder(GPS_ENABLE_ORDER) } }
     }
 
     /**
@@ -96,7 +87,7 @@ class IseeSwipeOrders(
     fun askToFind() {
         if (listening) return
         if (!placeMode().pictoEnabled) {
-            scope.launch { speak(PictoVoiceText.refused(settings().speechLanguage)) }
+            scope.launch { sayClip(IseeClipsEn.FIND_REFUSED) }
             return
         }
         listening = true
@@ -111,7 +102,7 @@ class IseeSwipeOrders(
 
     /** Question parlée (attendue jusqu'à sa fin), écoute, puis chasse du mot entendu. */
     private suspend fun askThenHunt() {
-        sayAndWait(PictoVoiceText.askWhatToFind(settings().speechLanguage))
+        sayClip(IseeClipsEn.FIND_ASK)
         // Le haut-parleur vient de se taire : un court silence évite de capter
         // sa traîne dans le micro qui s'ouvre.
         delay(ECHO_GUARD_MS)
@@ -140,9 +131,8 @@ class IseeSwipeOrders(
 
     /** Réponse vide : dit et affiché, aucun objet cherché. */
     private suspend fun nothingHeard(): String? {
-        val line = PictoVoiceText.nothingHeard(settings().speechLanguage)
-        update { it.copy(status = line) }
-        speak(line)
+        update { it.copy(status = IseeStatusText.NOTHING_HEARD) }
+        sayClip(IseeClipsEn.FIND_NOTHING)
         return null
     }
 
@@ -162,26 +152,12 @@ class IseeSwipeOrders(
         }
     }
 
-    /**
-     * Dit [text] et attend la **fin** de la lecture : la voix d'iSee ne doit pas
-     * entrer dans le micro qui s'ouvre juste après (elle dirait « Quoi
-     * chercher ? » deux fois, une fois en question, une fois en objet).
-     */
-    private suspend fun sayAndWait(text: String) {
-        speak(text)
-        val deadline = clock() + SPEECH_WAIT_MS
-        while (speaking() && clock() < deadline) delay(FindAskPolicy.POLL_MS)
-    }
-
     companion object {
         /** Forme dictée de l'ordre d'activation (parsée par `StopGuidanceParser`). */
         const val GPS_ENABLE_ORDER = "active le GPS"
 
         /** Préfixe de l'ordre de recherche : la forme canonique `mode find my X`. */
         const val FIND_PREFIX = "mode find my "
-
-        /** Plafond d'attente de la fin de la question (synthèse réseau comprise). */
-        const val SPEECH_WAIT_MS = 8_000L
 
         /** Silence après la question, avant l'ouverture du micro. */
         const val ECHO_GUARD_MS = 250L
