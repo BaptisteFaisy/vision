@@ -27,6 +27,16 @@ class GlassesStreamConfigTest {
     }
 
     @Test
+    fun `un lien sature replie en qualite moyenne`() {
+        assertEquals(0.05, GLASSES_MEDIUM_DROP_RATE, 0.0)
+        assertEquals(VideoQuality.HIGH, glassesVideoQuality(0.0))
+        assertEquals(VideoQuality.HIGH, glassesVideoQuality(0.05))
+        assertEquals(VideoQuality.MEDIUM, glassesVideoQuality(0.051))
+        assertEquals(VideoQuality.MEDIUM, glassesStreamConfiguration(null, dropRate = 0.2).videoQuality)
+        assertEquals(VideoQuality.HIGH, glassesStreamConfiguration(null, dropRate = 0.0).videoQuality)
+    }
+
+    @Test
     fun `le direct iSee demande 15 images par seconde`() {
         assertEquals(GLASSES_FRAME_RATE, glassesStreamConfiguration(null).frameRate)
         assertEquals(15, GLASSES_FRAME_RATE)
