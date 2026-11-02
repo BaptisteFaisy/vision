@@ -395,7 +395,7 @@ class GlassesLiveDecoder(
             MediaCodec.createDecoderByType(MediaFormat.MIMETYPE_VIDEO_HEVC).apply {
                 val format = MediaFormat.createVideoFormat(MediaFormat.MIMETYPE_VIDEO_HEVC, width, height)
                 effectiveCsd?.let { format.setByteBuffer("csd-0", ByteBuffer.wrap(it)) }
-                applyLowLatencyKeys(format)
+                applyDecoderLowLatencyKeys(format, OPERATING_RATE)
                 configure(format, target, null, 0)
                 start()
             }
@@ -406,21 +406,6 @@ class GlassesLiveDecoder(
         Log.i(TAG, "direct lunettes : décodeur H.265 ${width}×${height}")
         onVideoSize(width, height)
         return created
-    }
-
-    /**
-     * Clés basse latence du décodeur : pas de mise en file interne, cadence annoncée à
-     * l'opérateur, priorité temps réel, aucun B-frame à réordonner.
-     *
-     * Chaque clé est posée dans son propre `runCatching` : une clé inconnue de
-     * l'implémentation lève `IllegalArgumentException`, et sous un seul `runCatching`
-     * elle ferait échouer la création entière du codec (écran noir, sans erreur).
-     */
-    private fun applyLowLatencyKeys(format: MediaFormat) {
-        runCatching { format.setInteger(MediaFormat.KEY_LOW_LATENCY, 1) }
-        runCatching { format.setInteger(MediaFormat.KEY_OPERATING_RATE, OPERATING_RATE) }
-        runCatching { format.setInteger(MediaFormat.KEY_PRIORITY, 0) }
-        runCatching { format.setInteger(MediaFormat.KEY_MAX_B_FRAMES, 0) }
     }
 
     private fun dropCodecLocked() {
@@ -478,4 +463,19 @@ class GlassesLiveDecoder(
         const val LOG_EVERY_RENDERS = 300L
         const val NAL_SURVEY_FRAMES = 50L
     }
+}
+
+/**
+ * Clés basse latence d'un décodeur : pas de mise en file interne, cadence
+ * annoncée à l'opérateur, priorité temps réel, aucun B-frame à réordonner.
+ *
+ * Chaque clé est posée dans son propre `runCatching` : une clé inconnue de
+ * l'implémentation lève `IllegalArgumentException`, et sous un seul `runCatching`
+ * elle ferait échouer la création entière du codec (écran noir, sans erreur).
+ */
+internal fun applyDecoderLowLatencyKeys(format: MediaFormat, operatingRate: Int) {
+    runCatching { format.setInteger(MediaFormat.KEY_LOW_LATENCY, 1) }
+    runCatching { format.setInteger(MediaFormat.KEY_OPERATING_RATE, operatingRate) }
+    runCatching { format.setInteger(MediaFormat.KEY_PRIORITY, 0) }
+    runCatching { format.setInteger(MediaFormat.KEY_MAX_B_FRAMES, 0) }
 }
