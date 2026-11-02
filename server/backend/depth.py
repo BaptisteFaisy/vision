@@ -175,7 +175,7 @@ def attach_medians(norm, entries, image_size):
 
 
 def attach_frame_depth(ctx, image, entries: list, with_depth: bool, timers: dict):
-    """Étage profondeur de ``run_frame`` : médiane par entrée, sous le verrou GPU.
+    """Étage profondeur de ``run_frame`` : médiane par entrée (verrou selon l'appelant).
 
     Sans ``with_depth``, sans modèle chargé, ou sans entrée (DETR n'a rien
     trouvé : aucune médiane à mesurer) : les entrées repartent intactes, sans

@@ -188,19 +188,23 @@ def repeat_vision(vision, n: int):
 
 
 def _detections(model, processor, device, dtype, vision, concepts, work_size, timers,
-                graphs=None):
+                graphs=None, inputs=None, embeds=None):
     """UN forward pour les N concepts (batch=N) -> N détections post-traitées.
 
     ``graphs`` (cache `DetrGraphs`) est optionnel : sans lui, eager only. La capture et la
     vérification sont dans `detr_graph.py` ; ici on ne fait que présenter la passe.
+    ``inputs``/``embeds`` pré-calculés (hors verrou par ``run_frame``) : None = calcul
+    paresseux ici (bancs, passe-par-passe).
     """
     torch = _torch()
     from segmentation import MASK_THRESHOLD, SCORE_THRESHOLD
 
-    started = now()
-    inputs = tokenize_cached(processor, concepts, device)
-    add_ms(timers, "tokenize_ms", elapsed_ms(started))
-    embeds = repeat_vision(vision, len(concepts))
+    if inputs is None:
+        started = now()
+        inputs = tokenize_cached(processor, concepts, device)
+        add_ms(timers, "tokenize_ms", elapsed_ms(started))
+    if embeds is None:
+        embeds = repeat_vision(vision, len(concepts))
 
     def forward(static_embeds, static_inputs):
         with torch.inference_mode():
@@ -240,32 +244,73 @@ def _preprocess(ctx, image, work_edge: int):
     return work, ctx["processor"](images=work, return_tensors="pt")["pixel_values"]
 
 
+def _to_device(ctx, pixels):
+    """Montée H2D des ``pixel_values`` **hors verrou** (``non_blocking``).
+
+    Non-tenseur (doublure de banc, torch absent) : renvoyé tel quel — ``_vision``
+    le consomme comme avant, les bancs sans GPU ne voient rien changer.
+    """
+    try:
+        import torch
+
+        is_tensor = torch.is_tensor
+    except (ImportError, AttributeError):
+        return pixels
+    if not is_tensor(pixels):
+        return pixels
+    return pixels.to(device=ctx["device"], dtype=ctx["dtype"], non_blocking=True)
+
+
+def _pre_tokenize(ctx, concepts, batch: bool, timers: dict):
+    """Entrées texte du lot **hors verrou** ; None = paresseux sous verrou.
+
+    Lot seul (le passe-par-passe tokenize un concept par passe, textes différents).
+    Échec (préprocesseur factice des bancs) : None, ``_detections`` refera le même
+    appel sous verrou — comportement et erreur identiques, juste pas avancés.
+    """
+    if not batch:
+        return None
+    try:
+        started = now()
+        inputs = tokenize_cached(ctx.get("processor"), concepts, ctx.get("device"))
+    except Exception:  # noqa: BLE001 — repli paresseux, voir docstring
+        return None
+    add_ms(timers, "tokenize_ms", elapsed_ms(started))
+    return inputs
+
+
 def _vision(ctx, pixels, timers: dict):
-    """Encodeur vision de la frame — une seule fois, sous verrou GPU (poste ``vision_ms``)."""
+    """Encodeur vision de la frame — une seule fois, sous verrou GPU (poste ``vision_ms``).
+
+    ``pixels`` est déjà sur la carte (``_to_device`` hors verrou) : la montée H2D
+    (~1-3 ms) ne tient plus le créneau GPU ni le ``queue_ms`` du 2e vol.
+    """
     import torch
 
     started = now()
     with torch.inference_mode():
-        vision = ctx["model"].vision_encoder(pixels.to(device=ctx["device"], dtype=ctx["dtype"]))
+        vision = ctx["model"].vision_encoder(pixels)
     _sync_cuda()
     add_ms(timers, "vision_ms", elapsed_ms(started))
     return vision
 
 
 def _collect(ctx, vision, prompts, concepts, work_size, image_size, batch: bool,
-             keep: int, timers: dict) -> list[dict]:
+             keep: int, timers: dict, inputs=None) -> list[dict]:
     """Passe(s) DETR -> objets **sans masque encodé**, borés aux ``keep`` meilleurs par concept.
 
     ``batch=True`` (levier ``FAST_BATCH_PROMPTS``) fait les N concepts en un seul forward ;
     sinon une passe par concept. Le contenu et l'ordre de la liste finale ne changent pas
     quand ``keep`` vaut ``max_objects`` : un objet plus mal classé que ``keep`` objets de son
     propre concept ne peut pas entrer dans le top global (voir ``segmentation._top_indices``).
+    ``inputs`` (lot tokenizé hors verrou) : None = tokenize paresseux dans ``_detections``.
     """
     from segmentation import detection_entries
 
     if batch:
         found = _detections(ctx["model"], ctx["processor"], ctx["device"], ctx["dtype"],
-                           vision, concepts, work_size, timers, ctx.get("detr_graphs"))
+                           vision, concepts, work_size, timers, ctx.get("detr_graphs"),
+                           inputs)
         pairs = list(zip(found, prompts))
     else:
         pairs = []
@@ -354,12 +399,16 @@ def run_frame(ctx, image, prompts: list[str], work_edge: int, max_objects: int, 
     image_size = image.size
     with Stage(timers, "preprocess_ms"):
         work, pixels = _preprocess(ctx, image, work_edge)
+        pixels = _to_device(ctx, pixels)
     concepts = [routed_concept(prompt) for prompt in prompts]
+    inputs = _pre_tokenize(ctx, concepts, batch, timers)
     with _locked(gpu_lock, timers):
         vision = _vision(ctx, pixels, timers)
         entries = _collect(ctx, vision, prompts, concepts, work.size, image_size, batch,
-                           max_objects, timers)
-        entries = attach_frame_depth(ctx, image, entries, with_depth, timers)
+                           max_objects, timers, inputs)
+    # Profondeur (DA2) hors verrou : indépendante du DETR, ~22 ms de créneau rendus
+    # 1 frame sur 8 — poste ``depth_ms`` et médianes inchangés.
+    entries = attach_frame_depth(ctx, image, entries, with_depth, timers)
     result = _payload(entries, image_size, max_objects, mask_encoding, timers,
                       mask_format=mask_format, mask_edge=mask_edge)
     return _decorate(ctx, result, edge, edge_ok, timers)
@@ -367,11 +416,13 @@ def run_frame(ctx, image, prompts: list[str], work_edge: int, max_objects: int, 
 
 def segment_frame(ctx, image, prompts: list[str], work_edge: int, max_objects: int,
                   batch: bool, edge=None, mask_encoding=None, mask_format=None,
-                  mask_edge: int = 0) -> dict:
+                  mask_edge: int = 0, gpu_lock=None) -> dict:
     """Une frame : vision UNE fois, puis un forward groupé (batch) ou N passes seules.
 
-    Interface historique, sans verrou (l'appelant tient le sien). Équivalente à
-    :func:`run_frame` avec ``gpu_lock=None`` — conservée pour ``_segment_sync`` et les bancs.
+    Interface historique — ``gpu_lock=None`` garde le comportement d'avant (l'appelant
+    sérialise déjà) ; sinon le verrou ne couvre que vision + DETR (``run_frame``).
+    Conservée pour ``_segment_sync`` et les bancs.
     """
     return run_frame(ctx, image, prompts, work_edge, max_objects, batch, edge=edge,
-                     mask_encoding=mask_encoding, mask_format=mask_format, mask_edge=mask_edge)
+                     mask_encoding=mask_encoding, mask_format=mask_format, mask_edge=mask_edge,
+                     gpu_lock=gpu_lock)
