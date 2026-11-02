@@ -1,6 +1,7 @@
 package dev.sam3vision.app.glasses
 
 import android.graphics.Bitmap
+import android.graphics.Matrix
 import android.os.SystemClock
 import android.util.Base64
 import com.meta.wearable.dat.camera.types.VideoFrame
@@ -58,12 +59,11 @@ internal fun videoFrameToArgb(frame: VideoFrame): ArgbImage? {
 internal fun argbToJpegFrame(image: ArgbImage, nowMs: Long = SystemClock.elapsedRealtime()): JpegFrame? =
     runCatching { encode(image, nowMs) }.getOrNull()
 
-/** ARGB → Bitmap → recadrage 16:9 → réduction → JPEG → base64. */
+/** ARGB → Bitmap → recadrage 16:9 + réduction en une passe → JPEG → base64. */
 private fun encode(image: ArgbImage, nowMs: Long): JpegFrame? {
     val source = Bitmap.createBitmap(image.pixels, image.width, image.height, Bitmap.Config.ARGB_8888)
-    val cropped = cropToLandscape(source)
     try {
-        val scaled = scaleDown(cropped)
+        val scaled = cropAndScale(source)
         try {
             val buffer = ByteArrayOutputStream()
             if (!scaled.compress(Bitmap.CompressFormat.JPEG, JPEG_QUALITY, buffer)) return null
@@ -73,26 +73,26 @@ private fun encode(image: ArgbImage, nowMs: Long): JpegFrame? {
             val capturedAtMs = frameTimestampMs(image.presentationTimeUs, nowMs)
             return JpegFrame(base64, scaled.width, scaled.height, capturedAtMs)
         } finally {
-            if (scaled !== cropped) scaled.recycle()
+            if (scaled !== source) scaled.recycle()
         }
     } finally {
-        if (cropped !== source) cropped.recycle()
         source.recycle()
     }
 }
 
 /**
- * Recadre l'image au 16:9 paysage ([cropTo16x9]) ; rend le bitmap d'origine
- * quand il est déjà au format (aucune copie dans ce cas).
+ * Recadrage 16:9 ([cropTo16x9]) et réduction ([scaledDimensions]) en une seule
+ * passe : le rectangle est découpé et mis à l'échelle dans le même `createBitmap`
+ * — un seul bitmap intermédiaire au lieu de deux, un seul rééchantillonnage.
+ * Rend [source] tel quel quand il n'y a ni recadrage ni réduction.
  */
-private fun cropToLandscape(source: Bitmap): Bitmap {
-    val rect = cropTo16x9(source.width, source.height) ?: return source
-    return Bitmap.createBitmap(source, rect.x, rect.y, rect.width, rect.height)
-}
-
-/** Réduit l'image pour que son plus grand côté fasse au plus le bord partagé. */
-private fun scaleDown(bitmap: Bitmap): Bitmap {
-    val (targetWidth, targetHeight) =
-        scaledDimensions(bitmap.width, bitmap.height) ?: return bitmap
-    return Bitmap.createScaledBitmap(bitmap, targetWidth, targetHeight, true)
+private fun cropAndScale(source: Bitmap): Bitmap {
+    val rect = cropTo16x9(source.width, source.height)
+    val region = rect ?: CropRect(0, 0, source.width, source.height)
+    val target = scaledDimensions(region.width, region.height)
+        ?: return if (rect == null) source else Bitmap.createBitmap(source, rect.x, rect.y, rect.width, rect.height)
+    val matrix = Matrix().apply {
+        postScale(target.first / region.width.toFloat(), target.second / region.height.toFloat())
+    }
+    return Bitmap.createBitmap(source, region.x, region.y, region.width, region.height, matrix, true)
 }
