@@ -35,13 +35,18 @@ import androidx.compose.ui.unit.sp
 import dev.sam3vision.app.isee.vm.PictoPhase
 import dev.sam3vision.app.isee.vm.PictoUiState
 import dev.sam3vision.core.picto.PictoHit
+import dev.sam3vision.core.picto.PictoSize
+import dev.sam3vision.core.picto.withFixedSize
 
 /** Le jaune des pictogrammes : le cadre reprend leur palette. */
 private val PICTO_YELLOW = Color(0xFFFFD600)
 
 /**
- * Les objets reconnus, dessinés sur la vidéo : le pictogramme remplit le
- * rectangle reconnu, dans un cadre jaune — rien d'autre : ni nom, ni carte
+ * Les objets reconnus, dessinés sur la vidéo : chaque pictogramme est
+ * dessiné à taille fixe ([PictoSize.DEFAULT], carré centré sur l'objet
+ * reconnu) dans un cadre jaune — jamais à la taille du rectangle reconnu,
+ * qui varie avec la distance. Plusieurs objets reconnus : plusieurs
+ * pictos, chacun à la même taille. Rien d'autre : ni nom, ni carte
  * « en grand ». Posée après les pastilles de distance, comme
  * [SteeringLayer]. Rien de composé sans reconnaissance — la vidéo reste
  * nette le reste du temps.
@@ -52,7 +57,9 @@ internal fun PictoLayer(hits: List<PictoHit>, pngOf: (String) -> ByteArray?, mod
     BoxWithConstraints(modifier.fillMaxSize()) {
         val fullW = maxWidth
         val fullH = maxHeight
-        hits.forEach { hit ->
+        val aspect = if (maxHeight.value > 0f) maxWidth.value / maxHeight.value else 9f / 16f
+        hits.forEach { raw ->
+            val hit = raw.withFixedSize(PictoSize.DEFAULT, aspect)
             key(hit.pictoId) {
                 val image = remember(hit.pictoId) {
                     runCatching {
