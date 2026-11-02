@@ -26,6 +26,8 @@ import dev.sam3vision.app.glasses.EXTRA_GLASSES_MOCK_CONNECT
 import dev.sam3vision.app.glasses.EXTRA_GLASSES_TALK
 import dev.sam3vision.app.glasses.GlassesController
 import dev.sam3vision.app.glasses.GlassesSessionLifecycle
+import dev.sam3vision.app.glasses.hasLinkedDevice
+import dev.sam3vision.app.glasses.linkedStates
 import dev.sam3vision.app.glasses.shouldSwipeConnect
 import dev.sam3vision.app.glasses.bench.BenchEntryPoint
 import dev.sam3vision.app.glasses.bench.EXTRA_ANALYZE
@@ -212,11 +214,12 @@ class MainActivity : ComponentActivity() {
     }
 
     /**
-     * Balayage droit : la session lunettes quand elle est joignable (bouton « Start the
-     * session »), sinon le « Quoi chercher ? » d'avant — le geste ne coupe jamais un direct.
+     * Balayage droit : finit de connecter les lunettes (session) quand le bouton le
+     * pourrait et que le Bluetooth est déjà monté, sinon le « Quoi chercher ? » d'avant.
+     * Le geste ne coupe jamais un direct et n'attend jamais le Bluetooth.
      */
     private fun swipeRight() {
-        if (shouldSwipeConnect(glasses.state.value)) {
+        if (shouldSwipeConnect(glasses.state.value, hasLinkedDevice(linkedStates()))) {
             Log.i("GlassesChain", "swipe connect")
             glasses.connect()
         } else {

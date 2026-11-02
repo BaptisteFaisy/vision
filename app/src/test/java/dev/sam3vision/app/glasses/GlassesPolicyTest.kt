@@ -239,11 +239,13 @@ class GlassesPolicyTest {
 
     @Test
     fun `le balayage droit connecte quand le bouton le pourrait`() {
-        assertTrue(shouldSwipeConnect(state(phase = SessionPhase.IDLE)))
-        assertTrue(shouldSwipeConnect(state(phase = SessionPhase.STOPPED)))
+        assertTrue(shouldSwipeConnect(state(phase = SessionPhase.IDLE), linked = true))
+        assertTrue(shouldSwipeConnect(state(phase = SessionPhase.STOPPED), linked = true))
         // Ni coupure d'un direct, ni rejou d'une ouverture, ni session sans app enregistrée.
-        assertFalse(shouldSwipeConnect(state(phase = SessionPhase.STARTED)))
-        assertFalse(shouldSwipeConnect(state(phase = SessionPhase.STARTING)))
-        assertFalse(shouldSwipeConnect(state(registered = false)))
+        assertFalse(shouldSwipeConnect(state(phase = SessionPhase.STARTED), linked = true))
+        assertFalse(shouldSwipeConnect(state(phase = SessionPhase.STARTING), linked = true))
+        assertFalse(shouldSwipeConnect(state(registered = false), linked = true))
+        // Bluetooth pas encore monté : le geste n'attend pas (le bouton, lui, attend 30 s).
+        assertFalse(shouldSwipeConnect(state(phase = SessionPhase.IDLE), linked = false))
     }
 }
