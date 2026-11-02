@@ -124,7 +124,7 @@ object DynamicClipChain {
 
     /**
      * Chaîne d'un vœu bordure depuis son sens ([edge], le signal — la
-     * phrase ne le dit pas : « Curb detected… », « Curb at… ») et l'heure
+     * phrase ne le dit pas : « Curb detected… », « Curb … m. ») et l'heure
      * lue dans [phrase] : montée → [curb_up, clock_N?], descente →
      * [curb_down, clock_N?]. Sens incertain ou phrase non anglaise (FR :
      * zéro clip FR, le pack ne porte que des EN) → vide (silence, pas de

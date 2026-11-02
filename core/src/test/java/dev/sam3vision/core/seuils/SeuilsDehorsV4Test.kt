@@ -255,9 +255,9 @@ class SeuilsDehorsV4Test {
         val far = CurbSignal(detected = true, meters = 5f, centerX = 0.5f, edge = CurbEdge.Up)
         watcher.onSignal(far, 1_000L, En)
         assertNotNull(watcher.onSignal(far, 1_100L, En))
-        val near = CurbSignal(detected = true, meters = 1.5f, centerX = 0.5f, edge = CurbEdge.Up)
+        val near = CurbSignal(detected = true, meters = 1.0f, centerX = 0.5f, edge = CurbEdge.Up)
         assertNull(watcher.onSignal(near, 1_200L, En))
-        assertEquals("Curb at 1.5 meters.", watcher.onSignal(near, 1_300L, En)!!.phrase)
+        assertEquals("Curb 1 m.", watcher.onSignal(near, 1_300L, En)!!.phrase)
     }
 
     @Test

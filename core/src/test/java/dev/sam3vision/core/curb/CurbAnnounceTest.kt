@@ -9,7 +9,7 @@ import org.junit.Assert.assertNull
 import org.junit.Assert.assertTrue
 import org.junit.Test
 
-/** Annonces bordure : détection immédiate + compte à rebours 2 / 1,5 / 1 / 0,7 / 0,5 m (plan continu ignoré). */
+/** Annonces bordure : détection immédiate + compte à rebours 2 / 1 / 0,5 m (plan continu ignoré). */
 class CurbAnnounceTest {
 
     private fun reading(label: String, meters: Float, box: List<Float>) =
@@ -56,18 +56,16 @@ class CurbAnnounceTest {
     }
 
     @Test
-    fun `compte a rebours 2 15 1 07 05 FR`() {
+    fun `compte a rebours 2 1 05 FR`() {
         val watcher = CurbWatcher()
         val seen = sig(2.5f)
         watcher.onSignal(seen, 1_000L, SpeechLanguage.Fr)
         assertEquals("Bordure détectée.", watcher.onSignal(seen, 2_000L, SpeechLanguage.Fr)!!.phrase)
 
         val steps = listOf(
-            2.0f to "Bordure à 2 mètres.",
-            1.5f to "Bordure à 1,5 mètre.",
-            1.0f to "Bordure à 1 mètre.",
-            0.7f to "Bordure à 0,7 mètre.",
-            0.5f to "Bordure à 0,5 mètre.",
+            2.0f to "Bordure 2 m.",
+            1.0f to "Bordure 1 m.",
+            0.5f to "Bordure 0,5 m.",
         )
         var now = 3_000L
         for ((meters, phrase) in steps) {
@@ -76,7 +74,7 @@ class CurbAnnounceTest {
             assertEquals(phrase, watcher.onSignal(signal, now + 1_000L, SpeechLanguage.Fr)!!.phrase)
             now += 2_000L
         }
-        assertEquals(12_000L, watcher.lastAlertMs)
+        assertEquals(8_000L, watcher.lastAlertMs)
     }
 
     @Test
@@ -100,7 +98,7 @@ class CurbAnnounceTest {
         watcher.onSignal(seen, 1_000L, SpeechLanguage.Fr)
         watcher.onSignal(seen, 2_000L, SpeechLanguage.Fr)
 
-        val soft = listOf(sig(2.0f), sig(1.5f), sig(1.0f))
+        val soft = listOf(sig(2.0f), sig(1.0f))
         var now = 3_000L
         for (signal in soft) {
             watcher.onSignal(signal, now, SpeechLanguage.Fr)
@@ -110,17 +108,12 @@ class CurbAnnounceTest {
             assertNull(cue.safetyPhrase)
             now += 2_000L
         }
-        watcher.onSignal(sig(0.7f), now, SpeechLanguage.Fr)
-        val near = watcher.onSignal(sig(0.7f), now + 1_000L, SpeechLanguage.Fr)!!
-        assertEquals(CurbTier.NEAR, near.tier)
-        assertTrue(near.urgent)
-        assertNull(near.safetyPhrase)
 
-        watcher.onSignal(sig(0.5f), now + 2_000L, SpeechLanguage.Fr)
-        val last = watcher.onSignal(sig(0.5f), now + 3_000L, SpeechLanguage.Fr)!!
+        watcher.onSignal(sig(0.5f), now, SpeechLanguage.Fr)
+        val last = watcher.onSignal(sig(0.5f), now + 1_000L, SpeechLanguage.Fr)!!
         assertEquals(CurbTier.NEAR, last.tier)
         assertTrue(last.urgent)
-        assertEquals("Bordure à 0,5 mètre.", last.safetyPhrase)
+        assertEquals("Bordure 0,5 m.", last.safetyPhrase)
     }
 
     @Test
@@ -133,8 +126,8 @@ class CurbAnnounceTest {
         assertNull(watcher.onSignal(close, 3_000L, SpeechLanguage.Fr))
         val cue = watcher.onSignal(close, 4_000L, SpeechLanguage.Fr)!!
 
-        // Les paliers 2 / 1,5 / 1 / 0,7 sont derrière : seul 0,5 parle.
-        assertEquals("Bordure à 0,5 mètre.", cue.phrase)
+        // Les paliers 2 / 1 sont derrière : seul 0,5 parle.
+        assertEquals("Bordure 0,5 m.", cue.phrase)
         assertNull(watcher.onSignal(close, 5_000L, SpeechLanguage.Fr))
         assertNull(watcher.onSignal(close, 6_000L, SpeechLanguage.Fr))
     }
@@ -146,12 +139,13 @@ class CurbAnnounceTest {
         watcher.onSignal(seen, 1_000L, SpeechLanguage.Fr)
         watcher.onSignal(seen, 2_000L, SpeechLanguage.Fr)
 
-        // Une seule frame à 1,4 m : 2 m n'a pas ses deux frames, 1,5 m prend le relais.
+        // Une seule frame à 1,4 m : 2 m n'a pas ses deux frames, 1 m prend le relais.
         assertNull(watcher.onSignal(sig(1.4f), 3_000L, SpeechLanguage.Fr))
-        val cue = watcher.onSignal(sig(1.3f), 4_000L, SpeechLanguage.Fr)!!
+        assertNull(watcher.onSignal(sig(0.9f), 4_000L, SpeechLanguage.Fr))
+        val cue = watcher.onSignal(sig(0.9f), 5_000L, SpeechLanguage.Fr)!!
 
-        assertEquals("Bordure à 1,5 mètre.", cue.phrase)
-        assertNull(watcher.onSignal(sig(1.3f), 5_000L, SpeechLanguage.Fr))
+        assertEquals("Bordure 1 m.", cue.phrase)
+        assertNull(watcher.onSignal(sig(0.9f), 6_000L, SpeechLanguage.Fr))
     }
 
     @Test
@@ -175,17 +169,17 @@ class CurbAnnounceTest {
         val seen = sig(2.5f)
         watcher.onSignal(seen, 1_000L, SpeechLanguage.Fr)
         watcher.onSignal(seen, 2_000L, SpeechLanguage.Fr)
-        for ((meters, now) in listOf(2.0f to 3_000L, 1.5f to 5_000L, 1.0f to 7_000L)) {
+        for ((meters, now) in listOf(2.0f to 3_000L, 1.0f to 5_000L)) {
             watcher.onSignal(sig(meters), now, SpeechLanguage.Fr)
             assertNotNull(watcher.onSignal(sig(meters), now + 1_000L, SpeechLanguage.Fr))
         }
-        // Recul à 1,3 m : 1,0 m se ré-arme (> 1,2), 1,5 m reste verrouillé (< 1,7).
-        assertNull(watcher.onSignal(sig(1.3f), 9_000L, SpeechLanguage.Fr))
-        assertNull(watcher.onSignal(sig(1.0f), 10_000L, SpeechLanguage.Fr))
-        val cue = watcher.onSignal(sig(1.0f), 11_000L, SpeechLanguage.Fr)
+        // Recul à 1,3 m : 1 m se ré-arme (> 1,2), 2 m reste verrouillé (< 2,2).
+        assertNull(watcher.onSignal(sig(1.3f), 7_000L, SpeechLanguage.Fr))
+        assertNull(watcher.onSignal(sig(1.0f), 8_000L, SpeechLanguage.Fr))
+        val cue = watcher.onSignal(sig(1.0f), 9_000L, SpeechLanguage.Fr)
 
         assertNotNull(cue)
-        assertEquals("Bordure à 1 mètre.", cue!!.phrase)
+        assertEquals("Bordure 1 m.", cue!!.phrase)
     }
 
     @Test
@@ -218,7 +212,7 @@ class CurbAnnounceTest {
         assertNull(watcher.onSignal(seen, 13_000L, SpeechLanguage.Fr))
         assertEquals("Bordure détectée.", watcher.onSignal(seen, 14_000L, SpeechLanguage.Fr)!!.phrase)
         assertNull(watcher.onSignal(sig(2.0f), 15_000L, SpeechLanguage.Fr))
-        assertEquals("Bordure à 2 mètres.", watcher.onSignal(sig(2.0f), 16_000L, SpeechLanguage.Fr)!!.phrase)
+        assertEquals("Bordure 2 m.", watcher.onSignal(sig(2.0f), 16_000L, SpeechLanguage.Fr)!!.phrase)
     }
 
     @Test
@@ -262,7 +256,7 @@ class CurbAnnounceTest {
 
         // Reprise : le countdown continue — pas de re-détection, pas de blocage cooldown.
         assertNull(watcher.onSignal(sig(2.0f), 4_000L, SpeechLanguage.Fr))
-        assertEquals("Bordure à 2 mètres.", watcher.onSignal(sig(2.0f), 5_000L, SpeechLanguage.Fr)!!.phrase)
+        assertEquals("Bordure 2 m.", watcher.onSignal(sig(2.0f), 5_000L, SpeechLanguage.Fr)!!.phrase)
         assertEquals(5_000L, watcher.lastAlertMs)
     }
 
@@ -278,7 +272,7 @@ class CurbAnnounceTest {
         assertNull(watcher.onSignal(CurbSignal.none(), 4_000L, SpeechLanguage.Fr))
 
         assertNull(watcher.onSignal(sig(2.0f), 5_000L, SpeechLanguage.Fr))
-        assertEquals("Bordure à 2 mètres.", watcher.onSignal(sig(2.0f), 6_000L, SpeechLanguage.Fr)!!.phrase)
+        assertEquals("Bordure 2 m.", watcher.onSignal(sig(2.0f), 6_000L, SpeechLanguage.Fr)!!.phrase)
         assertEquals(6_000L, watcher.lastAlertMs)
     }
 
@@ -296,7 +290,7 @@ class CurbAnnounceTest {
         assertNull(watcher.onSignal(seen, 6_000L, SpeechLanguage.Fr))
         assertEquals("Bordure détectée.", watcher.onSignal(seen, 7_000L, SpeechLanguage.Fr)!!.phrase)
         assertNull(watcher.onSignal(sig(2.0f), 8_000L, SpeechLanguage.Fr))
-        assertEquals("Bordure à 2 mètres.", watcher.onSignal(sig(2.0f), 9_000L, SpeechLanguage.Fr)!!.phrase)
+        assertEquals("Bordure 2 m.", watcher.onSignal(sig(2.0f), 9_000L, SpeechLanguage.Fr)!!.phrase)
     }
 
 
@@ -321,15 +315,15 @@ class CurbAnnounceTest {
         val seen = sig(2.5f)
         watcher.onSignal(seen, 1_000L)
         watcher.onSignal(seen, 2_000L)
-        for ((meters, now) in listOf(2.0f to 3_000L, 1.5f to 5_000L, 1.0f to 7_000L)) {
+        for ((meters, now) in listOf(2.0f to 3_000L, 1.0f to 5_000L)) {
             watcher.onSignal(sig(meters), now)
             watcher.onSignal(sig(meters), now + 1_000L)
         }
         assertNull("paliers doux : pas d'imminent", watcher.lastNearMs)
 
-        watcher.onSignal(sig(0.7f), 9_000L)
-        watcher.onSignal(sig(0.7f), 10_000L)
-        assertEquals(10_000L, watcher.lastNearMs)
+        watcher.onSignal(sig(0.5f), 7_000L)
+        watcher.onSignal(sig(0.5f), 8_000L)
+        assertEquals(8_000L, watcher.lastNearMs)
 
         watcher.reset()
         assertNull(watcher.lastNearMs)
@@ -348,7 +342,7 @@ class CurbAnnounceTest {
         assertNull(watcher.onSignal(seen, 5_000L, SpeechLanguage.Fr))
         assertEquals("Bordure détectée.", watcher.onSignal(seen, 6_000L, SpeechLanguage.Fr)!!.phrase)
         assertNull(watcher.onSignal(sig(2.0f), 7_000L, SpeechLanguage.Fr))
-        assertEquals("Bordure à 2 mètres.", watcher.onSignal(sig(2.0f), 8_000L, SpeechLanguage.Fr)!!.phrase)
+        assertEquals("Bordure 2 m.", watcher.onSignal(sig(2.0f), 8_000L, SpeechLanguage.Fr)!!.phrase)
     }
 
     @Test
@@ -369,11 +363,9 @@ class CurbAnnounceTest {
         assertEquals("Curb detected.", watcher.onSignal(seen, 2_000L, SpeechLanguage.En)!!.phrase)
 
         val steps = listOf(
-            2.0f to "Curb at 2 meters.",
-            1.5f to "Curb at 1.5 meters.",
-            1.0f to "Curb at 1 meter.",
-            0.7f to "Curb at 0.7 meters.",
-            0.5f to "Curb at 0.5 meters.",
+            2.0f to "Curb 2 m.",
+            1.0f to "Curb 1 m.",
+            0.5f to "Curb 0.5 m.",
         )
         var now = 3_000L
         for ((meters, phrase) in steps) {

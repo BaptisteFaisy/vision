@@ -142,16 +142,16 @@ class CurbWatcherTest {
     fun `phrases detection et compte a rebours FR et EN`() {
         assertEquals("Bordure détectée.", CurbText.detectedPhrase(SpeechLanguage.Fr))
         assertEquals("Curb detected.", CurbText.detectedPhrase(SpeechLanguage.En))
-        assertEquals("Bordure à 2 mètres.", CurbText.distancePhrase(2.0f, SpeechLanguage.Fr))
-        assertEquals("Bordure à 1,5 mètre.", CurbText.distancePhrase(1.5f, SpeechLanguage.Fr))
-        assertEquals("Bordure à 1 mètre.", CurbText.distancePhrase(1.0f, SpeechLanguage.Fr))
-        assertEquals("Bordure à 0,7 mètre.", CurbText.distancePhrase(0.7f, SpeechLanguage.Fr))
-        assertEquals("Bordure à 0,5 mètre.", CurbText.distancePhrase(0.5f, SpeechLanguage.Fr))
-        assertEquals("Curb at 2 meters.", CurbText.distancePhrase(2.0f, SpeechLanguage.En))
-        assertEquals("Curb at 1.5 meters.", CurbText.distancePhrase(1.5f, SpeechLanguage.En))
-        assertEquals("Curb at 1 meter.", CurbText.distancePhrase(1.0f, SpeechLanguage.En))
-        assertEquals("Curb at 0.7 meters.", CurbText.distancePhrase(0.7f, SpeechLanguage.En))
-        assertEquals("Curb at 0.5 meters.", CurbText.distancePhrase(0.5f, SpeechLanguage.En))
+        assertEquals("Bordure 2 m.", CurbText.distancePhrase(2.0f, SpeechLanguage.Fr))
+        assertEquals("Bordure 1,5 m.", CurbText.distancePhrase(1.5f, SpeechLanguage.Fr))
+        assertEquals("Bordure 1 m.", CurbText.distancePhrase(1.0f, SpeechLanguage.Fr))
+        assertEquals("Bordure 0,7 m.", CurbText.distancePhrase(0.7f, SpeechLanguage.Fr))
+        assertEquals("Bordure 0,5 m.", CurbText.distancePhrase(0.5f, SpeechLanguage.Fr))
+        assertEquals("Curb 2 m.", CurbText.distancePhrase(2.0f, SpeechLanguage.En))
+        assertEquals("Curb 1.5 m.", CurbText.distancePhrase(1.5f, SpeechLanguage.En))
+        assertEquals("Curb 1 m.", CurbText.distancePhrase(1.0f, SpeechLanguage.En))
+        assertEquals("Curb 0.7 m.", CurbText.distancePhrase(0.7f, SpeechLanguage.En))
+        assertEquals("Curb 0.5 m.", CurbText.distancePhrase(0.5f, SpeechLanguage.En))
     }
 
 
@@ -166,7 +166,7 @@ class CurbWatcherTest {
             CurbText.detectedPhrase(SpeechLanguage.En, 0.5f),
         )
         assertEquals("Bordure détectée.", CurbText.detectedPhrase(SpeechLanguage.Fr))
-        assertEquals("Bordure à 2 mètres.", CurbText.distancePhrase(2.0f, SpeechLanguage.Fr))
+        assertEquals("Bordure 2 m.", CurbText.distancePhrase(2.0f, SpeechLanguage.Fr))
     }
 
     @Test
