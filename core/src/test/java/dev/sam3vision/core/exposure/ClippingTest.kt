@@ -73,6 +73,18 @@ class ClippingTest {
     }
 
     @Test
+    fun `mediane - garde-fou nocturne lu dans la meme passe`() {
+        // Trois noirs et un blanc : médiane des canaux max = 0 (le plancher nocturne tire).
+        val sombre = Clipping.stats(intArrayOf(0xFF000000.toInt(), 0xFF000000.toInt(), 0xFF000000.toInt(), 0xFFFFFFFF.toInt()), 2, 2)
+        assertEquals(0, sombre.median)
+        // Deux gris 0x40 et deux gris 0x80 : médiane 0x40 = 64, au-dessus du plancher.
+        val moyen = Clipping.stats(intArrayOf(0xFF404040.toInt(), 0xFF404040.toInt(), 0xFF808080.toInt(), 0xFF808080.toInt()), 2, 2)
+        assertEquals(0x40, moyen.median)
+        // Un crop non mesuré ne propose aucun plancher (sentinel -1), jamais « noir ».
+        assertEquals(ClipStats.UNMEASURED, ClipStats.NONE.median)
+    }
+
+    @Test
     fun `dimensions incoherentes - aucune mesure`() {
         assertEquals(ClipStats.NONE, Clipping.stats(IntArray(4), 3, 3))
         assertEquals(ClipStats.NONE, Clipping.stats(IntArray(4), 0, 0))

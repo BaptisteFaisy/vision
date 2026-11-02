@@ -363,6 +363,7 @@ private fun LiveRoute(
     )
     LiveScreen(
         viewModel = liveViewModel,
+        fireExposureCompensation = settings.fireExposureCompensation,
         onBack = { liveViewModel.stop(); pop() },
         onAsk = {
             viewModel.useLiveFrame(liveViewModel.latestFrameB64())

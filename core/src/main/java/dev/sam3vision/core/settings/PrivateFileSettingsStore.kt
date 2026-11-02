@@ -113,6 +113,7 @@ internal object SettingsCodec {
     private const val K_INTRO_PLAYED = "introPlayed"
     private const val K_DISTANCE_OVERLAY = "distanceOverlayEnabled"
     private const val K_COLLECT_LIGHT_CROPS = "collectLightCrops"
+    private const val K_FIRE_EXPOSURE_COMPENSATION = "fireExposureCompensation"
     private const val K_LIVE_SAM = "liveSamEnabled"
     private const val K_BOX_PREDICTION = "boxPredictionEnabled"
     private const val K_ADAPTIVE_UPLOAD = "adaptiveUploadEnabled"
@@ -155,6 +156,7 @@ internal object SettingsCodec {
         appendLine("$K_INTRO_PLAYED=${s.introPlayed}")
         appendLine("$K_DISTANCE_OVERLAY=${s.distanceOverlayEnabled}")
         appendLine("$K_COLLECT_LIGHT_CROPS=${s.collectLightCrops}")
+        appendLine("$K_FIRE_EXPOSURE_COMPENSATION=${s.fireExposureCompensation}")
         appendLine("$K_LIVE_SAM=${s.liveSamEnabled}")
         appendLine("$K_BOX_PREDICTION=${s.boxPredictionEnabled}")
         appendLine("$K_ADAPTIVE_UPLOAD=${s.adaptiveUploadEnabled}")
@@ -205,6 +207,8 @@ internal object SettingsCodec {
             introPlayed = values[K_INTRO_PLAYED]?.toBooleanStrictOrNull() ?: default.introPlayed,
             distanceOverlayEnabled = values[K_DISTANCE_OVERLAY]?.toBooleanStrictOrNull() ?: default.distanceOverlayEnabled,
             collectLightCrops = values[K_COLLECT_LIGHT_CROPS]?.toBooleanStrictOrNull() ?: default.collectLightCrops,
+            fireExposureCompensation = values[K_FIRE_EXPOSURE_COMPENSATION]?.toBooleanStrictOrNull()
+                ?: default.fireExposureCompensation,
             liveSamEnabled = values[K_LIVE_SAM]?.toBooleanStrictOrNull() ?: default.liveSamEnabled,
             boxPredictionEnabled = values[K_BOX_PREDICTION]?.toBooleanStrictOrNull()
                 ?: default.boxPredictionEnabled,

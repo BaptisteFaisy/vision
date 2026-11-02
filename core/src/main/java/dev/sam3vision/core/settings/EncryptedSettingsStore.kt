@@ -54,6 +54,7 @@ class EncryptedSettingsStore(context: Context) : SettingsStore {
             introPlayed = prefs.getBoolean(KEY_INTRO_PLAYED, default.introPlayed),
             distanceOverlayEnabled = prefs.getBoolean(KEY_DISTANCE_OVERLAY, default.distanceOverlayEnabled),
             collectLightCrops = prefs.getBoolean(KEY_COLLECT_LIGHT_CROPS, default.collectLightCrops),
+            fireExposureCompensation = fireExposureOf(prefs, default),
             liveSamEnabled = prefs.getBoolean(KEY_LIVE_SAM, default.liveSamEnabled),
             boxPredictionEnabled = prefs.getBoolean(KEY_BOX_PREDICTION, default.boxPredictionEnabled),
             adaptiveUploadEnabled = prefs.getBoolean(KEY_ADAPTIVE_UPLOAD, default.adaptiveUploadEnabled),
@@ -71,6 +72,9 @@ class EncryptedSettingsStore(context: Context) : SettingsStore {
             cameraHalBareEnabled = prefs.getBoolean(KEY_CAMERA_HAL_BARE, default.cameraHalBareEnabled),
         ).let { readShareSettings(prefs, it) }
     }
+
+    private fun fireExposureOf(prefs: SharedPreferences, default: Settings): Boolean =
+        prefs.getBoolean(KEY_FIRE_EXPOSURE_COMPENSATION, default.fireExposureCompensation)
 
     private fun objectsOf(prefs: SharedPreferences, default: Settings): Int =
         ObjectLimits.clamp(prefs.getInt(KEY_MAX_OBJECTS, default.maxObjects))
@@ -100,6 +104,7 @@ class EncryptedSettingsStore(context: Context) : SettingsStore {
             .putBoolean(KEY_INTRO_PLAYED, s.introPlayed)
             .putBoolean(KEY_DISTANCE_OVERLAY, s.distanceOverlayEnabled)
             .putBoolean(KEY_COLLECT_LIGHT_CROPS, s.collectLightCrops)
+            .putBoolean(KEY_FIRE_EXPOSURE_COMPENSATION, s.fireExposureCompensation)
             .putBoolean(KEY_LIVE_SAM, s.liveSamEnabled)
             .putBoolean(KEY_BOX_PREDICTION, s.boxPredictionEnabled)
             .putBoolean(KEY_ADAPTIVE_UPLOAD, s.adaptiveUploadEnabled)
@@ -145,6 +150,7 @@ class EncryptedSettingsStore(context: Context) : SettingsStore {
         const val KEY_INTRO_PLAYED = "intro_played"
         const val KEY_DISTANCE_OVERLAY = "distance_overlay"
         const val KEY_COLLECT_LIGHT_CROPS = "collect_light_crops"
+        const val KEY_FIRE_EXPOSURE_COMPENSATION = "fire_exposure_compensation"
         const val KEY_LIVE_SAM = "live_sam"
         const val KEY_BOX_PREDICTION = "box_prediction"
         const val KEY_ADAPTIVE_UPLOAD = "adaptive_upload"
