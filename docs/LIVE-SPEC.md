@@ -21,6 +21,9 @@ qu'elles entourent le direct (réveil, photo, vidéo, extinction).
 | `http://` | devient `ws://` | `WsTransport.kt:42` |
 | User-Agent du handshake | `sam3vision-android/1.0 live` | `HttpLiveClient.kt:24`, posé par `WsTransport.kt:68` |
 | Fermeture | code `1000`, raison `fin du direct` | `WsTransport.kt:80`, `:101-103` |
+| Fermeture idle | code `1011`, raison `idle` : **45 s sans frame** (les pings 30 s ne réarment pas) | `server/backend/live_fast/service.py:350-353` |
+| Fermeture trop gros | code `1009` : réponse > 4 Mo, rien n'est envoyé | `server/backend/live_fast/service.py:310-314` |
+| Frame trop lente | **erreur `503` dans la trame**, connexion gardée (budget serveur 180 s) | `server/backend/live_fast/service.py:300-304` |
 | Socket | **un seul par session**, réutilisé pour toutes les frames | `WsLiveClient.kt:91-102` |
 
 - Le handshake réutilise le pool de connexions du direct (`newBuilder()` sur le client
