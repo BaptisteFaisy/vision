@@ -145,15 +145,19 @@ class StairsUncuttableTest {
     }
 
     @Test
-    fun `escaliers attendent la parole gps en cours`() {
-        VoiceBus.post(OutdoorLevel.GPS_EVENT, "Tournez à droite.")
-        VoiceBus.post(OutdoorLevel.STAIRS, "5 marches.")
+    fun `escaliers coupent le mot de guidage en cours`() {
+        // Ordre user du 02/11/2026 (top priorité sur « droite » / « gauche ») :
+        // le respect mutuel GPS est levé pour les escaliers, comme pour la bordure.
+        VoiceBus.post(OutdoorLevel.GPS_EVENT, "Left.")
+        VoiceBus.post(OutdoorLevel.STAIRS, "Stairs 2 m.")
 
-        assertEquals(1, speaker.said.size)
-
-        VoiceBus.onSpeechIdle()
-        VoiceBus.post(OutdoorLevel.STAIRS, "5 marches.")
         assertEquals(2, speaker.said.size)
+        assertEquals(StairsFakeSpeaker.Said(OutdoorLevel.STAIRS, "Stairs 2 m."), speaker.said[1])
+
+        VoiceBus.reset()
+        VoiceBus.post(OutdoorLevel.GPS_REMINDER, "Left.")
+        VoiceBus.post(OutdoorLevel.STAIRS, "Stairs 1 m.")
+        assertEquals(4, speaker.said.size)
     }
 
     @Test

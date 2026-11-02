@@ -120,30 +120,30 @@ class StairWatcherTest {
     ): StairCue? = watcher.onSignal(positive(), nowMs, language, direction, null, meters)
 
     @Test
-    fun `traversee 4 m = detection puis jalon`() {
+    fun `traversee 2 m = detection puis jalon`() {
         val watcher = StairWatcher()
 
-        assertNull(feed(watcher, 5.0f, 0L, SpeechLanguage.En))
-        assertNull(feed(watcher, 3.9f, 1000L, SpeechLanguage.En))
-        assertEquals("Stairs up.", feed(watcher, 3.8f, 2000L, SpeechLanguage.En)!!.phrase)
-        assertEquals("Stairs up at 4 meters.", feed(watcher, 3.7f, 3000L, SpeechLanguage.En)!!.phrase)
+        assertNull(feed(watcher, 2.5f, 0L, SpeechLanguage.En))
+        assertNull(feed(watcher, 1.9f, 1000L, SpeechLanguage.En))
+        assertEquals("Stairs up.", feed(watcher, 1.8f, 2000L, SpeechLanguage.En)!!.phrase)
+        assertEquals("Stairs 2 m.", feed(watcher, 1.7f, 3000L, SpeechLanguage.En)!!.phrase)
     }
 
     @Test
-    fun `compte a rebours 4 puis 2 puis 1 en approche`() {
+    fun `compte a rebours 2 puis 1 puis 05 en approche`() {
         val watcher = StairWatcher(confirmFrames = 2)
         val phrases = mutableListOf<String>()
 
-        listOf(5.0f, 3.9f, 3.8f, 3.0f, 1.9f, 1.8f, 1.2f, 0.9f, 0.8f).forEachIndexed { i, meters ->
+        listOf(2.6f, 1.9f, 1.8f, 1.2f, 0.9f, 0.8f, 0.4f, 0.3f).forEachIndexed { i, meters ->
             feed(watcher, meters, i * 1000L)?.let { phrases += it.phrase }
         }
 
         assertEquals(
             listOf(
                 "Escalier montant.",
-                "Escalier montant à 4 mètres.",
-                "Escalier montant à 2 mètres.",
-                "Escalier montant à 1 mètre.",
+                "Escalier 2 m.",
+                "Escalier 1 m.",
+                "Escalier 0,5 m.",
             ),
             phrases,
         )
@@ -153,13 +153,13 @@ class StairWatcherTest {
     fun `entree directe entre paliers = standard puis jalon traverse`() {
         val watcher = StairWatcher(confirmFrames = 2)
 
-        assertNull(feed(watcher, 3.0f, 0L, SpeechLanguage.En, StairDirection.Unknown))
-        // 4 m jamais vu d'au-delà : pas de jalon, annonce standard.
-        assertEquals("Stairs ahead.", feed(watcher, 2.9f, 1000L, SpeechLanguage.En, StairDirection.Unknown)!!.phrase)
-        assertNull(feed(watcher, 1.9f, 2000L, SpeechLanguage.En, StairDirection.Unknown))
+        assertNull(feed(watcher, 1.5f, 0L, SpeechLanguage.En, StairDirection.Unknown))
+        // 2 m jamais vu d'au-delà : pas de jalon, annonce standard.
+        assertEquals("Stairs ahead.", feed(watcher, 1.4f, 1000L, SpeechLanguage.En, StairDirection.Unknown)!!.phrase)
+        assertNull(feed(watcher, 0.9f, 2000L, SpeechLanguage.En, StairDirection.Unknown))
         assertEquals(
-            "Stairs ahead at 2 meters.",
-            feed(watcher, 1.8f, 3000L, SpeechLanguage.En, StairDirection.Unknown)!!.phrase,
+            "Stairs 1 m.",
+            feed(watcher, 0.8f, 3000L, SpeechLanguage.En, StairDirection.Unknown)!!.phrase,
         )
     }
 
@@ -168,85 +168,80 @@ class StairWatcherTest {
         val watcher = StairWatcher(confirmFrames = 2)
         val phrases = mutableListOf<String>()
 
-        listOf(4.5f, 1.9f, 1.8f).forEachIndexed { i, meters ->
+        listOf(2.5f, 0.9f, 0.8f).forEachIndexed { i, meters ->
             feed(watcher, meters, i * 1000L, SpeechLanguage.En)?.let { phrases += it.phrase }
         }
 
-        assertEquals(listOf("Stairs up.", "Stairs up at 2 meters."), phrases)
+        assertEquals(listOf("Stairs up.", "Stairs 1 m."), phrases)
     }
 
     @Test
     fun `recul au-dela de l'hysteresis re-arme le palier`() {
         val watcher = StairWatcher(confirmFrames = 2)
 
-        assertNull(feed(watcher, 4.5f, 0L))
-        assertEquals("Escalier montant.", feed(watcher, 3.9f, 1000L)!!.phrase)
-        assertEquals("Escalier montant à 4 mètres.", feed(watcher, 3.8f, 2000L)!!.phrase)
-        assertNull(feed(watcher, 4.5f, 3000L))
-        assertNull(feed(watcher, 3.9f, 4000L))
-        assertEquals("Escalier montant à 4 mètres.", feed(watcher, 3.8f, 5000L)!!.phrase)
+        assertNull(feed(watcher, 2.5f, 0L))
+        assertEquals("Escalier montant.", feed(watcher, 1.9f, 1000L)!!.phrase)
+        assertEquals("Escalier 2 m.", feed(watcher, 1.8f, 2000L)!!.phrase)
+        assertNull(feed(watcher, 2.5f, 3000L))
+        assertNull(feed(watcher, 1.9f, 4000L))
+        assertEquals("Escalier 2 m.", feed(watcher, 1.8f, 5000L)!!.phrase)
     }
 
     @Test
     fun `recul sous l'hysteresis ne re-arme pas`() {
         val watcher = StairWatcher(confirmFrames = 2)
 
-        feed(watcher, 4.5f, 0L)
-        feed(watcher, 3.9f, 1000L)
-        assertEquals("Escalier montant à 4 mètres.", feed(watcher, 3.8f, 2000L)!!.phrase)
-        assertNull(feed(watcher, 4.1f, 3000L))
-        assertNull(feed(watcher, 3.9f, 4000L))
-        assertNull(feed(watcher, 3.8f, 5000L))
+        feed(watcher, 2.5f, 0L)
+        feed(watcher, 1.9f, 1000L)
+        assertEquals("Escalier 2 m.", feed(watcher, 1.8f, 2000L)!!.phrase)
+        assertNull(feed(watcher, 2.1f, 3000L))
+        assertNull(feed(watcher, 1.9f, 4000L))
+        assertNull(feed(watcher, 1.8f, 5000L))
     }
 
     @Test
     fun `signal perdu re-arme detection et paliers`() {
         val watcher = StairWatcher(confirmFrames = 2)
 
-        feed(watcher, 4.5f, 0L)
-        feed(watcher, 3.9f, 1000L)
-        assertEquals("Escalier montant à 4 mètres.", feed(watcher, 3.8f, 2000L)!!.phrase)
+        feed(watcher, 2.5f, 0L)
+        feed(watcher, 1.9f, 1000L)
+        assertEquals("Escalier 2 m.", feed(watcher, 1.8f, 2000L)!!.phrase)
         assertNull(watcher.onSignal(StairSignal.none(), 3000L))
-        assertNull(feed(watcher, 4.5f, 4000L))
-        assertNull(feed(watcher, 3.9f, 5000L))
-        assertEquals("Escalier montant à 4 mètres.", feed(watcher, 3.8f, 6000L)!!.phrase)
+        assertNull(feed(watcher, 2.5f, 4000L))
+        assertNull(feed(watcher, 1.9f, 5000L))
+        assertEquals("Escalier 2 m.", feed(watcher, 1.8f, 6000L)!!.phrase)
     }
 
     @Test
     fun `phrases FR et EN des jalons`() {
-        assertEquals("Escalier montant à 4 mètres.", StairText.distancePhrase(SpeechLanguage.Fr, StairDirection.Up, 4f))
-        assertEquals(
-            "Escalier descendant à 2 mètres.",
-            StairText.distancePhrase(SpeechLanguage.Fr, StairDirection.Down, 2f),
-        )
-        assertEquals("Escalier devant à 1 mètre.", StairText.distancePhrase(SpeechLanguage.Fr, StairDirection.Unknown, 1f))
-        assertEquals("Stairs up at 4 meters.", StairText.distancePhrase(SpeechLanguage.En, StairDirection.Up, 4f))
-        assertEquals("Stairs down at 1 meter.", StairText.distancePhrase(SpeechLanguage.En, StairDirection.Down, 1f))
+        assertEquals("Escalier 2 m.", StairText.distancePhrase(SpeechLanguage.Fr, 2f))
+        assertEquals("Escalier 1 m.", StairText.distancePhrase(SpeechLanguage.Fr, 1f))
+        assertEquals("Escalier 0,5 m.", StairText.distancePhrase(SpeechLanguage.Fr, 0.5f))
+        assertEquals("Stairs 2 m.", StairText.distancePhrase(SpeechLanguage.En, 2f))
+        assertEquals("Stairs 1 m.", StairText.distancePhrase(SpeechLanguage.En, 1f))
+        assertEquals("Stairs 0.5 m.", StairText.distancePhrase(SpeechLanguage.En, 0.5f))
     }
 
     @Test
-    fun `jalons EN 4 2 1 resolvent leur clip, le reste nul`() {
-        assertEquals(IseeClipsEn.STAIRS_UP_4, StairClips.clipIdFor("Stairs up at 4 meters."))
-        assertEquals(IseeClipsEn.STAIRS_UP_2, StairClips.clipIdFor("Stairs up at 2 meters."))
-        assertEquals(IseeClipsEn.STAIRS_UP_1, StairClips.clipIdFor("Stairs up at 1 meter."))
-        assertEquals(IseeClipsEn.STAIRS_DOWN_4, StairClips.clipIdFor("Stairs down at 4 meters."))
-        assertEquals(IseeClipsEn.STAIRS_DOWN_2, StairClips.clipIdFor("Stairs down at 2 meters."))
-        assertEquals(IseeClipsEn.STAIRS_DOWN_1, StairClips.clipIdFor("Stairs down at 1 meter."))
-        assertNull(StairClips.clipIdFor("Escalier montant à 4 mètres."))
-        assertNull(StairClips.clipIdFor("Stairs ahead at 4 meters."))
-        assertNull(StairClips.clipIdFor("Stairs up at 3 meters."))
+    fun `jalons EN 2 1 05 resolvent leur clip, le reste nul`() {
+        assertEquals(IseeClipsEn.STAIRS_2M, StairClips.clipIdFor("Stairs 2 m."))
+        assertEquals(IseeClipsEn.STAIRS_1M, StairClips.clipIdFor("Stairs 1 m."))
+        assertEquals(IseeClipsEn.STAIRS_HALF_M, StairClips.clipIdFor("Stairs 0.5 m."))
+        assertNull(StairClips.clipIdFor("Escalier 2 m."))
+        assertNull(StairClips.clipIdFor("Stairs up at 2 meters."))
+        assertNull(StairClips.clipIdFor("Stairs 3 m."))
     }
 
     @Test
     fun `reset oublie paliers`() {
         val watcher = StairWatcher(confirmFrames = 2)
 
-        feed(watcher, 4.5f, 0L)
-        feed(watcher, 3.9f, 1000L)
-        assertEquals("Escalier montant à 4 mètres.", feed(watcher, 3.8f, 2000L)!!.phrase)
+        feed(watcher, 2.5f, 0L)
+        feed(watcher, 1.9f, 1000L)
+        assertEquals("Escalier 2 m.", feed(watcher, 1.8f, 2000L)!!.phrase)
         watcher.reset()
-        assertNull(feed(watcher, 3.8f, 3000L))
+        assertNull(feed(watcher, 1.8f, 3000L))
         // Palier désarmé : la détection se redit en standard, sans jalon.
-        assertEquals("Escalier montant.", feed(watcher, 3.7f, 4000L)!!.phrase)
+        assertEquals("Escalier montant.", feed(watcher, 1.7f, 4000L)!!.phrase)
     }
 }
