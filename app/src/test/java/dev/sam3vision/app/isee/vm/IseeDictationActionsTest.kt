@@ -33,6 +33,7 @@ class IseeDictationActionsTest {
             onCrossingChanged = {},
             confirmFindStopped = {},
             gpsGo = { _ -> },
+            gpsAsk = {},
             gpsOff = {},
             glasses = {},
         )
