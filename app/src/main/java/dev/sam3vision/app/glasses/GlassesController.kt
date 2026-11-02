@@ -129,6 +129,7 @@ class GlassesController(
         note = ::note,
         report = { error, phase, current -> reportSessionError(error, activity, ::note, phase, current) },
         onCreated = { created -> startSession(created) },
+        starting = { _state.update { it.copy(phase = SessionPhase.STARTING) } },
     )
 
     /** Attache caméra/bouton : un seul attachement à la fois. */
@@ -304,7 +305,7 @@ class GlassesController(
         }
         when (state) {
             DeviceSessionState.STARTED -> scope.launch { attachCapabilities(created) }
-            DeviceSessionState.STOPPED -> releaseCapabilities()
+            DeviceSessionState.STOPPED -> opener.settled(::releaseCapabilities)
             else -> Unit
         }
     }
