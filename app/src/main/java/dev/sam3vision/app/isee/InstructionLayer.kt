@@ -42,6 +42,16 @@ internal fun InstructionLayer(pulse: GuidancePulse?, modifier: Modifier = Modifi
     val line = GuidanceInstruction.text(pulse)
     val rim = if (pulse.word == GuidanceWord.Straight) STEERING_FREE else STEERING_BLOCKED
     val alpha = if (pulse.stale) STALE_TEXT_ALPHA else 1f
+    InstructionPlate(line, rim, alpha, modifier)
+}
+
+/**
+ * La pastille consigne (texte + liseré), partagée par la consigne du
+ * battement ([InstructionLayer]) et les cas prioritaires de l'arbitre
+ * ([ArbitratedInstruction]) : une seule pastille, jamais deux rendus.
+ */
+@Composable
+internal fun InstructionPlate(line: String, rim: Color, alpha: Float, modifier: Modifier = Modifier) {
     val measurer = rememberTextMeasurer()
     Canvas(modifier.fillMaxSize()) {
         val layout = measurer.measure(
