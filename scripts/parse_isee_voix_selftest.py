@@ -152,7 +152,7 @@ def selftest_tts_propre():
 
 
 def selftest_continuite():
-    """Continu pur, trou 8 s, micro tenu, seuil, wrap, sans-ts : 15 assertions.
+    """Continu pur, trou 8 s, micro tenu, seuil, wrap, sans-ts, silence-total : 18 assertions.
 
     Session inactive : non taggée (aucune ligne ISEE_VOIX/VoiceMute ne porte
     l'état de session) — aucun écart exclu de ce fait. Micro tenu : `bus-jet
@@ -182,12 +182,22 @@ def selftest_continuite():
     assert parse_ligne("W VoiceMute: bus-jet motif=micro-user level=2 texte=[A.]") == ("MICRO", "", "")
     assert parse_ligne("W VoiceMute: prox-jet level=1 motif=parole-user texte=[A.]") == ("MICRO", "", "")
     assert taux_parole(evenements(TRACE_PROPRE)) == (None, None, None)
+    vil = ("11-02 15:00:00.000  1000  1000 W VoiceMute: bus-parole level=6 texte=[1 step.]\n"
+           "11-02 15:00:00.100  1000  1000 I ISEE_VOIX: PLAYER stop\n"
+           "11-02 15:00:02.000  1000  1000 W VoiceMute: bus-parole level=2 texte=[Left.]\n"
+           "11-02 15:00:02.100  1000  1000 I ISEE_VOIX: PLAYER stop\n")
+    lignes, propre = verdict_coupe(evenements(vil))
+    vil_tenu = "\n".join(lignes)
+    assert not propre and "silence-total×1" in lignes[-1], lignes
+    assert "TOTAL : 0 PLAY, 0 TTS done" in vil_tenu, lignes
+    tts_seul = evenements("11-02 15:00:00.000  1000  1000 I ISEE_VOIX: TTS done\n")
+    assert "TOTAL" not in "\n".join(verdict_coupe(tts_seul)[0])
     nuit = ("11-02 23:59:59.000  1000  1000 I ISEE_VOIX: PLAY source=clip detail=[A.]\n"
             "11-03 00:00:01.000  1000  1000 I ISEE_VOIX: PLAY source=clip detail=[B.]\n")
     assert ecarts_silence(evenements(nuit))[0][0] == 2.0
     seul = "11-02 15:00:00.000  1000  1000 I ISEE_VOIX: PLAY source=clip detail=[A.]\n"
     assert taux_parole(evenements(seul)) == (None, 0.0, 0.0)
-    return 15
+    return 18
 
 
 def selftest():
