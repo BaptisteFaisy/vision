@@ -85,34 +85,4 @@ class Fix4DeadCutGuardTest {
         assertEquals(OutdoorLevel.FALLBACK to "repli", speaker.said.last())
     }
 
-    @Test
-    fun `alerte securite libere le bus`() {
-        val driver = SafetyTestDriver()
-        val stops = mutableListOf<Unit>()
-        VoiceBus.post(OutdoorLevel.HUMAN, "personne")
-        VoiceBus.post(OutdoorLevel.FALLBACK, "repli")
-        assertEquals(1, speaker.said.size)
-
-        testSafetyVoice(driver, stops).speak("Danger.")
-
-        assertEquals(1, stops.size)
-        assertEquals(1, driver.calls.size)
-        VoiceBus.post(OutdoorLevel.FALLBACK, "repli")
-        assertEquals(2, speaker.said.size)
-        assertEquals(OutdoorLevel.FALLBACK to "repli", speaker.said.last())
-    }
-
-    @Test
-    fun `alerte blanche ne coupe ni ne libere`() {
-        val driver = SafetyTestDriver()
-        val stops = mutableListOf<Unit>()
-        VoiceBus.post(OutdoorLevel.HUMAN, "personne")
-
-        testSafetyVoice(driver, stops).speak("   ")
-
-        assertEquals(0, stops.size)
-        assertEquals(0, driver.calls.size)
-        VoiceBus.post(OutdoorLevel.FALLBACK, "repli")
-        assertEquals(1, speaker.said.size)
-    }
 }

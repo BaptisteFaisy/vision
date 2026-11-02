@@ -34,7 +34,7 @@ SOUS_CHEMIN = os.path.join("src", "test")
 PUBLIE = ("probe.onFrame(", "probe.dispatch(", "probe.runFrame(")
 # Remises à zéro admises : `begin()` les appelle toutes depuis le 01/11.
 NETTOIE = ("begin()", "seanceVide(", "ProbeTracks.reset(", "StairCannyCount.clear(",
-           "ProbeBackgroundMotion.reset(", "MotionLog.reset(",
+           "ProbeBackgroundMotion.reset(",
            "cleanSessionGlobals(")
 SKIP_DIRS = {"build", ".gradle", ".idea", "__pycache__", ".kotlin"}
 

@@ -42,4 +42,12 @@ object SpeechArbitration {
         VoiceNavEvent.BackOnRoute -> SpeechPriority.Info
         else -> SpeechPriority.Instruction
     }
+    /**
+     * [incoming] coupe-t-elle [current] ? Oui si et seulement si elle est
+     * prioritaire — sauf le danger, qui coupe tout, y compris un danger en
+     * cours (la plus fraîche gagne) : le danger coupe la consigne, jamais
+     * l'inverse, et deux phrases de même niveau s'enchaînent.
+     */
+    fun interrupts(current: SpeechPriority, incoming: SpeechPriority): Boolean =
+        incoming == SpeechPriority.Danger || incoming > current
 }
