@@ -3,7 +3,7 @@
 
 Vérifie, sans clé ni réseau (runnable en CI) :
 1. chaque texte EN du catalogue (nouveaux + reuse) existe en littéral exact
-   dans IseeClipsEn.kt ;
+   dans le miroir Kotlin (IseeClipsEn.kt + IseeClipsSidewalk.kt) ;
 2. chaque reuse existe dans tools/voicepack-catalog.json avec le même texte EN
    (pas de doublon audio qui diverge) ;
 3. aucun id nouveau ne collisionne avec le pack existant ;
@@ -18,7 +18,10 @@ import os
 import re
 import sys
 
-MIRROR = "core/src/main/java/dev/sam3vision/core/speech/IseeClipsEn.kt"
+MIRRORS = [
+    "core/src/main/java/dev/sam3vision/core/speech/IseeClipsEn.kt",
+    "core/src/main/java/dev/sam3vision/core/speech/IseeClipsSidewalk.kt",
+]
 CATALOG = "tools/isee-clips-en-catalog.json"
 LEGACY = "tools/voicepack-catalog.json"
 ID_RE = re.compile(r"^[a-z0-9_]+$")
@@ -56,7 +59,7 @@ def check_mirror(entries: list, mirror_src: str, problems: list) -> None:
         text = entry.get("en", "")
         if text and text not in mirror_src:
             problems.append(f"{entry.get('id')}: « {text} » "
-                            "introuvable dans IseeClipsEn.kt")
+                            "introuvable dans le miroir Kotlin")
 
 
 def check_reuse(reuse: list, legacy: dict, problems: list) -> None:
@@ -105,8 +108,11 @@ def failures(root: str, allow_missing: bool) -> list:
     reuse = catalog.get("reuse", [])
     legacy = {c["id"]: c.get("en", "")
               for c in load_json(root, LEGACY).get("clips", [])}
-    with open(os.path.join(root, MIRROR), encoding="utf-8") as fh:
-        mirror_src = fh.read()
+    parts = []
+    for rel in MIRRORS:
+        with open(os.path.join(root, rel), encoding="utf-8") as fh:
+            parts.append(fh.read())
+    mirror_src = "\n".join(parts)
     check_ids(clips, set(legacy), problems)
     check_mirror(clips + reuse, mirror_src, problems)
     check_reuse(reuse, legacy, problems)

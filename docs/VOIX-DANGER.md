@@ -624,8 +624,9 @@ Nouveau contrat : l'annonce tient en moins de 500 ms.
   inchangé (muet en v4 : pas de clip FR, seuls les niveaux GPS
   synthétisent) ;
 - **nouveaux clips** : `sidewalk_*_short` (catalogue `clips`, miroir
-  `IseeClipsEn`, garde `check-isee-clips-en.py`) — les `sidewalk_*`
-  existants sont gardés (partagés avec le voicepack, section `reuse`) ;
+  `IseeClipsEn` + `IseeClipsSidewalk`, garde `check-isee-clips-en.py`) —
+  les `sidewalk_*` existants sont gardés (partagés avec le voicepack,
+  section `reuse`) ;
 - **pauses trimmées** : la synthèse mettait jusqu'à 1 s de pauses dans
   1,8 s d'audio — les MP3 commis sont trimmés (silences tête/queue
   retirés, pauses internes plafonnées à 0,1 s) : `across` 0,91 s, `left`
@@ -642,7 +643,7 @@ Nouveau contrat : l'annonce tient en moins de 500 ms.
   dans son clip court (`TraversePhrases.clipIdFor`).
 
 Verrouillé par `VoiceSliceTest` (+2 : pastille par niveau, bus 500 ms),
-`IseeClipsEnTest` (registre 122, miroir, 4 clefs inverses),
+`IseeClipsEnTest` (registre 127, miroir, 4 clefs inverses),
 `SidewalkWatcherTest` + `SeuilsDehorsV4Test` (phrases courtes),
 `TraverseVoiceTest` + `TraverseVetoPriorityTest` (but court + clip court)
 et `GUIDAGE-TOUT-DROIT.md` (phrases citées).
