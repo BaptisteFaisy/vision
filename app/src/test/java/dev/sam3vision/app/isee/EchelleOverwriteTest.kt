@@ -13,8 +13,6 @@ import dev.sam3vision.core.hazard.HazardKind
 import dev.sam3vision.core.hazard.HazardWatcher
 import dev.sam3vision.core.live.GuidanceWord
 import dev.sam3vision.core.speech.SpeechLanguage
-import dev.sam3vision.core.traverse.VehicleStateCue
-import dev.sam3vision.core.traverse.VehicleStateWatcher
 import kotlinx.coroutines.test.runTest
 import org.junit.After
 import org.junit.Assert.assertEquals
@@ -122,27 +120,6 @@ class EchelleOverwriteTest {
     }
 
     // Vœux par guetteur.
-
-    @Test
-    fun `vehicule en mouvement niveau 0 avec clip, arret muet`() {
-        val moving = vehicleWish(VehicleStateCue("Voiture.", meters = 5f, moving = true))
-
-        assertNotNull(moving)
-        assertEquals(OutdoorLevel.CAR_MOVING, moving?.level)
-        assertEquals(AntiRepeat.KEY_CAR_MOVING, moving?.key)
-        assertEquals("car", moving?.clipId)
-
-        assertNull(vehicleWish(VehicleStateCue("Voiture à l'arrêt.", meters = 5f, moving = false)))
-        assertNull(vehicleWish(null))
-    }
-
-    @Test
-    fun `vehicule pluriel niveau 0 sans clip`() {
-        val plural = vehicleWish(VehicleStateCue("2 vehicles moving.", meters = 5f, moving = true, movingCount = 2))
-
-        assertEquals(OutdoorLevel.CAR_MOVING, plural?.level)
-        assertNull(plural?.clipId)
-    }
 
     @Test
     fun `personne douce niveau 2, mot imminent meme niveau en clip`() {
@@ -378,7 +355,7 @@ class EchelleOverwriteTest {
 
 
     private fun rig(): ObstacleWatchers =
-        ObstacleWatchers(VehicleStateWatcher(), CurbWatcher(), HazardWatcher())
+        ObstacleWatchers(CurbWatcher(), HazardWatcher())
 
     /** Lecture centrée 640×480 : boîte de [largeur] px à [meters] m. */
     private fun lecture(label: String, largeur: Float, meters: Float): DistanceReading {
@@ -436,17 +413,14 @@ class EchelleOverwriteTest {
     }
 
     @Test
-    fun `voiture qui approche postee niveau 0 avec clip`() = runTest {
+    fun `voiture dehors muette meme en mouvement, traversee seule`() = runTest {
         val guetteurs = rig()
 
         obstacleFrame(etat(1, lecture("car", 100f, 8f)), { SpeechLanguage.Fr }, guetteurs)
         obstacleFrame(etat(2, lecture("car", 120f, 7f)), { SpeechLanguage.Fr }, guetteurs)
         obstacleFrame(etat(3, lecture("car", 145f, 6f)), { SpeechLanguage.Fr }, guetteurs)
 
-        assertEquals(1, speaker.said.size)
-        assertEquals(OutdoorLevel.CAR_MOVING, speaker.said.single().level)
-        assertEquals("Voiture.", speaker.said.single().text)
-        assertEquals("car", speaker.said.single().clipId)
+        assertTrue(speaker.said.isEmpty())
     }
 
     @Test

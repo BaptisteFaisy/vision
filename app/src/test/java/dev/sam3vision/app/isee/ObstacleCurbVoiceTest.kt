@@ -7,7 +7,6 @@ import dev.sam3vision.core.distance.DistanceReading
 import dev.sam3vision.core.hazard.HazardWatcher
 import dev.sam3vision.core.live.AntiRepeat
 import dev.sam3vision.core.speech.SpeechLanguage
-import dev.sam3vision.core.traverse.VehicleStateWatcher
 import org.junit.After
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertTrue
@@ -78,7 +77,7 @@ class ObstacleCurbVoiceTest {
 
     @Test
     fun `bordure confirmee sur 2 frames = postee niveau 5`() {
-        val guetteurs = ObstacleWatchers(VehicleStateWatcher(), CurbWatcher(), HazardWatcher())
+        val guetteurs = ObstacleWatchers(CurbWatcher(), HazardWatcher())
 
         obstacleFrame(etat(frames = 1, listOf(bordure())), { SpeechLanguage.Fr }, guetteurs)
         assertTrue(speaker.said.isEmpty())
@@ -91,7 +90,7 @@ class ObstacleCurbVoiceTest {
 
     @Test
     fun `lectures non revendiquees = silence`() {
-        val guetteurs = ObstacleWatchers(VehicleStateWatcher(), CurbWatcher(), HazardWatcher())
+        val guetteurs = ObstacleWatchers(CurbWatcher(), HazardWatcher())
 
         obstacleFrame(etat(frames = 1, listOf(arbre())), { SpeechLanguage.Fr }, guetteurs)
         obstacleFrame(etat(frames = 2, listOf(arbre())), { SpeechLanguage.Fr }, guetteurs)

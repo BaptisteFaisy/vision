@@ -7,22 +7,21 @@ import dev.sam3vision.core.hazard.HazardKind
 import dev.sam3vision.core.crossing.CrossingLevels
 import dev.sam3vision.core.live.AntiRepeat
 import dev.sam3vision.core.live.GuidanceWord
-import dev.sam3vision.core.traverse.VehicleStateCue
 
 /**
  * Échelle voix dehors SPEC v4 : 13 niveaux, le plus petit gagne —
- * l'écrasé n'est jamais redit sauf re-détecté actuel. 0 voitures en
- * mouvement (< 20 m, présence seule, pluriel si plusieurs) ; 1 parole du
- * user (seul 0 la coupe) ; 2 humains (< 10 m, phrase + cadran + distance,
- * imminent 2 m ou moins = mot immédiat) ; 3 rappel GPS (silence 15 s ou
- * plus) ; 4 grillages, murs et barrières (< 6 m) ; 5 bordures (< 6 m) ;
- * 6 escaliers (jalons 4/2/1, marches comptées) ; 7 poteaux, mobilier
- * vertical et divers (< 6 m) ; 8 passages piétons (< 6 m) ; 9 réponses du
- * chat ; 10 trottoirs ; 11 manœuvres et événements GPS ; 12 repli
- * (gauche, droite ou tout droit).
+ * l'écrasé n'est jamais redit sauf re-détecté actuel. 0 réservé (plus
+ * aucun producteur dehors : les voitures ne parlent qu'en Traversée,
+ * verdict 100 — ordre user du 02/11) ; 1 parole du user ; 2 humains
+ * (< 10 m, phrase + cadran + distance, imminent 2 m ou moins = mot
+ * immédiat) ; 3 rappel GPS (silence 15 s ou plus) ; 4 grillages, murs
+ * et barrières (< 6 m) ; 5 bordures (< 6 m) ; 6 escaliers (jalons 4/2/1,
+ * marches comptées) ; 7 poteaux, mobilier vertical et divers (< 6 m) ;
+ * 8 passages piétons (< 6 m) ; 9 réponses du chat ; 10 trottoirs ;
+ * 11 manœuvres et événements GPS ; 12 repli (gauche, droite ou tout droit).
  */
 object OutdoorLevel {
-    /** Voitures en mouvement : présence seule, sans cadran ni distance. */
+    /** Niveau 0 réservé (aucun producteur dehors : voitures = Traversée). */
     const val CAR_MOVING = 0
 
     /** Parole du user : tait tout, seul le niveau 0 la coupe. */
@@ -85,16 +84,6 @@ internal data class VoiceWish(
  */
 internal fun decideFrame(wishes: List<VoiceWish?>): VoiceWish? =
     wishes.filterNotNull().filter { it.text.isNotBlank() }.minByOrNull { it.level }
-
-/**
- * Vœu véhicule : le mouvement seul parle (niveau 0, clip quand la phrase
- * est fixe) — arrêt et stationnement muets (la spec ne dit que le
- * mouvement). Pur, testé en JVM.
- */
-internal fun vehicleWish(cue: VehicleStateCue?): VoiceWish? {
-    if (cue == null || !cue.moving) return null
-    return VoiceWish(OutdoorLevel.CAR_MOVING, cue.phrase, AntiRepeat.KEY_CAR_MOVING, recordedClipId(cue.phrase))
-}
 
 /**
  * Vœu danger : transfère le niveau et la clé du guetteur ([HazardCue.level],

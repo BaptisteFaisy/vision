@@ -127,9 +127,9 @@ class LiveViewModel(app: Application) : AndroidViewModel(app) {
     /** Annonce vocale des positions : une phrase à la fois, jamais superposée. */
     private val voice = VoiceAnnouncer(app, POSITION_VOICE_DIR)
 
-    /** Voix du direct : positions + états moteurs (un champ, plafond 500 lignes). */
+    /** Voix du direct : positions (un champ, plafond 500 lignes). */
     private val announcers = LiveDirectAnnouncers(viewModelScope, _state, { settings },
-        { traverse.active }, { _state.value.memory.asking || asker.pictoActive }, { c, p -> voice.say(c, p) })
+        { _state.value.memory.asking || asker.pictoActive }, { c, p -> voice.say(c, p) })
 
     /** Câblage traversée : pipeline + voix, branché dans [publish]. */
     private val traverse = TraverseWiring(TraversePipeline())
@@ -384,7 +384,7 @@ class LiveViewModel(app: Application) : AndroidViewModel(app) {
         // extrapolées entre deux inférences. Flag éteint : appel inerte (`null`).
         prediction.absorb(shown.frame, now, width, height)
         val readings = distances.measure(width, height, shown.detections, seen.map { it?.id })
-        announcers.announce(shown.frame, width, height, now, readings, shown.detections, !traverse.active || shown.keepGuidance)
+        announcers.announce(shown.frame, width, height, now, readings, !traverse.active || shown.keepGuidance)
         if (!traverse.active) asker.onLiveFrame(width, height, now)
         // Calcul hors thread principal ; le poste `overlays` est posé juste après.
         val overlays = decodeOverlays(shown.frame)
