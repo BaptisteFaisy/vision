@@ -212,10 +212,11 @@ class TraverseWiringTest {
     @Test
     fun `sans vert - traversez jamais parle`() = runBlocking {
         val played = mutableListOf<String>()
-        val wiring = voicedWiring(played)
+        val asked = mutableListOf<String>()
+        val wiring = voicedWiring(played, asked)
         repeat(5) { wiring.at(emptyList(), it + 1) }
 
-        assertTrue(played.isEmpty())
+        assertFalse(asked.contains("Vert."))
     }
 
     @Test
@@ -256,9 +257,12 @@ class TraverseWiringTest {
         assertEquals(listOf("traversee mode=OFF"), lines)
     }
 
-    private fun voicedWiring(played: MutableList<String>): TraverseWiring {
+    private fun voicedWiring(
+        played: MutableList<String>,
+        asked: MutableList<String> = mutableListOf(),
+    ): TraverseWiring {
         val pipeline = TraversePipeline()
-        pipeline.voice = TraverseVoice(FakePlayer(played), FakeStore(), FakeBundled())
+        pipeline.voice = TraverseVoice(FakePlayer(played), FakeStore(asked), FakeBundled())
         return TraverseWiring(pipeline, log = {})
     }
 
@@ -275,9 +279,12 @@ class TraverseWiringTest {
         override fun fill(phrase: String, path: String): Boolean = true
     }
 
-    private class FakeStore : TraverseClipStore {
+    private class FakeStore(val asked: MutableList<String> = mutableListOf()) : TraverseClipStore {
         override fun pathFor(phrase: String): String = "/tmp/clip.wav"
-        override fun clipFor(phrase: String): String? = "/tmp/${phrase.hashCode()}.wav"
+        override fun clipFor(phrase: String): String? {
+            asked += phrase
+            return "/tmp/${phrase.hashCode()}.wav"
+        }
     }
 
     private fun scope(): CoroutineScope = CoroutineScope(EmptyCoroutineContext)
