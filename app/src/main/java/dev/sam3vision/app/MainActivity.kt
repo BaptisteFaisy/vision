@@ -213,7 +213,9 @@ class MainActivity : ComponentActivity() {
         // et un minuteur ne servirait à rien, Android gèle le processus en arrière-plan.
         // Session lunettes-iSee en cours : la carte reste allumée, la veille ne coupe rien.
         if (!isChangingConfigurations && !glassesKeepAlive()) viewModel.releaseGpu()
-        isee.onBackground()
+        // Rotation : l'activité est recréée mais les ViewModels survivent — le direct
+        // (socket `/live/ws`, sessions) survit avec eux au lieu d'être coupé/rouvert.
+        if (!isChangingConfigurations) isee.onBackground()
         super.onPause()
     }
 

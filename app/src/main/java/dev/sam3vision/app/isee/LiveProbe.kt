@@ -438,7 +438,8 @@ _state.update { it.cleared() }
                 // restent les derniers connus, seul le message d'erreur change.
                 val error = result.exceptionOrNull() ?: ApiError.BadResponse("SAM call failed")
                 if (!warmed && error is ApiError.Timeout) sayColdTimeout()
-                android.util.Log.w("sam3vision", "live KO: ${error::class.simpleName} ${error.message}")
+                val cause = error.cause?.let { " + ${it::class.simpleName} ${it.message}" } ?: ""
+                android.util.Log.w("sam3vision", "live KO: ${error::class.simpleName} ${error.message}$cause")
                 _state.update { it.copy(error = probeFailureText(error), timings = shown.snapshot()) }
                 return@withLock
             }

@@ -1,5 +1,6 @@
 package dev.sam3vision.app
 
+import android.app.Activity
 import android.content.Context
 import android.graphics.Bitmap
 import android.util.Size
@@ -158,10 +159,15 @@ private fun rememberLivePreview(context: Context, onAttached: (Boolean) -> Unit)
 @Composable
 private fun ForegroundGate(viewModel: LiveViewModel) {
     val lifecycle = LocalLifecycleOwner.current.lifecycle
+    val activity = LocalContext.current as? Activity
     DisposableEffect(lifecycle, viewModel) {
         val observer = LifecycleEventObserver { _, event ->
+            // Rotation : l'activité est recréée mais le ViewModel survit — le socket
+            // `/live/ws` survit avec lui (pas de coupure/reprise). Au vrai retour,
+            // `onForeground()` ne relance que si `onBackground()` avait coupé.
+            val rotating = activity?.isChangingConfigurations == true
             when (event) {
-                Lifecycle.Event.ON_PAUSE -> viewModel.onBackground()
+                Lifecycle.Event.ON_PAUSE -> if (!rotating) viewModel.onBackground()
                 Lifecycle.Event.ON_RESUME -> viewModel.onForeground()
                 else -> {}
             }
