@@ -19,8 +19,8 @@ Règles de lecture :
   vérifie l'arithmétique, `--verdict` imprime le verdict sur les 100 ms.
 
 Provenance : les valeurs marquées `uNN` viennent des notes de la campagne (vague 1), **hors de ce
-dépôt** ; aucune n'est présentée comme mesurée **ici** — sauf celles datées du 01/11/2026, lues sur
-un téléphone via `ISEE_LAT` (§ 10 bis). Ce que cet arbre-ci permet de vérifier est listé en
+dépôt** ; aucune n'est présentée comme mesurée **ici** — sauf celles datées des 01-02/11/2026, lues sur
+un téléphone via `ISEE_LAT` (§ 10 bis et § 10 ter). Ce que cet arbre-ci permet de vérifier est listé en
 annexe B, et `docs/PERF.md` reste la référence de ce qui est mesuré dans cet arbre.
 
 ## 1. Définitions
@@ -104,6 +104,13 @@ Nature des chiffres : seuls `1,2 ms` (décodage), `7,3 ms` (masques) et les tota
 sont **mesurés**. Le partage vision ≈ 234 ms / détection ≈ 85 ms est une **attribution par
 soustraction** (328 − 234 − 7) : un `breakdown_ms` sur un appel réel doit le trancher.
 
+Tentative de nuit du 01/11/2026 (prod `sam3-eu-a100` **sans** `breakdown_ms`, repli
+`timings_ms`, n = 6, 0 objet à chaque run) : vision 1,8 ms / détection 0,5 ms /
+hors-GPU 58,5 ms en médiane (total 64 ms ; runs 1–2 à froid : 1 086 / 530 ms).
+Ce repli **ne tranche pas** l'attribution : à 0 objet, c'est le chemin sans détection,
+et `timings_ms` n'est pas `breakdown_ms`. Le partage reste **calculé** tant qu'un appel
+réel avec `breakdown_ms` n'a pas eu lieu (`[deploy-gpu]`, décision en attente).
+
 ## 3. Planchers physiques
 
 <!-- table:planchers -->
@@ -134,6 +141,11 @@ soustraction** (328 − 234 − 7) : un `breakdown_ms` sur un appel réel doit l
   le marqueur `[deploy-gpu]` pour ne pas invalider le snapshot à chaque push. Le snapshot
   ne change aucun chiffre de ce budget (disponibilité, pas latence), mais une recette
   qui suit un deploy de peu paie le boot complet — prévoir le réveil hors prise.
+- **Chronométrage de nuit du 01/11/2026** (3 cycles, `GET /warm` après gel puis après
+  `/release`) : restaurations 7,79 s / 9,15 s murales (GPU 4,2 / 3,3 s), cycle « boot »
+  14,09 s mural (GPU 8,6 s) — mais `restored: true` sur les 3 cycles, conteneur âgé de
+  6,6 h : le booléen ne discrimine pas `kill → boot` d'un dégel, et aucun cycle ne prouve
+  un vrai boot à froid. Les 25–38 s restent ceux de la vague 1.
 
 ## 4. Budget par architecture (latence perçue, calculée étage par étage)
 
@@ -253,13 +265,13 @@ Règles d'usage :
 | grandeur | mesure manquante | unité | attendu |
 |---|---|---|---|
 | `ENCODE` (10 ms) : tranché | écart 27/32 résolu (n = 343 nominal, p95 11–26 selon charge) | § 2 | clos le 01/11/2026 |
-| `CAPTURE` (86 ms) : p95 et max | percentiles hauts sur n = 38 seulement ; R1 donne p95 477 / p99 573 / gigue 75,1 (N = 323, build combi) | instrument | campagne longue sur master HEAD : n ≥ 1000, p95/p99/jetées (bloquée le 01/11 : téléphone + bail GPU ; protocole et analyseur `lat_stats` prêts) |
+| `CAPTURE` (86 ms) : p95 et max | percentiles hauts : § 10 ter donne `age` p95 92 / p99 106 (n = 1374, veto nuit) ; R1 donne p95 477 / p99 573 / gigue 75,1 (N = 323, build combi) | instrument | partiellement clos nuit 01-02/11 (capsplit) ; `latency` p95/p99 et jetées toujours ouverts (0 frame, veto nuit) |
 | `DECODE`, `DISPLAY` réels, `CAPTURE` local | valeurs terrain (le banc est une simulation) ; `DECODE` instrumenté par la PR #907 (ligne `decsplit`) | instrument | `--capsplit` + `--decsplit` en campagne longue, p50/p95 |
 | distribution d'A/R (N = 20, keep-alive, p50/p95) | reproductibilité de l'A/R médian | banc réseau | un banc sans campagne payante |
 | propagation locale (ms/frame) | cible < 8 ms à 512×206 | banc JVM | ms/frame par étape de warp |
-| part vision / détection du serveur | attribution par soustraction à confirmer ; champ `breakdown_ms` livré par la PR #904 (banc `bench_breakdown`, repli `timings_ms`) | backend | un appel `/live` réel (~1 min GPU après libération du bail) |
-| froid / snapshot : temps muraux | boot complet et restauration non remesurés depuis la vague 1 (25–38 s / 2–7 s) | backend | `GET /warm` chronométré après gel 60 s (restore) puis `POST /release` (boot), 2–3 cycles |
-| transport M1 binaire : gain mesuré | contrat figé et prouvé byte-exact (16 vecteurs, PR #900 ; harnais A/B PR #912) | instrument | baseline base64 puis jambe binaire, N ≥ 500 chacune, sur `isee-sim` |
+| part vision / détection du serveur | attribution par soustraction à confirmer ; champ `breakdown_ms` livré par la PR #904 (banc `bench_breakdown`, repli `timings_ms`) | backend | tenté nuit 01/11 (repli `timings_ms` n = 6, 0 objet : 1,8/0,5/58,5 ms — ne tranche pas, § 2 bis) ; `breakdown_ms` réel toujours attendu (`[deploy-gpu]` en attente) |
+| froid / snapshot : temps muraux | restore 7,79/9,15 s et « boot » 14,09 s nuit 01/11 (3 cycles), mais `restored: true` partout : aucun vrai froid prouvé | backend | clos nuit 01/11 comme « non discriminant » (§ 3) ; 25–38 s conservés, vrai boot à froid toujours non remesuré |
+| transport M1 binaire : gain mesuré | contrat figé et prouvé byte-exact (16 vecteurs, PR #900 ; harnais A/B PR #912) | instrument | bloqué nuit 01-02/11 : émulateur mort 2/2 (0 frame, ~30–90 s après init caméra) ; piste `swangle` (tiers tenu ~10 min) ; baseline toujours à mesurer |
 | régulateur : réouverture (PR #905) | 83 % → 7,1 % de trames bridées en simulation sur dump N = 1081 | terrain | confirmation en campagne (ips ×~2 attendus) |
 | poids montant ⇄ octets ⇄ ms | modèle qualité ↔ latence | transport | tableau octets ↔ ms |
 | dérive du masque ⇄ fréquence de keyframe | erreur de reprojection | simulation | courbe erreur ↔ intervalle |
@@ -269,10 +281,10 @@ Tant que ces mesures ne sont pas faites, ce budget est **exact en planchers** (m
 
 ## 9. Ce que ce document n'affirme pas
 
-- **Hors `CAPTURE`** (§ 2, mesuré sur téléphone le 01/11/2026, n = 38), **`ENCODE`**
-  (§ 2, n = 343) et hors § 10, les coûts client sont des simulations ou des estimations
-  reprises de la campagne, pas des relevés d'appareil. `DECODE`, `DISPLAY` et la capture
-  du chemin local restent des hypothèses.
+- **Hors `CAPTURE`** (§ 2, mesuré sur téléphone le 01/11/2026, n = 38, confirmé n = 1374
+  au § 10 ter), **`ENCODE`** (§ 2, n = 343) et hors § 10, les coûts client sont des simulations
+  ou des estimations reprises de la campagne, pas des relevés d'appareil. `DECODE`, `DISPLAY`
+  et la capture du chemin local restent des hypothèses.
 - Les chiffres marqués `uNN` viennent de notes **hors de ce dépôt** : ils décrivent le backend et
   les patchs de la vague 1, pas le code d'ici.
 - Le partage vision / détection du serveur est **calculé**, pas mesuré (§ 2 bis).
@@ -316,7 +328,10 @@ Lecture :
   N = 323 < 1000) et SHA exact du build non prouvé (combi-équivalent) ;
 - R1 confirme le modèle de file côté client : `up` p50 19 ms = phase caméra (attente ≈
   intervalle ÷ 2), file serveur 0 ms sur tout le dump — et motive la PR #905 (réouverture
-  après 5 moyennes sous budget : 83 % → 7,1 % de trames bridées en simulation).
+  après 5 moyennes sous budget : 83 % → 7,1 % de trames bridées en simulation) ;
+- la nuit du 01 au 02/11 (Redmi, 2 × 6 × 150 s, veto nuit) n'a produit **aucune** frame
+  `latency` : le p95 serveur reste celui de R1, et M1 reste sans baseline (émulateur mort
+  2/2, 0 frame) — la même nuit livre N = 1374 lignes `capsplit` (§ 10 ter).
 
 ### 10 bis. Campagne `capsplit` du 01/11/2026 — ce qui était mesuré nulle part, et ce que `int` tranche
 
@@ -377,6 +392,32 @@ rien ne reliait cette étiquette à une campagne. `scripts/check-budget-provenan
 que ça ne recommence pas — une mesure chasse l'hypothèse, et une hypothèse qui survit à une mesure
 fait échouer la CI.
 
+### 10 ter. Campagne `capsplit` longue du 01-02/11/2026 — N = 1374, veto nuit, 0 `latency`
+
+Deux runs Redmi (6 × 150 s chacun, builds `1.0.1349-0c25270e` puis `1.0.1350-db543b09`,
+nuit du 01 au 02/11/2026), combinés après `skip 5` : N = 1374 lignes `capsplit`. La nuit
+noire a déclenché le veto nuit sur chaque frame — **0 envoi serveur, 0 frame `latency`** :
+cette campagne ne mesure que le chemin client avant envoi, pas le serveur. Les deux runs
+ont été perturbés par l'usage du téléphone (X en avant-plan sur le run 2, Horloge puis
+écran éteint sur le run 3 : chunks à 0 ligne, aucune frame fantôme).
+
+| poste | p50 | p95 | p99 | max | moyenne | lecture |
+|---|---:|---:|---:|---:|---:|---|
+| `age` | 82 | 92 | 106 | 126 | 83,0 | `CAPTURE` confirmé à 5 % près (86 au § 10 bis, autre téléphone) ; p95/p99 désormais publiés |
+| `enc` | 14 | 19 | 33 | 107 | 14,9 | dans la sensibilité à la charge documentée (§ 2 : p95 11–26) ; le 10 nominal publié inchangé |
+| `b64` | 0 | 0 | 0 | 0 | 0,0 | base64 sous la milliseconde, comme au § 10 bis |
+| `cb` | 0 | 0 | 0 | 0 | 0,0 | veto nuit : aucun envoi, rien à rappeler — cohérent avec le `cb` résolu (O(1) sur master) |
+| `total` | 15 | 20 | 35 | 114 | 16,0 | analyse complète sous la période (33 ms) jusqu'au p95 : le débit tient |
+| `int` | 33 | 46 | 53 | 100 | 33,4 | 30 fps tenus même en veto nuit |
+
+Ce que cette campagne change et ne change pas :
+
+- `CAPTURE` 86 ms n'est plus un n = 38 isolé : un second téléphone, d'autres builds,
+  N = 1374, donnent `age` p50 82 ms. L'écart (−5 %) tient dans la variabilité
+  inter-appareils ; le § 2 garde 86 ms ;
+- les percentiles hauts du § 8 sont partiellement livrés (`age` p95 92 / p99 106),
+  mais en veto nuit, sans envois : le p95 serveur et les jetées restent ceux de R1.
+
 ## Annexe A — où retrouver chaque chiffre
 
 | chiffre | source | unité |
@@ -392,6 +433,9 @@ fait échouer la CI.
 | 7 étages, perçu ≠ A/R, coût d'instrumentation borné | `LatencyProfile`, `LatencyTrace` (vague 1) | u07 |
 | 1 220–1 260 ms affichés (6 en vol) · 599–775 ms (1 en vol) | notes de campagne, terrain | terrain |
 | R1 Redmi combi : N = 323, moyenne 343 ms, p95 477, p99 573, gigue 75,1, max 722 ms | dump `ISEE_LAT` 01/11/2026 15:47–15:49 (hors dépôt) | R1 |
+| capsplit nuit 01-02/11 : N = 1374, `age` p50 82/p95 92, `total` p50 15/p95 20, 0 `latency` (veto nuit) | dumps `ISEE_LAT` Redmi (hors dépôt) | § 10 ter |
+| partage serveur (repli `timings_ms`, n = 6, 0 objet) : vision 1,8 / detr 0,5 / hors-GPU 58,5 ms | bench partage 01/11/2026 (hors dépôt) | § 2 bis |
+| réveil conteneur 01/11 : restore 7,79/9,15 s, « boot » 14,09 s, `restored: true` partout | `GET /warm` chronométré (hors dépôt) | § 3 |
 
 ## Annexe B — ce que cet arbre-ci permet de vérifier
 
