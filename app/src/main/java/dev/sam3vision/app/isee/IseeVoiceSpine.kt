@@ -6,6 +6,7 @@ import dev.sam3vision.core.picto.PictoPlaceMode
 import dev.sam3vision.core.picto.PictoVoiceText
 import dev.sam3vision.core.settings.Settings
 import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.collect
 import kotlinx.coroutines.launch
@@ -50,17 +51,30 @@ internal class IseeVoiceSpine(
      * Parole GPS vers le bus (SPEC v4) : manœuvres au rang 11, rappel au
      * rang 3 — tus en Traversée (le verdict y est propriétaire du son) et
      * dedans (chaîne dedans : find, user, humain, chat, porte et murs).
+     * Sous un compte (§ 41) : reportée au silence (un cycle au plus),
+     * jamais perdue (une manœuvre ne se re-propose pas).
      */
     fun speakGps(text: String, level: Int) {
         if (crossingActive()) return
         if (placeMode() != PictoPlaceMode.DEHORS) return
+        if (VoiceBus.stairsSpeaking()) {
+            scope.launch { deferGpsToGap(text, level) }
+            return
+        }
         VoiceBus.post(level, text)
     }
 
-    /** Reprise au repos : la réponse coupée reparle (rang 9, hors Traversée). */
+    /** Reprise au repos : la réponse coupée reparle (rang 9, hors Traversée, marches finies). */
     suspend fun resumeChatIfDue() {
         if (crossingActive()) return
+        if (VoiceBus.stairsActive(System.currentTimeMillis())) return
         runCatching { speakPending() }
+    }
+
+    /** Manœuvre sous un compte : attendue au silence, puis postée (Traversée entre-temps : jetée). */
+    private suspend fun deferGpsToGap(text: String, level: Int) {
+        while (VoiceBus.stairsSpeaking()) delay(GPS_GAP_POLL_MS)
+        if (!crossingActive()) VoiceBus.post(level, text)
     }
 
     /**
@@ -75,3 +89,6 @@ internal class IseeVoiceSpine(
         speak(PictoVoiceText.found(label, clockHour, settings().speechLanguage))
     }
 }
+
+/** Scrutation du silence sous un compte (report GPS, § 41). */
+private const val GPS_GAP_POLL_MS = 100L

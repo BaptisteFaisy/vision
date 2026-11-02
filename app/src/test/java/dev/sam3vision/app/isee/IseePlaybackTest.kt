@@ -157,6 +157,34 @@ class IseePlaybackTest {
     }
 
     @Test
+    fun `tranches — la lecture attend la fin des escaliers`() = runBlocking {
+        val played = mutableListOf<ByteArray>()
+        VoiceBus.speaker = object : VoiceBusSpeaker {
+            override fun idle(): Boolean = true
+            override fun say(level: Int, text: String, clipId: String?, clips: List<String>) = Unit
+            override fun cut() = Unit
+        }
+        try {
+            VoiceBus.post(OutdoorLevel.STAIRS, "5 marches.")
+            val streaming = playback(
+                synthesize = { it.toByteArray() },
+                playSlice = { bytes -> played += bytes; Result.success(PlaybackEnd.Done) },
+            )
+            val job = launch { streaming.speakStreaming(seedRow(), "Devant toi.") }
+            delay(400)
+
+            assertTrue("rien de joué sous un compte", played.isEmpty())
+
+            VoiceBus.reset()
+            withTimeout(2_000) { job.join() }
+            assertEquals("tranche jouée après les marches", 1, played.size)
+        } finally {
+            VoiceBus.speaker = null
+            VoiceBus.reset()
+        }
+    }
+
+    @Test
     fun `lecture en continu — le MP3 rejouable concatene les tranches`() = runBlocking {
         val parts = SentenceChunker.chunk(LONG_ANSWER)
         val row = seedRow()

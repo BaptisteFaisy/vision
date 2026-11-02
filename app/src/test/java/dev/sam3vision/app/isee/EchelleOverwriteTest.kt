@@ -352,6 +352,28 @@ class EchelleOverwriteTest {
         assertEquals(2, speaker.said.size)
     }
 
+    @Test
+    fun `offre non escaliers tue sous un compte, tour intact`() {
+        VoiceBus.post(OutdoorLevel.STAIRS, "5 marches.")
+        val wish = VoiceWish(OutdoorLevel.HUMAN, "personne", AntiRepeat.KEY_HUMAN_SOFT)
+
+        assertFalse(offer(wish, nowMs = 0L))
+        assertTrue(AntiRepeat.allow(AntiRepeat.KEY_HUMAN_SOFT, 1_000L))
+
+        VoiceBus.onSpeechIdle()
+        assertTrue(offer(wish, nowMs = 3_000L))
+        assertEquals(2, speaker.said.size)
+    }
+
+    @Test
+    fun `offre escaliers passe sous un compte`() {
+        VoiceBus.post(OutdoorLevel.STAIRS, "5 marches.")
+
+        assertTrue(offer(VoiceWish(OutdoorLevel.STAIRS, "4 marches.", "test-escaliers-passe"), nowMs = 0L))
+
+        assertEquals(2, speaker.said.size)
+    }
+
     // Flux obstacles vers le bus.
 
 

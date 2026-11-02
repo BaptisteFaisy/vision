@@ -14,6 +14,7 @@ import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.Deferred
 import kotlinx.coroutines.async
 import kotlinx.coroutines.coroutineScope
+import kotlinx.coroutines.delay
 import kotlinx.coroutines.withTimeoutOrNull
 
 /**
@@ -159,6 +160,7 @@ class IseePlayback(
     private suspend fun playAudio(file: File, row: MessageMultimedia, preferAi: Boolean) {
         val id = bubbleId(row.id, preferAi)
         update { it.copy(speakingEntryId = id, status = null) }
+        awaitStairsQuiet()
         VoiceBus.chatSpeaking(true)
         try {
             player.playFile(file).onFailure { cause ->
@@ -199,6 +201,7 @@ class IseePlayback(
                 val bytes = if (pending != null) pending.await() else synthSlice(part, synthTimeoutMs)
                 if (i + 1 < parts.size) prefetch = async { synthSlice(parts[i + 1], synthTimeoutMs) }
                 if (bytes == null) continue
+                awaitStairsQuiet()
                 markSpeaking(id)
                 when (playSlice(bytes).getOrThrow()) {
                     PlaybackEnd.Done -> {
@@ -246,6 +249,15 @@ class IseePlayback(
     }
 
     /**
+     * Escaliers actifs ([VoiceBus.stairsActive]) : la tranche attend la fin
+     * des marches au lieu de couper le compte (§ 41 — une tranche ne tient
+     * pas dans l'intervalle). Annulable (préemption réponse suivante).
+     */
+    private suspend fun awaitStairsQuiet() {
+        while (VoiceBus.stairsActive(System.currentTimeMillis())) delay(STAIRS_POLL_MS)
+    }
+
+    /**
      * Une tranche, bornée : `null` = rien à dire (bénin, la synthèse a déjà posé son
      * motif s'il y a lieu), l'échéance lève [StepTimeout]. Une annulation extérieure
      * passe telle quelle, jamais convertie en timeout.
@@ -277,6 +289,9 @@ class IseePlayback(
          * s'interrompt avec son motif au lieu d'attendre les 60 s du client HTTP.
          */
         const val SYNTH_SLICE_TIMEOUT_MS = 25_000L
+
+        /** Scrutation de fin des marches (attente tranche, § 41). */
+        const val STAIRS_POLL_MS = 200L
     }
 }
 

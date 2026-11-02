@@ -430,13 +430,31 @@ bordures coupaient le niveau 6 en pleine phrase.
   l'annonce seule) — l'esquive ne perd rien : mots continus
   humains (niveau 2, sans antirépétition) et repli 12, re-postés
   en continu, parlent dans le silence entre deux comptes, jamais
-  par-dessus.
+  par-dessus ;
+- **audible** : le niveau 6 synthétise comme le GPS (amende D-04 :
+  sans clip, le compte restait muet — le cache voix absorbe les
+  répétitions, une synthèse par compte et par session au plus) ;
+- **GPS mutuel** : une parole GPS en cours (rappel 3, manœuvre 11,
+  jamais re-proposée) va au bout, le compte reprenant après — en
+  retour une manœuvre sous un compte est reportée au silence (un
+  cycle au plus), jamais perdue ;
+- **chat** : les tranches attendent la fin des marches (ni coupure
+  du compte, ni bégaiement dans l'intervalle — reprise depuis la
+  coupure, comme après tout niveau prioritaire) ;
+- **bouclier antirépétition** : sous un compte, les vœux non
+  escaliers attendent sans consommer leur tour (`offer`, stop,
+  grillage, trottoir — le garde véhicule seul du § 40 est
+  fondu dedans) et parlent dans l'intervalle.
 
 Verrouillé par `StairCountVoiceTest` (répétition après 1 s),
 `IseeSpecV4AntiRepeatTest` + `SeuilsDehorsV4Test` (compte 1 s,
 annonce 2 s), `StairsUncuttableTest` (tous attendent, 6 coupe,
-esquive au milieu, parole user devant, garde 4 s) et
-`ProbeStairsCountVoiceTest` (cadence 1 s, compte dans l'esquive).
+esquive au milieu, parole user devant, GPS mutuel, garde 4 s),
+`ProbeStairsCountVoiceTest` (cadence 1 s, compte dans l'esquive),
+`MortsVoixV4Test` (compte synthétisé), `EchelleOverwriteTest`
+(vœux en attente sous un compte), `ProbeWiringSpokenTest` (stop
+attendu), `IseePlaybackTest` (chat attendu) et `IseeVoiceSpineTest`
+(reprise et GPS reportés).
 
 Recette téléphone : escalier + gens qui passent — « N marches. »
 toutes les 1 s, « Gauche. »/« Droite. » entre deux — **non

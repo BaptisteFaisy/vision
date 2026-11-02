@@ -180,7 +180,11 @@ internal fun LiveProbe.observeSpoken(
     ) { text, urgent ->
         if (placeMode() != PictoPlaceMode.DEHORS) return@observeSpokenEmissions
         if (urgent || GuidanceWord.isStopPhrase(text)) {
-            if (AntiRepeat.allow(AntiRepeat.KEY_FENCE, System.currentTimeMillis())) {
+            // Sous un compte : le stop attend le silence sans manger son
+            // tour (§ 41 — ré-émis à chaque frame, il parle dans l'intervalle).
+            if (!VoiceBus.stairsSpeaking() &&
+                AntiRepeat.allow(AntiRepeat.KEY_FENCE, System.currentTimeMillis())
+            ) {
                 VoiceBus.post(OutdoorLevel.FENCE, text, spokenClipId(text))
             }
         } else {
@@ -207,6 +211,7 @@ internal fun LiveProbe.observeFenceOpening(
             val readings = st.distanceLayer?.readings ?: return@collect
             val signal = FenceOpeningSignal.of(readings, st.width, st.height)
             val cue = watcher.onSignal(signal, System.currentTimeMillis(), language()) ?: return@collect
+            if (VoiceBus.stairsSpeaking()) return@collect
             VoiceTick.report(
                 VoiceTick.SRC_FENCE,
                 VoiceWish(cue.level, cue.phrase, cue.antiRepeatKey),
@@ -370,6 +375,7 @@ internal fun LiveProbe.observeSidewalk(
             if (placeMode() != PictoPlaceMode.DEHORS) return@collect
             val position = this@observeSidewalk.voice.lastSidewalk
             val cue = watcher.onPosition(position, System.currentTimeMillis(), language()) ?: return@collect
+            if (VoiceBus.stairsSpeaking()) return@collect
             VoiceTick.report(
                 VoiceTick.SRC_SIDEWALK,
                 VoiceWish(cue.level, cue.phrase, cue.antiRepeatKey),
