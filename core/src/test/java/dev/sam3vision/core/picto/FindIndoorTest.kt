@@ -1,7 +1,6 @@
 package dev.sam3vision.core.picto
 
 import org.junit.Assert.assertEquals
-import org.junit.Assert.assertFalse
 import org.junit.Assert.assertNull
 import org.junit.Assert.assertTrue
 import org.junit.Test
@@ -9,98 +8,51 @@ import org.junit.Test
 class FindIndoorTest {
 
     @Test
-    fun `find my x vise les 10 cibles en anglais`() {
-        assertEquals(FindIndoorTarget.KEYS, FindIndoorOrder.parseFind("find my keys"))
-        assertEquals(FindIndoorTarget.MEDICINE_BOX, FindIndoorOrder.parseFind("find the medicine box"))
-        assertEquals(FindIndoorTarget.GLASSES, FindIndoorOrder.parseFind("find my glasses"))
-        assertEquals(FindIndoorTarget.GLASSES_CASE, FindIndoorOrder.parseFind("find the glasses case"))
-        assertEquals(FindIndoorTarget.PHONE, FindIndoorOrder.parseFind("find my phone"))
-        assertEquals(FindIndoorTarget.SHOES, FindIndoorOrder.parseFind("find my shoes"))
-        assertEquals(FindIndoorTarget.DOOR, FindIndoorOrder.parseFind("find the door"))
-        assertEquals(FindIndoorTarget.WALL, FindIndoorOrder.parseFind("find the wall"))
-        assertEquals(FindIndoorTarget.PERSON, FindIndoorOrder.parseFind("find the person"))
-        assertEquals(FindIndoorTarget.SOCKS, FindIndoorOrder.parseFind("find my socks"))
+    fun `fromSpoken vise les 10 noms parles anglais`() {
+        assertEquals(FindIndoorTarget.KEYS, FindIndoorTarget.fromSpoken("keys"))
+        assertEquals(FindIndoorTarget.MEDICINE_BOX, FindIndoorTarget.fromSpoken("medicine box"))
+        assertEquals(FindIndoorTarget.GLASSES, FindIndoorTarget.fromSpoken("glasses"))
+        assertEquals(FindIndoorTarget.GLASSES_CASE, FindIndoorTarget.fromSpoken("glasses case"))
+        assertEquals(FindIndoorTarget.PHONE, FindIndoorTarget.fromSpoken("phone"))
+        assertEquals(FindIndoorTarget.SHOES, FindIndoorTarget.fromSpoken("shoes"))
+        assertEquals(FindIndoorTarget.DOOR, FindIndoorTarget.fromSpoken("door"))
+        assertEquals(FindIndoorTarget.WALL, FindIndoorTarget.fromSpoken("wall"))
+        assertEquals(FindIndoorTarget.PERSON, FindIndoorTarget.fromSpoken("person"))
+        assertEquals(FindIndoorTarget.SOCKS, FindIndoorTarget.fromSpoken("socks"))
     }
 
     @Test
-    fun `find my x vise les 10 cibles en francais`() {
-        assertEquals(FindIndoorTarget.KEYS, FindIndoorOrder.parseFind("find mes clés"))
-        assertEquals(FindIndoorTarget.MEDICINE_BOX, FindIndoorOrder.parseFind("find ma boîte de médicaments"))
-        assertEquals(FindIndoorTarget.GLASSES, FindIndoorOrder.parseFind("find mes lunettes"))
-        assertEquals(FindIndoorTarget.GLASSES_CASE, FindIndoorOrder.parseFind("find mon boîtier de lunettes"))
-        assertEquals(FindIndoorTarget.PHONE, FindIndoorOrder.parseFind("find mon téléphone"))
-        assertEquals(FindIndoorTarget.SHOES, FindIndoorOrder.parseFind("find mes chaussures"))
-        assertEquals(FindIndoorTarget.DOOR, FindIndoorOrder.parseFind("find la porte"))
-        assertEquals(FindIndoorTarget.WALL, FindIndoorOrder.parseFind("find le mur"))
-        assertEquals(FindIndoorTarget.PERSON, FindIndoorOrder.parseFind("find un humain"))
-        assertEquals(FindIndoorTarget.SOCKS, FindIndoorOrder.parseFind("find mes chaussettes"))
+    fun `fromSpoken vise les 10 noms parles francais`() {
+        assertEquals(FindIndoorTarget.KEYS, FindIndoorTarget.fromSpoken("clés"))
+        assertEquals(FindIndoorTarget.MEDICINE_BOX, FindIndoorTarget.fromSpoken("boîte de médicaments"))
+        assertEquals(FindIndoorTarget.GLASSES, FindIndoorTarget.fromSpoken("lunettes"))
+        assertEquals(FindIndoorTarget.GLASSES_CASE, FindIndoorTarget.fromSpoken("boîtier de lunettes"))
+        assertEquals(FindIndoorTarget.PHONE, FindIndoorTarget.fromSpoken("téléphone"))
+        assertEquals(FindIndoorTarget.SHOES, FindIndoorTarget.fromSpoken("chaussures"))
+        assertEquals(FindIndoorTarget.DOOR, FindIndoorTarget.fromSpoken("porte"))
+        assertEquals(FindIndoorTarget.WALL, FindIndoorTarget.fromSpoken("mur"))
+        assertEquals(FindIndoorTarget.PERSON, FindIndoorTarget.fromSpoken("personne"))
+        assertEquals(FindIndoorTarget.SOCKS, FindIndoorTarget.fromSpoken("chaussettes"))
     }
 
     @Test
-    fun `singulier pluriel locate et please sont toleres`() {
-        assertEquals(FindIndoorTarget.KEYS, FindIndoorOrder.parseFind("find the key"))
-        assertEquals(FindIndoorTarget.SHOES, FindIndoorOrder.parseFind("find a shoe please"))
-        assertEquals(FindIndoorTarget.PHONE, FindIndoorOrder.parseFind("locate my portable"))
-        assertEquals(FindIndoorTarget.MEDICINE_BOX, FindIndoorOrder.parseFind("find mes médicaments"))
-        assertEquals(FindIndoorTarget.GLASSES_CASE, FindIndoorOrder.parseFind("find my étui"))
-        assertEquals(FindIndoorTarget.WALL, FindIndoorOrder.parseFind("find the walls"))
+    fun `fromSpoken ignore la casse et rend null pour l inconnu`() {
+        assertEquals(FindIndoorTarget.KEYS, FindIndoorTarget.fromSpoken("Keys"))
+        assertEquals(FindIndoorTarget.WALL, FindIndoorTarget.fromSpoken("MURS"))
+        assertNull(FindIndoorTarget.fromSpoken("glass"))
+        assertNull(FindIndoorTarget.fromSpoken("homme"))
+        assertNull(FindIndoorTarget.fromSpoken("doudou"))
+        assertNull(FindIndoorTarget.fromSpoken(""))
     }
 
     @Test
     fun `le verre n'est pas des lunettes`() {
-        assertNull(FindIndoorOrder.parseFind("find the glass"))
-        assertTrue(FindIndoorOrder.isUnknownFind("find the glass"))
+        assertNull(FindIndoorTarget.fromSpoken("glass"))
+        assertEquals(FindIndoorTarget.GLASSES, FindIndoorTarget.fromSpoken("glasses"))
     }
 
     @Test
-    fun `find off efface`() {
-        assertEquals(FindIndoorCommand.Off, FindIndoorOrder.parse("find off"))
-        assertEquals(FindIndoorCommand.Off, FindIndoorOrder.parse("Find off please"))
-        assertTrue(FindIndoorOrder.isFindOff("find off"))
-        assertFalse(FindIndoorOrder.isFindOff("find my keys"))
-        assertFalse(FindIndoorOrder.isFindOff("locate off"))
-    }
-
-    @Test
-    fun `ni verbe ni cible ni ordre`() {
-        assertNull(FindIndoorOrder.parse("find"))
-        assertNull(FindIndoorOrder.parse("I found my keys"))
-        assertNull(FindIndoorOrder.parse("où sont mes clés"))
-        assertNull(FindIndoorOrder.parse("pourquoi ?"))
-        assertNull(FindIndoorOrder.parse(""))
-        assertFalse(FindIndoorOrder.isUnknownFind("find"))
-        assertFalse(FindIndoorOrder.isUnknownFind("I found my keys"))
-    }
-
-    @Test
-    fun `find d'objet hors des 10 est inconnu pas question`() {
-        assertNull(FindIndoorOrder.parse("find the elephant"))
-        assertTrue(FindIndoorOrder.isUnknownFind("find the elephant"))
-        assertTrue(FindIndoorOrder.isUnknownFind("find my doudou"))
-    }
-
-    @Test
-    fun `parse rend start avec la cible`() {
-        assertEquals(
-            FindIndoorCommand.Start(FindIndoorTarget.SOCKS),
-            FindIndoorOrder.parse("find my socks"),
-        )
-    }
-
-    @Test
-    fun `clips demarrage trouves et one-shots`() {
-        val started = FindIndoorClips.started(FindIndoorTarget.KEYS)
-        assertEquals("find_start_keys", started.id)
-        assertEquals("Looking for keys.", started.text)
-        val found = FindIndoorClips.found(FindIndoorTarget.GLASSES_CASE, 3)
-        assertEquals("find_found_glasses_case_3", found.id)
-        assertEquals("Glasses case at 3 o'clock.", found.text)
-        assertEquals("find_off", FindIndoorClips.OFF.id)
-        assertEquals("Search cleared.", FindIndoorClips.OFF.text)
-        assertEquals("find_refused", FindIndoorClips.REFUSED.id)
-        assertEquals("Find works indoors only.", FindIndoorClips.REFUSED.text)
-        assertEquals("find_unknown", FindIndoorClips.UNKNOWN.id)
-        assertEquals("I cannot find that.", FindIndoorClips.UNKNOWN.text)
+    fun `clips porte et murs`() {
         assertEquals("indoor_door_9", FindIndoorClips.doorAt(9).id)
         assertEquals("Door at 9 o'clock.", FindIndoorClips.doorAt(9).text)
         assertEquals("indoor_wall_12", FindIndoorClips.wallAt(12).id)
@@ -109,10 +61,8 @@ class FindIndoorTest {
 
     @Test
     fun `clips anglais uniquement sans accent`() {
-        val clips = FindIndoorTarget.entries.flatMap { target ->
-            listOf(FindIndoorClips.started(target)) + listOf(9, 10, 11, 12, 1, 2, 3).map { FindIndoorClips.found(target, it) }
-        } + listOf(FindIndoorClips.OFF, FindIndoorClips.REFUSED, FindIndoorClips.UNKNOWN) +
-            listOf(9, 12).flatMap { listOf(FindIndoorClips.doorAt(it), FindIndoorClips.wallAt(it)) }
+        val clips = listOf(9, 10, 11, 12, 1, 2, 3)
+            .flatMap { listOf(FindIndoorClips.doorAt(it), FindIndoorClips.wallAt(it)) }
         assertTrue(clips.isNotEmpty())
         clips.forEach { clip ->
             assertTrue("id " + clip.id, clip.id.matches(Regex("[a-z0-9_]+")))
@@ -138,7 +88,7 @@ class FindIndoorTest {
 
     @Test
     fun `arbitre le plus petit gagne stable et silence`() {
-        val find = FindIndoorPriority.Candidate(FindIndoorLevels.FIND, "Keys at 9 o'clock.", "find_found_keys_9")
+        val find = FindIndoorPriority.Candidate(FindIndoorLevels.FIND, "Mug at 9 o'clock.", null)
         val human = FindIndoorPriority.Candidate(FindIndoorLevels.HUMAN, "Personne à 9 heures.", null)
         val chat = FindIndoorPriority.Candidate(FindIndoorLevels.CHAT, "Réponse.", null)
         val doors = FindIndoorPriority.Candidate(FindIndoorLevels.DOOR_WALL, "Door at 3 o'clock.", "indoor_door_3")

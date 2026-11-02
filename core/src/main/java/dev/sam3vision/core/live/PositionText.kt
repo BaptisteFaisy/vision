@@ -89,17 +89,23 @@ object PositionText {
         if (centerX == null) "$base." else "$base, ${clockLabel(centerX, language)}."
 
     /**
-     * Direction parlée au cadran : « à 11 heures », « à midi », « à 3 heures »
-     * (ou « at 11 o'clock », « at 12 o'clock ») — la convention des déplacements
-     * sans voir, plus précise que « à gauche / au centre / à droite ».
+     * Direction parlée au cadran depuis [centerX] : « à 11 heures », « à
+     * midi », « à 3 heures » (ou « at 11 o'clock », « at 12 o'clock ») — la
+     * convention des déplacements sans voir, plus précise que « à gauche /
+     * au centre / à droite ».
      */
-    fun clockLabel(centerX: Float, language: SpeechLanguage = SpeechLanguage.DEFAULT): String {
-        val hour = clockHour(centerX)
-        return when (language) {
-            SpeechLanguage.Fr ->
-                if (hour == 12) "à midi" else "à $hour ${if (hour == 1) "heure" else "heures"}"
-            SpeechLanguage.En -> "at $hour o'clock"
-        }
+    fun clockLabel(centerX: Float, language: SpeechLanguage = SpeechLanguage.DEFAULT): String =
+        hourLabel(clockHour(centerX), language)
+
+    /**
+     * Heure du cadran parlée : « à 11 heures », « à midi », « à 1 heure »
+     * (ou « at 11 o'clock ») — [clockLabel] y passe par [clockHour], le
+     * trouvé de la chasse picto y passe par son heure directe.
+     */
+    fun hourLabel(hour: Int, language: SpeechLanguage = SpeechLanguage.DEFAULT): String = when (language) {
+        SpeechLanguage.Fr ->
+            if (hour == 12) "à midi" else "à $hour ${if (hour == 1) "heure" else "heures"}"
+        SpeechLanguage.En -> "at $hour o'clock"
     }
 
     /** Détection (boîte en pixels) → label placé ; `null` si la géométrie est inutilisable. */
@@ -166,7 +172,7 @@ object PositionText {
     /**
      * Mise en lumière d'un objet suivi : « Les clés sont devant toi, à 9
      * heures. » — dite quand l'utilisateur cherche cet objet précis (chasse
-     * picto, « Find the X »), jamais dans l'annonce générale ([phrase]).
+     * picto, « mode find my X »), jamais dans l'annonce générale ([phrase]).
      * Le pluriel se lit à la finale (« clés », « keys » : « Les … sont » /
      * « The … are ») ; au singulier, pas d'article en français (le genre du
      * label est inconnu : « Téléphone devant toi, à 9 heures »). La distance

@@ -7,10 +7,9 @@ import org.junit.Assert.assertTrue
 import org.junit.Test
 
 /**
- * Routeur de dictée (spec v4 + chasse sans « mode ») : les 10 ordres
- * « mode … » et les chasses sans « mode » vers les 10 dedans appellent
- * leur effet, une fois ; tout le reste rend `false` sans rien appeler —
- * l'appelant envoie le texte au LLM comme question.
+ * Routeur de dictée (spec v4 : ordres « mode … » uniquement) : les 10 ordres
+ * appellent leur effet, une fois ; tout le reste rend `false` sans rien
+ * appeler — l'appelant envoie le texte au LLM comme question.
  */
 class IseeDictationRouterTest {
 
@@ -37,6 +36,7 @@ class IseeDictationRouterTest {
             "mode crossing on" to "crossing-on",
             "mode crossing off" to "crossing-off",
             "mode find my keys" to "find:keys",
+            "mode find my mug" to "find:mug",
             "mode find off" to "find-off",
             "mode GPS I want to go to gare Montparnasse" to "gps:gare Montparnasse",
             "mode GPS off" to "gps-off",
@@ -57,25 +57,31 @@ class IseeDictationRouterTest {
     }
 
     @Test
-    fun `les chasses sans mode appellent find une fois`() = runTest {
-        val cases = listOf(
-            "où sont mes clés" to "find:keys",
-            "where are my keys" to "find:keys",
-            "find my keys" to "find:keys",
-            "Find the keys" to "find:keys",
+    fun `les chasses sans mode partent au llm`() = runTest {
+        val chases = listOf(
+            "où sont mes clés",
+            "où est mon téléphone",
+            "où étaient mes clés",
+            "où étaient-elles",
+            "where are my keys",
+            "Where is my phone?",
+            "find my keys",
+            "Find the keys",
+            "find my shoes please",
+            "locate my phone",
         )
-        cases.forEach { (text, want) ->
+        chases.forEach { text ->
             calls.clear()
-            assertTrue(text, router.run(text))
-            assertEquals(listOf(want), calls)
+            assertFalse(text, router.run(text))
+            assertTrue(text, calls.isEmpty())
         }
     }
 
     @Test
-    fun `le pronom reprend la chasse en cours, sinon llm`() = runTest {
+    fun `le pronom part au llm`() = runTest {
         calls.clear()
-        assertTrue(router.run("où étaient-elles", hunting = "keys"))
-        assertEquals(listOf("find:keys"), calls)
+        assertFalse(router.run("où étaient-elles"))
+        assertTrue(calls.isEmpty())
         calls.clear()
         assertFalse(router.run("où étaient-elles"))
         assertTrue(calls.isEmpty())

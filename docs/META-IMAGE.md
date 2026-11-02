@@ -51,27 +51,26 @@ générations live depuis le téléphone, clé des Réglages). Le 402 reste gér
 tel quel si le compte se retrouve sans paiement (voir `META-ASR.md` pour
 l'historique côté dictée).
 
-## Ordre « Find the X »
+## Ordre « mode find my X »
 
-Sur l'accueil iSee, « Find the keys » (`PictoVoiceOrder.parseFind`, verbe
-anglais `find`/`locate` en premier mot) ajoute « keys » aux concepts SAM de
-la sonde (`LiveProbe.ensureConcept`, sauf en Traversée) puis crée le
-pictogramme (`IseePicto.findObject`, routé par `IseePictoVoice`) : même appel
-Muse (`muse-image-1.0`, jaune/noir), stocké et armé aussitôt, comme le bouton —
-l'utilisateur est seul. « Where are my keys » (`parseWhere`, objets maison
-ou « my ») prend le même chemin, sauf repère déjà armé (chassé, jamais
-régénéré) ; toute autre question « where » reste pour le LLM. Le matcher
-local le reconnaît dès la frame suivante et `PictoLayer` le montre sur la
-caméra iSee, à son emplacement (cadre jaune seul,
-sans nom ni carte « en grand »).
+Sur l'accueil iSee, « mode find my mug » (`DictationOrders.parse`, l'un des
+10 ordres « mode … ») ajoute « mug » aux concepts SAM de la sonde
+(`LiveProbe.ensureConcept`, sauf en Traversée) puis crée le pictogramme à sa
+première détection (`IseePicto.findObject`, rejoué par `IseeDictationActions`
+dans `IseeModeOrders`) : même appel Muse (`muse-image-1.0`, jaune/noir),
+stocké et armé aussitôt, comme le bouton — l'utilisateur est seul. Tout objet
+est accepté (plus de liste fermée) ; hors dedans, l'ordre est refusé à voix
+haute ; toute phrase sans « mode » reste pour le LLM. Le matcher local le
+reconnaît dès la frame suivante et `PictoLayer` le montre sur la caméra iSee,
+à son emplacement (cadre jaune seul, sans nom ni carte « en grand »).
 
 ## Où ça vit dans le code
 
 | Rôle | Fichier |
 |---|---|
-| Ordre vocal « Find the X » / « Where… » | `core/.../picto/PictoVoiceOrder.kt` (`parseFind`, `parseWhere`, `PictoVoiceText.findStarted`) |
+| Ordre vocal « mode find my X » | `core/.../speech/DictationOrder.kt` (`DictationOrders.parse`) + `app/.../isee/vm/ModeFindVoice.kt` |
 | Ajout du concept SAM | `app/.../isee/ProbeWiring.kt` (`LiveProbe.ensureConcept`) |
-| Création + armement sur iSee | `app/.../isee/vm/IseePicto.kt` (`findObject`), routé par `IseePictoVoice` |
+| Création + armement sur iSee | `app/.../isee/vm/IseePicto.kt` (`findObject`), rejoué par `IseeDictationActions` |
 | Client HTTP Meta Image | `core/.../net/MetaImageClient.kt` (+ `PictoImageClient` dans `Clients.kt`) |
 | Multipart partagé ASR+image | `core/.../net/MetaMultipart.kt` |
 | Extraction `b64_json` | `extractImageB64` (`core/.../net/Json.kt`) |

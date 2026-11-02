@@ -61,7 +61,7 @@ là, atteignables depuis les Réglages, section « Other screens »
 | Tests | **4 809 `@Test`** JVM (`:core` 2 972, `:app` 1 837, relevé du 01/11/2026, voir `docs/TESTING.md`) + 8 instrumentés (`:app` : 7 + 1 banc `MockGlassesTest`) |
 | Taille | **1 215** fichiers `.kt`, **78 831** lignes de prod (`:core` 34 397, `:app` 44 434, mesure du 01/11/2026 par `tools/count-tree.py`) |
 | Versions | JDK Temurin 17.0.21 (par `JAVA_HOME`, hors dépôt) · Gradle 8.14.1 · AGP 8.11.1 · Kotlin 2.2.21 · compileSdk/targetSdk 36 |
-| Spec v4 (mergée le 01/11/2026) | voix : échelle 0-12 dehors, 100-102 traversée, chaîne dedans ; clips anglais, zéro réseau sauf chat + GPS ; 10 ordres « mode … » + chasse sans « mode » vers les 10 dedans, reste = LLM (voir § 1 bis) |
+| Spec v4 (mergée le 01/11/2026) | voix : échelle 0-12 dehors, 100-102 traversée, chaîne dedans ; clips anglais, zéro réseau sauf chat + GPS ; 10 ordres « mode … » (reste = LLM), recherche « mode find my X » ouverte à tout objet (voir § 1 bis) |
 
 ## 1 bis. Spec v4 — résumé (`feat/isee-*`, 01/11/2026, mergée)
 
@@ -85,9 +85,9 @@ un doc pré-v4, la v4 gagne.
 - **Traversée 100-102** : verdict (rouge ou voiture en mouvement =
   « Don't cross. », sinon « Cross. », voiture uniquement) > humains >
   bordures ; dictée active ; chat et GPS muets.
-- **Dedans** : objet cherché (10 : clés, médicaments, lunettes, boîtier,
-  téléphone, chaussures, porte, murs, humain, chaussettes) > parole user >
-  humain > chat > porte et murs ; résultats en clips.
+- **Dedans** : objet cherché (tout objet, « mode find my X »)
+  > parole user > humain > chat > porte et murs ; résultats en synthèse
+  vocale (porte et murs en clips).
 - **Antirépétition** : voitures 4 s, humains 2 s (imminent immédiat),
   grillages 4 s, bordures 2 s, escaliers 2 s, poteaux/divers 2 s, passage
   (1 fois / changement / 1 fois), chat aucune, trottoirs 10 s, GPS aux

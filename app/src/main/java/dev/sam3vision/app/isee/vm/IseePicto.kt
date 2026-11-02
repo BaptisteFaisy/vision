@@ -41,7 +41,7 @@ import kotlinx.coroutines.withTimeoutOrNull
  *
  * Un seul vol à la fois (`busy`) : le bouton est muet pendant la génération
  * (~10 s facturées ~0,01 $), et une seconde demande ne double pas la facture.
- * La chasse (« où sont mes clés ») est pilotée par la détection : l'ordre
+ * La chasse (« mode find my X ») est pilotée par la détection : l'ordre
  * arme le label, le pictogramme se génère à sa première détection SAM,
  * puis l'overlay s'ancre sur la boîte détectée : l'ancrage live est seul
  * juge tant que dure la chasse — objet hors champ (passage gabarit muet)
@@ -212,7 +212,7 @@ class IseePicto(
     }
 
     /**
-     * Ordre « Find the X » / « Where are my keys » / « où sont mes clés » :
+     * Ordre « mode find my X » :
      * arme la chasse de [label] — le pictogramme se génère à sa première
      * détection sur l'image ([onDetections]), pas sur une photo à
      * l'aveugle, puis s'ancre sur les détections. Déjà armé : la chasse
@@ -232,7 +232,7 @@ class IseePicto(
     }
 
     /**
-     * « find off » : la chasse pendante est effacée — label, ancrage live
+     * « mode find off » : la chasse pendante est effacée — label, ancrage live
      * et cadran du trouvé. L'affichage retombe sur les gabarits armés
      * (repères conservés : une nouvelle chasse reprend sans régénérer).
      * Idempotent : sans chasse, ne coûte rien. Le statut est au demandeur.

@@ -23,7 +23,6 @@ import kotlinx.coroutines.test.TestScope
 import kotlinx.coroutines.test.UnconfinedTestDispatcher
 import kotlinx.coroutines.test.advanceUntilIdle
 import kotlinx.coroutines.test.runTest
-import org.junit.Assert.assertArrayEquals
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
 import org.junit.Assert.assertNull
@@ -195,49 +194,14 @@ class LiveAskSessionTest {
     }
 
     @Test
-    fun `ordre picto cree le repere et confirme sans llm`() = runTest {
-        val fakes = pictoFakes(frame = frameWith(testTemplate()))
+    fun `l ancien ordre picto part au llm`() = runTest {
+        val fakes = pictoFakes()
         fakes.session.ask("fais un pictogramme de ces médics")
         advanceUntilIdle()
-        assertEquals(1, fakes.client.calls)
-        assertEquals("medics", fakes.client.lastHint)
-        assertArrayEquals("jpeg-de-test".toByteArray(), fakes.client.lastPhoto)
-        assertEquals(listOf("medics"), fakes.store.list().map { it.label })
-        assertEquals(
-            listOf(
-                "Création picto.",
-                "medics prêt.",
-            ),
-            fakes.spoken,
-        )
-        assertEquals(0, fakes.llm.calls)
+        assertEquals(1, fakes.llm.calls)
         assertTrue(fakes.restarts.isEmpty())
-    }
-
-    @Test
-    fun `ordre picto sans image parle echec sans generer`() = runTest {
-        val fakes = pictoFakes(jpeg = "")
-        fakes.session.ask("fais un pictogramme de ces médics")
-        advanceUntilIdle()
-        assertEquals(listOf("Picto raté."), fakes.spoken)
-        assertEquals(0, fakes.client.calls)
         assertTrue(fakes.store.list().isEmpty())
-    }
-
-    @Test
-    fun `echec muse parle echec sans stocker`() = runTest {
-        val fakes = pictoFakes(
-            frame = frameWith(testTemplate()),
-            clientResult = Result.failure(RuntimeException("402")),
-        )
-        fakes.session.ask("fais un pictogramme de ces médics")
-        advanceUntilIdle()
-        assertEquals(
-            listOf("Création picto.", "Picto raté."),
-            fakes.spoken,
-        )
-        assertTrue(fakes.store.list().isEmpty())
-        assertEquals(0, fakes.llm.calls)
+        assertTrue(fakes.spoken.isEmpty())
     }
 
     @Test

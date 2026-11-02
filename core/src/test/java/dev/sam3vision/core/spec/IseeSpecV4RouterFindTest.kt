@@ -1,17 +1,16 @@
 package dev.sam3vision.core.spec
 
 import org.junit.Assert.assertEquals
-import org.junit.Assert.assertNull
 import org.junit.Assert.assertTrue
 import org.junit.Test
 
 /**
  * Spec v4 — routeur dictée et recherche d'objet dedans (find).
  *
- * Contrat pur : ordres dictée (tout le reste = question LLM), 10 cibles
- * find dedans, résultats de recherche en clips anglais. La mission
- * routeur-dictée implémente ce découpage en prod ; la mission find-indoor
- * porte les 10 cibles et leurs clips.
+ * Contrat pur : 10 ordres « mode … » (tout le reste = question LLM),
+ * recherche « mode find my X » ouverte à tout objet, trouvé parlé au
+ * cadran. La mission routeur-dictée implémente ce découpage en prod ; la
+ * mission find-indoor porte la chasse et ses phrases.
  */
 class IseeSpecV4RouterFindTest {
 
@@ -20,7 +19,7 @@ class IseeSpecV4RouterFindTest {
         data object Indoor : Order
         data object CrossingOn : Order
         data object CrossingOff : Order
-        data class Find(val target: String) : Order
+        data class Find(val label: String) : Order
         data object FindOff : Order
         data class GpsGo(val destination: String) : Order
         data object GpsOff : Order
@@ -29,64 +28,53 @@ class IseeSpecV4RouterFindTest {
         data class LlmQuestion(val text: String) : Order
     }
 
-    /** Routeur v4 : ordres anglais exacts, reste = question LLM. */
+    /** Routeur v4 : ordres « mode … » exacts, reste = question LLM. */
     private fun route(raw: String): Order {
         val text = raw.trim().lowercase()
+        if (!text.startsWith("mode ")) return Order.LlmQuestion(raw)
         when (text) {
-            "outdoor mode", "mode outdoor" -> return Order.Outdoor
-            "indoor mode", "mode indoor" -> return Order.Indoor
-            "crossing on" -> return Order.CrossingOn
-            "crossing off" -> return Order.CrossingOff
-            "find off" -> return Order.FindOff
-            "gps off" -> return Order.GpsOff
-            "glasses on" -> return Order.GlassesOn
-            "glasses off" -> return Order.GlassesOff
+            "mode outdoor" -> return Order.Outdoor
+            "mode indoor" -> return Order.Indoor
+            "mode crossing on" -> return Order.CrossingOn
+            "mode crossing off" -> return Order.CrossingOff
+            "mode find off" -> return Order.FindOff
+            "mode gps off" -> return Order.GpsOff
+            "mode glasses on" -> return Order.GlassesOn
+            "mode glasses off" -> return Order.GlassesOff
         }
-        if (text.startsWith("find my ")) {
-            val target = text.removePrefix("find my ").trim()
-            if (target.isNotEmpty() && target in FIND_TARGETS_EN) return Order.Find(target)
+        if (text.startsWith("mode find my ")) {
+            val label = text.removePrefix("mode find my ").trim().trimEnd('.', ',', '?', '!')
+            if (label.isNotEmpty()) return Order.Find(label)
             return Order.LlmQuestion(raw)
         }
-        for (prefix in listOf("gps i want to go to ", "i want to go to ")) {
-            if (text.startsWith(prefix)) {
-                val destination = text.removePrefix(prefix).trim()
-                if (destination.isNotEmpty()) return Order.GpsGo(destination)
-                return Order.LlmQuestion(raw)
-            }
+        if (text.startsWith("mode gps i want to go to ")) {
+            val destination = text.removePrefix("mode gps i want to go to ").trim()
+            if (destination.isNotEmpty()) return Order.GpsGo(destination)
+            return Order.LlmQuestion(raw)
         }
         return Order.LlmQuestion(raw)
     }
 
     @Test
-    fun `routeur = outdoor et indoor`() {
-        assertEquals(Order.Outdoor, route("outdoor mode"))
-        assertEquals(Order.Indoor, route("indoor mode"))
+    fun `routeur = les 10 ordres mode`() {
+        assertEquals(Order.Outdoor, route("mode outdoor"))
+        assertEquals(Order.Indoor, route("mode indoor"))
+        assertEquals(Order.CrossingOn, route("mode crossing on"))
+        assertEquals(Order.CrossingOff, route("mode crossing off"))
+        assertEquals(Order.Find("keys"), route("mode find my keys"))
+        assertEquals(Order.FindOff, route("mode find off"))
+        assertEquals(Order.GpsGo("gare de lyon"), route("mode GPS I want to go to gare de Lyon"))
+        assertEquals(Order.GpsOff, route("mode GPS off"))
+        assertEquals(Order.GlassesOn, route("mode glasses on"))
+        assertEquals(Order.GlassesOff, route("mode glasses off"))
     }
 
     @Test
-    fun `routeur = crossing on et off`() {
-        assertEquals(Order.CrossingOn, route("crossing on"))
-        assertEquals(Order.CrossingOff, route("crossing off"))
-    }
-
-    @Test
-    fun `routeur = find my X et find off`() {
-        assertEquals(Order.Find("keys"), route("find my keys"))
-        assertEquals(Order.Find("phone"), route("Find my phone"))
-        assertEquals(Order.FindOff, route("find off"))
-    }
-
-    @Test
-    fun `routeur = GPS go et off`() {
-        assertEquals(Order.GpsGo("gare de lyon"), route("I want to go to gare de Lyon"))
-        assertEquals(Order.GpsGo("gare de lyon"), route("GPS I want to go to gare de Lyon"))
-        assertEquals(Order.GpsOff, route("GPS off"))
-    }
-
-    @Test
-    fun `routeur = glasses on et off`() {
-        assertEquals(Order.GlassesOn, route("glasses on"))
-        assertEquals(Order.GlassesOff, route("glasses off"))
+    fun `routeur = find my X ouvert a tout objet`() {
+        assertEquals(Order.Find("mug"), route("mode find my mug"))
+        assertEquals(Order.Find("spaceship"), route("mode find my spaceship"))
+        assertEquals(Order.Find("tv remote"), route("mode find my tv remote"))
+        assertTrue(route("mode find my") is Order.LlmQuestion)
     }
 
     @Test
@@ -96,39 +84,20 @@ class IseeSpecV4RouterFindTest {
         assertTrue(route("il fait beau aujourd'hui") is Order.LlmQuestion)
         assertTrue(route("où est la gare ?") is Order.LlmQuestion)
         assertTrue(route("emmène-moi à la gare") is Order.LlmQuestion)
+        assertTrue(route("où sont mes clés") is Order.LlmQuestion)
+        assertTrue(route("where are my keys") is Order.LlmQuestion)
+        assertTrue(route("find my keys") is Order.LlmQuestion)
+        assertTrue(route("Find the keys") is Order.LlmQuestion)
+        assertTrue(route("locate my phone") is Order.LlmQuestion)
+        assertTrue(route("create a picto for my mug") is Order.LlmQuestion)
+        assertTrue(route("fais un pictogramme de ma tasse") is Order.LlmQuestion)
     }
 
     @Test
-    fun `find = 10 cibles exactes`() {
-        assertEquals(
-            setOf(
-                "keys", "medicine box", "glasses", "glasses case", "phone",
-                "shoes", "door", "walls", "person", "socks",
-            ),
-            FIND_TARGETS_EN,
-        )
-        assertEquals(
-            setOf(
-                "clés", "boîte de médicaments", "lunettes", "boîtier de lunettes",
-                "téléphone", "chaussures", "porte", "murs", "humain", "chaussettes",
-            ),
-            FIND_TARGETS_FR,
-        )
-    }
-
-    @Test
-    fun `find = resultats en clips anglais`() {
-        val result = findResult(targetEn = "keys", clock = 2)
-
-        assertEquals("find_keys", result.clipId)
-        assertTrue(result.text.matches(Regex("[A-Za-z0-9 .,']+")))
-        assertEquals("Keys found at 2 o'clock.", result.text)
-    }
-
-    @Test
-    fun `find = hors-liste question LLM`() {
-        assertTrue(route("find my spaceship") is Order.LlmQuestion)
-        assertNull(findClipOrNull("spaceship"))
+    fun `find = trouve parle au cadran`() {
+        assertEquals("Mug at 9 o'clock.", findResult("mug", 9))
+        assertEquals("Spaceship at 2 o'clock.", findResult("spaceship", 2))
+        assertTrue(findResult("mug", 9).matches(Regex("[A-Za-z0-9 .,']+")))
     }
 
     @Test
@@ -140,25 +109,8 @@ class IseeSpecV4RouterFindTest {
         assertTrue(ranks.getValue("target") < ranks.getValue("door-walls"))
     }
 
-    private data class FindResult(val text: String, val clipId: String)
-
-    private fun findResult(targetEn: String, clock: Int): FindResult {
+    private fun findResult(targetEn: String, clock: Int): String {
         val label = targetEn.replaceFirstChar { it.uppercase() }
-        val clipId = "find_" + targetEn.replace(" ", "_")
-        return FindResult("$label found at $clock o'clock.", clipId)
-    }
-
-    private fun findClipOrNull(targetEn: String): String? =
-        if (targetEn in FIND_TARGETS_EN) "find_" + targetEn.replace(" ", "_") else null
-
-    companion object {
-        val FIND_TARGETS_EN = setOf(
-            "keys", "medicine box", "glasses", "glasses case", "phone",
-            "shoes", "door", "walls", "person", "socks",
-        )
-        val FIND_TARGETS_FR = setOf(
-            "clés", "boîte de médicaments", "lunettes", "boîtier de lunettes",
-            "téléphone", "chaussures", "porte", "murs", "humain", "chaussettes",
-        )
+        return "$label at $clock o'clock."
     }
 }

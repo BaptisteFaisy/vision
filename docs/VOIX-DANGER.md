@@ -121,8 +121,10 @@ frappe ne fait jamais taire une annonce).
   mot supplémentaire ; les ordres à libellé exigent un libellé non vide.
 - Les 10 ordres sont écoutés **partout, traversée comprise**.
 - Confirmations en clips anglais (`outdoor_on`, `indoor_on`, `cross_on`,
-  `cross_off`, `find_looking_for` + objet, `find_stopped`, `gps_started`,
-  `nav_stopped`, `glasses_on`, `glasses_off`) — jamais en synthèse.
+  `cross_off`, `find_stopped`, `gps_started`,
+  `nav_stopped`, `glasses_on`, `glasses_off`) ; la recherche (`mode find my X`,
+  départ, refus, trouvé) parle en synthèse vocale — aucun clip ne couvre un
+  objet quelconque.
 
 ## 7. Listes de détection (SAM 3.1, anglais)
 
@@ -131,7 +133,7 @@ frappe ne fait jamais taire une annonce).
   `sign`, `street lamp`, `animal`, `trash can`, `souvenir shop`.
 - **Dedans (10)** : `keys`, `medicine box`, `glasses`, `glasses case`,
   `phone`, `shoes`, `door`, `wall`, `person`, `socks`.
-- `Find my X` ajoute le concept (le dernier cède son slot au plafond).
+- `mode find my X` ajoute le concept (le dernier cède son slot au plafond).
   Liste unique normal/traversée : la bascule ne change plus les prompts.
 
 ## 8. Contrats partagés (l'intégration suppose ces signatures)

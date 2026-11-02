@@ -4,14 +4,18 @@ import dev.sam3vision.core.distance.KnownSizes
 import dev.sam3vision.core.live.AntiRepeat
 
 /**
- * Les 10 objets cherchables dedans (spec v4) : le concept SAM suivi
- * ([concept], anglais), ses noms parlés ([spoken], canoniques FR + EN) et
- * sa base d'identifiant clip ([clipBase]).
+ * Les 10 noms parlés dedans (spec v4) : le concept SAM suivi ([concept],
+ * anglais), ses noms parlés ([spoken], canoniques FR + EN) et sa base
+ * d'identifiant clip ([clipBase]).
+ *
+ * Ils ne bornent plus la recherche (l'unique ordre « mode find my X »
+ * accepte tout objet) : ils servent la détection porte et murs
+ * ([Kind] du direct dedans) et le pont FR-EN de la chasse (« cles » chasse
+ * les détections « keys », et l'inverse).
  *
  * « glass » (le verre) est volontairement exclu de [GLASSES] : un verre
- * n'est pas des lunettes. « personne » vise [PERSON] (« find my
- * personne » maladroit mais compris) ; « homme »/« femme » ne visent rien
- * (question LLM).
+ * n'est pas des lunettes. « personne » vise [PERSON] ; « homme » et
+ * « femme » ne visent rien (question LLM).
  */
 enum class FindIndoorTarget(
     val concept: String,
@@ -51,70 +55,6 @@ enum class FindIndoorTarget(
          * neutralisés ([KnownSizes.canonical]).
          */
         fun fromSpoken(text: String): FindIndoorTarget? = BY_SPOKEN[KnownSizes.canonical(text)]
-    }
-}
-
-/** Ordre « find » : démarrer une chasse ([Start]) ou l'effacer ([Off]). */
-sealed interface FindIndoorCommand {
-    data class Start(val target: FindIndoorTarget) : FindIndoorCommand
-    data object Off : FindIndoorCommand
-}
-
-/**
- * Ordres vocaux « find my X » / « find off » (spec v4, dedans uniquement).
- *
- * « find » et « locate » sont acceptés, articles EN + FR élidés (« find my
- * keys », « find mes clés », « locate the phone »), « please » final
- * ignoré. Le reste après le verbe doit nommer exactement l'une des 10
- * cibles ([FindIndoorTarget]) — « find the elephant » n'est pas un ordre
- * valide ([isUnknownFind]), « find » seul et « I found my keys » non plus
- * (questions LLM). Pur et testé en JVM.
- */
-object FindIndoorOrder {
-
-    /** Verbes de recherche (canoniques, anglais seuls). */
-    private val FIND_VERBS = setOf("find", "locate")
-
-    /** Articles et possessifs élidés après le verbe (anglais + français). */
-    private val LEADERS = setOf(
-        "the", "a", "an", "my", "some",
-        "mes", "mon", "ma", "les", "le", "la", "des", "du", "de", "un", "une",
-    )
-
-    /**
-     * Ordre porté par [text], `null` si ce n'en est pas un. « find off »
-     * gagne sur la recherche (« find my socks off » efface, quirk
-     * documenté : un ordre « off » explicite prime).
-     */
-    fun parse(text: String): FindIndoorCommand? {
-        if (isFindOff(text)) return FindIndoorCommand.Off
-        return parseFind(text)?.let { FindIndoorCommand.Start(it) }
-    }
-
-    /** Cible de l'ordre « find my X » porté par [text], `null` si aucun. */
-    fun parseFind(text: String): FindIndoorTarget? {
-        val words = KnownSizes.canonical(text).split(' ').filter { it.isNotEmpty() }
-        if (words.size < 2 || !FIND_VERBS.contains(words[0])) return null
-        val rest = words.drop(1).dropWhile { LEADERS.contains(it) }.dropLastWhile { it == "please" }
-        if (rest.isEmpty()) return null
-        return FindIndoorTarget.fromSpoken(rest.joinToString(" "))
-    }
-
-    /** Vrai si [text] ordonne « find off » (« find » + « off », spec exacte). */
-    fun isFindOff(text: String): Boolean {
-        val words = KnownSizes.canonical(text).split(' ').filter { it.isNotEmpty() }.toSet()
-        return words.contains("find") && words.contains("off")
-    }
-
-    /**
-     * Vrai si [text] est un ordre « find » invalide (verbe + reste qui ne
-     * nomme aucune cible, « find the elephant ») : consommé avec un message
-     * d'aide, jamais une question LLM. « find » seul rend faux (question).
-     */
-    fun isUnknownFind(text: String): Boolean {
-        val words = KnownSizes.canonical(text).split(' ').filter { it.isNotEmpty() }
-        if (words.size < 2 || !FIND_VERBS.contains(words[0])) return false
-        return parse(text) == null
     }
 }
 
@@ -176,35 +116,14 @@ object FindIndoorRepeat {
 data class FindClip(val id: String, val text: String)
 
 /**
- * Clips anglais de la recherche dedans (spec v4 : clips anglais
- * uniquement, zéro réseau). Textes composés : le catalogue voix les déclare
- * par morceaux (`parts`), les MP3 sont générés à part (`gen-voicepack.py`,
- * autre mission). Pur et testé en JVM.
+ * Clips anglais porte et murs dedans (spec v4 : clips anglais uniquement,
+ * zéro réseau). Textes composés : le catalogue voix les déclare par
+ * morceaux (`parts`), les MP3 sont générés à part (`gen-voicepack.py`,
+ * autre mission). La recherche d'objet, elle, parle en synthèse vocale
+ * ([PictoVoiceText]) : aucun clip pré-enregistré ne peut couvrir un objet
+ * quelconque. Pur et testé en JVM.
  */
 object FindIndoorClips {
-
-    /** La chasse démarre : « Looking for keys. » (10 cibles → 10 clips). */
-    fun started(target: FindIndoorTarget): FindClip =
-        FindClip("find_start_" + target.clipBase, "Looking for " + target.en + ".")
-
-    /**
-     * Le trouvé au cadran [hour] (1..12, PositionText.clockHour) : « Keys
-     * at 9 o'clock. » (10 cibles × 7 cadrans → 70 clips).
-     */
-    fun found(target: FindIndoorTarget, hour: Int): FindClip =
-        FindClip("find_found_" + target.clipBase + "_" + hour, target.enCap + " at " + hour + " o'clock.")
-
-    /** « find off » : la chasse pendante est effacée. */
-    val OFF = FindClip("find_off", "Search cleared.")
-
-    /** « find » dehors : refusé, jamais de picto dehors. */
-    val REFUSED = FindClip("find_refused", "Find works indoors only.")
-
-    /** « find » d'un objet hors des 10 : l'aide, courte ; le détail va au statut. */
-    val UNKNOWN = FindClip("find_unknown", "I cannot find that.")
-
-    /** Les 10 cherchables, pour le statut visuel (l'aide parlée reste courte). */
-    const val SUPPORTED = "keys, medicine box, glasses, glasses case, phone, shoes, door, wall, person, socks"
 
     /** Porte dedans au cadran [hour] : « Door at 3 o'clock. » (7 clips). */
     fun doorAt(hour: Int): FindClip = FindClip("indoor_door_" + hour, "Door at " + hour + " o'clock.")

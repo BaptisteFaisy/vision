@@ -263,7 +263,7 @@ OkHttp ne le rejoue jamais, donc pas de seconde inférence facturée (`Http.kt:9
   vélo, moto et trottoir sont revenus** — le trottoir sert de rail de maintien
   (`SidewalkKeep`), pas d'obstacle — la Traversée les rétablit quand elle s'arme, via
   `VehicleConcepts.promptsFor` + curb/sidewalk). Plafond client **et** serveur :
-  **22** (marge pour « Find the X »), un serveur resté à 18 refuserait la
+  **22** (marge pour « mode find my X »), un serveur resté à 18 refuserait la
   frame —
   `core/src/main/java/dev/sam3vision/core/live/LivePrompts.kt`.
 - Preset extérieur : `["person", "pole", "street lamp", "bollard", "fence", "barrier",

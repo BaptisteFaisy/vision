@@ -34,6 +34,19 @@ class DictationOrderTest {
     }
 
     @Test
+    fun `mode find my accepte n importe quel objet`() {
+        assertEquals(DictationOrder.Find("mug"), DictationOrders.parse("mode find my mug"))
+        assertEquals(DictationOrder.Find("tv remote"), DictationOrders.parse("mode find my tv remote"))
+    }
+
+    @Test
+    fun `mode find my ignore le please final`() {
+        assertEquals(DictationOrder.Find("keys"), DictationOrders.parse("mode find my keys please"))
+        assertEquals(DictationOrder.Find("mug"), DictationOrders.parse("mode find my mug, please!"))
+        assertNull(DictationOrders.parse("mode find my please"))
+    }
+
+    @Test
     fun `mode find off arrete la recherche`() {
         assertEquals(DictationOrder.FindOff, DictationOrders.parse("mode find off"))
     }
@@ -103,6 +116,27 @@ class DictationOrderTest {
     }
 
     @Test
+    fun `ou where et find sans mode partent au llm`() {
+        assertNull(DictationOrders.parse("où sont mes clés"))
+        assertNull(DictationOrders.parse("où est mon téléphone"))
+        assertNull(DictationOrders.parse("où sont mes lunettes"))
+        assertNull(DictationOrders.parse("où étaient mes clés"))
+        assertNull(DictationOrders.parse("où était mon téléphone"))
+        assertNull(DictationOrders.parse("où étaient-elles"))
+        assertNull(DictationOrders.parse("where are my keys"))
+        assertNull(DictationOrders.parse("Where is my phone?"))
+        assertNull(DictationOrders.parse("where is the exit"))
+        assertNull(DictationOrders.parse("where is my wallet"))
+        assertNull(DictationOrders.parse("where is it?"))
+        assertNull(DictationOrders.parse("find my keys"))
+        assertNull(DictationOrders.parse("Find the keys"))
+        assertNull(DictationOrders.parse("find my shoes please"))
+        assertNull(DictationOrders.parse("locate my phone"))
+        assertNull(DictationOrders.parse("find the elephant"))
+        assertNull(DictationOrders.parse("I found my keys"))
+    }
+
+    @Test
     fun `mode hors tete part au llm`() {
         assertNull(DictationOrders.parse("s'il te plaît mode outdoor"))
         assertNull(DictationOrders.parse("passe en mode outdoor"))
@@ -136,67 +170,28 @@ class DictationOrderTest {
     }
 
     @Test
-    fun `ou sont sans mode cherche dans les 10`() {
-        assertEquals(DictationOrder.Find("keys"), DictationOrders.parse("où sont mes clés"))
-        assertEquals(DictationOrder.Find("phone"), DictationOrders.parse("où est mon téléphone"))
-        assertEquals(DictationOrder.Find("glasses"), DictationOrders.parse("où sont mes lunettes"))
-    }
-
-    @Test
-    fun `where sans mode cherche dans les 10`() {
-        assertEquals(DictationOrder.Find("keys"), DictationOrders.parse("where are my keys"))
-        assertEquals(DictationOrder.Find("phone"), DictationOrders.parse("Where is my phone?"))
-        assertEquals(DictationOrder.Find("phone"), DictationOrders.parse("locate my phone"))
-    }
-
-    @Test
-    fun `find sans mode cherche dans les 10`() {
-        assertEquals(DictationOrder.Find("keys"), DictationOrders.parse("find my keys"))
-        assertEquals(DictationOrder.Find("keys"), DictationOrders.parse("Find the keys"))
-        assertEquals(DictationOrder.Find("shoes"), DictationOrders.parse("find my shoes please"))
-    }
-
-    @Test
-    fun `ou where et find hors des 10 partent au llm`() {
-        assertNull(DictationOrders.parse("où est la gare"))
-        assertNull(DictationOrders.parse("where is the exit"))
-        assertNull(DictationOrders.parse("where is my wallet"))
-        assertNull(DictationOrders.parse("find the elephant"))
-        assertNull(DictationOrders.parse("I found my keys"))
-        assertNull(DictationOrders.parse("where is it?"))
-    }
-
-    @Test
     fun `isOrder dit vrai pour les ordres, faux pour le reste`() {
         assertTrue(DictationOrders.isOrder("mode outdoor"))
         assertTrue(DictationOrders.isOrder("mode indoor"))
         assertTrue(DictationOrders.isOrder("mode crossing on"))
         assertTrue(DictationOrders.isOrder("mode crossing off"))
         assertTrue(DictationOrders.isOrder("mode find my keys"))
+        assertTrue(DictationOrders.isOrder("mode find my mug"))
         assertTrue(DictationOrders.isOrder("mode find off"))
         assertTrue(DictationOrders.isOrder("mode GPS I want to go to la gare"))
         assertTrue(DictationOrders.isOrder("mode GPS off"))
         assertTrue(DictationOrders.isOrder("mode glasses on"))
         assertTrue(DictationOrders.isOrder("mode glasses off"))
-        assertTrue(DictationOrders.isOrder("où sont mes clés"))
-        assertTrue(DictationOrders.isOrder("where are my keys"))
-        assertTrue(DictationOrders.isOrder("find my keys"))
+        assertFalse(DictationOrders.isOrder("où sont mes clés"))
+        assertFalse(DictationOrders.isOrder("where are my keys"))
+        assertFalse(DictationOrders.isOrder("find my keys"))
         assertFalse(DictationOrders.isOrder("mode outdoor please"))
         assertFalse(DictationOrders.isOrder("décris-moi la pièce"))
     }
 
     @Test
-    fun `ou imparfait sans mode cherche dans les 10`() {
-        assertEquals(DictationOrder.Find("keys"), DictationOrders.parse("où étaient mes clés"))
-        assertEquals(DictationOrder.Find("phone"), DictationOrders.parse("où était mon téléphone"))
-    }
-
-    @Test
-    fun `ou pronom reprend la chasse en cours, sinon llm`() {
-        assertEquals(DictationOrder.Find("keys"), DictationOrders.parse("où étaient-elles", hunting = "keys"))
-        assertEquals(DictationOrder.Find("keys"), DictationOrders.parse("où étaient-elles ?", hunting = "cles"))
+    fun `ou pronom part au llm`() {
         assertNull(DictationOrders.parse("où étaient-elles"))
-        assertNull(DictationOrders.parse("où étaient-elles", hunting = "doudou"))
+        assertNull(DictationOrders.parse("où étaient-elles ?"))
     }
-
 }

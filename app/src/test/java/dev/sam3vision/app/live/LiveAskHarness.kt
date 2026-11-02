@@ -8,7 +8,6 @@ import dev.sam3vision.core.live.PositionAnnouncer
 import dev.sam3vision.core.model.Analysis
 import dev.sam3vision.core.model.ChatTurn
 import dev.sam3vision.core.net.LlmClient
-import dev.sam3vision.core.net.PictoImageClient
 import dev.sam3vision.core.picto.GrayImage
 import dev.sam3vision.core.picto.PictoTemplate
 import dev.sam3vision.core.settings.Settings
@@ -19,9 +18,9 @@ import kotlinx.coroutines.test.TestScope
 import kotlinx.coroutines.test.UnconfinedTestDispatcher
 
 /**
- * Harnais partagé des tests [LiveAskSession] : LLM et génération d'image
- * espions, session branchée sur un magasin réel (dossier jetable) et une
- * voix espionne. Un seul endroit construit les sessions de test.
+ * Harnais partagé des tests [LiveAskSession] : LLM espion, session branchée
+ * sur un magasin réel (dossier jetable) et une voix espionne. Un seul endroit
+ * construit les sessions de test.
  */
 internal val configured = Settings.Default.copy(llmBaseUrl = "https://llm.test", llmApiKey = "cle-test")
 
@@ -72,20 +71,6 @@ internal fun homeState() = MutableStateFlow(
     LiveUiState(prompts = HomeModes.ESSENTIELS.prompts, samEnabled = true),
 )
 
-/** Génération d'image espionne : rend toujours [result], note photo et consigne. */
-internal class FakePictoClient(var result: Result<ByteArray>) : PictoImageClient {
-    var calls = 0
-    var lastPhoto: ByteArray? = null
-    var lastHint: String? = null
-
-    override suspend fun editToPictogram(photoJpeg: ByteArray, hint: String): Result<ByteArray> {
-        calls++
-        lastPhoto = photoJpeg
-        lastHint = hint
-        return result
-    }
-}
-
 /** Gabarit 24px non plat (dégradé) : le matcher le reconnaît toujours. */
 internal fun testTemplate() = PictoTemplate(IntArray(24 * 24) { it % 256 }, 24)
 
@@ -104,7 +89,6 @@ internal class PictoFakes(
     val session: LiveAskSession,
     val state: MutableStateFlow<LiveUiState>,
     val llm: FakeLlm,
-    val client: FakePictoClient,
     val store: PictoStore,
     val spoken: MutableList<String>,
     val restarts: MutableList<List<String>>,
@@ -114,11 +98,9 @@ internal class PictoFakes(
 /** Session branchée sur un magasin réel (dossier jetable) et une voix espionne. */
 internal fun TestScope.pictoFakes(
     frame: GrayImage? = null,
-    clientResult: Result<ByteArray> = Result.success("png".toByteArray()),
     jpeg: String = "jpeg-de-test",
 ): PictoFakes {
     val llm = FakeLlm(Result.success("ne doit pas servir"))
-    val client = FakePictoClient(clientResult)
     val store = PictoStore(Files.createTempDirectory("live-picto-store").toFile())
     val spoken = mutableListOf<String>()
     val restarts = mutableListOf<List<String>>()
@@ -136,11 +118,9 @@ internal fun TestScope.pictoFakes(
         restart = restarts::add,
         pictoSpeak = { _, phrase -> spoken += phrase },
         io = UnconfinedTestDispatcher(),
-        pictoClient = { client },
         store = store,
         frameGray = { _, _ -> frame },
-        decodeB64 = { it.toByteArray() },
         guideAnnouncer = PositionAnnouncer(minFrames = 1, cooldownMs = 0),
     )
-    return PictoFakes(session, state, llm, client, store, spoken, restarts) { currentJpeg = it }
+    return PictoFakes(session, state, llm, store, spoken, restarts) { currentJpeg = it }
 }
