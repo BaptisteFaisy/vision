@@ -89,7 +89,7 @@ class SpeechPlayer(
         runCatching {
             stop()
             playBlocking(writeCache(bytes), onComplete, onPlaybackError)
-        }
+        }.onFailure { reportSyncFailure(it) }
     }
 
     /**
@@ -100,7 +100,7 @@ class SpeechPlayer(
         runCatching {
             stop()
             playBlocking(file, onComplete, onPlaybackError)
-        }
+        }.onFailure { reportSyncFailure(it) }
     }
 
     /**
@@ -119,7 +119,7 @@ class SpeechPlayer(
         runCatching {
             stop()
             playBlocking(file, onComplete, onPlaybackError, sliceMs)
-        }
+        }.onFailure { reportSyncFailure(it) }
     }
 
     /** Joue [bytes] en tranche ([sliceMs]) : synthèse GPS et confirmations, jamais le chat. */
@@ -127,7 +127,7 @@ class SpeechPlayer(
         runCatching {
             stop()
             playBlocking(writeCache(bytes), onComplete, onPlaybackError, sliceMs)
-        }
+        }.onFailure { reportSyncFailure(it) }
     }
 
     suspend fun playQueued(bytes: ByteArray): Result<PlaybackEnd> {
@@ -148,6 +148,17 @@ class SpeechPlayer(
         } finally {
             if (waiter === gate) waiter = null
         }
+    }
+
+    /**
+     * Échec synchrone (fichier illisible, préparation refusée) : le rappel
+     * d'erreur part comme en lecture — sinon aucun rappel ne part jamais et
+     * l'appelant qui attend la fin (bus vocal) reste coincé pour toujours.
+     * Le rappel ne lève jamais (le [Result] d'échec est déjà renvoyé).
+     */
+    private fun reportSyncFailure(cause: Throwable) {
+        val detail = cause.message ?: cause.javaClass.simpleName
+        runCatching { onPlaybackError("lecture audio impossible ($detail)") }
     }
 
     /**
