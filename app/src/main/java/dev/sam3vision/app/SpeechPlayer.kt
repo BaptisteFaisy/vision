@@ -80,6 +80,10 @@ class SpeechPlayer(
     @Volatile
     private var waiter: CompletableDeferred<Result<PlaybackEnd>>? = null
 
+    /** Generation des lectures (modele BusSpeaker) : seule la lecture courante rappelle. */
+    @Volatile
+    private var generation = 0L
+
     /** Joue [bytes] ; renvoie l'échec au lieu de le lever (l'UI affiche le message). */
     suspend fun play(bytes: ByteArray): Result<Unit> = withContext(Dispatchers.IO) {
         runCatching {
@@ -153,6 +157,7 @@ class SpeechPlayer(
      */
     private fun playBlocking(file: File, onDone: () -> Unit, onError: (String) -> Unit, sliceMs: Long? = null) {
         val mp = MediaPlayer()
+        val current = ++generation
         player = mp
         mp.setAudioAttributes(audioAttributes())
         // Sortie de la phrase : relue ici, jamais mémorisée à la construction — la
@@ -161,9 +166,9 @@ class SpeechPlayer(
         // part quand même, il ne se tait pas pour un routage raté.
         runCatching { output()?.let { device -> mp.preferredDevice = device } }
         mp.setDataSource(file.absolutePath)
-        mp.setOnCompletionListener { onDone() }
+        mp.setOnCompletionListener { finishIfCurrent(current, onDone) }
         mp.setOnErrorListener { _, what, extra ->
-            onError("lecture audio impossible ($what/$extra)")
+            finishIfCurrent(current) { onError("lecture audio impossible ($what/$extra)") }
             true
         }
         mp.prepare()
@@ -175,6 +180,24 @@ class SpeechPlayer(
         runCatching { mp.playbackParams = mp.playbackParams.setSpeed(rate) }
         mp.start()
     }
+
+    /**
+     * Fin de lecture gardee : le rappel ne passe que si [gen] est la lecture
+     * courante, une seule fois. Un rappel tardif (lecture tuee par [stop]) est
+     * ignore, et la plateforme ne rappelle jamais deux fois. Pur, teste en JVM.
+     */
+    internal fun finishIfCurrent(gen: Long, block: () -> Unit) {
+        if (gen == generation) {
+            generation++
+            block()
+        }
+    }
+
+    /**
+     * Arme une lecture fictive (tests JVM : `MediaPlayer` indisponible) ; rend sa
+     * generation, a terminer par [finishIfCurrent] comme le ferait la plateforme.
+     */
+    internal fun armPlaybackForTest(): Long = ++generation
 
     /**
      * Accessibilité + parole : la voix doit s'entendre et se comprendre dehors.
@@ -189,6 +212,7 @@ class SpeechPlayer(
 
     /** Arrête et libère la lecture en cours ; une file en attente rend [PlaybackEnd.Stopped]. */
     fun stop() {
+        generation++
         waiter?.complete(Result.success(PlaybackEnd.Stopped))
         waiter = null
         player?.let { mp ->
