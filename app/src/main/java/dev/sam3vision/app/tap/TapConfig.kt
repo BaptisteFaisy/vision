@@ -18,6 +18,9 @@ enum class Announcement(val spoken: String) {
 
     /** Nom du clip en cache : `launched.mp3`, `sent.mp3`, `failed.mp3`. */
     val clipFile: String get() = name.lowercase() + ".mp3"
+
+    /** Id du MP3 embarqué (`tap_launched`, … — `tools/voicepack-catalog.json`). */
+    val clipId: String get() = "tap_" + name.lowercase()
 }
 
 /**
@@ -69,10 +72,7 @@ object TapConfig {
     /** Les trois mots, dans l'ordre d'apparition à l'écran. */
     val words: List<Announcement> get() = Announcement.entries.toList()
 
-    /** Clé ElevenLabs : saisie Réglages d'abord, sinon valeur de debug (`local.properties`). */
-    fun elevenLabsKey(settings: Settings): String = settings.ttsApiKey.ifBlank { BuildConfig.TTS_API_KEY.trim() }
-
-    /** Voix ElevenLabs : Réglages, puis debug, puis la premade par défaut de l'app. */
+    /** Voix des clips : Réglages, puis debug, puis la premade par défaut de l'app. */
     fun elevenLabsVoice(settings: Settings): String = when {
         settings.ttsVoiceId.isNotBlank() -> settings.ttsVoiceId
         BuildConfig.TTS_VOICE_ID.isNotBlank() -> BuildConfig.TTS_VOICE_ID
