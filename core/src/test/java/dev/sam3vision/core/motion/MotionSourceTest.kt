@@ -35,7 +35,9 @@ class MotionSourceTest {
     @Test
     fun `deux frames identiques rendent le mouvement nul`() {
         val scene = MotionScenes.scene()
-        assertEquals(MotionSample.Zero, source.estimateSince(scene, MotionScenes.scene()))
+        val proven = source.estimateSince(scene, MotionScenes.scene())
+        assertEquals(MotionSample.Zero, proven)
+        assertEquals("texturé identique : arrêt prouvé", 1f, proven!!.confidence, 0f)
     }
 
     @Test
@@ -75,7 +77,9 @@ class MotionSourceTest {
     fun `scene plate ne donne pas d avis`() {
         val flat = GrayMask(MotionScenes.WIDTH, MotionScenes.HEIGHT, ByteArray(MotionScenes.WIDTH * MotionScenes.HEIGHT) { 90 })
         val other = GrayMask(MotionScenes.WIDTH, MotionScenes.HEIGHT, ByteArray(MotionScenes.WIDTH * MotionScenes.HEIGHT) { 91 })
-        assertEquals(MotionSample.Zero, source.estimateSince(flat, flat))
+        // Uni identique = mur blanc en pan : muet (l'ancien Zéro sans
+        // confiance était inutilisable partout en aval — même silence).
+        assertNull(source.estimateSince(flat, flat))
         val avis = source.estimateSince(flat, other)
         assertTrue("avis sur une image plate : $avis", avis == null || avis.confidence < BlockMotionSource.TRUST_MIN)
     }
