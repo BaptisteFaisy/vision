@@ -54,7 +54,7 @@ livré et ses preuves (tâche, fichiers, chiffres) dans l'arbre.
   escaliers en attente sans tour mangé (`offer`, stop, grillage,
   trottoir) ; garde anti-blocage 4 s. Doc `VOIX-DANGER.md` § 42
   (amende § 37, § 40).
-- **Preuve** : `:core` + `:app` 5 161 tests, 0 échec (r630) ;
+- **Preuve** : `:core` + `:app` 5 146 tests, 0 échec (r630, rebasé) ;
   `check-kotlin-limits.py` + `check-test-globals.py` verts ; recette
   rue **non mesurée** (preuves par `logcat`).
 
