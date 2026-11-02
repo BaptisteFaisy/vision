@@ -297,12 +297,12 @@ main() {
   read -r _junk || _junk=""
   hear "escalier (attendu jalons « Stairs up, 4 meters. », … + marches « Five. Steps. »)"
 
-  note "### 7. passage piéton (« Crosswalk ahead », 1 fois par vue)"
+  note "### 7. passage piéton (« Crosswalk. », toutes les 2 s hors Traversée, 1 fois par vue sinon)"
   printf '\n  Continuez vers le passage piéton.\n'
   printf '  Entrée après le passage : '
   _junk=""
   read -r _junk || _junk=""
-  hear "passage (attendu « Crosswalk ahead/left/right. » 1 fois par vue, « Aligned with the crosswalk. » au changement, « On the crosswalk. » 1 fois)"
+  hear "passage (attendu « Crosswalk. » clip < 500 ms toutes les 2 s hors Traversée, « Aligned with the crosswalk. » au changement, « On the crosswalk. » 1 fois)"
   note "  doublon : $(ask 'Avez-vous entendu un doublon (annonce répétée sans changement)')"
 
   note "### 8. virage (manœuvre synthèse + 0 chevauchement)"
