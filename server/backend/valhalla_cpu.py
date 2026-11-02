@@ -118,6 +118,10 @@ class ValhallaRouter:
         self._signals = _load_points(SIGNALS_JSON_REMOTE, "feux")
         self._junctions = _load_points(JUNCTIONS_JSON_REMOTE, "carrefours")
         self._jgrid = _build_grid(self._junctions)
+        # Feux indexés comme les carrefours : le balayage linéaire des 23 170
+        # points coûtait ~11 ms par manœuvre (~70 ms/requête au pire, mesuré
+        # le 02/11/2026) ; la grille 3×3 tombe à ~0,25 ms, résultats identiques.
+        self._sgrid = _build_grid(self._signals)
 
     @modal.asgi_app()
     def web(self):
@@ -141,7 +145,7 @@ class ValhallaRouter:
                 raise HTTPException(status_code=400, detail="invalid JSON body")
             try:
                 data = await asyncio.to_thread(
-                    _route_with_repairs, self._actor, self._signals, self._jgrid, body
+                    _route_with_repairs, self._actor, self._sgrid, self._jgrid, body
                 )
             except Exception as exc:
                 raise HTTPException(status_code=500, detail=str(exc)[:2000])
@@ -188,7 +192,7 @@ def _filter_signals(all_points: list, s: float, w: float, n: float, e: float) ->
     return found
 
 
-def _route_with_repairs(actor, signals: list, jgrid: dict, body: dict) -> dict:
+def _route_with_repairs(actor, sgrid: dict, jgrid: dict, body: dict) -> dict:
     """Itinéraire Valhalla, réparé (piéton uniquement, voir _repair_crossings).
 
     Lève si l'appel de base échoue (→ 500) ; une réparation qui échoue rend
@@ -197,16 +201,16 @@ def _route_with_repairs(actor, signals: list, jgrid: dict, body: dict) -> dict:
     import json
 
     base = json.loads(actor.route(json.dumps(body)))
-    if body.get("costing") != "pedestrian" or not signals:
+    if body.get("costing") != "pedestrian" or not sgrid:
         return base
     try:
-        return _repair_crossings(actor, signals, jgrid, body, base)
+        return _repair_crossings(actor, sgrid, jgrid, body, base)
     except Exception as exc:
         print(f"[route] réparation annulée : {exc}")
         return base
 
 
-def _repair_crossings(actor, signals: list, jgrid: dict, body: dict, base: dict) -> dict:
+def _repair_crossings(actor, sgrid: dict, jgrid: dict, body: dict, base: dict) -> dict:
     """Traversées sans feu → reroutage via le feu proche (borné, accepté si
     moins de traversées dangereuses et au plus +20 % de temps)."""
     import json
@@ -217,10 +221,12 @@ def _repair_crossings(actor, signals: list, jgrid: dict, body: dict, base: dict)
     if len(locations) < 2:
         return base
     for _ in range(MAX_REPAIRS):
-        unsafe = _unsafe_crossings(best, signals, jgrid)
+        unsafe = _unsafe_crossings(best, sgrid, jgrid)
         if not unsafe:
             return best
-        via = _nearest_point(signals, unsafe[0][0], unsafe[0][1], REPAIR_SEARCH_M)
+        via = _nearest_point(
+            _grid_near(sgrid, unsafe[0][0], unsafe[0][1]), unsafe[0][0], unsafe[0][1], REPAIR_SEARCH_M
+        )
         if via is None:
             return best
         attempt = dict(body)
@@ -230,7 +236,7 @@ def _repair_crossings(actor, signals: list, jgrid: dict, body: dict, base: dict)
         candidate = json.loads(actor.route(json.dumps(attempt)))
         if _trip_time(candidate) > best_time * DETOUR_FACTOR:
             return best
-        if len(_unsafe_crossings(candidate, signals, jgrid)) >= len(unsafe):
+        if len(_unsafe_crossings(candidate, sgrid, jgrid)) >= len(unsafe):
             return best
         best, best_time = candidate, _trip_time(candidate)
         print(f"[route] traversée réparée via ({via[0]:.5f}, {via[1]:.5f})")
@@ -245,7 +251,7 @@ def _trip_time(data: dict) -> float:
         return float("inf")
 
 
-def _unsafe_crossings(trip_data: dict, signals: list, jgrid: dict) -> list:
+def _unsafe_crossings(trip_data: dict, sgrid: dict, jgrid: dict) -> list:
     """Points des traversées de chaussée sans feu proche (v2).
 
     Candidat = manœuvre "tout droit" (types 7/8) : passage marqué
@@ -273,7 +279,7 @@ def _unsafe_crossings(trip_data: dict, signals: list, jgrid: dict) -> list:
             lat, lon = shape[index]
             if not _is_crossing(maneuver.get("instruction"), lat, lon, jgrid):
                 continue
-            if _nearest_point(signals, lat, lon, SIGNAL_NEAR_M) is None:
+            if _nearest_point(_grid_near(sgrid, lat, lon), lat, lon, SIGNAL_NEAR_M) is None:
                 unsafe.append((lat, lon))
     return unsafe
 
