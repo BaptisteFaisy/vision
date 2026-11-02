@@ -100,16 +100,6 @@ object IseeClipsEn {
     const val SIDEWALK_ACROSS = "sidewalk_across"
     const val SIDEWALK_ACROSS_TEXT = "Sidewalk across the street."
 
-    // Niveau 10 : annonces trottoir courtes (pastille 500 ms, § 46).
-    const val SIDEWALK_AHEAD_SHORT = "sidewalk_ahead_short"
-    const val SIDEWALK_AHEAD_SHORT_TEXT = "Sidewalk."
-    const val SIDEWALK_LEFT_SHORT = "sidewalk_left_short"
-    const val SIDEWALK_LEFT_SHORT_TEXT = "Sidewalk left."
-    const val SIDEWALK_RIGHT_SHORT = "sidewalk_right_short"
-    const val SIDEWALK_RIGHT_SHORT_TEXT = "Sidewalk right."
-    const val SIDEWALK_ACROSS_SHORT = "sidewalk_across_short"
-    const val SIDEWALK_ACROSS_SHORT_TEXT = "Sidewalk across."
-
     // Niveau 12 : repli (gauche, droite, tout droit — clips existants).
     const val GO_LEFT = "guide_left"
     const val GO_LEFT_TEXT = "Left."
@@ -375,7 +365,7 @@ object IseeClipsEn {
     fun fileName(clipId: String): String = "vp_" + clipId + "_en.mp3"
 
     /** Registre complet : clipId → texte parlé (nouveaux + réutilisés). */
-    val all: Map<String, String> = outdoor() + orders() + indoor() + quantities() + chainables()
+    val all: Map<String, String> = outdoor() + orders() + indoor() + quantities() + chainables() + IseeClipsSidewalk.short()
 
     /**
      * Clip d'une phrase parlée par un producteur, `null` si aucun texte du
@@ -417,10 +407,6 @@ object IseeClipsEn {
         SIDEWALK_LEFT to SIDEWALK_LEFT_TEXT,
         SIDEWALK_RIGHT to SIDEWALK_RIGHT_TEXT,
         SIDEWALK_ACROSS to SIDEWALK_ACROSS_TEXT,
-        SIDEWALK_AHEAD_SHORT to SIDEWALK_AHEAD_SHORT_TEXT,
-        SIDEWALK_LEFT_SHORT to SIDEWALK_LEFT_SHORT_TEXT,
-        SIDEWALK_RIGHT_SHORT to SIDEWALK_RIGHT_SHORT_TEXT,
-        SIDEWALK_ACROSS_SHORT to SIDEWALK_ACROSS_SHORT_TEXT,
         GO_LEFT to GO_LEFT_TEXT,
         GO_RIGHT to GO_RIGHT_TEXT,
         GO_STRAIGHT to GO_STRAIGHT_TEXT,
