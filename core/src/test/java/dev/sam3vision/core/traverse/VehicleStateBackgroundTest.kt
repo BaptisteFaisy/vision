@@ -45,6 +45,30 @@ class VehicleStateBackgroundTest {
     }
 
     @Test
+    fun `sans arbitrage fond - la croissance parle meme sous camera`() {
+        // Ordre user du 02/11 (voix iSee dehors) : sans arbitrage, le
+        // mouvement se juge sur la boîte brute — la croissance annonce
+        // « Car. » même quand le fond défile (miroir du premier test, qui
+        // lui reste tu avec l'arbitrage par défaut).
+        val motion = FrameMotion(MotionSample(0.75f, 0f, 1f, 0.9f), 96, 96, 100L)
+        val watcher = VehicleStateWatcher()
+        var spoke: VehicleStateCue? = null
+        repeat(12) { index ->
+            val width = if (index < 8) 100f else 100f + (index - 7) * 10f
+            val frame = box(width, cx = 320f + index * 5f)
+            val cue = watcher.update(
+                listOf(det("car", frame)), listOf(reading("car", 5f, frame)),
+                atMs = index * 100L, motion = motion, arbitrateBackground = false,
+            )
+            if (index == 9) spoke = cue
+        }
+
+        assertNotNull("sans arbitrage, la croissance annonce", spoke)
+        assertEquals("Car.", spoke!!.phrase)
+        assertFalse(watcher.cameraMoved)
+    }
+
+    @Test
     fun `camera qui suit - jeune cle non jugee, annonce maintenue`() {
         // Voiture tue par la caméra + seconde voiture qui apparaît en
         // croissance : la clé jeune, jamais évaluée, annonce à la

@@ -3,7 +3,6 @@ package dev.sam3vision.app.isee
 import dev.sam3vision.app.LiveUiState
 import dev.sam3vision.core.distance.DistanceReading
 import dev.sam3vision.core.model.Detection
-import dev.sam3vision.core.motion.GyroMotion
 import dev.sam3vision.core.settings.Settings
 import dev.sam3vision.core.speech.SpeechLanguage
 import dev.sam3vision.core.traverse.FrameMotion
@@ -57,10 +56,9 @@ internal class LiveVehicleVoice(
         readings: List<DistanceReading>,
         nowMs: Long,
         motion: FrameMotion? = null,
-        gyro: GyroMotion? = null,
     ) {
         if (traverseActive() || !settings().announcePositions || asking()) return
-        val cue = watcher.update(detections, readings, nowMs, settings().speechLanguage, motion = motion, gyro = gyro) ?: return
+        val cue = watcher.update(detections, readings, nowMs, settings().speechLanguage, motion = motion) ?: return
         state.update { it.copy(spoken = cue.phrase) }
         scope.launch { say(cue.phrase) }
     }
