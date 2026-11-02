@@ -58,10 +58,16 @@ internal fun GlassesProbeWiring(probe: LiveProbe, glassesFeed: Boolean, guidance
                 // Décodage, redressement, JPEG, Canny et envoi : tout en fond, comme le
                 // fil d'analyse du téléphone.
                 withContext(Dispatchers.Default) {
+                    val decodeStart = SystemClock.elapsedRealtime()
                     val bitmap = sampler.bitmapOf(box) ?: return@withContext
+                    val jpegStart = SystemClock.elapsedRealtime()
                     applyGlassesLens(probe, fromView = false)
                     val jpeg = bitmapToProbeJpeg(bitmap) ?: return@withContext
-                    probe.onFrame(jpeg, SystemClock.elapsedRealtimeNanos())
+                    val sentAt = SystemClock.elapsedRealtime()
+                    // Arrivée + séquence du flux : le poste `capt` mesure enfin le pont
+                    // (décodage + JPEG), et la ligne rejoint le GlassesLink de même seq.
+                    probe.onFrame(jpeg, box.frame.arrivedAtNs, box.seq)
+                    countBridgeSplit(jpegStart - decodeStart, sentAt - jpegStart)
                 }
             }
         } finally {
@@ -140,6 +146,15 @@ private var snapshots = 0L
 private fun countSnapshot() {
     snapshots += 1
     if (snapshots % 20L == 0L) Log.i(TAG, "pont lunettes : $snapshots photos envoyées à la sonde")
+}
+
+/**
+ * Décomposition du pont, même cadence que [countSnapshot] : « bridgesplit decode 3 ·
+ * enc 24 » — `decode` = poussée → bitmap, `enc` = redressement + Canny + JPEG.
+ * Invisible à `parse_isee_lat.py` (ni `latency`, ni `server:`), même tag [TAG].
+ */
+private fun countBridgeSplit(decodeMs: Long, encMs: Long) {
+    if (snapshots % 20L == 0L) Log.i(TAG, "bridgesplit decode $decodeMs · enc $encMs")
 }
 
 /**
