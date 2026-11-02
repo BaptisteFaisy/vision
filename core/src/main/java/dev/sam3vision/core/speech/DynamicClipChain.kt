@@ -1,5 +1,7 @@
 package dev.sam3vision.core.speech
 
+import dev.sam3vision.core.curb.CurbEdge
+
 /**
  * Chaînes MP3 des phrases dynamiques non-GPS (P1 silence SPEC v4) : la porte
  * GPS de `ProximityVoice` tait toute phrase dynamique non-GPS sans clip — la
@@ -105,8 +107,9 @@ object DynamicClipChain {
      * Chaîne d'un vœu bordure : « Step up… » → [curb_up, clock_N?], « Step
      * down… » → [curb_down, clock_N?]. Le reste (« Curb detected… », « Curb
      * at… », « Attention, curb… », tout le FR) ne dit pas le sens du bord :
-     * vide (pas de mensonge — le vrai fix ajoute le sens au signal, voir
-     * le rapport P1). La distance sous 5 m tombe (pas d'atome « mètre »).
+     * vide. Héritage phrase-seule, gardé pour compatibilité — [curbChain]
+     * (sens du signal) le remplace. La distance sous 5 m tombe (pas
+     * d'atome « mètre »).
      */
     fun curbClips(phrase: String): List<String> {
         val edge = when {
@@ -118,6 +121,34 @@ object DynamicClipChain {
         hourOfEn(phrase)?.let { IseeClipsEn.clock(it) }?.let { chain += it }
         return chain
     }
+
+    /**
+     * Chaîne d'un vœu bordure depuis son sens ([edge], le signal — la
+     * phrase ne le dit pas : « Curb detected… », « Curb at… ») et l'heure
+     * lue dans [phrase] : montée → [curb_up, clock_N?], descente →
+     * [curb_down, clock_N?]. Sens incertain ou phrase non anglaise (FR :
+     * zéro clip FR, le pack ne porte que des EN) → vide (silence, pas de
+     * mensonge). La distance sous 5 m tombe (pas d'atome « mètre »).
+     */
+    fun curbChain(edge: CurbEdge, phrase: String): List<String> {
+        val base = when (edge) {
+            CurbEdge.Up -> IseeClipsEn.CURB_UP
+            CurbEdge.Down -> IseeClipsEn.CURB_DOWN
+            CurbEdge.Uncertain -> return emptyList()
+        }
+        if (!isEnCurb(phrase)) return emptyList()
+        val chain = mutableListOf(base)
+        hourOfEn(phrase)?.let { IseeClipsEn.clock(it) }?.let { chain += it }
+        return chain
+    }
+
+    /**
+     * Phrase bordure anglaise (liste fermée : « Curb… », « Step… »,
+     * « Attention, curb… ») — tout le reste (FR, inconnu) rend faux :
+     * zéro clip FR, et les formes inconnues se taisent au lieu de mentir.
+     */
+    private fun isEnCurb(phrase: String): Boolean =
+        phrase.startsWith("Curb") || phrase.startsWith("Step") || phrase.startsWith("Attention, curb")
 
     /** Heure du cadran lue dans une phrase anglaise, `null` si absente ou hors 1..12. */
     fun hourOfEn(phrase: String): Int? =
