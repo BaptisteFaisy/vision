@@ -107,8 +107,8 @@ class TraverseWiringTest {
     @Test
     fun `deactivate sans activation - sans effet`() {
         val wiring = wiring()
-        wiring.deactivate {}
-        wiring.deactivate {}
+        wiring.deactivate()
+        wiring.deactivate()
         assertFalse(wiring.active)
     }
 
