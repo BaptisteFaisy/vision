@@ -19,20 +19,20 @@ class VoiceNavAnnouncerTest {
     @Test
     fun `phrases exactes du contrat`() {
         assertEquals(
-            "Do you really want to go to la gare? Travel time: 15 minutes. Answer yes or no.",
+            "Go to la gare? 15 minutes. Yes?",
             VoiceNavPhrases.confirmQuestion("  la gare ", "15 minutes"),
         )
         assertEquals(
-            "Do you really want to go to la gare? Answer yes or no.",
+            "Go to la gare? Yes?",
             VoiceNavPhrases.confirmQuestion("la gare", null),
         )
-        assertEquals("Here is the page for la tour Eiffel", VoiceNavPhrases.placeOpened("la tour Eiffel"))
-        assertEquals("Guidance stopped", VoiceNavPhrases.STOP_DONE)
-        assertEquals("Arrived at destination", VoiceNavPhrases.ARRIVED)
+        assertEquals("Page: la tour Eiffel.", VoiceNavPhrases.placeOpened("la tour Eiffel"))
+        assertEquals("Stopped", VoiceNavPhrases.STOP_DONE)
+        assertEquals("Arrived", VoiceNavPhrases.ARRIVED)
         assertEquals("GPS disabled", VoiceNavPhrases.GPS_DISABLED)
         assertEquals("GPS enabled", VoiceNavPhrases.GPS_ENABLED)
         assertEquals("Cancelled.", VoiceNavPhrases.CONFIRM_CANCELLED)
-        assertEquals("Your route is still loading, one moment.", VoiceNavPhrases.CONFIRM_LOADING)
+        assertEquals("Loading route.", VoiceNavPhrases.CONFIRM_LOADING)
     }
 
     @Test
@@ -50,14 +50,14 @@ class VoiceNavAnnouncerTest {
 
         assertEquals(
             listOf(
-                "Do you really want to go to la gare? Travel time: 15 minutes. Answer yes or no.",
-                "Here is the page for la tour Eiffel",
-                "Guidance stopped",
+                "Go to la gare? 15 minutes. Yes?",
+                "Page: la tour Eiffel.",
+                "Stopped",
                 "GPS disabled",
                 "GPS enabled",
-                "Arrived at destination",
+                "Arrived",
                 "Cancelled.",
-                "Your route is still loading, one moment.",
+                "Loading route.",
             ),
             spoken,
         )
@@ -77,14 +77,14 @@ class VoiceNavAnnouncerTest {
         val announcer = VoiceNavAnnouncer()
         val turn = VoiceNavEvent.Turn(SteeringCap.Left, 100f)
 
-        assertEquals("Continue in this direction.", announcer.admitEvent(0L, turn))
+        assertEquals("Straight on.", announcer.admitEvent(0L, turn))
         // Non marquée : ré-admise (moteur en échec, la réémission reparle).
-        assertEquals("Continue in this direction.", announcer.admitEvent(1_000L, turn))
+        assertEquals("Straight on.", announcer.admitEvent(1_000L, turn))
         assertNull(announcer.lastPhrase)
 
-        announcer.markSpoken(turn, 1_000L, "Continue in this direction.")
+        announcer.markSpoken(turn, 1_000L, "Straight on.")
 
-        assertEquals("Continue in this direction.", announcer.lastPhrase)
+        assertEquals("Straight on.", announcer.lastPhrase)
         assertNull(announcer.admitEvent(2_000L, turn))
     }
 

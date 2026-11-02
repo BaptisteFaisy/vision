@@ -27,33 +27,33 @@ class NavUiStateTest {
     }
 
     @Test
-    fun `Navigating annonce Navigating to X`() {
+    fun `Navigating annonce Going to X`() {
         val state = NavUiState.Navigating("la gare de Lyon")
         assertEquals("Navigation", state.overlayTitle)
-        assertEquals("Navigating to la gare de Lyon", state.overlayMessage)
-        assertEquals("Navigating to la gare de Lyon", state.announcement)
+        assertEquals("Going to la gare de Lyon", state.overlayMessage)
+        assertEquals("Going to la gare de Lyon", state.announcement)
     }
 
     @Test
-    fun `PlaceCard annonce Here is the page for X`() {
+    fun `PlaceCard annonce Page X`() {
         val state = NavUiState.PlaceCard("la tour Eiffel")
         assertEquals("Navigation", state.overlayTitle)
-        assertEquals("Here is the page for la tour Eiffel", state.overlayMessage)
-        assertEquals("Here is the page for la tour Eiffel", state.announcement)
+        assertEquals("Page: la tour Eiffel.", state.overlayMessage)
+        assertEquals("Page: la tour Eiffel.", state.announcement)
     }
 
     @Test
-    fun `BrowserFallback affiche le repli mais annonce Navigating to X`() {
+    fun `BrowserFallback affiche le repli mais annonce Going to X`() {
         val state = NavUiState.BrowserFallback("Nice")
         assertEquals("Route opened in the browser", state.overlayMessage)
-        assertEquals("Navigating to Nice", state.announcement)
+        assertEquals("Going to Nice", state.announcement)
     }
 
     @Test
-    fun `Stopped annonce Guidance stopped`() {
+    fun `Stopped annonce Stopped`() {
         assertEquals("Navigation", NavUiState.Stopped.overlayTitle)
-        assertEquals("Guidance stopped", NavUiState.Stopped.overlayMessage)
-        assertEquals("Guidance stopped", NavUiState.Stopped.announcement)
+        assertEquals("Stopped", NavUiState.Stopped.overlayMessage)
+        assertEquals("Stopped", NavUiState.Stopped.announcement)
     }
 
     @Test
@@ -67,7 +67,7 @@ class NavUiStateTest {
     @Test
     fun `Failed muet sur panne TTS overlay seul`() {
         val state = NavUiState.Failed(NavMessages.GUIDANCE_UNAVAILABLE, speak = false)
-        assertEquals("I can't open the guidance", state.overlayMessage)
+        assertEquals("No guidance.", state.overlayMessage)
         assertNull(state.announcement)
     }
 }

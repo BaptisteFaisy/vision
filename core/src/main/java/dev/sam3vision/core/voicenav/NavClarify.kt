@@ -152,8 +152,8 @@ object NavClarifyText {
     /** « Je n'ai pas compris où tu veux aller… » (jamais blanche). */
     fun ask(language: SpeechLanguage = SpeechLanguage.DEFAULT): String = when (language) {
         SpeechLanguage.Fr ->
-            "Je n'ai pas compris où tu veux aller. Dis par exemple : je veux aller à la gare."
+            "Où aller ?"
         SpeechLanguage.En ->
-            "I didn't catch where you want to go. Say for example: I want to go to the train station."
+            "Where to?"
     }
 }

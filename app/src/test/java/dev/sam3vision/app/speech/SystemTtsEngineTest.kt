@@ -46,9 +46,9 @@ class SystemTtsEngineTest {
         val driver = FakeDriver()
         val engine = SystemTtsEngine(driver)
 
-        assertTrue(engine.speak("Tournez à gauche.", urgent = false, Locale.FRENCH, 1f))
+        assertTrue(engine.speak("À gauche.", urgent = false, Locale.FRENCH, 1f))
 
-        assertEquals(listOf(FakeDriver.Call("Tournez à gauche.", false, Locale.FRENCH, 1f)), driver.calls)
+        assertEquals(listOf(FakeDriver.Call("À gauche.", false, Locale.FRENCH, 1f)), driver.calls)
     }
 
     @Test
@@ -56,7 +56,7 @@ class SystemTtsEngineTest {
         val driver = FakeDriver()
         val engine = SystemTtsEngine(driver)
 
-        engine.speak("Continuez tout droit.", urgent = false, Locale.FRENCH, 1f)
+        engine.speak("Tout droit.", urgent = false, Locale.FRENCH, 1f)
         engine.speak("Recalcul en cours.", urgent = true, Locale.FRENCH, 1f)
 
         assertEquals(2, driver.calls.size)
@@ -79,10 +79,10 @@ class SystemTtsEngineTest {
         val driver = FakeDriver()
         val engine = SystemTtsEngine(driver)
 
-        engine.speak("  Tournez à gauche. ", urgent = false, Locale.FRENCH, 9.9f)
-        engine.speak("Tournez à droite.", urgent = false, Locale.FRENCH, 0.1f)
+        engine.speak("  À gauche. ", urgent = false, Locale.FRENCH, 9.9f)
+        engine.speak("À droite.", urgent = false, Locale.FRENCH, 0.1f)
 
-        assertEquals("Tournez à gauche.", driver.calls[0].text)
+        assertEquals("À gauche.", driver.calls[0].text)
         assertEquals(2.0f, driver.calls[0].rate, 0f)
         assertEquals(0.5f, driver.calls[1].rate, 0f)
     }
@@ -91,14 +91,14 @@ class SystemTtsEngineTest {
     fun `pilote qui jette devient un refus`() {
         val engine = SystemTtsEngine(FakeDriver(throwOnSpeak = true))
 
-        assertFalse(engine.speak("Tournez à gauche.", urgent = false, Locale.FRENCH, 1f))
+        assertFalse(engine.speak("À gauche.", urgent = false, Locale.FRENCH, 1f))
     }
 
     @Test
     fun `pilote en echec remonte faux`() {
         val engine = SystemTtsEngine(FakeDriver(fail = true))
 
-        assertFalse(engine.speak("Tournez à gauche.", urgent = false, Locale.FRENCH, 1f))
+        assertFalse(engine.speak("À gauche.", urgent = false, Locale.FRENCH, 1f))
     }
 
     @Test
@@ -120,7 +120,7 @@ class SystemTtsEngineTest {
 
         assertEquals(0, driver.stops)
         assertEquals(1, driver.shutdowns)
-        assertFalse(engine.speak("Tournez à gauche.", urgent = true, Locale.FRENCH, 1f))
+        assertFalse(engine.speak("À gauche.", urgent = true, Locale.FRENCH, 1f))
         assertFalse(engine.speaking)
         assertTrue(driver.calls.isEmpty())
     }
@@ -171,7 +171,7 @@ class SystemTtsEngineTest {
         val engine = SystemTtsEngine(driver)
 
         engine.speak("Bordure à 0,5 mètre.", urgent = true, Locale.FRENCH, 1f, SystemTtsEngine.SAFETY_PITCH)
-        engine.speak("Tournez à gauche.", urgent = false, Locale.FRENCH, 1f)
+        engine.speak("À gauche.", urgent = false, Locale.FRENCH, 1f)
 
         assertEquals(SystemTtsEngine.SAFETY_PITCH, driver.calls[0].pitch, 0f)
         assertEquals(1f, driver.calls[1].pitch, 0f)

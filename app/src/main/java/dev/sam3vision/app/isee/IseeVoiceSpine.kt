@@ -69,6 +69,7 @@ internal class IseeVoiceSpine(
 internal fun postFoundClip(label: String, clockHour: Int) {
     val target = FindIndoorTarget.fromSpoken(label) ?: return
     val clip = FindIndoorClips.found(target, clockHour)
+    VoiceTick.report(VoiceTick.SRC_FIND, VoiceWish(FindIndoorLevels.FIND, clip.text, AntiRepeat.KEY_FIND_FOUND + ":" + clip.id, clip.id), System.currentTimeMillis(), indoor = true)
     if (AntiRepeat.allow(AntiRepeat.KEY_FIND_FOUND + ":" + clip.id, System.currentTimeMillis())) {
         VoiceBus.post(FindIndoorLevels.FIND, clip.text, clip.id)
     }

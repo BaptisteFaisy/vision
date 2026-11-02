@@ -23,30 +23,30 @@ object NavMessages {
     const val ERROR_TITLE = "Error"
 
     /**
-     * « Navigating to X » — [destination] brute, espaces rognés.
+     * « Going to X » — [destination] brute, espaces rognés (résiduelle).
      * Identique à `NavigationPhrases.started` et `nav_confirm_destination`.
      * L'appelant refuse les destinations blanches avant de parler.
      */
-    fun started(destination: String): String = "Navigating to ${destination.trim()}"
+    fun started(destination: String): String = "Going to ${destination.trim()}"
 
     /**
      * Guidage impossible à ouvrir (aucune app capable, lancement refusé…).
      * Identique à `NavigationPhrases.GUIDANCE_UNAVAILABLE` et
      * `nav_guidance_unavailable`.
      */
-    const val GUIDANCE_UNAVAILABLE = "I can't open the guidance"
+    const val GUIDANCE_UNAVAILABLE = "No guidance."
 
     /**
-     * « Here is the page for X » — guidage éteint, fiche lieu ouverte sans guidage.
+     * « Page: X. » — guidage éteint, fiche lieu ouverte sans guidage.
      * Future clé `nav_place_opened`.
      */
-    fun placeOpened(destination: String): String = "Here is the page for ${destination.trim()}"
+    fun placeOpened(destination: String): String = "Page: ${destination.trim()}."
 
     /** Overlay seul quand Maps est absent (repli navigateur). Future clé `nav_browser_fallback`. */
     const val BROWSER_FALLBACK = "Route opened in the browser"
 
     /** Ordre STOP consommé : destination oubliée, retour accueil. Future clé `nav_stop_done`. */
-    const val STOP_DONE = "Guidance stopped"
+    const val STOP_DONE = "Stopped"
 
     /**
      * Micro pris par la vidéo au moment de l'appui long.

@@ -261,3 +261,71 @@ par fenêtre), `ProbeHazardsTest` (silence à 499 ms) et
 
 Recette téléphone : escalier nommé → « N marches. » puis répétition
 toutes les 0,5 s — **non mesuré**, exige un APK sur appareil réel.
+
+## 38. Battement voix 350 ms : la priorité du moment, toutes les 350 ms (ordre user du 01/11)
+
+Le user veut une voix qui parle toutes les 350 ms pour dire la chose
+la plus prioritaire du moment. Nouveau contrat : les producteurs
+continus rapportent leur vœu courant, et un battement toutes les 350 ms
+propose le plus prioritaire au bus — l'écrasé n'est plus perdu dans sa
+fenêtre de fraîcheur, il est re-proposé au battement suivant.
+
+- **registre** (`VoiceTick.report`, par source : escaliers, compte des
+  marches, grillage, trottoir) : le vœu courant de chaque source, frais
+  2 s (`FRESH_MS`, prior à valider rue) ; le post immédiat est gardé
+  (la première détection parle sans attendre le battement) ;
+- **battement** (`observeVoiceTick`, démarré par `observeHazards`,
+  coupé en Traversée — le verdict y est propriétaire du son) : toutes
+  les 350 ms (`TICK_MS`), le plus petit niveau frais est proposé via
+  `offer` (antirépétition puis bus) — ex æquo au plus récent ;
+- **anti-bégaiement** : le même (niveau, texte) ne repart pas avant 1 s
+  (`SAME_MS` — les clés sans antirépétition n'ont pas d'autre borne) ;
+  un refus de l'antirépétition n'est pas mémorisé (retenté au
+  battement suivant) ;
+- **hors battement, par construction** : les obstacles (re-postés à
+  chaque frame SAM, ~200 ms), la Traversée (verdict nourri à chaque
+  frame), les événements (GPS, chat, passage, trouvaille — ponctuels)
+  et le repli 12 (son chemin émission + silence 300 ms existe déjà —
+  un double chemin bégayerait le mot).
+
+Verrouillé par `VoiceTickTest` (8 : ordre, ex æquo, fraîcheur, offre
+au bus, anti-bégaiement 1 s, retentative après refus, boucle 350 ms
+au temps virtuel + silence en Traversée). `check-kotlin-limits.py`
+vert, suite `:app` isee 775 tests verts.
+
+Recette téléphone : alerte écrasée par une parole plus prioritaire →
+re-dite au battement suivant (≤ 350 ms après le silence) — **non
+mesuré**, exige un APK sur appareil réel.
+
+## 39. Tranche 350 ms : chaque phrase tient dans un tick (ordre user du 01/11)
+
+Un tick, une phrase : toute parole du bus tient dans 350 ms, dehors comme
+dedans (même battement, chaîne du mode courant — §3 dedans, §1 dehors).
+Deux leviers :
+
+- **vitesse adaptative** (`sliceRateFor`, pitch conservé) : chaque clip et
+  chaque synthèse GPS/confirmation joue à `max(réglage, durée/350)`
+  plafonné à ×3 (`MAX_SLICE_RATE`) — au-delà, la phrase dépasse ;
+  un refus plateforme rejoue à ×1,9 (prior à valider oreille et appareil) ;
+- **formes minimales** (~15 caractères) : manœuvres GPS (`Turn left.`,
+  `Straight on.`, `Off route.`, `Arrived.`…), confirmations et ordres
+  (`Crossing on.`, `Dedans.`, `Création picto.`, `Where to?`…),
+  miroirs `strings.xml` et `voicepack-catalog.json` à jour (entrées
+  `stale_audio` : l'audio dit encore l'ancien texte, régénération
+  pendante) ;
+- **verdicts Traversée exemptés** : `Cross.` / `Don't cross.` dits
+  entiers à vitesse du réglage (421/632 ms à ×1,9) — la sécurité ne
+  s'accélère ni ne se coupe jamais ; chat LLM hors tranche (imprévisible).
+
+Phrases qui dépassent même à ×3 (résiduelles, pas de coupe horloge —
+seule une parole plus prioritaire coupe, règle du bus inchangée, et le
+battement §38 re-propose) : créneaux non bornés (destinations, rues,
+noms d'objets), littérales moteur Valhalla, rappel GPS (consigne +
+distance), FR marginales (`Gauche, 5 mètres.` ~370 ms).
+
+Verrouillé par `VoiceSliceTest` (tranche, plafond, verdict entier) et
+`VoiceTickTest` (10, modes exclusifs) ; `check-voicepack` (miroir),
+`check-voice-nav-doc` et `check-kotlin-limits` verts.
+
+Recette téléphone : oreille — mots ×2-3 intelligibles, verdicts entiers,
+aucune coupure mid-mot — **non mesuré**, exige un APK sur appareil réel.

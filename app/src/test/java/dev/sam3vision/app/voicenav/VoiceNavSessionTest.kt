@@ -47,10 +47,10 @@ class VoiceNavSessionTest {
     private val gpsFlags = mutableListOf<Boolean>()
     private val summary = RouteSummary("la gare", "Place Louis-Armand, Paris", 2450, 900)
     private val questionGare =
-        "Do you really want to go to la gare? Travel time: 15 minutes. Answer yes or no."
+        "Go to la gare? 15 minutes. Yes?"
     private val questionTour =
-        "Do you really want to go to la tour Eiffel? Travel time: 15 minutes. Answer yes or no."
-    private val questionTourNoTime = "Do you really want to go to la tour Eiffel? Answer yes or no."
+        "Go to la tour Eiffel? 15 minutes. Yes?"
+    private val questionTourNoTime = "Go to la tour Eiffel? Yes?"
 
     private fun session(
         launcher: FakeLauncher = FakeLauncher(),
@@ -102,7 +102,7 @@ class VoiceNavSessionTest {
         assertTrue(session.onVoiceTranscript("I want to go to the Sacré Coeur"))
         val state = session.state.value as VoiceNavUiState.Confirming
         assertEquals("35 Rue du Chevalier de la Barre", state.destination)
-        assertEquals(listOf("Do you really want to go to 35 Rue du Chevalier de la Barre? Travel time: 15 minutes. Answer yes or no."), spoken)
+        assertEquals(listOf("Go to 35 Rue du Chevalier de la Barre? 15 minutes. Yes?"), spoken)
     }
 
     @Test
@@ -251,12 +251,12 @@ class VoiceNavSessionTest {
         delay(50)
 
         assertTrue(session.onVoiceTranscript("yes"))
-        assertEquals(listOf("Your route is still loading, one moment."), spoken)
+        assertEquals(listOf("Loading route."), spoken)
 
         gate.complete(Result.success(summary))
         assertTrue(opening.await())
         assertEquals(
-            listOf("Your route is still loading, one moment.", questionGare),
+            listOf("Loading route.", questionGare),
             spoken,
         )
         assertTrue(session.state.value is VoiceNavUiState.Confirming)
@@ -269,17 +269,17 @@ class VoiceNavSessionTest {
         session.confirmDestination()
         spoken.clear()
 
-        session.onGuidanceUpdate(GuidanceUpdate("Tournez à droite", 150, 1200, 480))
+        session.onGuidanceUpdate(GuidanceUpdate("À droite", 150, 1200, 480))
 
         val guiding = session.state.value as VoiceNavUiState.Guiding
-        assertEquals("Tournez à droite", guiding.update.instruction)
+        assertEquals("À droite", guiding.update.instruction)
         assertTrue(spoken.isEmpty())
 
         session.onGuidanceUpdate(GuidanceUpdate("Arrivée", 0, 0, 0, arrived = true))
 
         val arrived = session.state.value as VoiceNavUiState.Arrived
         assertEquals("la gare", arrived.destination)
-        assertEquals(listOf("Arrived at destination"), spoken)
+        assertEquals(listOf("Arrived"), spoken)
 
         session.dismissArrived()
 
@@ -290,7 +290,7 @@ class VoiceNavSessionTest {
     fun `mises a jour hors guidage ignorees`() = runBlocking {
         val session = session()
 
-        session.onGuidanceUpdate(GuidanceUpdate("Tournez à droite", 150, 1200, 480))
+        session.onGuidanceUpdate(GuidanceUpdate("À droite", 150, 1200, 480))
 
         assertEquals(VoiceNavUiState.Idle, session.state.value)
         assertTrue(spoken.isEmpty())
@@ -306,7 +306,7 @@ class VoiceNavSessionTest {
         session.stopGuidance()
 
         assertEquals(VoiceNavUiState.Idle, session.state.value)
-        assertEquals(listOf("Guidance stopped"), spoken)
+        assertEquals(listOf("Stopped"), spoken)
     }
 
     @Test
@@ -321,7 +321,7 @@ class VoiceNavSessionTest {
         assertTrue(session.onVoiceTranscript("arrête le guidage"))
 
         assertEquals(VoiceNavUiState.Idle, session.state.value)
-        assertTrue("Guidance stopped" in spoken)
+        assertTrue("Stopped" in spoken)
     }
 
     @Test

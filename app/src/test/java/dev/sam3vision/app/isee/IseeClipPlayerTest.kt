@@ -30,6 +30,11 @@ class IseeClipPlayerTest {
             return this.file
         }
 
+        override suspend fun playSlice(file: File, sliceMs: Long): Result<Unit> {
+            playedFiles += file.name
+            return this.file
+        }
+
         override suspend fun playQueued(bytes: ByteArray): Result<PlaybackEnd> {
             playedSlices += bytes
             return queued

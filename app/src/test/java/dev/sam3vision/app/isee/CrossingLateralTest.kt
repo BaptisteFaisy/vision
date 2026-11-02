@@ -214,7 +214,7 @@ class CrossingLateralTest {
             lateral, arrival, objects, 512, 1138, readings, null,
             LensSpec.Default, 200L, SpeechLanguage.Fr, approach,
         )
-        assertEquals("Passage piéton à gauche, à 2 mètres.", second?.approach)
+        assertEquals("Gauche, 2 mètres.", second?.approach)
     }
 
     @Test
@@ -224,11 +224,11 @@ class CrossingLateralTest {
         val said = mutableListOf<String>()
         observeCrossingLateral(patches, backgroundScope, { clip, text -> words.add(clip to text) }, { said.add(it) })
 
-        patches.value = CrossingLateralPatch(null, null, "Sur le passage.", 0.5f, null, "Passage piéton devant.")
+        patches.value = CrossingLateralPatch(null, null, "Sur le passage.", 0.5f, null, "Devant.")
         runCurrent()
 
         assertTrue(words.isEmpty())
-        assertEquals(listOf("Passage piéton devant.", "Sur le passage."), said)
+        assertEquals(listOf("Devant.", "Sur le passage."), said)
     }
 
     @Test
@@ -242,10 +242,10 @@ class CrossingLateralTest {
             sayArrival = { arrived.add(it) },
         )
 
-        patches.value = CrossingLateralPatch(null, null, "Sur le passage.", 0.5f, null, "Passage piéton devant.")
+        patches.value = CrossingLateralPatch(null, null, "Sur le passage.", 0.5f, null, "Devant.")
         runCurrent()
 
-        assertEquals(listOf("Passage piéton devant."), said)
+        assertEquals(listOf("Devant."), said)
         assertEquals(listOf("Sur le passage."), arrived)
     }
 

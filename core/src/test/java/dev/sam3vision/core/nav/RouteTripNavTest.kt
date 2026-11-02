@@ -74,7 +74,7 @@ class RouteTripNavTest {
     @Test
     fun `rue en passage ne devient pas traversee`() {
         val homage = maneuver(10, 1, "Passage du Souvenir").copy(
-            instruction = "Tournez à droite dans Passage du Souvenir.",
+            instruction = "À droite dans Passage du Souvenir.",
         )
         val withStreet = leg.copy(
             maneuvers = listOf(maneuver(1, 0, "Rue A"), homage, maneuver(4, 1, "Rue B")),

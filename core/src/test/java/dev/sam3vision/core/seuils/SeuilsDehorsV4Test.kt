@@ -351,7 +351,7 @@ class SeuilsDehorsV4Test {
     fun `passage annonce 1 fois par vue sous 6m`() {
         val watcher = CrossingApproachWatcher()
         assertNull(watcher.onFrame(0.5f, 5.5f, En))
-        assertEquals("Crosswalk ahead, 6 meters away.", watcher.onFrame(0.5f, 5.5f, En))
+        assertEquals("Ahead, 6 meters.", watcher.onFrame(0.5f, 5.5f, En))
         assertNull(watcher.onFrame(0.5f, 5.5f, En))
         assertNull(watcher.onFrame(null, null, En))
         watcher.onFrame(0.5f, 5.5f, En)
@@ -377,7 +377,7 @@ class SeuilsDehorsV4Test {
     fun `passage arrivee 1 fois`() {
         val watcher = CrossingArrivalWatcher()
         assertNull(watcher.onFrame(true, En))
-        assertEquals("On the crosswalk.", watcher.onFrame(true, En)!!.phrase)
+        assertEquals("Here.", watcher.onFrame(true, En)!!.phrase)
         assertNull(watcher.onFrame(true, En))
         assertNull(watcher.onFrame(false, En))
         watcher.onFrame(true, En)

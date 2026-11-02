@@ -49,7 +49,7 @@ class VoiceNavGpsVoiceTest {
     private val spoken = mutableListOf<String>()
     private val summary = RouteSummary("la gare", "Place Louis-Armand, Paris", 2450, 900)
     private val questionTour =
-        "Do you really want to go to la tour Eiffel? Travel time: 15 minutes. Answer yes or no."
+        "Go to la tour Eiffel? 15 minutes. Yes?"
 
     private fun session(
         launcher: GpsVoiceLauncher = GpsVoiceLauncher(),
@@ -69,7 +69,7 @@ class VoiceNavGpsVoiceTest {
     @Test
     fun `le rappel repete la consigne et la distance restante`() {
         assertEquals(
-            "Turn right, rue de la Paix. 450 meters remaining.",
+            "Turn right, rue de la Paix. 450 meters left.",
             gpsReminderPhrase("Turn right, rue de la Paix", 450),
         )
     }
@@ -77,7 +77,7 @@ class VoiceNavGpsVoiceTest {
     @Test
     fun `le rappel rogne le point et couvre le singulier`() {
         assertEquals(
-            "Destination in 200 meters. 1 meter remaining.",
+            "Destination in 200 meters. 1 meter left.",
             gpsReminderPhrase("Destination in 200 meters.", 1),
         )
     }
@@ -85,7 +85,7 @@ class VoiceNavGpsVoiceTest {
     @Test
     fun `le rappel sans consigne dit tout droit`() {
         assertEquals(
-            "Continue straight ahead. 120 meters remaining.",
+            "Straight on. 120 meters left.",
             gpsReminderPhrase("   ", 120),
         )
     }

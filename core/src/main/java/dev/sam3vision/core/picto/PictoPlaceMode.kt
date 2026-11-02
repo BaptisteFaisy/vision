@@ -65,12 +65,12 @@ object PlaceModeText {
     fun switched(mode: PictoPlaceMode, language: SpeechLanguage = SpeechLanguage.DEFAULT): String =
         when (language) {
             SpeechLanguage.Fr -> when (mode) {
-                PictoPlaceMode.DEDANS -> "Mode dedans activé."
-                PictoPlaceMode.DEHORS -> "Mode dehors activé."
+                PictoPlaceMode.DEDANS -> "Dedans."
+                PictoPlaceMode.DEHORS -> "Dehors."
             }
             SpeechLanguage.En -> when (mode) {
-                PictoPlaceMode.DEDANS -> "Indoor mode on."
-                PictoPlaceMode.DEHORS -> "Outdoor mode on."
+                PictoPlaceMode.DEDANS -> "Inside."
+                PictoPlaceMode.DEHORS -> "Outside."
             }
         }
 }
