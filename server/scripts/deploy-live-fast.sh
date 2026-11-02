@@ -18,6 +18,8 @@
 #   FAST_SNAPSHOT=1      snapshot mémoire (réveil 2-7 s au lieu de 25-38 s)
 #   FAST_MODEL_DIR=...   poids dans l'image (plus de re-téléchargement au réveil)
 #   FAST_TIMING=1        timings_ms + Server-Timing (validation des < 10 s)
+#   FAST_PREPROCESS=fast pixel_values fusionnés torch (défaut hf : appel HF,
+#                        écart ±1 LSB, repli auto — levier CPU, FIX-14)
 #   FAST_DEPTH_EVERY     throttle depth WS, ACTIF par défaut (8 : 1 carte sur 8,
 #                        médianes répétées entre deux) — non posé ici, le défaut
 #                        suffit ; =1 pour revenir au calcul à chaque frame.
@@ -84,7 +86,7 @@ deploy_once() {
   ( cd "$ROOT" && LIVE_APP_NAME="$APP_NAME" FAST_GPU="$GPU" FAST_REGION="$REGION" \
       FAST_ROUTING_REGION="$ROUTING" FAST_BATCH_PROMPTS=1 FAST_EDGE=512 \
       FAST_CUDA_GRAPH=1 FAST_DETR_GRAPH=1 FAST_POST_KEPT_ONLY=1 FAST_ATTN=sdpa FAST_SCALEDOWN=60 \
-      FAST_SNAPSHOT=1 FAST_MODEL_DIR=/opt/models/sam3.1 FAST_TIMING=1 \
+      FAST_SNAPSHOT=1 FAST_MODEL_DIR=/opt/models/sam3.1 FAST_TIMING=1 FAST_PREPROCESS=fast \
       "$MODAL" deploy backend/live_fast/live_app_fast.py "${profile_arg[@]}" )
 }
 
@@ -108,7 +110,7 @@ print("boot   :", "restore" if restored is True else
 print("load   :", json.dumps(h.get("load_breakdown"), ensure_ascii=False, sort_keys=True))
 missing = [k for k, v in {"batch_prompts": True, "cuda_graph": True, "edge": 512,
                            "snapshot": True, "detr_graph": True, "depth_every": 8,
-                           "post": "kept-only",
+                           "post": "kept-only", "preprocess": "fast",
                            "attn": "sdpa"}.items()
            if lev.get(k) != v]
 if "fast" not in str(h.get("model", "")).lower():
@@ -156,7 +158,7 @@ warmup_snapshot() {
 }
 
 if (( deploy )); then
-  echo "== deploy $APP_NAME ($GPU, $REGION / $ROUTING, cuda_graph=1, detr_graph=1, post=kept-only, attn=sdpa, scaledown=60, edge=512)"
+  echo "== deploy $APP_NAME ($GPU, $REGION / $ROUTING, cuda_graph=1, detr_graph=1, post=kept-only, attn=sdpa, scaledown=60, edge=512, preprocess=fast)"
   deploy_once || { echo "KO : le déploiement a échoué" >&2; exit 1; }
   echo "== attente de la nouvelle version"
   if wait_for_new_version 6 10; then
