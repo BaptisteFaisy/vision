@@ -82,6 +82,14 @@ object VoiceBus {
     /** Niveau de la parole en cours ([IDLE_LEVEL] = aucune). */
     private var activeLevel: Int = IDLE_LEVEL
 
+    /**
+     * Jeton de la parole en cours (+1 par parole acceptée) : le superviseur
+     * de restitution ([dev.sam3vision.app.isee.BusSpeaker]) ne rend le bus
+     * que si le niveau ET le jeton sont encore les siens — une parole plus
+     * récente ne se fait jamais voler son tour.
+     */
+    private var holdToken: Long = 0L
+
     /** Horodatage de la dernière parole acceptée (repli silence). */
     private var lastSayMs: Long = 0L
 
@@ -126,6 +134,7 @@ object VoiceBus {
             activeLevel = level
             lastSayMs = nowMs
             lastStairsSayMs = nowMs
+            holdToken++
             target.say(level, text, clipId, clips)
             return
         }
@@ -139,8 +148,22 @@ object VoiceBus {
         }
         activeLevel = level
         lastSayMs = nowMs
+        holdToken++
         target.say(level, text, clipId, clips)
     }
+
+    /**
+     * Parole tenue (niveau + jeton), lue par le porte-parole à l'entrée de
+     * [VoiceBusSpeaker.say] — sous le verrou de [post], donc sans course :
+     * c'est bien la parole qui vient d'être acceptée.
+     */
+    @Synchronized
+    internal fun hold(): Pair<Int, Long> = activeLevel to holdToken
+
+    /** Vrai si le bus tient encore la parole ([level], [token]). */
+    @Synchronized
+    internal fun holds(level: Int, token: Long): Boolean =
+        activeLevel == level && holdToken == token
 
     /**
      * Vrai quand des escaliers parlent (niveau 6 en cours) : les producteurs
@@ -232,6 +255,7 @@ object VoiceBus {
         chatReads = false
         lastSayMs = 0L
         lastStairsSayMs = 0L
+        holdToken = 0L
     }
 }
 
