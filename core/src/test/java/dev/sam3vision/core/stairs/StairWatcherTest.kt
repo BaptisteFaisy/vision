@@ -1,5 +1,6 @@
 package dev.sam3vision.core.stairs
 
+import dev.sam3vision.core.speech.IseeClipsEn
 import dev.sam3vision.core.speech.SpeechLanguage
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertNull
@@ -221,6 +222,19 @@ class StairWatcherTest {
         assertEquals("Escalier devant à 1 mètre.", StairText.distancePhrase(SpeechLanguage.Fr, StairDirection.Unknown, 1f))
         assertEquals("Stairs up at 4 meters.", StairText.distancePhrase(SpeechLanguage.En, StairDirection.Up, 4f))
         assertEquals("Stairs down at 1 meter.", StairText.distancePhrase(SpeechLanguage.En, StairDirection.Down, 1f))
+    }
+
+    @Test
+    fun `jalons EN 4 2 1 resolvent leur clip, le reste nul`() {
+        assertEquals(IseeClipsEn.STAIRS_UP_4, StairClips.clipIdFor("Stairs up at 4 meters."))
+        assertEquals(IseeClipsEn.STAIRS_UP_2, StairClips.clipIdFor("Stairs up at 2 meters."))
+        assertEquals(IseeClipsEn.STAIRS_UP_1, StairClips.clipIdFor("Stairs up at 1 meter."))
+        assertEquals(IseeClipsEn.STAIRS_DOWN_4, StairClips.clipIdFor("Stairs down at 4 meters."))
+        assertEquals(IseeClipsEn.STAIRS_DOWN_2, StairClips.clipIdFor("Stairs down at 2 meters."))
+        assertEquals(IseeClipsEn.STAIRS_DOWN_1, StairClips.clipIdFor("Stairs down at 1 meter."))
+        assertNull(StairClips.clipIdFor("Escalier montant à 4 mètres."))
+        assertNull(StairClips.clipIdFor("Stairs ahead at 4 meters."))
+        assertNull(StairClips.clipIdFor("Stairs up at 3 meters."))
     }
 
     @Test

@@ -314,11 +314,33 @@ object IseeClipsEn {
         else -> null
     }
 
+    // Mots TwinLite (couloir bouché, [TwinLiteWord]) : MP3 pré-synthétisés
+    // réutilisés — textes exacts des mots EN, au caractère près.
+    const val TL_STRAIGHT = "tl_straight"
+    const val TL_STRAIGHT_TEXT = "straight ahead."
+    const val TL_LEFT = "tl_left"
+    const val TL_LEFT_TEXT = "left."
+    const val TL_RIGHT = "tl_right"
+    const val TL_RIGHT_TEXT = "right."
+    const val TL_STOP = "tl_stop"
+    const val TL_STOP_TEXT = "obstacle, stop."
+
     /** Nom du MP3 embarqué (`res/raw`) pour [clipId]. */
     fun fileName(clipId: String): String = "vp_" + clipId + "_en.mp3"
 
     /** Registre complet : clipId → texte parlé (nouveaux + réutilisés). */
     val all: Map<String, String> = outdoor() + orders() + indoor() + quantities()
+
+    /**
+     * Clip d'une phrase parlée par un producteur, `null` si aucun texte du
+     * catalogue ne correspond exactement : le producteur dit son texte
+     * (trottoirs EN, « Stop. », objets trouvés…), le bus retrouve le MP3 —
+     * personne ne connaît les cotes par cœur. Pur, testé en JVM.
+     */
+    fun idForText(phrase: String): String? = byText[phrase]
+
+    /** Texte parlé → clipId (registre inversé, construit une fois). */
+    private val byText: Map<String, String> by lazy { all.entries.associate { (id, text) -> text to id } }
 
     private fun outdoor(): Map<String, String> = mapOf(
         CAR to CAR_TEXT,
@@ -357,6 +379,10 @@ object IseeClipsEn {
         GO_STRAIGHT to GO_STRAIGHT_TEXT,
         VERDICT_CROSS to VERDICT_CROSS_TEXT,
         VERDICT_WAIT to VERDICT_WAIT_TEXT,
+        TL_STRAIGHT to TL_STRAIGHT_TEXT,
+        TL_LEFT to TL_LEFT_TEXT,
+        TL_RIGHT to TL_RIGHT_TEXT,
+        TL_STOP to TL_STOP_TEXT,
     )
 
     private fun orders(): Map<String, String> = mapOf(
