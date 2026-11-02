@@ -42,22 +42,22 @@ class IseeDictationActionsTest {
     fun `onFind rejoue mode find my avec tout objet dedans`() = runBlocking {
         actions(PictoPlaceMode.DEDANS).onFind("mug")
         assertEquals(listOf("mug"), found)
-        assertEquals(listOf("Looking for mug."), spoken)
-        assertEquals("Looking for mug.", state.status)
+        assertEquals(listOf("Finding mug."), spoken)
+        assertEquals("Finding mug.", state.status)
     }
 
     @Test
     fun `onFind dehors refuse sans chasse`() = runBlocking {
         actions(PictoPlaceMode.DEHORS).onFind("mug")
         assertTrue(found.isEmpty())
-        assertEquals(listOf("Find works indoors only."), spoken)
-        assertEquals("Find works indoors only.", state.status)
+        assertEquals(listOf("Indoors only."), spoken)
+        assertEquals("Indoors only.", state.status)
     }
 
     @Test
     fun `onFind nommant un lieu ne bascule pas le mode`() = runBlocking {
         actions(PictoPlaceMode.DEDANS).onFind("indoor plant")
         assertEquals(listOf("indoor plant"), found)
-        assertEquals(listOf("Looking for indoor plant."), spoken)
+        assertEquals(listOf("Finding indoor plant."), spoken)
     }
 }
