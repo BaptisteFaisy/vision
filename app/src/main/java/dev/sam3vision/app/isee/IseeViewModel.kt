@@ -211,7 +211,7 @@ class IseeViewModel(app: Application) : AndroidViewModel(app) {
     fun dismissVoiceNav() = voiceNav.dismiss()
 
     /** Ordres de mode (lieu, picto), rejoués par le routeur sous leurs phrases canoniques. */
-    private val modes = IseeModeOrders({ settings }, ::speakNavigation, ::update, { label -> runFindOrder(probe, settings, camera?.lensSpec, lensFeeds, picto, label) }, { _state.value.placeMode }, onFindOff = { picto.cancelHunt() }, onPlaceMode = (IseePlaceSync({ settings }, { settings = it }, viewModelScope, prefs::save, ::syncProbe))::onPlaceMode)
+    private val modes = IseeModeOrders({ settings }, ::speakNavigation, ::update, { label -> runFindOrder(probe, settings, camera?.lensSpec, lensFeeds, picto, label) }, { _state.value.placeMode }, onFindOff = { picto.cancelHunt() }, onPlaceMode = (IseePlaceSync({ settings }, { settings = it }, viewModelScope, prefs::save, ::syncProbe))::onPlaceMode, post = { level, text, clip -> VoiceBus.post(level, text, clip) })
 
     /** Colonne vocale v4 : bus, bascule Traversée, parole GPS, reprise chat, trouvé (voir [IseeVoiceSpine]). */
     private val spine: IseeVoiceSpine = IseeVoiceSpine(viewModelScope, { probe.state.value.crossingActive }, { _state.value.placeMode }, ::cutSpeech, voiceNav::stopVoice, { playback.speakPending() }, ::speakNavigation, { settings })
