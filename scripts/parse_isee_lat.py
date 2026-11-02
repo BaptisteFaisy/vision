@@ -374,7 +374,7 @@ def lit_entree(chemin):
     """Contenu du dump : fichier UTF-8, ou stdin quand aucun chemin n'est donné."""
     if chemin is None:
         return sys.stdin.read()
-    with open(chemin, encoding="utf-8") as fichier:
+    with open(chemin, encoding="utf-8", errors="replace") as fichier:
         return fichier.read()
 
 
