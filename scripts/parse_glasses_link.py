@@ -2,13 +2,20 @@
 """parse_glasses_link.py — verdict B2 lunettes (`LUNETTES-RECETTE-TEL` § 3).
 
 Entrée : un dump `adb logcat -s GlassesLink` (fichier ou stdin) — lignes
-per-frame `TimingsText.link`, en microsecondes :
+détaillées `TimingsText.link`, en microsecondes :
 
     link seq 12 · lien 30123 · dec 8421 · aff 7110 · percu 45654
 
 plus les résumés `GlassesLink e2e … drops F+D` pour les pertes. Un poste non
 mesuré vaut `—` : la frame reste comptée, le poste est ignoré pour ce
-poste-là. Les K premières frames partent au warmup (`--skip`, défaut 5).
+poste-là. Depuis l'échantillonnage à la source, la ligne détaillée ne sort
+qu'une fois sur 24 frames (~1 Hz) : les K premières **lignes** partent au
+warmup (`--skip`, défaut 1).
+
+Statistiques de référence = ligne e2e 1 Hz (`GlassesLink e2e p50/p95/p99 …`) :
+60 s de dump ne donnent que ~60 lignes détaillées, insuffisant pour un p99
+stable. Le tableau par poste ci-dessous sert au diagnostic des étages, pas au
+verdict statistique.
 
 Sortie : n, moyenne, p50, p95, p99, max par poste, puis le verdict : TENU si
 `p95(percu) < 100 ms`, avec les seuils de la recette (warn p95 > 70 ms,
@@ -33,7 +40,10 @@ LIGNE_RESUME_LINK = re.compile(r"GlassesLink e2e p50/p95/p99 \S+.*drops (\d+)\+(
 CIBLE_P95_LINK_US = 100_000
 WARN_P95_LINK_US = 70_000
 CRIT_P99_LINK_US = 150_000
-WARMUP_DEFAUT = 5
+# Lignes détaillées jetées au warmup. La ligne ne sort plus qu'une fois sur 24
+# frames (24 i/s → 1 Hz) : une seule ligne (~1 s de flux) suffit après reset,
+# alors que 5 lignes jetteraient désormais 5 s de mesure utile.
+WARMUP_DEFAUT = 1
 
 
 def centile(tri, pourcent):

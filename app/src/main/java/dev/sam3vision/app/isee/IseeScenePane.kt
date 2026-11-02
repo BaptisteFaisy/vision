@@ -102,7 +102,7 @@ private fun BoxWithConstraintsScope.PortraitScene(
     // la boule s'efface et la rue grandit (60 %), sans respirer.
     val geo = with(density) { portraitGeometry(width.toPx(), (height - navInsetDp()).toPx(), open, 1f, isGuidanceOverlay(navState)) }
     with(density) { PortraitCamera(state, glue, probe, viewModel, open, geo.pictureH.toDp(), showGlasses, layers.glassesGhost) }
-    GlassesProbeWiring(viewModel.probe, (glassesLive || glassesStreaming) && state.glassesPhoto == null)
+    GlassesProbeLayer(state, viewModel.probe, glassesLive, glassesStreaming, isGuidanceOverlay(navState))
     Header(view.scene, onPicture = open > 0.5f, modifier = Modifier.fillMaxWidth())
     // navState est collecté plus haut : la taille de la rue en dépend.
     SceneGuidanceLayer(viewModel) {
@@ -119,6 +119,23 @@ private fun BoxWithConstraintsScope.PortraitScene(
     // Génération picto : le bloc fin semi-transparent survit à la rue
     // (génération lancée, vidéo coupée), jamais dehors.
     if (state.placeMode.pictoEnabled && state.picto.phase == PictoPhase.Generating) PictoGeneratingCard()
+}
+
+/**
+ * Pont lunettes → sonde : nourri seulement quand le direct vit et qu'aucune photo n'est
+ * figée à l'écran. Le guidage se lit sur `isGuidanceOverlay(navState)`, le signal que la
+ * scène utilise déjà pour agrandir la rue, effacer la boule et poser la carte — donc le
+ * même « mode route » que celui vu par l'utilisateur.
+ */
+@Composable
+private fun GlassesProbeLayer(
+    state: IseeUiState,
+    probe: LiveProbe,
+    glassesLive: Boolean,
+    glassesStreaming: Boolean,
+    guidance: Boolean,
+) {
+    GlassesProbeWiring(probe, (glassesLive || glassesStreaming) && state.glassesPhoto == null, guidance)
 }
 
 /**

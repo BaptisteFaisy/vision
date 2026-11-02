@@ -17,7 +17,6 @@ import dev.sam3vision.app.glasses.GlassesLiveDecoder
 import dev.sam3vision.app.glasses.GlassesVideoLink
 import dev.sam3vision.app.glasses.VideoSize
 import dev.sam3vision.app.glasses.textureViewCrop
-import dev.sam3vision.app.targetSize
 import dev.sam3vision.core.live.LinkDrop
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
@@ -27,7 +26,7 @@ import kotlinx.coroutines.launch
  * nourrie par le décodeur, recadré « remplit la vue ». Même place, même fondu, même boule
  * dessous que la caméra du téléphone — seule la source change.
  *
- * Le décodage tourne hors du fil UI (les frames arrivent jusqu'à 60 i/s) et ne recompose rien :
+ * Le décodage tourne hors du fil UI (les frames arrivent jusqu'à 24 i/s) et ne recompose rien :
  * seule la taille vidéo recadre la vue, une fois par résolution.
  */
 @Composable
@@ -37,8 +36,8 @@ internal fun GlassesLive(modifier: Modifier) {
     val size by GlassesVideoLink.videoSize.collectAsState()
     LaunchedEffect(decoder) {
         launch(Dispatchers.Default) {
-            // Un essai par poussée, sans attendre : le flux bat jusqu'à 60 i/s, la suivante
-            // réessaie ~17 ms plus tard. Boucler ici affamerait le décodeur (constaté :
+            // Un essai par poussée, sans attendre : le flux bat jusqu'à 24 i/s, la suivante
+            // réessaie ~42 ms plus tard. Boucler ici affamerait le décodeur (constaté :
             // 200 entrées en 4 min au lieu de 15/s, première sortie à +4 min).
             // Le rendu est daté à ses bornes (même horloge monotone que
             // `arrivedAtNs`) : c'est l'étage `dec` de la mesure B2.
@@ -57,9 +56,9 @@ internal fun GlassesLive(modifier: Modifier) {
         }
     }
     DisposableEffect(decoder, attached) {
-        GlassesVideoLink.attachSnapshot { attachedSnapshot(attached.view, attached) }
+        // Aucune photo de la vue : la sonde prend sa frame dans le bitstream (hors fil
+        // UI). Le calque reste donc nu, sans `getBitmap()` par poussée.
         onDispose {
-            GlassesVideoLink.detachSnapshot()
             decoder.release()
             attached.release()
         }
@@ -67,8 +66,10 @@ internal fun GlassesLive(modifier: Modifier) {
     AndroidView(
         factory = { context ->
             TextureView(context).apply {
+                // Le flux vidéo est opaque : on le déclare pour que la composition
+                // saute le blending du calque et sa passe de mélange avec le fond.
+                setOpaque(true)
                 surfaceTextureListener = glassesListener(decoder, attached)
-                attached.view = this
             }
         },
         update = { view -> size?.let { video -> applyCrop(view, attached, video) } },
@@ -80,9 +81,6 @@ internal fun GlassesLive(modifier: Modifier) {
 private class AttachedSurface {
     var current: Surface? = null
         private set
-
-    /** La vue, pour photographier la rue vers la sonde SAM. */
-    var view: TextureView? = null
 
     /**
      * Taille vidéo connue (0 = pas encore annoncée) : les buffers sont taillés
@@ -180,20 +178,6 @@ private fun sizeBuffersToVideo(view: TextureView, attached: AttachedSurface, vid
             attached.bufferW = video.width
             attached.bufferH = video.height
         }
-}
-
-/**
- * Photographie la rue à l'échelle d'envoi SAM (320 px, jamais agrandie) : c'est cette
- * image — exactement ce que l'utilisateur voit — qui part au guidage. `null` si la vue
- * n'a pas encore de taille. Note aussi la géométrie (vidéo + vue) pour le sténopé (D2).
- */
-private fun attachedSnapshot(view: TextureView?, attached: AttachedSurface): android.graphics.Bitmap? {
-    if (view == null || view.width <= 0 || view.height <= 0) return null
-    if (attached.videoW > 0 && attached.videoH > 0) {
-        GlassesVideoLink.noteSnapshotGeometry(attached.videoW, attached.videoH, view.width, view.height)
-    }
-    val (targetWidth, targetHeight) = targetSize(view.width, view.height, 0, FramePolicy.EDGE)
-    return runCatching { view.getBitmap(targetWidth, targetHeight) }.getOrNull()
 }
 
 /**
