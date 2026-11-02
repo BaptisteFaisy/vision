@@ -34,7 +34,7 @@ class AntiRepeatTest {
         assertEquals(0L, AntiRepeat.durationMs(AntiRepeat.KEY_POLE_AVOID))
         assertEquals(0L, AntiRepeat.durationMs(AntiRepeat.KEY_WALL_AVOID))
         assertEquals(2_000L, AntiRepeat.durationMs(AntiRepeat.KEY_MISC))
-        assertEquals(AntiRepeat.ONCE_MS, AntiRepeat.durationMs(AntiRepeat.KEY_CROSSWALK_ANNOUNCE))
+        assertEquals(2_000L, AntiRepeat.durationMs(AntiRepeat.KEY_CROSSWALK_ANNOUNCE))
         assertEquals(0L, AntiRepeat.durationMs(AntiRepeat.KEY_CROSSWALK_ALIGN))
         assertEquals(AntiRepeat.ONCE_MS, AntiRepeat.durationMs(AntiRepeat.KEY_CROSSWALK_ARRIVAL))
         assertEquals(10_000L, AntiRepeat.durationMs(AntiRepeat.KEY_SIDEWALK))
@@ -99,14 +99,14 @@ class AntiRepeatTest {
     }
 
     @Test
-    fun `annonce et arrivee passage = une fois jusqu-a l oubli`() {
+    fun `annonce passage = 2 s, le devant se repete`() {
         assertTrue(AntiRepeat.allow(AntiRepeat.KEY_CROSSWALK_ANNOUNCE, 1_000L))
-        assertFalse(AntiRepeat.allow(AntiRepeat.KEY_CROSSWALK_ANNOUNCE, 2_000L))
-        assertFalse("même loin dans la séance : une fois", AntiRepeat.allow(AntiRepeat.KEY_CROSSWALK_ANNOUNCE, 3_600_000L))
+        assertFalse(AntiRepeat.allow(AntiRepeat.KEY_CROSSWALK_ANNOUNCE, 2_999L))
+        assertTrue("échéance pile : le devant reparle", AntiRepeat.allow(AntiRepeat.KEY_CROSSWALK_ANNOUNCE, 3_000L))
+    }
 
-        AntiRepeat.forget(AntiRepeat.KEY_CROSSWALK_ANNOUNCE)
-        assertTrue("nouvelle vue : reparle", AntiRepeat.allow(AntiRepeat.KEY_CROSSWALK_ANNOUNCE, 3_700_000L))
-
+    @Test
+    fun `arrivee passage = une fois jusqu-a l oubli`() {
         assertTrue(AntiRepeat.allow(AntiRepeat.KEY_CROSSWALK_ARRIVAL, 1_000L))
         assertFalse(AntiRepeat.allow(AntiRepeat.KEY_CROSSWALK_ARRIVAL, 60_000L))
         AntiRepeat.reset()

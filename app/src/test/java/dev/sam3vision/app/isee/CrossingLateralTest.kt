@@ -268,13 +268,13 @@ class CrossingLateralTest {
             assertFalse("tour consommé", AntiRepeat.allow(AntiRepeat.KEY_CROSSWALK_ANNOUNCE, 2_000L))
             // 1 dropout : pas d'oubli (la vue n'est pas perdue).
             CrossingLateralWatch.update(nobody, 512, 1138, emptyList(), null, LensSpec.Default, 400L, SpeechLanguage.Fr)
-            assertFalse("dropout isolé : toujours consommé", AntiRepeat.allow(AntiRepeat.KEY_CROSSWALK_ANNOUNCE, 3_000L))
+            assertFalse("dropout isolé : toujours consommé", AntiRepeat.allow(AntiRepeat.KEY_CROSSWALK_ANNOUNCE, 2_500L))
             // 2e absence : oubli — la vue suivante reproduit et reparle.
             CrossingLateralWatch.update(nobody, 512, 1138, emptyList(), null, LensSpec.Default, 600L, SpeechLanguage.Fr)
             CrossingLateralWatch.update(objects, 512, 1138, readings, null, LensSpec.Default, 800L, SpeechLanguage.Fr)
             val again = CrossingLateralWatch.update(objects, 512, 1138, readings, null, LensSpec.Default, 1000L, SpeechLanguage.Fr)
             assertEquals("Gauche, 2 mètres.", again?.approach)
-            assertTrue("vue suivante : reparle", AntiRepeat.allow(AntiRepeat.KEY_CROSSWALK_ANNOUNCE, 4_000L))
+            assertTrue("vue suivante : reparle", AntiRepeat.allow(AntiRepeat.KEY_CROSSWALK_ANNOUNCE, 2_000L))
         } finally {
             AntiRepeat.reset()
             CrossingLateralWatch.reset()
@@ -297,11 +297,63 @@ class CrossingLateralTest {
             assertFalse("reset isolé : toujours consommé", AntiRepeat.allow(AntiRepeat.KEY_CROSSWALK_ANNOUNCE, 2_000L))
             // ...le 2e oublie (absence confirmée).
             CrossingLateralWatch.reset()
-            assertTrue("2e reset : la vue suivante reparle", AntiRepeat.allow(AntiRepeat.KEY_CROSSWALK_ANNOUNCE, 3_000L))
+            assertTrue("2e reset : la vue suivante reparle", AntiRepeat.allow(AntiRepeat.KEY_CROSSWALK_ANNOUNCE, 2_500L))
         } finally {
             AntiRepeat.reset()
             CrossingLateralWatch.reset()
         }
+    }
+
+    @Test
+    fun `patch repete le devant toutes les 2 s hors traversee`() {
+        val lateral = CrossingLateralAnnouncer()
+        val arrival = CrossingArrivalWatcher()
+        val approach = CrossingApproachWatcher()
+        val box = listOf(156f, 700f, 356f, 1100f)
+        val objects = listOf(obj("crosswalk", box))
+        val readings = listOf(reading("crosswalk", 3.0f, box))
+        fun patch(atMs: Long) = crossingLateralPatchOf(
+            lateral, arrival, objects, 512, 1138, readings, null,
+            LensSpec.Default, atMs, SpeechLanguage.Fr, approach, repeatAhead = true,
+        )
+        assertNull(patch(0L)?.approach)
+        assertEquals("Devant, 3 mètres.", patch(200L)?.approach)
+        assertNull(patch(1_000L)?.approach)
+        assertEquals("Devant, 3 mètres.", patch(2_200L)?.approach)
+    }
+
+    @Test
+    fun `patch ne repete pas le devant en traversee`() {
+        val lateral = CrossingLateralAnnouncer()
+        val arrival = CrossingArrivalWatcher()
+        val approach = CrossingApproachWatcher()
+        val box = listOf(156f, 700f, 356f, 1100f)
+        val objects = listOf(obj("crosswalk", box))
+        val readings = listOf(reading("crosswalk", 3.0f, box))
+        fun patch(atMs: Long) = crossingLateralPatchOf(
+            lateral, arrival, objects, 512, 1138, readings, null,
+            LensSpec.Default, atMs, SpeechLanguage.Fr, approach, repeatAhead = false,
+        )
+        assertNull(patch(0L)?.approach)
+        assertEquals("Devant, 3 mètres.", patch(200L)?.approach)
+        assertNull(patch(2_200L)?.approach)
+        assertNull(patch(5_000L)?.approach)
+    }
+
+    @Test
+    fun `feed hors traversee repete le devant, en traversee non`() {
+        CrossingLateralWatch.reset()
+        val box = listOf(156f, 700f, 356f, 1100f)
+        val objects = listOf(obj("crosswalk", box))
+        val readings = listOf(reading("crosswalk", 3.0f, box))
+        feedCrossingLateral(false, objects, 512, 1138, readings, null, LensSpec.Default, 0L, SpeechLanguage.Fr)
+        assertNull(CrossingLateralWatch.flow.value?.approach)
+        feedCrossingLateral(false, objects, 512, 1138, readings, null, LensSpec.Default, 200L, SpeechLanguage.Fr)
+        assertEquals("Devant, 3 mètres.", CrossingLateralWatch.flow.value?.approach)
+        feedCrossingLateral(false, objects, 512, 1138, readings, null, LensSpec.Default, 2_200L, SpeechLanguage.Fr)
+        assertEquals("Devant, 3 mètres.", CrossingLateralWatch.flow.value?.approach)
+        feedCrossingLateral(true, objects, 512, 1138, readings, null, LensSpec.Default, 4_200L, SpeechLanguage.Fr)
+        assertNull("en traversée : plus de répétition", CrossingLateralWatch.flow.value?.approach)
     }
 
     @Test

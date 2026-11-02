@@ -105,4 +105,63 @@ class CrossingApproachTest {
         assertNull(watcher.lastPhrase)
         assertNull(watcher.onFrame(0.10f, 2.0f, SpeechLanguage.Fr))
     }
+
+    @Test
+    fun `repetition du devant toutes les 2 s, ordre user`() {
+        assertEquals(2_000L, CrossingApproachWatcher.REPEAT_AHEAD_MS)
+    }
+
+    @Test
+    fun `devant hors traversee se repete toutes les 2 s, distance fraiche`() {
+        val watcher = CrossingApproachWatcher()
+        assertNull(watcher.onFrame(0.50f, 4.0f, SpeechLanguage.Fr, 0L, repeatAhead = true))
+        assertEquals(
+            "Devant, 4 mètres.",
+            watcher.onFrame(0.50f, 4.0f, SpeechLanguage.Fr, 200L, repeatAhead = true),
+        )
+        assertNull(watcher.onFrame(0.50f, 3.5f, SpeechLanguage.Fr, 1_000L, repeatAhead = true))
+        assertEquals(
+            "Devant, 3 mètres.",
+            watcher.onFrame(0.50f, 3.0f, SpeechLanguage.Fr, 2_200L, repeatAhead = true),
+        )
+    }
+
+    @Test
+    fun `devant en traversee ne se repete pas`() {
+        val watcher = CrossingApproachWatcher()
+        watcher.onFrame(0.50f, 4.0f, SpeechLanguage.Fr, 0L, repeatAhead = false)
+        watcher.onFrame(0.50f, 4.0f, SpeechLanguage.Fr, 200L, repeatAhead = false)
+        assertNull(watcher.onFrame(0.50f, 4.0f, SpeechLanguage.Fr, 5_000L, repeatAhead = false))
+    }
+
+    @Test
+    fun `gauche et droite ne se repetent jamais`() {
+        val watcher = CrossingApproachWatcher()
+        watcher.onFrame(0.10f, 4.0f, SpeechLanguage.Fr, 0L, repeatAhead = true)
+        watcher.onFrame(0.10f, 4.0f, SpeechLanguage.Fr, 200L, repeatAhead = true)
+        assertNull(watcher.onFrame(0.10f, 4.0f, SpeechLanguage.Fr, 5_000L, repeatAhead = true))
+    }
+
+    @Test
+    fun `direction nouvelle se reconfirme puis se redit`() {
+        val watcher = CrossingApproachWatcher()
+        watcher.onFrame(0.10f, 5.0f, SpeechLanguage.Fr)
+        assertEquals(
+            "Gauche, 5 mètres.",
+            watcher.onFrame(0.10f, 5.0f, SpeechLanguage.Fr),
+        )
+        assertNull("nouvelle direction : 1re frame silencieuse", watcher.onFrame(0.50f, 4.0f, SpeechLanguage.Fr))
+        assertEquals(
+            "Devant, 4 mètres.",
+            watcher.onFrame(0.50f, 4.0f, SpeechLanguage.Fr),
+        )
+    }
+
+    @Test
+    fun `arrive coupe la repetition, l arrivee parle a la place`() {
+        val watcher = CrossingApproachWatcher()
+        watcher.onFrame(0.50f, 4.0f, SpeechLanguage.Fr, 0L, repeatAhead = true)
+        watcher.onFrame(0.50f, 4.0f, SpeechLanguage.Fr, 200L, repeatAhead = true)
+        assertNull(watcher.onFrame(0.50f, 1.0f, SpeechLanguage.Fr, 2_200L, repeatAhead = true, arrived = true))
+    }
 }

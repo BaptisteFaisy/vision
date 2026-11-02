@@ -305,8 +305,8 @@ internal fun crossingOfferMeters(
 }
 
 /**
- * Signal latéral de la frame : mot nouveau seul + annonce localisée + arrivée (2 frames,
- * changement seul). Sans passage : les trois guetteurs retombent et `null` est rendu.
+ * Signal latéral de la frame : mot nouveau seul + annonce localisée ([repeatAhead] = « Devant » redit toutes les
+ * 2 s) + arrivée (2 frames, changement seul). Sans passage : les trois guetteurs retombent et `null` est rendu.
  * Pur hors annonceurs (injectés pour les tests JVM).
  */
 internal fun crossingLateralPatchOf(
@@ -320,7 +320,7 @@ internal fun crossingLateralPatchOf(
     lens: LensSpec,
     atMs: Long,
     language: SpeechLanguage,
-    approach: CrossingApproachWatcher = CrossingApproachWatcher(),
+    approach: CrossingApproachWatcher = CrossingApproachWatcher(), repeatAhead: Boolean = false,
 ): CrossingLateralPatch? {
     if (width <= 0 || height <= 0) return null
     val best = CrossingGuidance.selectBest(objects)
@@ -337,7 +337,7 @@ internal fun crossingLateralPatchOf(
     val clip = lateralPhrase?.let { GuidanceWord.clipIdFor(it) }
     val arrived = CrossingGuidance.isArrivedPx(best.box, height, meters)
     val arrivalPhrase = arrival.onFrame(arrived, language)?.phrase
-    val approachPhrase = approach.onFrame(centerX, meters, language)
+    val approachPhrase = approach.onFrame(centerX, meters, language, atMs, repeatAhead, arrived)
     return CrossingLateralPatch(lateralPhrase, clip, arrivalPhrase, centerX, meters, approachPhrase, atMs)
 }
 
@@ -366,10 +366,10 @@ internal object CrossingLateralWatch {
         pose: CameraPose?,
         lens: LensSpec,
         atMs: Long,
-        language: SpeechLanguage,
+        language: SpeechLanguage, repeatAhead: Boolean = false,
     ): CrossingLateralPatch? {
         val patch = crossingLateralPatchOf(
-            lateral, arrival, objects, width, height, readings, pose, lens, atMs, language, approach,
+            lateral, arrival, objects, width, height, readings, pose, lens, atMs, language, approach, repeatAhead,
         )
         if (patch == null && _flow.value == null) AntiRepeat.forget(AntiRepeat.KEY_CROSSWALK_ANNOUNCE) // 2e absence : vue perdue, la suivante reparle
         _flow.value = patch
@@ -394,7 +394,7 @@ internal object CrossingLateralWatch {
  * l'user s'aligne à la voix (« Gauche. », « Droite. », « Tout droit. »,
  * « Sur le passage. »), le feu et le veto gardant la priorité du son (mots
  * doux, `urgent = false`). Loin ou invisible, la mémoire retombe (une ligne
- * côté sonde, plafond respecté).
+ * côté sonde, plafond respecté). « Devant » redit toutes les 2 s hors traversée (8, devant le repli 12) ; 1 fois par vue en traversée.
  */
 internal fun feedCrossingLateral(
     traversing: Boolean,
@@ -408,7 +408,7 @@ internal fun feedCrossingLateral(
     language: SpeechLanguage,
 ) {
     if (!traversing) {
-        CrossingLateralWatch.update(objects, width, height, readings, pose, lens, atMs, language)
+        CrossingLateralWatch.update(objects, width, height, readings, pose, lens, atMs, language, repeatAhead = true)
         return
     }
     val near = CrossingOffer.seesNearCrosswalk(
@@ -465,9 +465,9 @@ internal fun crossingLateralLevel(traversing: Boolean): Int =
 /**
  * Voix du guidage latéral sur le bus (SPEC v4, niveau 8 dehors, 101 en
  * Traversée) : mot d'alignement en clip (clé alignement, au changement),
- * annonce localisée (clé annonce, 1 fois par vue), arrivée (clé arrivée,
- * 1 fois). Sans file ni rattrapage : l'écrasé n'est jamais redit. Dehors
- * uniquement.
+ * annonce localisée (clé annonce 2 s), arrivée (clé arrivée, 1 fois). Sans
+ * file ni rattrapage : l'écrasé n'est jamais redit (son tour est rendu).
+ * Dehors uniquement.
  */
 internal fun observeCrossingVoice(
     scope: CoroutineScope,
