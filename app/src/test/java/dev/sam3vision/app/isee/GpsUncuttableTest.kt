@@ -119,6 +119,26 @@ class GpsUncuttableTest {
         assertEquals(2, speaker.said.size)
     }
 
+    @Test
+    fun `manoeuvre et rappel attendent, le GPS ne coupe jamais`() {
+        VoiceBus.post(OutdoorLevel.HUMAN, "personne")
+        VoiceBus.post(OutdoorLevel.GPS_EVENT, "Left.")
+        VoiceBus.post(OutdoorLevel.GPS_REMINDER, "Left.")
+
+        assertEquals(listOf(GpsFakeSpeaker.Said(OutdoorLevel.HUMAN, "personne")), speaker.said)
+
+        VoiceBus.onSpeechIdle()
+        VoiceBus.post(OutdoorLevel.STAIRS, "escalier")
+        VoiceBus.post(OutdoorLevel.GPS_EVENT, "Right.")
+
+        assertEquals(2, speaker.said.size)
+        assertEquals(OutdoorLevel.STAIRS, speaker.said[1].level)
+
+        VoiceBus.onSpeechIdle()
+        VoiceBus.post(OutdoorLevel.GPS_EVENT, "Right.")
+        assertEquals(3, speaker.said.size)
+    }
+
     private fun rig(): ObstacleWatchers =
         ObstacleWatchers(VehicleStateWatcher(), CurbWatcher(), HazardWatcher())
 

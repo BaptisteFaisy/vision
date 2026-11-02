@@ -49,9 +49,10 @@ internal const val WALK_METERS_PER_SECOND = 1.3
  *   pour la sonde SAM (`LiveProbe.setRouteCap`) : tant qu'il est posé, la
  *   sonde marche le couloir de la route (fusion itinéraire × obstacle).
  * - [speakRoute] dit les manœuvres par la voix réseau ElevenLabs (`null` = voix système) :
- *   la phrase (même politique que le canal système) + son urgence (sortie de
- *   trace et recalcul coupent, le reste attend). Une seule voix : GPS et
- *   obstacles partagent le même tuyau, jamais deux voix en même temps.
+ *   la phrase (même politique que le canal système) ; jamais de coupe
+ *   (ordre user du 02/11) : le GPS attend son tour comme le reste.
+ *   Une seule voix : GPS et obstacles partagent le même tuyau, jamais deux
+ *   voix en même temps.
  *   Niveaux SPEC v4 : manœuvres = 11, rappel 15 s = 3 (l'intégrateur les
  *   porte au bus vocal).
  * - [stopRoute] coupe la parole route (fin de guidage, user qui parle),
@@ -60,8 +61,8 @@ internal const val WALK_METERS_PER_SECOND = 1.3
  *   [isSpeaking] marque la route occupée sur son état réel, jamais sur le
  *   TTS système qui ne parle pas sur ce chemin.
  *
- * Priorité à la voix du user : tant qu'il parle ([userSpeaking]), la voix
- * ordinaire se tait — sauf urgence ([VoiceNavPolicy.isUrgent]) qui coupe.
+ * Priorité à la voix du user : tant qu'il parle ([userSpeaking]), le GPS
+ * se tait, urgences comprises (miroir du bus — ordre user du 02/11).
  * [stopVoice] coupe la parole en cours quand le user prend la parole,
  * sans toucher au guidage lui-même.
  *

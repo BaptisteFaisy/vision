@@ -43,13 +43,13 @@ sealed interface VoiceNavEvent {
     /** Arrivée à [destination] (vide = arrivée sans nom). */
     data class Arrival(val destination: String) : VoiceNavEvent
 
-    /** Sortie de trace : urgent, coupe la phrase en cours. */
+    /** Sortie de trace : prioritaire (saute le délai, voix grave), sans couper. */
     data object OffRoute : VoiceNavEvent
 
-    /** Nouvel itinéraire après recalcul : urgent, suit [OffRoute] de près. */
+    /** Nouvel itinéraire après recalcul : prioritaire, suit [OffRoute] de près. */
     data object Rerouted : VoiceNavEvent
 
-    /** Fin de guidage sur ordre de l'utilisateur : urgent, parle tout de suite. */
+    /** Fin de guidage sur ordre de l'utilisateur : prioritaire, parlé au silence. */
     data object Stopped : VoiceNavEvent
 
     /** Retour sur le tracé sans recalcul : informatif, ne coupe rien. */
@@ -363,7 +363,7 @@ object VoiceNavPolicy {
         is VoiceNavEvent.Literal -> "literal|${event.phrase.trim()}"
     }
 
-    /** Urgent = parle tout de suite, délai écoulé ou non, en coupant la phrase en cours. */
+    /** Urgent = saute le délai de la porte (prioritaire au silence) — ne coupe plus rien (ordre user du 02/11). */
     fun isUrgent(event: VoiceNavEvent): Boolean = when (event) {
         VoiceNavEvent.OffRoute, VoiceNavEvent.Rerouted, VoiceNavEvent.Stopped -> true
         is VoiceNavEvent.Arrival -> true

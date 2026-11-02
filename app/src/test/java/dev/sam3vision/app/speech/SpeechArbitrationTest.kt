@@ -2,11 +2,9 @@ package dev.sam3vision.app.speech
 
 import dev.sam3vision.core.live.SteeringCap
 import org.junit.Assert.assertEquals
-import org.junit.Assert.assertFalse
-import org.junit.Assert.assertTrue
 import org.junit.Test
 
-/** Arbitrage de la voix unique : danger > consigne > info, urgent coupe tout. */
+/** Arbitrage de la voix unique : danger grave > consigne > info, jamais de coupe (ordre user du 02/11). */
 class SpeechArbitrationTest {
 
     @Test
@@ -40,30 +38,5 @@ class SpeechArbitrationTest {
     @Test
     fun `retour sur trace est info`() {
         assertEquals(SpeechPriority.Info, SpeechArbitration.priorityOf(VoiceNavEvent.BackOnRoute))
-    }
-
-    @Test
-    fun `danger coupe consigne et info`() {
-        assertTrue(SpeechArbitration.interrupts(SpeechPriority.Instruction, SpeechPriority.Danger))
-        assertTrue(SpeechArbitration.interrupts(SpeechPriority.Info, SpeechPriority.Danger))
-    }
-
-    @Test
-    fun `danger coupe meme un danger en cours, la plus fraiche gagne`() {
-        assertTrue(SpeechArbitration.interrupts(SpeechPriority.Danger, SpeechPriority.Danger))
-    }
-
-    @Test
-    fun `consigne coupe info mais pas danger`() {
-        assertTrue(SpeechArbitration.interrupts(SpeechPriority.Info, SpeechPriority.Instruction))
-        assertFalse(SpeechArbitration.interrupts(SpeechPriority.Danger, SpeechPriority.Instruction))
-    }
-
-    @Test
-    fun `info ne coupe rien et doux de meme niveau s enchaine`() {
-        assertFalse(SpeechArbitration.interrupts(SpeechPriority.Danger, SpeechPriority.Info))
-        assertFalse(SpeechArbitration.interrupts(SpeechPriority.Instruction, SpeechPriority.Info))
-        assertFalse(SpeechArbitration.interrupts(SpeechPriority.Info, SpeechPriority.Info))
-        assertFalse(SpeechArbitration.interrupts(SpeechPriority.Instruction, SpeechPriority.Instruction))
     }
 }
