@@ -88,8 +88,8 @@ class IseeClipPlayer(
         return true
     }
 
-    /** Coupe la lecture en cours (ordre plus prioritaire, écran quitté). */
-    fun stop() = sink.stop()
+    /** Coupe la lecture en cours (ordre plus prioritaire, écran quitté) et rend le bus. */
+    fun stop() = sink.stop().also { VoiceBus.onSpeechIdle() }
 
     private fun clipFile(clipId: String): File? =
         clips.clipFor(clipId, SpeechLanguage.En, voiceId())?.takeIf { it.isFile }

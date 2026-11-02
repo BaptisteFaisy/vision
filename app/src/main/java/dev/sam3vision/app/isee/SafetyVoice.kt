@@ -42,10 +42,10 @@ class SafetyVoice(
     private val stopCurrent: () -> Unit = player::stop,
 ) {
 
-    /** Parle [phrase] aussitôt : coupe tout, puis TTS système grave en flush (jamais de file). */
+    /** Parle [phrase] aussitôt : coupe tout (bus rendu), puis TTS système grave en flush (jamais de file). */
     fun speak(phrase: String) {
         if (phrase.isBlank()) return
-        stopCurrent()
+        stopCurrent().also { VoiceBus.onSpeechIdle() }
         val current = settings()
         system.speak(phrase, true, SystemTtsEngine.localeOf(current.speechLanguage), current.ttsSpeed, SystemTtsEngine.SAFETY_PITCH)
     }
