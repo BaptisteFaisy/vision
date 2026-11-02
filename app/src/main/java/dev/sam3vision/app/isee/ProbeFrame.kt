@@ -12,6 +12,7 @@ import dev.sam3vision.core.live.LiveSession
 import dev.sam3vision.core.live.PlacedLabel
 import dev.sam3vision.core.live.SteeringCap
 import dev.sam3vision.core.live.Timing
+import dev.sam3vision.core.mask.GrayMask
 import dev.sam3vision.core.mask.toDetectionsWithExtents
 import dev.sam3vision.core.model.Detection
 import dev.sam3vision.core.model.LiveFrame
@@ -47,15 +48,17 @@ internal fun DistanceMeter.effectivePose(): CameraPose? = if (groundPlaneEnabled
 
 /**
  * Détections SAM confirmées de la frame et leurs distances (sténopé) : une
- * seule conversion (les étendues masques coûtent un décodage par objet).
- * Score 1 : l'écran montre chaque masque, la voix dit chacun — mesuré ou non.
+ * seule conversion, sans redécodage quand [grays] porte les masques déjà décodés
+ * par le peintre (un par objet). Score 1 : l'écran montre chaque masque, la voix
+ * dit chacun — mesuré ou non.
  */
 internal fun detectionsAndReadingsOf(
     distances: DistanceMeter,
     frame: LiveFrame,
+    grays: List<GrayMask?> = emptyList(),
 ): Pair<List<Detection>, List<DistanceReading>> {
     if (frame.width <= 0 || frame.height <= 0) return emptyList<Detection>() to emptyList()
-    val detections = frame.objects.toDetectionsWithExtents(frame.width, frame.height)
+    val detections = frame.objects.toDetectionsWithExtents(frame.width, frame.height, grays)
         .map { it.copy(score = 1f) }
     if (detections.isEmpty()) return detections to emptyList()
     return detections to distances.measure(frame.width, frame.height, detections)

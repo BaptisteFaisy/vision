@@ -76,4 +76,16 @@ class MaskPainterTest {
 
         assertEquals(DecodeSplit.EMPTY, painter.lastDecode)
     }
+
+    @Test
+    fun `lastGrays expose un gris par objet a la taille de la frame`() {
+        val painter = MaskPainter({ 0xFFFF0000.toInt() }, 128)
+
+        painter.overlays(frame)
+        val grays = painter.lastGrays
+
+        assertEquals(1, grays.size)
+        assertEquals(8, grays[0]?.width)
+        assertEquals(6, grays[0]?.height)
+    }
 }

@@ -59,13 +59,25 @@ class MaskPainter(
     /** Décomposition de la dernière frame : lue par la publication, après [noteDecoded]. */
     val lastDecode: DecodeSplit get() = lastSplit
 
+    /**
+     * Masques gris de la dernière frame, par emplacement d'objet (`null` = illisible) :
+     * posés par [overlays], relus par la publication (distances, marches) qui ne
+     * redécodent plus — un seul décodage par objet et par frame.
+     */
+    @Volatile
+    var lastGrays: List<GrayMask?> = emptyList()
+        private set
+
     /** Masques coloriés de [frame], dans l'ordre des objets ; un masque illisible est sauté. */
     fun overlays(frame: LiveFrame): List<Bitmap> {
         front = 1 - front
         val probe = if (measureDecode) DecodeProbe() else null
-        return frame.objects.mapIndexedNotNull { index, obj ->
-            val gray = decodeObjectGray(obj, frame.width, frame.height, probe) ?: return@mapIndexedNotNull null
-            paint(index, gray, paletteArgb(index), obj.label, probe)
+        // Un seul décodage par objet : les gris servent ici (coloriage) et à la
+        // publication (distances, marches), via [lastGrays].
+        val grays = frame.objects.map { obj -> decodeObjectGray(obj, frame.width, frame.height, probe) }
+        lastGrays = grays
+        return grays.mapIndexedNotNull { index, gray ->
+            gray?.let { paint(index, it, paletteArgb(index), frame.objects[index].label, probe) }
         }.also { lastSplit = probe?.snapshot(totalMs = -1, masks = it.size) ?: DecodeSplit.EMPTY }
     }
 
