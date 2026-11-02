@@ -434,6 +434,20 @@ fun sessionErrorWorthTelling(error: DeviceSessionError, phase: SessionPhase, cur
 
 /** Les messages d'enregistrement vivent dans [GlassesRegistrationPolicy] (garde 500 lignes). */
 
+/**
+ * Mot dit à voix haute quand la session lunettes démarre : le téléphone est en
+ * poche, l'utilisateur entend que les lunettes sont prêtes. Anglais, comme tout
+ * ce qui se dit côté lunettes.
+ */
+const val SESSION_CONNECTED_ANNOUNCEMENT = "connected"
+
+/**
+ * L'annonce « connected » ne part qu'à l'entrée en session, jamais sur un
+ * `STARTED` répété par le SDK ni sur une autre transition. Pure : testée en JVM.
+ */
+fun shouldAnnounceSessionConnected(previous: SessionPhase, new: SessionPhase): Boolean =
+    previous != SessionPhase.STARTED && new == SessionPhase.STARTED
+
 /** Une session terminée n'est pas une session : il faut pouvoir en rouvrir une. */
 fun SessionPhase.isFinished(): Boolean = this == SessionPhase.STOPPED
 
