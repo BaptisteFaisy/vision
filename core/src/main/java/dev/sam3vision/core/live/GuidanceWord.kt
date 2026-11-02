@@ -71,6 +71,18 @@ enum class GuidanceWord {
         }
 
         /**
+         * Mot d'une phrase parlée, `null` si ce n'est pas un mot SAM
+         * (TwinLite, positions, avis de réveil : autre canal).
+         */
+        fun fromText(phrase: String): GuidanceWord? = when (phrase) {
+            "Straight.", "Tout droit." -> Straight
+            "Left.", "Gauche." -> Left
+            "Right.", "Droite." -> Right
+            "Stop." -> Stop
+            else -> null
+        }
+
+        /**
          * Vrai si [phrase] est le mot stop, FR ou EN : « Stop. » SAM (urgence
          * externe, le même des deux côtés) ou le stop TwinLite
          * ([TwinLiteWord.isStopPhrase], l'arrêt interne au contact) — le seul

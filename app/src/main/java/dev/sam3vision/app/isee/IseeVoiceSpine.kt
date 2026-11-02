@@ -36,12 +36,16 @@ internal class IseeVoiceSpine(
     /**
      * Bus vocal (SPEC v4) : le haut-parleur parle, la fin de parole reprend
      * le chat en attente ([resumeChatIfDue]), la tenue du micro tait le bus.
+     * Le keepalive de positionnement ([keepaliveJob]) démarre avec lui : en
+     * session active dehors, la voix ne se tait jamais (mot courant niveau 12
+     * après 3,5 s de silence — le bus arbitre (Traversée affamée incluse :
+     * un verdict sain parle toutes les 2 s, le silence 3,5 s n'y arrive pas).
      */
     fun wireBus(speaker: BusSpeaker, ui: StateFlow<IseeUiState>) {
         VoiceBus.speaker = speaker
         VoiceBus.onIdle = { scope.launch { resumeChatIfDue() } }
         scope.launch { ui.collect { VoiceBus.userSpeaking(it.holding || it.transcribing) } }
-
+        keepaliveJob(scope, ui, { settings().speechLanguage }, placeMode)
     }
 
     /**
