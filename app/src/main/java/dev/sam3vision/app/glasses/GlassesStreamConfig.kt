@@ -31,12 +31,32 @@ internal const val GLASSES_FRAME_RATE = 15
 internal val GLASSES_FRAME_RATE_LADDER = listOf(15)
 
 /**
+ * Taux d'abandon au-delà duquel le flux des lunettes passe en qualité moyenne :
+ * 5 % — à ce niveau le lien radio sature (jitter, freezes) et la rue plein
+ * format n'arrive de toute façon plus à temps.
+ */
+internal const val GLASSES_MEDIUM_DROP_RATE = 0.05
+
+/**
+ * Qualité vidéo demandée au flux : haute par défaut, moyenne quand le lien
+ * sature ([dropRate] > 5 %) — ~55 % de pixels en moins par frame sur un lien
+ * saturé, là où chaque octet compte. Pur, testé en JVM.
+ */
+internal fun glassesVideoQuality(dropRate: Double): VideoQuality =
+    if (dropRate > GLASSES_MEDIUM_DROP_RATE) VideoQuality.MEDIUM else VideoQuality.HIGH
+
+/**
  * Configuration du flux vidéo des lunettes pour l'écran iSee (production).
  *
  * - **Qualité haute** (`VideoQuality.HIGH` = 720×1280 portrait) : à qualité
  *   moyenne (504×896) la rue iSee (~1080 px de large) agrandissait chaque
  *   image ~2,1× — flou permanent. En haute, l'agrandissement tombe à ~1,5×,
  *   soit ~2× plus de pixels sources par pixel écran.
+ * - **Repli moyen automatique** : [dropRate] > 5 % ([GLASSES_MEDIUM_DROP_RATE])
+ *   demande `MEDIUM` ([glassesVideoQuality]) — un lien saturé ne porte plus le
+ *   plein format, et la rue réduite à temps vaut mieux que la rue pleine en
+ *   retard. Le repli s'applique à l'attache suivante (jamais de reconfiguration
+ *   en cours de session : le SDK ne le permet pas sans couper le flux).
  * - **15 i/s** ([GLASSES_FRAME_RATE], [frameRate]) : le maximum de bits par
  *   image à 750 kbit/s fixe (0,054 bit/pixel, KDoc de [GLASSES_FRAME_RATE]) ;
  *   [GLASSES_FRAME_RATE_LADDER] réduit à [15], borne basse du ladder.
@@ -45,11 +65,13 @@ internal val GLASSES_FRAME_RATE_LADDER = listOf(15)
  *
  * ⚠️ Le SDK n'expose ni bitrate ni résolution directe : la qualité est le
  * seul levier spatial, le débit restant fixé en interne à 750 kbit/s quel que
- * soit le réglage demandé. L'ancien commentaire « au-delà de la qualité
- * moyenne, le lien casserait l'image » était un constat non remesuré : la
- * haute qualité est **NON VALIDÉE sur matériel** : le H.265 à 720p/15 i/s est
- * gardé tel quel (rue nette sans freeze = le lien tient ; freezes = `MEDIUM`
- * ici, un seul endroit).
+ * soit le réglage demandé — il n'y a pas de levier MTU/GATT côté app, le
+ * transport radio est 100 % SDK Meta DAT (aucun socket ni `BluetoothGatt` dans
+ * `app/` ni `core/`, vérifié par grep). Tout correctif lien est donc applicatif
+ * (bits/frame, copies, verrous), jamais radio. L'ancien commentaire « au-delà
+ * de la qualité moyenne, le lien casserait l'image » était un constat non
+ * remesuré : la haute qualité est **NON VALIDÉE sur matériel**, et le repli
+ * `MEDIUM` ci-dessus est le seul levier quand elle freeze.
  *
  * Pure (le SDK s'instancie sur JVM) : prouvée par `GlassesStreamConfigTest`.
  * Le banc (`bench/GlassesDeviceSession`) garde sa propre config : outil LLM,
@@ -58,10 +80,11 @@ internal val GLASSES_FRAME_RATE_LADDER = listOf(15)
 internal fun glassesStreamConfiguration(
     audioCodec: AudioCodec?,
     frameRate: Int = GLASSES_FRAME_RATE,
+    dropRate: Double = 0.0,
 ): StreamConfiguration =
     StreamConfiguration(
         audioCodec = audioCodec,
-        videoQuality = VideoQuality.HIGH,
+        videoQuality = glassesVideoQuality(dropRate),
         frameRate = frameRate,
         compressVideo = true,
     )
