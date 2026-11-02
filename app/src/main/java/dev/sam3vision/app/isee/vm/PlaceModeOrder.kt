@@ -29,8 +29,17 @@ class PlaceModeOrder(
      */
     suspend fun run(text: String): Boolean {
         val mode = CorePlaceModeOrder.parse(text) ?: return false
+        apply(mode, PlaceModeText.switched(mode, settings().speechLanguage))
+        return true
+    }
+
+    /**
+     * Applique [mode] : chasse vidée vers dehors, état (lieu, statut,
+     * picto), sonde via [onPlaceMode], annonce [confirm] à voix haute.
+     * Dictée ([run]) et geste (quadruple tap) partagent ce chemin.
+     */
+    suspend fun apply(mode: PictoPlaceMode, confirm: String) {
         if (!mode.pictoEnabled) onLeaveIndoor()
-        val confirm = PlaceModeText.switched(mode, settings().speechLanguage)
         update {
             it.copy(
                 placeMode = mode,
@@ -43,6 +52,5 @@ class PlaceModeOrder(
         }
         onPlaceMode(mode)
         speak(confirm)
-        return true
     }
 }
