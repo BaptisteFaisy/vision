@@ -196,6 +196,7 @@ class MainActivity : ComponentActivity() {
         onSingleTap = isee::onSingleTap
         pictoZone = { isee.picto.chipZone() }
         crossingZone = { isee.crossingChip.zone() }
+        placeModeZone = { isee.placeModeChip.zone() }
         navZones = { isee.navButtons.zones() }
         addView(
             ComposeView(this@MainActivity).apply { setContent { SamRoot(viewModel, isee, glasses) } },
