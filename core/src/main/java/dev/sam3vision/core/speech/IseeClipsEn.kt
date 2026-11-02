@@ -163,6 +163,10 @@ object IseeClipsEn {
     const val GLASSES_OFF_TEXT = "Glasses off."
     const val NO_GLASSES = "no_glasses"
     const val NO_GLASSES_TEXT = "No glasses."
+    const val CONNECTED = "connected"
+    const val CONNECTED_TEXT = "connected"
+    const val WHERE_TO = "where_to"
+    const val WHERE_TO_TEXT = "Where to?"
 
     // Dedans : les 10 objets cherchés (humain = clip niveau 2).
     const val KEYS = "keys"
@@ -308,12 +312,8 @@ object IseeClipsEn {
     }
 
     // Nombres chaînables 1 à 20 (comptes de marches, sans point final).
-    private val CARDINALS = listOf(
-        "one", "two", "three", "four", "five",
-        "six", "seven", "eight", "nine", "ten",
-        "eleven", "twelve", "thirteen", "fourteen", "fifteen",
-        "sixteen", "seventeen", "eighteen", "nineteen", "twenty",
-    )
+    private val CARDINALS = listOf("one", "two", "three", "four", "five", "six", "seven", "eight", "nine", "ten",
+        "eleven", "twelve", "thirteen", "fourteen", "fifteen", "sixteen", "seventeen", "eighteen", "nineteen", "twenty")
 
     /** Id du nombre chaînable [n] (1 à 20), `null` hors plage. */
     fun cardinal(n: Int): String? = if (n in 1..20) "c_$n" else null
@@ -440,6 +440,8 @@ object IseeClipsEn {
         GLASSES_OFF to GLASSES_OFF_TEXT,
         NO_GLASSES to NO_GLASSES_TEXT,
         NO_GUIDANCE to NO_GUIDANCE_TEXT,
+        CONNECTED to CONNECTED_TEXT,
+        WHERE_TO to WHERE_TO_TEXT,
     )
 
     private fun chainables(): Map<String, String> =
