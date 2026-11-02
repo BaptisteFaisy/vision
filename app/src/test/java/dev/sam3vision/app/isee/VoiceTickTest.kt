@@ -126,9 +126,9 @@ class VoiceTickTest {
         val calls = mutableListOf<Long>()
         VoiceTick.report(VoiceTick.SRC_FENCE, VoiceWish(4, "grillage", "test-voicetick-dedup"), 0L)
 
-        assertTrue(VoiceTick.tick(0L) { _, at -> calls += at; true })
-        assertFalse(VoiceTick.tick(700L) { _, at -> calls += at; true })
-        assertTrue(VoiceTick.tick(1_000L) { _, at -> calls += at; true })
+        assertTrue(VoiceTick.tick(0L, offer = { _, at -> calls += at; true }))
+        assertFalse(VoiceTick.tick(700L, offer = { _, at -> calls += at; true }))
+        assertTrue(VoiceTick.tick(1_000L, offer = { _, at -> calls += at; true }))
 
         assertEquals(listOf(0L, 1_000L), calls)
     }
