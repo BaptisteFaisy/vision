@@ -39,6 +39,13 @@ class LiveSessionTest {
 
         override suspend fun health(): Result<LiveHealth> =
             Result.success(LiveHealth(true, "sam3.1", "cuda", "A100"))
+
+        var preconnectCalls = 0
+
+        override fun preconnect(): Boolean {
+            preconnectCalls += 1
+            return true
+        }
     }
 
     private fun sessionWith(stats: LiveStats, vararg latencies: Long): LiveSession {
@@ -114,6 +121,27 @@ class LiveSessionTest {
         assertEquals(1, session.stats.samples)
         assertEquals(0, session.serverStats.samples)
         assertFalse(session.inFlight)
+    }
+
+    @Test
+    fun `un echec re-arme le handshake en fond pour la frame suivante`() = runBlocking {
+        val client = FakeLiveClient()
+        client.result = Result.failure(ApiError.Timeout())
+        val session = LiveSession(client)
+
+        session.runFrame("QQ==")
+
+        assertEquals(1, client.preconnectCalls)
+    }
+
+    @Test
+    fun `un succes ne re-arme pas le handshake`() = runBlocking {
+        val client = FakeLiveClient()
+        val session = LiveSession(client)
+
+        session.runFrame("QQ==")
+
+        assertEquals(0, client.preconnectCalls)
     }
 
     @Test

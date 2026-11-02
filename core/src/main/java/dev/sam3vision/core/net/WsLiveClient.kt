@@ -380,9 +380,10 @@ class WsLiveClient(
      * attendrait son délai dans le vide — c'est ce qui figeait l'écran à
      * « réveil du GPU en cours » avec 0 masque, alors que `/health` répondait en 0,1 s.
      *
-     * On ferme et on marque fermé : la frame suivante **rouvre** le handshake — mais
-     * seulement si aucune frame n'a rouvert entre-temps ([gen] périmé = on ne touche
-     * pas au socket neuf).
+     * On ferme, on marque fermé et on **rouvre aussitôt** (FIX-16) : le handshake de
+     * reprise se fait en fond pendant l'inter-frame, plus sur le chemin critique de la
+     * frame suivante — mais seulement si aucune frame n'a rouvert entre-temps ([gen]
+     * périmé = on ne touche pas au socket neuf).
      */
     private fun dropDeadSocket(gen: Int) {
         val mine = synchronized(lock) {
@@ -391,7 +392,9 @@ class WsLiveClient(
                 true
             } else false
         }
-        if (mine) runCatching { transport.close() }
+        if (!mine) return
+        runCatching { transport.close() }
+        synchronized(lock) { openLocked() }
     }
 
     private companion object {
