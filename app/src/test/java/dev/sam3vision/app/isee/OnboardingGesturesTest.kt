@@ -6,7 +6,7 @@ import org.junit.Assert.assertTrue
 import org.junit.Test
 
 /**
- * Décision pure de l'onboarding des deux gestes : la pose du doigt est calculée
+ * Décision pure de l'onboarding des trois gestes : la pose du doigt est calculée
  * sans Android, donc vérifiable en JVM. Ce qui dépend du moteur Compose (rendu réel
  * du Canvas, antialiasing) reste hors de portée : c'est dit dans la PR.
  */
@@ -26,6 +26,8 @@ class OnboardingGesturesTest {
             assertEquals("aucun anneau ($kind)", ONBOARDING_OFF, pose.ripple, delta)
             assertEquals("aucun éclat ($kind)", ONBOARDING_OFF, pose.flash, delta)
             assertEquals("aucune onde ($kind)", ONBOARDING_OFF, pose.wavePhase, delta)
+            assertEquals("aucune glissade ($kind)", ONBOARDING_OFF, pose.swipeUp, delta)
+            assertFalse("Traversée éteinte ($kind)", pose.crossingOn)
         }
     }
 
@@ -62,6 +64,28 @@ class OnboardingGesturesTest {
     }
 
     @Test
+    fun `balayage haut, le doigt glisse vers le haut et la puce Traversee s'allume`() {
+        val glisse = onboardingPose(OnboardingGesture.SwipeUp, 0.4f)
+        assertEquals(1f, glisse.press, delta)
+        assertTrue(glisse.pressed)
+        assertTrue("la pointe a quitté l'écran vers le haut", glisse.tip < ONBOARDING_TOUCH_Y)
+        assertTrue("glissade en cours", glisse.swipeUp in 0f..1f)
+        assertFalse("pas encore basculé", glisse.crossingOn)
+
+        val bascule = onboardingPose(OnboardingGesture.SwipeUp, 0.7f)
+        assertTrue("puce Traversée allumée", bascule.crossingOn)
+        assertFalse("pas de pastille REC", bascule.recOn)
+        assertEquals("aucun anneau de tap", ONBOARDING_OFF, bascule.ripple, delta)
+        assertEquals("aucun éclat de photo", ONBOARDING_OFF, bascule.flash, delta)
+        assertEquals("aucune onde de voix", ONBOARDING_OFF, bascule.wavePhase, delta)
+
+        val fin = onboardingPose(OnboardingGesture.SwipeUp, 0.95f)
+        assertEquals("doigt relevé", 0f, fin.press, delta)
+        assertEquals(ONBOARDING_REST_Y, fin.tip, delta)
+        assertTrue("le mode reste allumé après le geste", fin.crossingOn)
+    }
+
+    @Test
     fun `une pression n'existe que dans sa fenetre`() {
         // Fenêtre [0,2 .. 0,8] : rien avant, plein au milieu, rien après.
         assertEquals(0f, pressAmount(0.1f, 0.2f, 0.3f, 0.7f, 0.8f), delta)
@@ -75,7 +99,7 @@ class OnboardingGesturesTest {
     }
 
     @Test
-    fun `les deux cartes ne pulsent pas ensemble`() {
+    fun `les cartes ne pulsent pas ensemble`() {
         val periods = kinds.map(::onboardingPeriodMs)
         assertEquals(kinds.size, periods.distinct().size)
         assertTrue("boucle du tap la plus courte", periods[0] < periods[1])
@@ -85,12 +109,17 @@ class OnboardingGesturesTest {
     fun `chaque geste se distingue par ce qu'il allume`() {
         val tap = onboardingPose(OnboardingGesture.Tap, 0.4f)
         val hold = onboardingPose(OnboardingGesture.Hold, 0.5f)
-        assertTrue("la vidéo n'est allumée que par le tap", tap.recOn && !hold.recOn)
+        val swipe = onboardingPose(OnboardingGesture.SwipeUp, 0.7f)
+        assertTrue("la vidéo n'est allumée que par le tap", tap.recOn && !hold.recOn && !swipe.recOn)
         assertFalse("le tap ne déclenche pas la photo", tap.cameraFlash)
         assertTrue(
             "l'appui long ne montre ni anneau ni éclat de photo",
             hold.ripple == ONBOARDING_OFF && hold.flash == ONBOARDING_OFF,
         )
         assertTrue("seules les ondes apparaissent pour l'appui long", hold.wavePhase >= 0f)
+        assertTrue(
+            "seule la puce Traversée s'allume pour le balayage haut",
+            swipe.crossingOn && !tap.crossingOn && !hold.crossingOn,
+        )
     }
 }

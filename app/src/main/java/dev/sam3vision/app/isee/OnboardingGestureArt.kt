@@ -31,6 +31,7 @@ private val SkinShade = Color(0xFFC68B62)
 private val RecRed = Color(0xFFE5484D)
 private val AccentBlue = Color(0xFF7CB6FF)
 private val PressGlow = Color(0x447CB6FF)
+private val CrossingGreen = Color(0xFF4ADE80)
 
 /** Rect horizontal du mini-écran, en fractions de la carte. */
 private const val SCREEN_LEFT = 0.10f
@@ -45,6 +46,10 @@ internal fun DrawScope.drawOnboardingStage(kind: OnboardingGesture, pose: Onboar
     drawPressGlow(pose)
     drawTapRipple(pose)
     if (kind == OnboardingGesture.Hold) drawHoldWaves(pose)
+    if (kind == OnboardingGesture.SwipeUp) {
+        drawCrossingPill(pose.crossingOn)
+        drawSwipeTrail(pose)
+    }
     if (pose.flash >= 0f) drawFlashBurst(pose)
     drawFinger(pose)
 }
@@ -168,6 +173,50 @@ private fun DrawScope.drawFlashBurst(pose: OnboardingPose) {
             strokeWidth = size.width * 0.02f,
         )
     }
+}
+
+/**
+ * Puce Traversée du mini-écran, allumée quand le mode bascule : pastille verte
+ * dans un cartouche, grise sinon — le même code couleur que la vraie puce.
+ */
+private fun DrawScope.drawCrossingPill(on: Boolean) {
+    val left = SCREEN_LEFT * size.width
+    val top = SCREEN_TOP * size.height
+    val w = (SCREEN_RIGHT - SCREEN_LEFT) * size.width
+    val h = (SCREEN_BOTTOM - SCREEN_TOP) * size.height
+    val pillH = h * 0.17f
+    val pillLeft = left + w * 0.08f
+    val pillTop = top + h * 0.10f
+    drawRoundRect(
+        color = if (on) Color(0xFF1E3A2A) else Color(0xFF252E3E),
+        topLeft = Offset(pillLeft, pillTop),
+        size = Size(w * 0.30f, pillH),
+        cornerRadius = CornerRadius(pillH / 2f, pillH / 2f),
+    )
+    drawCircle(
+        color = if (on) CrossingGreen else Color(0xFF39445A),
+        radius = pillH * 0.28f,
+        center = Offset(pillLeft + pillH * 0.5f, pillTop + pillH / 2f),
+    )
+}
+
+/** Traînée de la glissade : un trait qui monte du contact, coiffé d'une tête. */
+private fun DrawScope.drawSwipeTrail(pose: OnboardingPose) {
+    val k = pose.swipeUp
+    if (k !in 0.02f..1f) return
+    val contact = contactPoint()
+    val top = Offset(contact.x, contact.y - size.height * 0.34f * k)
+    drawLine(
+        color = AccentBlue.copy(alpha = 0.55f),
+        start = contact,
+        end = top,
+        strokeWidth = size.width * 0.022f,
+    )
+    drawCircle(
+        color = AccentBlue.copy(alpha = 0.75f),
+        radius = size.width * 0.028f,
+        center = top,
+    )
 }
 
 /** Ondes concentriques de la voix pendant l'appui maintenu. */

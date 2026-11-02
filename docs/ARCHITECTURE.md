@@ -65,12 +65,13 @@ Gestes, tous câblés dans `MainActivity.buildRoot` :
 |---|---|---|
 | tap simple | démarre / arrête l'enregistrement vidéo | `IseeViewModel.onSingleTap` (`app/isee/IseeViewModel.kt:363`) |
 | appui long (300 ms, tolérance 24 px) | dictée micro maintenu + photo filmée jointe | `core/gesture/LongPressTrigger.kt:102,105`, `IseePhotoShot` |
+| balayage vers le haut | bascule du mode Traversée (marche/arrêt, comme la puce) | `IseeViewModel.onSwipeUp` → `modeChips.toggleCrossing()` |
 | balayage horizontal | **reconnu mais sans effet** : `onHorizontalSwipe = Unit` | `app/IseeRootLayout.kt` |
 
-Le **glissement vertical** (changement de bulle) et le **double tap** (photo) ont
+Le **balayage vers le bas** (ex-changement de bulle) et le **double tap** (photo) ont
 été supprimés : `IseeViewModel` n'a plus `onVerticalDrag*` ni `onDoubleTap`, le
-rail vertical de `core/gesture/IseeGestureBrain.kt` verrouille le geste **sans
-rien émettre** (un glissement ne peut donc jamais passer pour un tap), et il n'y
+rail vertical de `core/gesture/IseeGestureBrain.kt` verrouille le geste et n'émet
+que vers le haut (un glissement ne peut donc jamais passer pour un tap), et il n'y
 a aucun moyen de revenir à un message antérieur.
 
 ### 2.1 Photo-contexte (appui long pendant qu'on filme)

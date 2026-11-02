@@ -32,10 +32,11 @@ import androidx.compose.ui.unit.sp
 import dev.sam3vision.app.BigButton
 
 /**
- * Onboarding des **deux gestes** de la page iSee : un doigt dessiné (Canvas, aucun
+ * Onboarding des **trois gestes** de la page iSee : un doigt dessiné (Canvas, aucun
  * asset embarqué) rejoue en boucle tap = vidéo, appui long = dicter (la photo
- * filmée part avec la question). Les cartes remplacent les boutons : la page
- * d'accueil n'en a aucun, le geste est la seule interface.
+ * filmée part avec la question), balayage vers le haut = Traversée. Les cartes
+ * remplacent les boutons : la page d'accueil n'en a aucun, le geste est la
+ * seule interface.
  *
  * L'écran est **rejouable** depuis les Réglages (« Replay gestures ») : c'est un
  * écran de la pile de navigation ([dev.sam3vision.app.Route.Onboarding]), pas une
@@ -45,8 +46,8 @@ import dev.sam3vision.app.BigButton
  * rendu vit dans `OnboardingGestureArt.kt`.
  */
 
-/** Les deux gestes expliqués, dans l'ordre du discours d'accueil. */
-enum class OnboardingGesture { Tap, Hold }
+/** Les trois gestes expliqués, dans l'ordre du discours d'accueil. */
+enum class OnboardingGesture { Tap, Hold, SwipeUp }
 
 /** Snapshot complet de l'état d'une carte : la pose pousse tout le dessin. */
 internal data class OnboardingPose(
@@ -66,6 +67,10 @@ internal data class OnboardingPose(
     val recOn: Boolean,
     /** Icône photo allumée sur le mini-écran. */
     val cameraFlash: Boolean,
+    /** [ONBOARDING_OFF] ou 0..1 : progression de la glissade vers le haut. */
+    val swipeUp: Float,
+    /** Puce Traversée allumée sur le mini-écran (le mode survit au geste). */
+    val crossingOn: Boolean,
 )
 
 /** Valeur d'un canal éteint : aucune forme n'est dessinée pour cette phase. */
@@ -75,16 +80,18 @@ internal const val ONBOARDING_OFF = -1f
 internal const val ONBOARDING_REST_Y = 0.20f
 internal const val ONBOARDING_TOUCH_Y = 0.70f
 
-/** Durée d'une boucle, par geste : les deux cartes ne pulsent pas ensemble. */
+/** Durée d'une boucle, par geste : les trois cartes ne pulsent pas ensemble. */
 internal fun onboardingPeriodMs(kind: OnboardingGesture): Int = when (kind) {
     OnboardingGesture.Tap -> 2_000
     OnboardingGesture.Hold -> 3_200
+    OnboardingGesture.SwipeUp -> 2_600
 }
 
 /** Pose du geste [kind] à l'instant [t] (0..1 d'une boucle) : fonction pure. */
 internal fun onboardingPose(kind: OnboardingGesture, t: Float): OnboardingPose = when (kind) {
     OnboardingGesture.Tap -> tapPose(t)
     OnboardingGesture.Hold -> holdPose(t)
+    OnboardingGesture.SwipeUp -> swipePose(t)
 }
 
 /** Une pression lissée (montée, tenue, descente) sur la fenêtre [a..d]. */
@@ -112,6 +119,33 @@ private fun holdPose(t: Float): OnboardingPose {
     return pose(press, ONBOARDING_OFF, ONBOARDING_OFF, wavePhase, recOn = false, cameraFlash = false)
 }
 
+/**
+ * Balayage vers le haut : le doigt se pose, glisse vers le haut en restant en
+ * contact, puis se relève — la puce Traversée s'allume à la fin de la glissade
+ * et reste allumée (le mode survit au geste, un nouveau balayage l'éteint).
+ */
+private fun swipePose(t: Float): OnboardingPose {
+    val press = pressAmount(t, 0.10f, 0.18f, 0.60f, 0.68f)
+    val slide = ((t - 0.24f) / (0.60f - 0.24f)).coerceIn(0f, 1f)
+    val tip = if (t < 0.24f) {
+        ONBOARDING_REST_Y + (ONBOARDING_TOUCH_Y - ONBOARDING_REST_Y) * press
+    } else {
+        ONBOARDING_TOUCH_Y + (ONBOARDING_REST_Y - ONBOARDING_TOUCH_Y) * ease(slide)
+    }
+    return OnboardingPose(
+        tip = tip,
+        pressed = press > 0.5f,
+        press = press,
+        ripple = ONBOARDING_OFF,
+        flash = ONBOARDING_OFF,
+        wavePhase = ONBOARDING_OFF,
+        recOn = false,
+        cameraFlash = false,
+        swipeUp = if (t < 0.24f || t > 0.68f) ONBOARDING_OFF else slide,
+        crossingOn = t >= 0.60f,
+    )
+}
+
 /** Fusionne un cas en [OnboardingPose] : pointe interpolée + états du mini-écran. */
 private fun pose(
     press: Float,
@@ -120,6 +154,8 @@ private fun pose(
     wavePhase: Float,
     recOn: Boolean,
     cameraFlash: Boolean,
+    swipeUp: Float = ONBOARDING_OFF,
+    crossingOn: Boolean = false,
 ): OnboardingPose = OnboardingPose(
     tip = ONBOARDING_REST_Y + (ONBOARDING_TOUCH_Y - ONBOARDING_REST_Y) * press,
     pressed = press > 0.5f,
@@ -129,6 +165,8 @@ private fun pose(
     wavePhase = wavePhase,
     recOn = recOn,
     cameraFlash = cameraFlash,
+    swipeUp = swipeUp,
+    crossingOn = crossingOn,
 )
 
 /** Texte d'une carte : numéro + geste en haut, conséquence en bas. */
@@ -141,9 +179,14 @@ private val ONBOARDING_CARDS = listOf(
         "2 · Long press",
         "Speak while holding: the filmed photo goes with the question.",
     ),
+    OnboardingCard(
+        OnboardingGesture.SwipeUp,
+        "3 · Swipe up",
+        "Crossing mode on. Swipe up again to switch it off.",
+    ),
 )
 
-/** Les deux cartes côte à côte : le geste compte partout sur l'écran. */
+/** Les trois cartes côte à côte : le geste compte partout sur l'écran. */
 @Composable
 fun OnboardingGestureRow(modifier: Modifier = Modifier) {
     Row(
@@ -211,7 +254,7 @@ fun OnboardingGesturesScreen(onClose: () -> Unit) {
     ) {
         Text("iSee", color = IseeSceneColors.wordmark, fontSize = 22.sp, fontWeight = FontWeight.Bold)
         Text(
-            "The two gestures",
+            "The three gestures",
             color = IseeSceneColors.headingDark,
             fontSize = 20.sp,
             fontWeight = FontWeight.Bold,
