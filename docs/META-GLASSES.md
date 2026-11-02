@@ -144,6 +144,10 @@ Règles de cycle de vie, toutes dans `GlassesController` :
   session impromptue, et `disconnect()`/`close()` annule l'ouverture en cours.
 - Un refus de création transitoire (`UNEXPECTED_ERROR`, `SESSION_ALREADY_EXISTS`) se
   rejoue **une fois** (`SessionRetry`, testé en JVM) ; l'échec suivant se dit comme avant.
+- Une session créée qui meurt avant 2 s (refus mesuré le 31/10/2026 : ~80 ms,
+  `0xc001` côté lunettes) se rejoue seule, espacée 1/3/5 s, 3 fois au plus
+  (`isQuickDeath`, `GlassesSessionOpener.settled`) ; passé ce budget, le refus
+  se dit avec le geste qui répare (force-restart), pas un « restart » générique.
 - Un seul **attachement** à la fois (mutex) : `STARTED` répété et autorisation caméra
   accordée entre-temps ne doublent plus l'attache.
 - `disconnect()` annule l'ouverture en cours, repasse à `IDLE` d'abord (les portes

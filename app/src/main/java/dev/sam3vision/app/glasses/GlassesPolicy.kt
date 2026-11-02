@@ -223,6 +223,18 @@ object GlassesMessages {
         "Glasses not connected yet: unfold them, put them on your nose, check Bluetooth, then restart the session.",
     )
 
+    /** La session meurt avant de servir : l'app réessaie seule, l'utilisateur patiente. */
+    fun sessionRetrying(attempt: Int, max: Int) = GlassesMessage(
+        MessageKind.INFO,
+        "Glasses cut the session instantly, retrying ($attempt/$max)…",
+    )
+
+    /** Refus en boucle : le geste qui répare est sur les lunettes, pas dans l'app. */
+    fun sessionRefusedByGlasses() = GlassesMessage(
+        MessageKind.ERROR,
+        "The glasses keep refusing: force-restart them (worn, hold power + capture), then start again.",
+    )
+
     fun noCamera() = GlassesMessage(
         MessageKind.WARNING,
         "Glasses camera inactive: start the session, or allow the camera in the Meta AI app.",
