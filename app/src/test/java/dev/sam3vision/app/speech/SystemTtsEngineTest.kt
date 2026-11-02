@@ -12,6 +12,8 @@ private class FakeDriver(
     var fail: Boolean = false,
     var throwOnSpeak: Boolean = false,
     var throwOnSpeaking: Boolean = false,
+    var throwOnStop: Boolean = false,
+    var throwOnShutdown: Boolean = false,
 ) : TtsDriver {
     data class Call(val text: String, val flush: Boolean, val locale: Locale, val rate: Float, val pitch: Float = 1f)
 
@@ -30,10 +32,12 @@ private class FakeDriver(
     }
 
     override fun stop() {
+        if (throwOnStop) throw IllegalStateException("pilote en panne")
         stops += 1
     }
 
     override fun shutdown() {
+        if (throwOnShutdown) throw IllegalStateException("pilote en panne")
         shutdowns += 1
     }
 }
@@ -232,5 +236,66 @@ class SystemTtsEngineTest {
         assertTrue(engine.speak("À gauche.", urgent = false, Locale.FRENCH, 1f))
 
         assertTrue(events.isEmpty())
+    }
+
+    @Test
+    fun `pilote qui jette - journalise TTS error avec phrase et cause`() {
+        val logs = mutableListOf<String>()
+        val engine = SystemTtsEngine(FakeDriver(throwOnSpeak = true), onLog = { logs += it })
+
+        assertFalse(engine.speak("À gauche.", urgent = false, Locale.FRENCH, 1f))
+
+        assertEquals(1, logs.size)
+        assertTrue(logs[0].startsWith("TTS error "))
+        assertTrue(logs[0].contains("À gauche."))
+        assertTrue(logs[0].contains("IllegalStateException"))
+    }
+
+    @Test
+    fun `pilote qui refuse - journalise TTS error avec phrase sans cause`() {
+        val logs = mutableListOf<String>()
+        val engine = SystemTtsEngine(FakeDriver(fail = true), onLog = { logs += it })
+
+        assertFalse(engine.speak("À droite.", urgent = false, Locale.FRENCH, 1f))
+
+        assertEquals(1, logs.size)
+        assertTrue(logs[0].contains("À droite."))
+        assertFalse(logs[0].contains("cause="))
+    }
+
+    @Test
+    fun `stop et shutdown qui jettent - journalises sans lever`() {
+        val logs = mutableListOf<String>()
+        val engine = SystemTtsEngine(FakeDriver(throwOnStop = true, throwOnShutdown = true), onLog = { logs += it })
+
+        engine.stop()
+        engine.close()
+
+        assertEquals(2, logs.size)
+        assertTrue(logs[0].startsWith("TTS error "))
+        assertTrue(logs[1].startsWith("TTS error "))
+    }
+
+    @Test
+    fun `speaking qui jette - faux et journalise`() {
+        val logs = mutableListOf<String>()
+        val engine = SystemTtsEngine(FakeDriver(throwOnSpeaking = true), onLog = { logs += it })
+
+        assertFalse(engine.speaking)
+
+        assertEquals(1, logs.size)
+        assertTrue(logs[0].startsWith("TTS error "))
+    }
+
+    @Test
+    fun `succes - aucun evenement ni journal`() {
+        val logs = mutableListOf<String>()
+        val events = mutableListOf<String>()
+        val engine = SystemTtsEngine(driver = FakeDriver(), onEvent = { events += it }, onLog = { logs += it })
+
+        assertTrue(engine.speak("À gauche.", urgent = false, Locale.FRENCH, 1f))
+
+        assertTrue(events.isEmpty())
+        assertTrue(logs.isEmpty())
     }
 }

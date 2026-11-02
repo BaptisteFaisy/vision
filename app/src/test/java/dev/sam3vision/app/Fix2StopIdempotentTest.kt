@@ -1,7 +1,11 @@
 package dev.sam3vision.app
 
 import java.nio.file.Files
+import java.util.concurrent.CountDownLatch
+import java.util.concurrent.TimeUnit
+import java.util.concurrent.atomic.AtomicInteger
 import org.junit.Assert.assertEquals
+import org.junit.Assert.assertTrue
 import org.junit.Test
 
 /**
@@ -64,5 +68,26 @@ class Fix2StopIdempotentTest {
         val gen = p.armPlaybackForTest()
         p.finishIfCurrent(gen) { calls++ }
         assertEquals(1, calls)
+    }
+
+    @Test
+    fun `finishIfCurrent concurrent - un seul rappel`() {
+        repeat(100) {
+            val p = player()
+            val calls = AtomicInteger()
+            val gen = p.armPlaybackForTest()
+            val gate = CountDownLatch(1)
+            val done = CountDownLatch(2)
+            repeat(2) {
+                Thread {
+                    gate.await()
+                    p.finishIfCurrent(gen) { calls.incrementAndGet() }
+                    done.countDown()
+                }.start()
+            }
+            gate.countDown()
+            assertTrue(done.await(5, TimeUnit.SECONDS))
+            assertEquals(1, calls.get())
+        }
     }
 }
