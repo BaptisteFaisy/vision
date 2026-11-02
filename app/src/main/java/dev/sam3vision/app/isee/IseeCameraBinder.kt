@@ -138,7 +138,9 @@ internal class IseeCameraBinder(
         }
         // Jamais de caméra liée sous un état « échec » : on délie, l'appelant reliera.
         unbind()
-        return failure ?: "Camera binding failed"
+        val reason = failure ?: "Camera binding failed"
+        android.util.Log.e("sam3vision", "isee: camera bind failed: $reason")
+        return reason
     }
 
     /** Cas d'usage d'une tentative : construits à neuf, une liaison ne se rejouant pas. */
