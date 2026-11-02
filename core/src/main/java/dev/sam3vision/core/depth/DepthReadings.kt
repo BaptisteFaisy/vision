@@ -2,6 +2,7 @@ package dev.sam3vision.core.depth
 
 import dev.sam3vision.core.distance.DistanceMeter
 import dev.sam3vision.core.distance.DistanceReading
+import dev.sam3vision.core.distance.KnownSizes
 import dev.sam3vision.core.distance.Pinhole
 import dev.sam3vision.core.model.Detection
 import dev.sam3vision.core.model.SegObject
@@ -157,15 +158,51 @@ object DepthReadings {
     }
 
     /**
+     * Pourquoi une détection DEPTH_ONLY finit sans distance : la cause bloquante,
+     * jamais un silence. Le sténopé ne parle jamais pour ces labels (pas de hauteur
+     * typique, [KnownSizes.DEPTH_ONLY]) ; sans lecture sténopé, la branche sol était
+     * muette elle aussi (coupée, sans pose, ou hors gardes).
+     */
+    enum class DepthMissReason {
+        /** 0 ancre sténopé : la profondeur n'a pas d'échelle, la proximité ne vaut pas des mètres. */
+        NO_ANCHOR,
+
+        /** Calibré mais pas de médiane de proximité pour cette boîte. */
+        NO_CLOSENESS,
+
+        /** Proximité calibrée hors bornes plausibles : refusée, pas bornée déguisée. */
+        OUT_OF_BOUNDS,
+    }
+
+    /**
+     * Détection DEPTH_ONLY sans distance : le `null` typé du repli — pas de mètres,
+     * mais le label, la boîte et la cause ([reason]). [cutBottom] dit si les pieds
+     * sont sous le cadre : le plan de sol ne pouvait alors pas parler, même avec
+     * une pose ([Pinhole.isCutBottom]).
+     */
+    data class DepthMiss(
+        val label: String,
+        val box: List<Float>,
+        val reason: DepthMissReason,
+        val cutBottom: Boolean,
+    )
+
+    /**
      * Affinage et sa calibration : sans ancre sténopé, [calibrated] est faux et
      * les lectures rendues sont le sténopé tel quel — la profondeur non calibrée
-     * ne déguise jamais une mesure.
+     * ne déguise jamais une mesure. [unmeasured] nomme les détections DEPTH_ONLY
+     * restées sans distance ([DepthMiss]) : le repli explicite, jamais silencieux.
      */
-    data class DepthRefinement(val readings: List<DistanceReading>, val calibrated: Boolean)
+    data class DepthRefinement(
+        val readings: List<DistanceReading>,
+        val calibrated: Boolean,
+        val unmeasured: List<DepthMiss> = emptyList(),
+    )
 
     /**
      * Même mesure que [refine], avec l'état de calibration : [DepthRefinement.calibrated]
-     * faux sans ancre exploitable (pas d'échelle, sténopé gardé tel quel).
+     * faux sans ancre exploitable (pas d'échelle, sténopé gardé tel quel), et les
+     * DEPTH_ONLY sans distance nommés dans [DepthRefinement.unmeasured] ([onUnmeasured]).
      */
     fun refineWithStatus(
         frameW: Int,
@@ -173,6 +210,7 @@ object DepthReadings {
         detections: List<Detection>,
         pinhole: List<DistanceReading>,
         depth: DepthMap,
+        onUnmeasured: ((DepthMiss) -> Unit)? = null,
     ): DepthRefinement {
         val closeByBox = HashMap<List<Float>, Float>()
         for (detection in detections) {
@@ -181,7 +219,7 @@ object DepthReadings {
                 closeByBox[detection.box] = closeness
             }
         }
-        return refineStatusWithCloseness(detections, pinhole, closeByBox)
+        return refineStatusWithCloseness(detections, pinhole, closeByBox, onUnmeasured)
     }
 
     /**
@@ -201,7 +239,9 @@ object DepthReadings {
      * Même affinage que [refine], sur des proximités déjà mesurées (serveur) :
      * calibration par les ancres sténopé de la frame, puis remplace/ajoute/garde.
      * L'échelle restant calibrée par frame, la normalisation serveur (0..1) et la
-     * carte brute embarquée se valent ici.
+     * carte brute embarquée se valent ici. Sans statut : les appelants qui veulent
+     * le repli DEPTH_ONLY explicite ([DepthRefinement.unmeasured]) utilisent
+     * [refineStatusWithCloseness].
      */
     fun refineWithCloseness(
         detections: List<Detection>,
@@ -215,11 +255,15 @@ object DepthReadings {
      * Même affinage que [refineWithCloseness], avec l'état de calibration :
      * [DepthRefinement.calibrated] faux sans ancre exploitable. Les replis
      * bas-au-contact ([DistanceReading.cutFallback]) ne calibrent pas.
+     * Une détection DEPTH_ONLY restée sans lecture n'est jamais tue : elle est
+     * nommée dans [DepthRefinement.unmeasured] ([DepthMiss]) et signalée à
+     * [onUnmeasured] (crochet de journalisation, le cœur restant pur JVM).
      */
     fun refineStatusWithCloseness(
         detections: List<Detection>,
         pinhole: List<DistanceReading>,
         closeByBox: Map<List<Float>, Float>,
+        onUnmeasured: ((DepthMiss) -> Unit)? = null,
     ): DepthRefinement {
         val byBox = pinhole.associateBy { it.box }
         val anchors = ArrayList<DepthAnchor>(pinhole.size)
@@ -234,11 +278,42 @@ object DepthReadings {
         }
         val cal = AffineScale.calibrate(anchors)
         val refined = ArrayList<DistanceReading>(detections.size)
+        val unmeasured = ArrayList<DepthMiss>()
         for (detection in detections) {
-            refined += refinedOne(detection, byBox[detection.box], closeByBox[detection.box], cal)
-                ?: continue
+            val base = byBox[detection.box]
+            val closeness = closeByBox[detection.box]
+            val reading = refinedOne(detection, base, closeness, cal)
+            if (reading != null) {
+                refined += reading
+            } else {
+                missOf(detection, closeness, cal)?.let { miss ->
+                    unmeasured += miss
+                    onUnmeasured?.invoke(miss)
+                }
+            }
         }
-        return DepthRefinement(refined, cal != null)
+        return DepthRefinement(refined, cal != null, unmeasured)
+    }
+
+    /**
+     * Cause d'absence de distance pour une détection DEPTH_ONLY restée sans lecture
+     * ([KnownSizes.isDepthOnly]) : sans ancre il n'y a pas d'échelle, sinon c'est la
+     * proximité qui manque ou sort des bornes. `null` pour les autres labels — leur
+     * silence garde ses causes amont (occlusion, coupe, classe inconnue).
+     */
+    private fun missOf(
+        detection: Detection,
+        closeness: Float?,
+        cal: AffineCalibration?,
+    ): DepthMiss? {
+        if (!KnownSizes.isDepthOnly(detection.label)) return null
+        val reason = when {
+            cal == null -> DepthMissReason.NO_ANCHOR
+            closeness == null -> DepthMissReason.NO_CLOSENESS
+            else -> DepthMissReason.OUT_OF_BOUNDS
+        }
+        val cutBottom = Pinhole.isCutBottom(detection.box, detection.height)
+        return DepthMiss(detection.label, detection.box, reason, cutBottom)
     }
 
     private fun refinedOne(
