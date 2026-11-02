@@ -438,6 +438,15 @@ class GuidanceAnnouncerTest {
         assertEquals("left.", announcer.onFrame(0L, centre, samPassage = sam))
     }
 
+    @Test
+    fun `passage SAM libre + mur bouchant = evitement local`() {
+        val announcer = GuidanceAnnouncer()
+        val sam = Passage(blocked = false)
+        val mur = listOf(PlacedLabel("wall", 0.5f, 0.5f, 2f))
+
+        assertEquals("left.", announcer.onFrame(0L, mur, samPassage = sam))
+    }
+
     private fun dire(rail: RailState?, lang: SpeechLanguage = SpeechLanguage.Fr): String? =
         GuidanceAnnouncer().onFrame(0L, libre, lang, rail = rail)
 

@@ -102,4 +102,33 @@ class PositionAnnouncerTest {
 
         assertEquals("Personne at 9 o'clock.", announcer.lastPhrase)
     }
+
+    @Test
+    fun `murs seuls = cote d'esquive, puis silence`() {
+        val announcer = PositionAnnouncer()
+        val mur = PlacedLabel("wall", 0.5f, 0.5f)
+
+        assertEquals("Left.", announcer.onFrame(0L, listOf(mur)))
+        assertNull(announcer.onFrame(500L, listOf(mur)))
+    }
+
+    @Test
+    fun `mur et personne = personne seule nommee`() {
+        val announcer = PositionAnnouncer()
+
+        assertEquals(
+            "Personne at 9 o'clock.",
+            announcer.onFrame(0L, listOf(PlacedLabel("wall", 0.5f, 0.5f), gauche)),
+        )
+    }
+
+    @Test
+    fun `chasse nommee nomme les murs`() {
+        val announcer = PositionAnnouncer()
+
+        assertEquals(
+            "Wall at 12 o'clock.",
+            announcer.onFrame(0L, listOf(PlacedLabel("wall", 0.5f, 0.5f)), nameWalls = true),
+        )
+    }
 }

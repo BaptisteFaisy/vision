@@ -145,4 +145,14 @@ class ProbeVoiceTest {
         assertTrue(cue.urgent)
         assertFalse(cue.blocked)
     }
+
+    @Test
+    fun `annonce mur seul = cote d'esquive, jamais le nom`() {
+        val voice = ProbeVoice().also { it.announce = true }
+
+        assertEquals(
+            "Left.",
+            voice.phrase(0L, listOf(PlacedLabel("wall", 0.5f, 0.5f)), SteeringCap.Straight),
+        )
+    }
 }
