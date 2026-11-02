@@ -178,13 +178,14 @@ Cible pour un futur Direct lunettes, si le portage est décidé : **5–8 images
 bout** (lunettes → téléphone → backend), pas 30 — la conversion, l'encodage et le réseau sont
 plus lents que le lien.
 
-> **Amendement 2026-11-01 (direct écran)** : le § ci-dessus vise la cadence **utile bout en
-> bout** (lunettes → backend), pas l'affichage local. Pour l'écran du téléphone, le user
-> exige le maximum (60 i/s si le lien le tient, 30 minimum) : `GLASSES_FRAME_RATE = 60`
-> avec échelle de repli 60 → 30 → 24 → 15 (`GLASSES_FRAME_RATE_LADDER`), repli annoncé
+> **Amendement 2026-11-01, révisé 2026-11-02 (direct écran)** : le § ci-dessus vise la cadence
+> **utile bout en bout** (lunettes → backend), pas l'affichage local. Pour l'écran du téléphone,
+> on vise le maximum utile (24 i/s, 15 en repli) : `GLASSES_FRAME_RATE = 24`
+> avec échelle de repli 24 → 15 (`GLASSES_FRAME_RATE_LADDER`), repli annoncé
 > (`GlassesMessages.frameRateFallback`), cadence tenue mesurée (`LUNETTES-RECETTE-TEL` §3).
-> 60 n'est pas dans les cadences citées par la doc Meta : c'est un essai, le repli fait foi.
-> Mesuré 01/11/2026 : 60 acceptés sans repli, ~30 i/s émis, ~24.5 i/s rendus
+> 60 n'est pas dans les cadences acceptées : demandé, il est ramené à 30 sans erreur
+> (`bitRate` figé à 750 000 bps, `META-GLASSES.md` §5). Mesuré 01/11/2026 (60 demandés,
+> ramenés à 30 par le SDK) : ~30 i/s émis, ~24.5 i/s rendus
 > (plafond CPU), B2 p95 111 ms — voir `LUNETTES-RECETTE-TEL.md` §7.
 
 ## 8. Matériel
