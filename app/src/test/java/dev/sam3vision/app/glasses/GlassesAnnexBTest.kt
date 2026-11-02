@@ -3,11 +3,17 @@ package dev.sam3vision.app.glasses
 import org.junit.Assert.assertArrayEquals
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
+import org.junit.Assert.assertSame
 import org.junit.Assert.assertTrue
+import org.junit.Before
 import org.junit.Test
 
 /** Remise en Annex B des accès H.265 : ne touche qu'au longueur-préfixé avéré. */
 class GlassesAnnexBTest {
+
+    /** Le format est mémorisé par session : chaque cas repart indécis. */
+    @Before
+    fun resetMemo() = resetAnnexBMemo()
 
     @Test
     fun `annexe B passe telle quelle`() {
@@ -60,6 +66,36 @@ class GlassesAnnexBTest {
         val converted = annexB(framed)
         assertEquals(payload.size + 4, converted.size)
         assertArrayEquals(payload, converted.copyOfRange(4, converted.size))
+    }
+
+    @Test
+    fun `un flux Annexe B stable repart sans nouveau balayage`() {
+        // Première détection : Annex B. Le format est stable par session, les
+        // accès suivants repartent tels quels — même instance, sans balayage.
+        val annex = byteArrayOf(0, 0, 0, 1, 0x40, 0x01, 0x02, 0x03)
+        assertSame(annex, annexB(annex))
+        val next = byteArrayOf(0, 0, 0, 1, 0x41, 0x02, 0x03, 0x04, 0x05)
+        assertSame(next, annexB(next))
+    }
+
+    @Test
+    fun `un flux longueur-prefixe garde le chemin complet a chaque acces`() {
+        // Pas de raccourci vers `return bytes` : chaque accès se convertit,
+        // les octets changent à chaque frame.
+        val first = byteArrayOf(0, 0, 0, 2, 0x40, 0x01)
+        val second = byteArrayOf(0, 0, 0, 3, 0x42, 0x02, 0x03)
+        assertArrayEquals(byteArrayOf(0, 0, 0, 1, 0x40, 0x01), annexB(first))
+        assertArrayEquals(byteArrayOf(0, 0, 0, 1, 0x42, 0x02, 0x03), annexB(second))
+    }
+
+    @Test
+    fun `le reset oublie le format memorise`() {
+        val annex = byteArrayOf(0, 0, 0, 1, 0x40, 0x01, 0x02, 0x03)
+        assertSame(annex, annexB(annex))
+        resetAnnexBMemo()
+        // Indécis à nouveau : le longueur-préfixé est converti, pas laissé passer.
+        val framed = byteArrayOf(0, 0, 0, 4, 0x40, 0x01, 0x02, 0x03)
+        assertArrayEquals(byteArrayOf(0, 0, 0, 1, 0x40, 0x01, 0x02, 0x03), annexB(framed))
     }
 
     @Test
