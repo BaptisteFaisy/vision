@@ -15,9 +15,9 @@ import org.junit.Test
 
 /**
  * Voix de proximité SPEC v4 : parle ou se tait, sans file — clips
- * d'abord, synthèse GPS sinon (hors GPS sans clip : silence), coupe du
- * lecteur partagé, parole du user devant tout sauf le niveau 0, silence
- * sans clé (repli supprimé).
+ * d'abord, synthèse réseau sinon (tous niveaux, ordre user du 02/11),
+ * coupe du lecteur partagé, parole du user devant tout sauf le niveau 0,
+ * silence sans clé (repli supprimé).
  */
 class ProximityVoiceEchelleTest {
 
@@ -65,15 +65,15 @@ class ProximityVoiceEchelleTest {
     }
 
     @Test
-    fun `phrase hors GPS sans clip = silence sans appel reseau`() = runTest {
+    fun `phrase hors GPS sans clip = synthese reseau`() = runTest {
         val rig = Rig()
         val voice = rig.voice()
 
-        assertFalse(voice.speak("Bordure détectée."))
-        assertFalse(voice.speak("Trottoir à gauche."))
+        assertTrue(voice.speak("Bordure détectée."))
+        assertTrue(voice.speak("Trottoir à gauche."))
 
-        assertTrue(rig.attempts.isEmpty())
-        assertTrue(rig.said().isEmpty())
+        assertEquals(listOf("Bordure détectée.", "Trottoir à gauche."), rig.attempts)
+        assertEquals(listOf("Bordure détectée.", "Trottoir à gauche."), rig.said())
     }
 
     @Test

@@ -1,5 +1,6 @@
 package dev.sam3vision.app.isee
 
+import dev.sam3vision.app.BuildConfig
 import dev.sam3vision.app.PlaybackEnd
 import dev.sam3vision.app.SpeechPlayer
 import dev.sam3vision.app.isee.vm.IseeStatusText
@@ -29,6 +30,10 @@ import kotlinx.coroutines.withTimeoutOrNull
  * user qui annule la réponse en vol) met en attente de même ; une nouvelle
  * réponse écrase l'attente (overwrite, jamais deux files).
  */
+
+/** Étiquette des diagnostics du mutisme spontané (`logcat -s VoiceMute:*`). */
+private const val TAG_MUTE = "VoiceMute"
+
 class IseePlayback(
     private val dao: MessageMultimediaDao,
     private val media: MediaCacheStore,
@@ -230,12 +235,14 @@ class IseePlayback(
             if (st.speakingEntryId == null || st.speakingEntryId == id) st.copy(speakingEntryId = id) else st
         }
         VoiceBus.chatSpeaking(true)
+        if (BuildConfig.DEBUG) android.util.Log.d(TAG_MUTE, "chat-lit bulle=$id")
     }
 
     /** Rend l'état parlant s'il est encore le nôtre, et le rang 9 avec. */
     private fun clearSpeaking(id: Long) {
         update { st -> if (st.speakingEntryId == id) st.copy(speakingEntryId = null) else st }
         VoiceBus.chatSpeaking(false)
+        if (BuildConfig.DEBUG) android.util.Log.d(TAG_MUTE, "chat-rendu bulle=$id")
     }
 
     /**

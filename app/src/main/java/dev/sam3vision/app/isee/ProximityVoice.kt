@@ -33,6 +33,9 @@ import kotlin.coroutines.coroutineContext
  * [synthesize] injecte le moteur doux (ElevenLabs en prod, faux en test),
  * [canPlay] la porte d'annonce (le niveau 0 la contourne, sécurité).
  */
+/** Étiquette des diagnostics du mutisme spontané (`logcat -s VoiceMute:*`). */
+private const val TAG_MUTE = "VoiceMute"
+
 class ProximityVoice(
     private val player: SpeechPlayer,
     private val settings: () -> Settings,
@@ -52,6 +55,15 @@ class ProximityVoice(
 
     /** Lecture déjà coupée pour la parole du user (une fois par prise de parole). */
     private var cutForUserDone = false
+
+    /**
+     * Jet diagnostiqué : motif au logcat en warning (visible en release —
+     * les jets sont déjà espacés par l'antirépétition), `false` rendu.
+     */
+    private fun mute(text: String, level: Int, reason: String): Boolean {
+        android.util.Log.w(TAG_MUTE, "prox-jet level=$level motif=$reason texte=[$text]")
+        return false
+    }
 
     /** Nouvelle session : le stop se redira, la coupe user est ré-armée. */
     fun reset() {
@@ -84,15 +96,15 @@ class ProximityVoice(
      * échec : `false`, phrase jetée (jamais redite, jamais mise en file).
      */
     suspend fun speak(text: String, clipId: String? = null, level: Int = OutdoorLevel.FALLBACK): Boolean {
-        if (text.isBlank()) return false
+        if (text.isBlank()) return mute(text, level, "vide")
         coroutineContext.ensureActive()
         if (yieldsToUser(level)) {
             cutForUser()
-            return false
+            return mute(text, level, "parole-user")
         }
         val privileged = level == OutdoorLevel.CAR_MOVING
-        if (!privileged && !canPlay()) return false
-        if (systemBusy()) return false
+        if (!privileged && !canPlay()) return mute(text, level, "porte-canPlay")
+        if (systemBusy()) return mute(text, level, "tts-systeme-occupe")
         val current = settings()
         val id = clipId ?: recordedClipId(text)
         val file = if (clipId != null) {
@@ -105,12 +117,12 @@ class ProximityVoice(
             player.playSliceFile(file).onFailure { onSpeaking("") }
             return true
         }
-        // v4 : seuls les niveaux GPS synthétisent ; sans clip, les autres se taisent.
-        if (level != OutdoorLevel.GPS_REMINDER && level != OutdoorLevel.GPS_EVENT) return false
-        if (!current.ttsConfigured) return false
-        val bytes = synthesize(current.ttsApiKey, current.ttsVoiceId, text).getOrElse { return false }
+        // Sans clip, tous les niveaux synthétisent (ordre user du 02/11 : la
+        // porte GPS D-04 taisait tout le spontané — voir `mute` pour les jets).
+        if (!current.ttsConfigured) return mute(text, level, "tts-non-configure")
+        val bytes = synthesize(current.ttsApiKey, current.ttsVoiceId, text).getOrElse { return mute(text, level, "synthese-echec") }
         coroutineContext.ensureActive()
-        if (bytes.isEmpty() || (!privileged && !canPlay()) || systemBusy()) return false
+        if (bytes.isEmpty() || (!privileged && !canPlay()) || systemBusy()) return mute(text, level, "coupe-apres-synthese")
         id?.let { clips?.put(it, current.speechLanguage, current.ttsVoiceId, bytes) }
         markSpoken(text)
         player.playSlice(bytes).onFailure { onSpeaking("") }
@@ -129,16 +141,16 @@ class ProximityVoice(
         language: SpeechLanguage,
         level: Int = OutdoorLevel.HUMAN,
     ): Boolean {
-        if (text.isBlank()) return false
-        if (text == lastText && GuidanceWord.isStopPhrase(text)) return false
+        if (text.isBlank()) return mute(text, level, "vide")
+        if (text == lastText && GuidanceWord.isStopPhrase(text)) return mute(text, level, "stop-deja-dit")
         coroutineContext.ensureActive()
         if (yieldsToUser(level)) {
             cutForUser()
-            return false
+            return mute(text, level, "parole-user")
         }
         val privileged = level == OutdoorLevel.CAR_MOVING
-        if (!privileged && !canPlay()) return false
-        if (systemBusy()) return false
+        if (!privileged && !canPlay()) return mute(text, level, "porte-canPlay")
+        if (systemBusy()) return mute(text, level, "tts-systeme-occupe")
         val current = settings()
         val file = clips?.clipFor(clipId, language, current.ttsVoiceId)?.takeIf { it.isFile }
         if (file != null) {
@@ -146,12 +158,12 @@ class ProximityVoice(
             player.playSliceFile(file).onFailure { onSpeaking("") }
             return true
         }
-        // v4 : seuls les niveaux GPS synthétisent ; sans clip, les autres se taisent.
-        if (level != OutdoorLevel.GPS_REMINDER && level != OutdoorLevel.GPS_EVENT) return false
-        if (!current.ttsConfigured) return false
-        val bytes = synthesize(current.ttsApiKey, current.ttsVoiceId, text).getOrElse { return false }
+        // Sans clip, tous les niveaux synthétisent (ordre user du 02/11 : la
+        // porte GPS D-04 taisait tout le spontané — voir `mute` pour les jets).
+        if (!current.ttsConfigured) return mute(text, level, "tts-non-configure")
+        val bytes = synthesize(current.ttsApiKey, current.ttsVoiceId, text).getOrElse { return mute(text, level, "synthese-echec") }
         coroutineContext.ensureActive()
-        if (bytes.isEmpty() || (!privileged && !canPlay()) || systemBusy()) return false
+        if (bytes.isEmpty() || (!privileged && !canPlay()) || systemBusy()) return mute(text, level, "coupe-apres-synthese")
         clips?.put(clipId, language, current.ttsVoiceId, bytes)
         markSpoken(text)
         player.playSlice(bytes).onFailure { onSpeaking("") }
