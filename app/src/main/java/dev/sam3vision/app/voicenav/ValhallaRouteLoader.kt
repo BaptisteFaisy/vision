@@ -2,8 +2,10 @@ package dev.sam3vision.app.voicenav
 
 import dev.sam3vision.core.model.RoutePoint
 import dev.sam3vision.core.model.RouteTrip
+import dev.sam3vision.core.nav.DestinationQuery
 import dev.sam3vision.core.nav.GeocodedPlace
 import dev.sam3vision.core.nav.NavRoute
+import dev.sam3vision.core.nav.PreloadedRoute
 import dev.sam3vision.core.nav.toNavRoute
 import dev.sam3vision.core.nav.RouteSummary
 import dev.sam3vision.core.net.HttpRouteClient
@@ -29,6 +31,8 @@ import kotlinx.coroutines.withTimeout
  * - aperçu carte ([onPreview]) : `null` au lancement, puis l'itinéraire
  *   guidable ([RouteTrip.toNavRoute], `null` si inconvertible) — zéro appel
  *   réseau de plus, le résumé et l'aperçu partagent le même `/route` ;
+ * - dernier chargement ([lastLoad]) : le moteur le guide tel quel au lieu
+ *   de refaire origine → géocode → `/route` (2e calcul supprimé).
  *
  * Ne lève jamais : tout collaborateur qui jetterait devient un échec.
  */
@@ -40,10 +44,20 @@ class ValhallaRouteLoader(
     private val routeTimeoutMs: Long = ROUTE_TIMEOUT_SECONDS * 1000,
     /** Reçoit l'itinéraire guidable (`null` en chargement ou en échec) pour la carte d'aperçu. */
     private val onPreview: (NavRoute?) -> Unit = {},
+    private val nowMs: () -> Long = System::currentTimeMillis,
 ) {
+    /**
+     * Dernier chargement réussi, `null` avant toute demande, pendant le
+     * chargement et après un échec : le moteur le réutilise via
+     * [PreloadedRoute.isReusableFor] au lieu de recalculer.
+     */
+    @Volatile
+    var lastLoad: PreloadedRoute? = null
+        private set
 
     suspend operator fun invoke(destination: String): Result<RouteSummary> {
-        // Nouvelle demande : l'aperçu précédent est périmé (jamais d'ancienne carte).
+        // Nouvelle demande : l'aperçu et le chargement précédents sont périmés.
+        lastLoad = null
         runCatching { onPreview(null) }
         // Position d'abord (attend un fix frais si besoin) : sans GPS, échec sans appel réseau.
         val origin = try {
@@ -70,6 +84,14 @@ class ValhallaRouteLoader(
         val trip = loadRoute(client, origin, RoutePoint(place.latitude, place.longitude))
             .onSuccess { runCatching { onPreview(it.toNavRoute(destination).getOrNull()) } }
             .getOrElse { return Result.failure(routeFailure(it)) }
+        lastLoad = PreloadedRoute(
+            destination = DestinationQuery.normalize(destination).getOrNull() ?: destination,
+            origin = origin,
+            dest = RoutePoint(place.latitude, place.longitude),
+            destLabel = place.label,
+            trip = trip,
+            loadedAtMs = runCatching { nowMs() }.getOrDefault(0L),
+        )
         return Result.success(
             RouteSummary(
                 destination,

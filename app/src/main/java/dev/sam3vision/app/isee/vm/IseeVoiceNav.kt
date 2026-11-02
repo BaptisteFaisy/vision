@@ -25,6 +25,7 @@ import dev.sam3vision.core.nav.GeocodeChain
 import dev.sam3vision.core.nav.GuidanceUpdate
 import dev.sam3vision.core.nav.NavFix
 import dev.sam3vision.core.nav.NavRoute
+import dev.sam3vision.core.net.HttpRouteClient
 import dev.sam3vision.core.voicenav.NavClarify
 import dev.sam3vision.core.voicenav.NavClarifyText
 import dev.sam3vision.core.settings.Settings
@@ -100,9 +101,12 @@ class IseeVoiceNav(
             guidanceEnabled = { settings().navigationGuidanceEnabled },
             announcer = NavigationAnnouncer({ settings() }, { _, text -> speakNetwork(text) }, speak),
             voice = VoiceNavAnnouncer({ settings() }) { _, text -> speak(text) },
-            routeLoader = { destination -> loader(destination) },
+            routeLoader = { destination ->
+                prewarmRoute()
+                loader(destination)
+            },
             extraParsers = listOf(VoiceDestinationParser::parseExtra),
-            engineStart = { destination, _ -> driver.start(destination) },
+            engineStart = { destination, _ -> driver.start(destination, loader.lastLoad) },
             onSessionIdle = { driver.stop() },
             // Ordres « désactive / active le GPS » : seul le réglage persiste
             // (SPEC v4 : la porte de voix ambiante est supprimée).
@@ -235,6 +239,18 @@ class IseeVoiceNav(
     /** Le pilote pousse ici l'état du moteur (instruction, distances, arrivée). */
     private fun pushGuidanceUpdate(update: GuidanceUpdate) {
         scope.launch { session.onGuidanceUpdate(update) }
+    }
+
+    /**
+     * Réveille le conteneur Modal **avant** le premier `/route` : lancé en
+     * fond dès le résumé demandé, le boot (~13 s mesurés à froid le
+     * 02/11/2026) chevauche GPS + géocode au lieu de les suivre. À chaud :
+     * une requête bon marché, sans effet. Ne lève jamais, ne bloque jamais.
+     */
+    private fun prewarmRoute() {
+        val base = runCatching { settings().routeBaseUrl.trim().trimEnd('/') }.getOrNull().orEmpty()
+        if (base.isBlank()) return
+        scope.launch { runCatching { HttpRouteClient(base).health() } }
     }
 
     /**
