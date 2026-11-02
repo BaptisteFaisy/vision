@@ -85,6 +85,11 @@ object GlassesMessages {
     fun streamStopped() =
         GlassesMessage(MessageKind.WARNING, "Camera stream stopped: restart the session to take a photo again.")
 
+    fun photoDuringLive() = GlassesMessage(
+        MessageKind.WARNING,
+        "Photo unavailable during live: stop the stream to take a photo.",
+    )
+
     fun photoUndecodable() = GlassesMessage(
         MessageKind.ERROR,
         "Glasses photo unreadable: format not decoded by the app.",

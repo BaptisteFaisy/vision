@@ -41,6 +41,7 @@ class GlassesMessagesTest {
         assertEquals(MessageKind.WARNING, GlassesMessages.sessionAlreadyRunning().kind)
         assertEquals(MessageKind.WARNING, GlassesMessages.noCamera().kind)
         assertEquals(MessageKind.WARNING, GlassesMessages.streamStopped().kind)
+        assertEquals(MessageKind.WARNING, GlassesMessages.photoDuringLive().kind)
         assertEquals(MessageKind.WARNING, GlassesMessages.noMockPress().kind)
         assertEquals(MessageKind.WARNING, GlassesMessages.videoUndecodable().kind)
         assertEquals(MessageKind.WARNING, GlassesMessages.frameRateFallback(60, 30).kind)
