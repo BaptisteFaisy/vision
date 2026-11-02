@@ -62,7 +62,7 @@ class VoiceNavSessionTest {
     ) = VoiceNavSession(
         launcher = launcher,
         guidanceEnabled = { guidance },
-        announcer = NavigationAnnouncer({ Settings.Default }) { _, text -> spoken += text },
+        announcer = NavigationAnnouncer({ Settings.Default }, { _, text -> spoken += text }, { text -> spoken += text }),
         voice = VoiceNavAnnouncer({ Settings.Default }) { _, text -> spoken += text },
         routeLoader = loader,
         router = NavigationRouter(),
@@ -446,7 +446,7 @@ class VoiceNavSessionTest {
         val throwing = VoiceNavSession(
             launcher = FakeLauncher(),
             guidanceEnabled = { true },
-            announcer = NavigationAnnouncer({ Settings.Default }) { _, _ -> },
+            announcer = NavigationAnnouncer({ Settings.Default }, { _, _ -> }, {}),
             voice = VoiceNavAnnouncer({ Settings.Default }) { _, _ -> },
             routeLoader = { throw IllegalStateException("panne") },
             router = NavigationRouter(parse = { throw IllegalStateException("panne") }),
