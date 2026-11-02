@@ -192,14 +192,14 @@ object VoiceBus {
             return false
         }
         if (level == OutdoorLevel.SIDEWALK) return postSidewalk(target, text, clipId, clips, antiRepeatKey, nowMs)
-        if (level == OutdoorLevel.STAIRS) {
-            return postStairs(target, text, clipId, clips, antiRepeatKey, nowMs)
-        }
-        if (activeLevel == OutdoorLevel.STAIRS || activeLevel == OutdoorLevel.SIDEWALK) {
-            val motif = if (activeLevel == OutdoorLevel.STAIRS) "escaliers" else "trottoir"
-            android.util.Log.w(TAG_MUTE, "bus-jet motif=$motif-en-cours level=$level texte=[$text]")
+        val blocker = uncuttableBlocker(activeLevel, level)
+        if (blocker != null) {
+            android.util.Log.w(TAG_MUTE, "bus-jet motif=$blocker-en-cours level=$level texte=[$text]")
             refundTurn(antiRepeatKey)
             return false
+        }
+        if (level == OutdoorLevel.STAIRS) {
+            return postStairs(target, text, clipId, clips, antiRepeatKey, nowMs)
         }
         if (curbGuidanceRefused(level, text, antiRepeatKey)) return false
         if (activeLevel != IDLE_LEVEL && level > activeLevel && !curbPreemptsGuidance(level)) {

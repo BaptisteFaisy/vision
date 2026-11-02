@@ -40,3 +40,15 @@ internal fun sidewalkBusStuck(activeLevel: Int, nowMs: Long, lastSayMs: Long): B
 
 /** Silence maximal sous un niveau 10 (4 s : un clip trottoir dure moins d'1 s). */
 internal const val SIDEWALK_BUS_TTL_MS = 4_000L
+
+/**
+ * Incoupable qui barre [level] : le trottoir en cours barre tout sauf un
+ * trottoir (§ 45), les escaliers en cours barrent tout sauf des escaliers
+ * (retenus, § 44) et un trottoir (qui coupe, § 45) — `null` = rien ne
+ * barre. Rend le motif du journal (`trottoir` / `escaliers`). Pur.
+ */
+internal fun uncuttableBlocker(activeLevel: Int, level: Int): String? {
+    if (activeLevel == OutdoorLevel.SIDEWALK && level != OutdoorLevel.SIDEWALK) return "trottoir"
+    if (activeLevel == OutdoorLevel.STAIRS && level != OutdoorLevel.STAIRS && level != OutdoorLevel.SIDEWALK) return "escaliers"
+    return null
+}
