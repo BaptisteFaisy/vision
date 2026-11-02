@@ -16,11 +16,15 @@ class FramePayload {
     /** Fin de l'encodage JPEG (ns monotones) : le poste « jpeg prêt ». */
     var encodedAtNs: Long = 0L
 
+    /** Séquence lunettes (`-1` = téléphone, sans jointure) : voyage avec la frame. */
+    var seq: Long = -1L
+
     /** Vide le contenu (sans garder de référence sur le JPEG). */
     fun clear() {
         jpegB64 = ""
         captureAtNs = 0L
         encodedAtNs = 0L
+        seq = -1L
     }
 }
 
@@ -50,6 +54,7 @@ class LatestFrameSlot {
     private var jpegB64: String? = null
     private var captureAtNs = 0L
     private var encodedAtNs = 0L
+    private var seq = -1L
     private var dropped = 0L
 
     /** Une frame attend-elle ? (la caméra peut éviter de convertir une image inutile). */
@@ -72,12 +77,13 @@ class LatestFrameSlot {
      * Dépose une frame en réserve. La plus récente gagne : l'ancienne est jetée et
      * comptée dans [droppedFrames]. Renvoie `true` si une frame attend désormais.
      */
-    fun offer(jpegB64: String, captureAtNs: Long, encodedAtNs: Long): Boolean {
+    fun offer(jpegB64: String, captureAtNs: Long, encodedAtNs: Long, seq: Long = -1L): Boolean {
         synchronized(lock) {
             if (this.jpegB64 != null) dropped += 1
             this.jpegB64 = jpegB64
             this.captureAtNs = captureAtNs
             this.encodedAtNs = encodedAtNs
+            this.seq = seq
             return true
         }
     }
@@ -92,9 +98,11 @@ class LatestFrameSlot {
             out.jpegB64 = current
             out.captureAtNs = captureAtNs
             out.encodedAtNs = encodedAtNs
+            out.seq = seq
             jpegB64 = null
             captureAtNs = 0L
             encodedAtNs = 0L
+            seq = -1L
             return true
         }
     }
@@ -105,6 +113,7 @@ class LatestFrameSlot {
             jpegB64 = null
             captureAtNs = 0L
             encodedAtNs = 0L
+            seq = -1L
         }
     }
 }
