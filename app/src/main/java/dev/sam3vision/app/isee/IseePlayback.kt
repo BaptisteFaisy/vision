@@ -203,17 +203,20 @@ class IseePlayback(
                 if (bytes == null) continue
                 awaitStairsQuiet()
                 markSpeaking(id)
-                when (playSlice(bytes).getOrThrow()) {
-                    PlaybackEnd.Done -> {
-                        played += bytes
-                        clearSpeaking(id)
+                try {
+                    when (playSlice(bytes).getOrThrow()) {
+                        PlaybackEnd.Done -> played += bytes
+                        PlaybackEnd.Stopped -> {
+                            prefetch?.cancel()
+                            waiting.hold(rowId, parts.drop(i))
+                            break
+                        }
                     }
-                    PlaybackEnd.Stopped -> {
-                        prefetch?.cancel()
-                        waiting.hold(rowId, parts.drop(i))
-                        clearSpeaking(id)
-                        break
-                    }
+                } finally {
+                    // Un échec de lecture (hors annulation) rend le chat lui
+                    // aussi : sans ça, `chatReads` restait coincé, les niveaux
+                    // 10/11/12 mouraient et `onSpeechIdle` restait sans effet.
+                    clearSpeaking(id)
                 }
             }
         } catch (cancelled: CancellationException) {
