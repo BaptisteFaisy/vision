@@ -357,7 +357,7 @@ internal object CrossingLateralWatch {
     /** Dernier signal latéral (`null` = silence ou aucun passage). */
     val flow: StateFlow<CrossingLateralPatch?> = _flow
 
-    /** Frame publiée : met à jour mot + arrivée, publie le signal. */
+    /** Frame publiée : mot + arrivée mis à jour, signal publié ; 2e absence de suite : annonce oubliée, la vue suivante reparle. */
     fun update(
         objects: List<SegObject>,
         width: Int,
@@ -371,15 +371,17 @@ internal object CrossingLateralWatch {
         val patch = crossingLateralPatchOf(
             lateral, arrival, objects, width, height, readings, pose, lens, atMs, language, approach,
         )
+        if (patch == null && _flow.value == null) AntiRepeat.forget(AntiRepeat.KEY_CROSSWALK_ANNOUNCE) // 2e absence : vue perdue, la suivante reparle
         _flow.value = patch
         return patch
     }
 
-    /** Nouvelle séance. */
+    /** Vue perdue (traversée loin) ou nouvelle séance : guetteurs remis à zéro ; 2e perte sans vue de suite : annonce oubliée. */
     fun reset() {
         lateral.reset()
         arrival.reset()
         approach.reset()
+        if (_flow.value == null) AntiRepeat.forget(AntiRepeat.KEY_CROSSWALK_ANNOUNCE) // déjà sans vue : 2e perte, la suivante reparle
         _flow.value = null
     }
 }

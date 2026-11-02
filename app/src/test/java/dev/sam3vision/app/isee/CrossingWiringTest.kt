@@ -349,6 +349,57 @@ class CrossingWiringTest {
     }
 
     @Test
+    fun `voix deuxieme vue annonce a nouveau, dropout isole non`() = runTest {
+        // SPEC v4 « 1 fois par vue » : la 1re annonce consomme son tour, la
+        // vue perdue (2 absences) l'oublie, la vue suivante reparle — un
+        // dropout isolé ne rouvre rien (jamais de spam).
+        val speaker = ApproachFakeSpeaker()
+        AntiRepeat.reset()
+        VoiceBus.reset()
+        CrossingLateralWatch.reset()
+        VoiceBus.speaker = speaker
+        try {
+            observeCrossingVoice(backgroundScope)
+            val box = listOf(10f, 100f, 100f, 500f)
+            val objects = listOf(obj("crosswalk", box))
+            val readings = listOf(reading("crosswalk", 2.0f, box))
+            val nobody = listOf(obj("person", box))
+            fun feed(objs: List<SegObject>, atMs: Long) {
+                CrossingLateralWatch.update(objs, 512, 1138, readings, null, LensSpec.Default, atMs, SpeechLanguage.En)
+            }
+            // Vue 1 : parle une fois (2 frames).
+            feed(objects, 0L)
+            runCurrent()
+            feed(objects, 200L)
+            runCurrent()
+            // Dropout isolé + retour : ne reparle pas.
+            feed(nobody, 400L)
+            runCurrent()
+            feed(objects, 600L)
+            runCurrent()
+            feed(objects, 800L)
+            runCurrent()
+            // Vue perdue (2 absences) + vue 2 : reparle une fois.
+            feed(nobody, 1000L)
+            runCurrent()
+            feed(nobody, 1200L)
+            runCurrent()
+            feed(objects, 1400L)
+            runCurrent()
+            feed(objects, 1600L)
+            runCurrent()
+
+            val announces = speaker.calls.filter { it.second == "Left, 2 meters." }
+            assertEquals("vue 1 + vue 2, dropout muet", 2, announces.size)
+        } finally {
+            VoiceBus.speaker = null
+            VoiceBus.reset()
+            AntiRepeat.reset()
+            CrossingLateralWatch.reset()
+        }
+    }
+
+    @Test
     fun `voix annonce approche sans distance poste sans clips, existant`() = runTest {
         val speaker = ApproachFakeSpeaker()
         AntiRepeat.reset()
