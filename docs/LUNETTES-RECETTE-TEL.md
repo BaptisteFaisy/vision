@@ -10,8 +10,8 @@
 ## 1. Cibles
 
 - **(A) Cadrage** : la rue des lunettes est nette, non déformée, sans freeze, au
-  bon ratio (HIGH = 720×1280 portrait natif, 24 i/s demandés, H.265 ;
-  repli 15 annoncé si le lien refuse).
+  bon ratio (HIGH = 720×1280 portrait natif, 15 i/s demandés, H.265 :
+  le maximum de bits par image à débit fixe, borne basse du ladder).
 - **(B) Latence lunettes → téléphone** : frame affichée en **< 100 ms** (p95,
   60 s à la cadence tenue), mesurée comme ci-dessous.
 - **(C) Latence vers le GPU Modal** : voir § 5 — l'aller-retour cloud a un
@@ -52,7 +52,7 @@ Le handshake (lien 2–30 s, session 0,1–2 s) est one-shot, hors budget.
 
 Tags logcat : `GlassesChain` (pompe), `GlassesVideo` (décodeur),
 `GlassesBridge` (pont sonde), `GlassesLink` (ligne détaillée ~1 Hz, une frame
-sur 24, + résumé `e2e p50/p95/p99` 1/s qui porte la mesure).
+sur 15, + résumé `e2e p50/p95/p99` 1/s qui porte la mesure).
 
 ## 4. Cadrage (A) : scénarios
 
@@ -124,7 +124,7 @@ nulle (le modèle embarqué ne porte que k1/k2 radiaux).
 | id | scénario | attendu | mesuré | verdict |
 | --- | --- | --- | --- | --- |
 | A1 | flux simulé | frame rendue | non rejoué (flux réel mesuré) | — |
-| A2 | HIGH 720×1280 | rue nette, live=true | WxH = 720×1280, pompe ~30 i/s, rendu ~24.5 i/s (01/11/2026, 60 alors demandés → ramenés à 30 par le SDK ; 24 demandés depuis, à remesurer) | TENU (24 suffisant, user) |
+| A2 | HIGH 720×1280 | rue nette, live=true | WxH = 720×1280, pompe ~30 i/s, rendu ~24.5 i/s (01/11/2026, 60 alors demandés → ramenés à 30 par le SDK ; 15 demandés depuis le 02/11/2026, à remesurer) | TENU (rue nette le 01/11 ; 15 à remesurer) |
 | A3 | recadrage | pas de déformation | capture 01/11 20:13 : rue nette, textes écran lisibles, pas d'étirement | TENU |
 | B1 | horloges | offset stable, drift < 1 ms/min | offset min-filtre actif (lien mesuré), drift non chiffré | — |
 | B2 | e2e p95 60 s | < 100 ms | p50/p95/p99 = 57/111/158 ms (n=1123, 01/11/2026) | NON TENU (jitter radio p95 77 ms) |
@@ -140,7 +140,7 @@ i/s)`, `direct lunettes : … images rendues (24.5 i/s)` ; verdict
 i/s, plafond CPU (app à ~300 % avec la sonde SAM téléphone en parallèle).
 
 Depuis l'échantillonnage à la source, la ligne détaillée `link seq …` n'est
-journalisée qu'une fois sur 24 frames (~1 Hz) : `--skip 1` jette la première
+journalisée qu'une fois sur 15 frames (~1 Hz) : `--skip 1` jette la première
 ligne (~1 s), et `n` dans le tableau compte des lignes, pas des frames (60 s →
 ~60 lignes). Le verdict statistique de référence reste le résumé 1 Hz
 `GlassesLink e2e p50/p95/p99 …` ; le tableau par poste ne sert qu'au diagnostic

@@ -13,10 +13,11 @@ import org.junit.Test
  * prouvée sur JVM : le SDK s'instancie hors Android.
  *
  * Ce que ces tests verrouillent : la rue iSee est nourrie en **haute qualité**
- * (720×1280, ~1,5× d'upscale au lieu de ~2,1× en moyenne), à **24 i/s** (le
- * maximum utile à 750 kbit/s, repli 15 si le lien refuse), en **H.265** (rendu
- * direct, sans ré-échantillonnage intermédiaire). Baisser la qualité ici,
- * c'est reflouter la rue : tout changement doit être volontaire et commenté.
+ * (720×1280, ~1,5× d'upscale au lieu de ~2,1× en moyenne), à **15 i/s** (le
+ * maximum de bits par image à 750 kbit/s fixe, borne basse du ladder),
+ * en **H.265** (rendu direct, sans ré-échantillonnage intermédiaire). Baisser
+ * la qualité ici, c'est reflouter la rue : tout changement doit être volontaire
+ * et commenté.
  */
 class GlassesStreamConfigTest {
 
@@ -26,14 +27,14 @@ class GlassesStreamConfigTest {
     }
 
     @Test
-    fun `le direct iSee demande 24 images par seconde`() {
+    fun `le direct iSee demande 15 images par seconde`() {
         assertEquals(GLASSES_FRAME_RATE, glassesStreamConfiguration(null).frameRate)
-        assertEquals(24, GLASSES_FRAME_RATE)
+        assertEquals(15, GLASSES_FRAME_RATE)
     }
 
     @Test
-    fun `l echelle degrade de 24 vers 15 sans jamais passer en dessous`() {
-        assertEquals(listOf(24, 15), GLASSES_FRAME_RATE_LADDER)
+    fun `l echelle ne porte que 15 sans jamais passer en dessous`() {
+        assertEquals(listOf(15), GLASSES_FRAME_RATE_LADDER)
         assertEquals(GLASSES_FRAME_RATE, GLASSES_FRAME_RATE_LADDER.first())
         assertEquals(15, GLASSES_FRAME_RATE_LADDER.last())
     }

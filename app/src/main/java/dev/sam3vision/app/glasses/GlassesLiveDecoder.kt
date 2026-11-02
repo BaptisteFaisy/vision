@@ -89,7 +89,7 @@ internal fun startsWithAnnexB(bytes: ByteArray): Boolean {
 
 /**
  * Faut-il tenter le décodage bitmap avant le codec ? Non pour un bitstream déjà en
- * Annex B : `BitmapFactory` y échoue à coup sûr après 1 à 3 ms (24 i/s, c'est jusqu'à ~72 ms
+ * Annex B : `BitmapFactory` y échoue à coup sûr après 1 à 3 ms (15 i/s, c'est jusqu'à ~45 ms
  * de CPU jetées par seconde). Les images fixes (JPEG/PNG/WebP, jamais `00 00 01…` en
  * tête) et le brut non compressé gardent la sonde ; le longueur-préfixé ambigu aussi
  * (prudence : [annexB] tranche déjà ce cas vers Annex B, la sonde reste le repli sûr).
@@ -206,7 +206,7 @@ class GlassesLiveDecoder(
                 try {
                     return drawBitmap(target, frame, it)
                 } finally {
-                    // Bitmap décodé pour ce seul dessin (jusqu'à 24 i/s) : libéré aussitôt.
+                    // Bitmap décodé pour ce seul dessin (jusqu'à 15 i/s) : libéré aussitôt.
                     runCatching { it.recycle() }
                 }
             }
@@ -308,7 +308,7 @@ class GlassesLiveDecoder(
      * Vide les sorties vers la surface ; annonce la taille réelle quand le codec la donne.
      *
      * La sortie de l'accès courant n'existe qu'une fois ce décodage fini : sans attente, elle
-     * n'est libérée qu'à l'arrivée de l'accès suivant (une période image, ≈ 42 ms à 24 i/s).
+     * n'est libérée qu'à l'arrivée de l'accès suivant (une période image, ≈ 67 ms à 15 i/s).
      * On attend donc [OUTPUT_WAIT_US] tant que rien n'est rendu, puis `0` : les sorties
      * suivantes du même accès ne coûtent rien, et l'attente disparaît dès que la première
      * image est sortie.
@@ -420,7 +420,7 @@ class GlassesLiveDecoder(
     }
 
     /**
-     * Panne de rendu : journalisée (1re fois puis une sur 100, le flux bat jusqu'à 24 i/s),
+     * Panne de rendu : journalisée (1re fois puis une sur 100, le flux bat jusqu'à 15 i/s),
      * annoncée à l'utilisateur une seule fois.
      */
     private fun noteFailure(message: GlassesMessage) {
@@ -432,10 +432,10 @@ class GlassesLiveDecoder(
     private companion object {
         const val TAG = "GlassesVideo"
         const val INPUT_TIMEOUT_US = 5_000L
-        /** Attente de la première sortie d'un accès : une demi-période image à 24 i/s. */
-        const val OUTPUT_WAIT_US = 20_000L
+        /** Attente de la première sortie d'un accès : une demi-période image à 15 i/s. */
+        const val OUTPUT_WAIT_US = 33_000L
         /** Cadence annoncée au décodeur (clé `operating-rate`), en images par seconde. */
-        const val OPERATING_RATE = 24
+        const val OPERATING_RATE = 15
         const val LOG_EVERY_RENDERS = 300L
         const val NAL_SURVEY_FRAMES = 50L
     }

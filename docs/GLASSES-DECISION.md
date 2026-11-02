@@ -180,9 +180,10 @@ plus lents que le lien.
 
 > **Amendement 2026-11-01, révisé 2026-11-02 (direct écran)** : le § ci-dessus vise la cadence
 > **utile bout en bout** (lunettes → backend), pas l'affichage local. Pour l'écran du téléphone,
-> on vise le maximum utile (24 i/s, 15 en repli) : `GLASSES_FRAME_RATE = 24`
-> avec échelle de repli 24 → 15 (`GLASSES_FRAME_RATE_LADDER`), repli annoncé
-> (`GlassesMessages.frameRateFallback`), cadence tenue mesurée (`LUNETTES-RECETTE-TEL` §3).
+> on fige 15 i/s, borne basse du ladder (max bits/image à débit fixe) : `GLASSES_FRAME_RATE = 15`,
+> échelle réduite à [15] (`GLASSES_FRAME_RATE_LADDER`, pas de repli plus bas ;
+> `GlassesMessages.frameRateFallback` gardé en garde), cadence tenue mesurée
+> (`LUNETTES-RECETTE-TEL` §3).
 > 60 n'est pas dans les cadences acceptées : demandé, il est ramené à 30 sans erreur
 > (`bitRate` figé à 750 000 bps, `META-GLASSES.md` §5). Mesuré 01/11/2026 (60 demandés,
 > ramenés à 30 par le SDK) : ~30 i/s émis, ~24.5 i/s rendus
