@@ -24,11 +24,16 @@ livré et ses preuves (tâche, fichiers, chiffres) dans l'arbre.
     `mode find my X` — le chemin existant (concept SAM, génération à la première
     détection, ancrage, refus dehors). Zéro synthèse réseau ajoutée.
   - **Clips** (`ELEVENLABS_API_KEY=… python3 tools/gen-isee-clips-en.py`, voix Laure du
-    pack) : 3 nouveaux MP3 — `find_ask` « What are you looking for? », `find_nothing`
-    « I didn't hear anything. », `find_refused` « Indoors only. » — et 2 entrées
-    **reuse** vers l'audio déjà embarqué (`nav_gps_enabled`, `nav_gps_disabled`), sans
-    doublon audio. Catalogue + miroir Kotlin + test de ponctuation mis à jour
-    (123 entrées : 102 neuves + 21 réutilisées).
+    pack) : 3 nouveaux MP3 — `find_ask` « Find what? », `find_nothing` « Say again. »,
+    `find_refused` « Indoors. » — et 2 entrées **reuse** vers l'audio déjà embarqué
+    (`nav_gps_enabled`, `nav_gps_disabled`), sans doublon audio. Catalogue + miroir
+    Kotlin mis à jour (123 entrées : 102 neuves + 21 réutilisées).
+  - **Budget de durée** (demande user 02/11 : « les 3 tiennent en moins de 700 ms ») :
+    les phrases ont été raccourcies pour tenir sous **700 ms à la vitesse de lecture
+    par défaut ×1,9** — `find_ask` 564 ms, `find_nothing` 522 ms, `find_refused`
+    522 ms (mesuré ffprobe ; 993 à 1 071 ms en natif). Plancher mesuré d'un seul mot
+    dans cette voix : 758 ms natif (« Again? ») — sous 700 ms *en natif* aucune phrase
+    audible n'existe, le budget se lit donc à la vitesse de l'app.
   - `core/picto/FindAsk.kt` (nouveau) : `FindAskPolicy` (fin d'écoute à la fin de la
     parole, plafond 8 s, silence jeté à 5 s) et `FindLabelFromSpeech` (« mes clés » →
     « cles », déterminants et « please » retirés, le pont FR-EN de la chasse prend le
@@ -47,9 +52,13 @@ livré et ses preuves (tâche, fichiers, chiffres) dans l'arbre.
   silence jeté, micro indisponible), `check-kotlin-limits` OK, `check-isee-clips-en`
   **strict** OK (les 3 MP3 sont générés), `check-voicepack` OK, `check-isee-design` OK,
   `assembleDebug` OK.
-- **Non vérifié** : recette téléphone (appareil occupé par d'autres agents au moment du
-  lot) — les gestes n'ont pas encore été balayés sur un vrai écran, et les 3 nouveaux
-  MP3 n'ont pas été écoutés (seul le catalogue et la taille des fichiers le prouvent).
+- **Vérifié sur les MP3** : les 5 clips du geste (3 neufs + `nav_gps_enabled` /
+  `nav_gps_disabled`) sont transcrits **deux fois** (ElevenLabs STT `scribe_v2` **et**
+  `scribe_v1`) : textes conformes, durées mesurées, crêtes −10 à −14 dB (ni muet ni
+  saturé). Personne ne les a écoutés à l'oreille.
+- **Non vérifié** : recette téléphone (appareil occupé par d'autres agents toute la
+  soirée ; émulateur `isee-sim` segfaulté deux fois) — les gestes n'ont pas encore été
+  balayés sur un vrai écran.
 
 ## 2026-11-02 — Serveur : déploiements Modal réparés (branche `fix-deploy-modal-init`)
 

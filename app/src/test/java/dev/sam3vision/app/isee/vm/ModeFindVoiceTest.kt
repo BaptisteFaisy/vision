@@ -46,8 +46,8 @@ class ModeFindVoiceTest {
     fun `mode find my dehors refuse sans chasse`() = runBlocking {
         assertTrue(voice(PictoPlaceMode.DEHORS).run("mode find my mug"))
         assertTrue(found.isEmpty())
-        assertEquals(listOf("Indoors only."), spoken)
-        assertEquals("Indoors only.", state.status)
+        assertEquals(listOf("Indoors."), spoken)
+        assertEquals("Indoors.", state.status)
     }
 
     @Test

@@ -143,11 +143,11 @@ object IseeClipsEn {
     const val FIND_STOPPED_TEXT = "Search stopped."
     // Balayage droite : question, silence jamais transcrit, refus dehors.
     const val FIND_ASK = "find_ask"
-    const val FIND_ASK_TEXT = "What are you looking for?"
+    const val FIND_ASK_TEXT = "Find what?"
     const val FIND_NOTHING = "find_nothing"
-    const val FIND_NOTHING_TEXT = "I didn't hear anything."
+    const val FIND_NOTHING_TEXT = "Say again."
     const val FIND_REFUSED = "find_refused"
-    const val FIND_REFUSED_TEXT = "Indoors only."
+    const val FIND_REFUSED_TEXT = "Indoors."
 
     // Ordres dictée : GPS (la synthèse réseau parle les manœuvres, hors scope).
     const val GPS_STARTED = "gps_started"

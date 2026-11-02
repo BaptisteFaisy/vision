@@ -51,8 +51,8 @@ class IseeDictationActionsTest {
     fun `onFind dehors refuse sans chasse`() = runBlocking {
         actions(PictoPlaceMode.DEHORS).onFind("mug")
         assertTrue(found.isEmpty())
-        assertEquals(listOf("Indoors only."), spoken)
-        assertEquals("Indoors only.", state.status)
+        assertEquals(listOf("Indoors."), spoken)
+        assertEquals("Indoors.", state.status)
     }
 
     @Test
