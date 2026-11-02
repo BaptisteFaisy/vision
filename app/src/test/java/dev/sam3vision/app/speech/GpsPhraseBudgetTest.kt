@@ -5,7 +5,7 @@ import dev.sam3vision.core.live.GuidanceWord
 import dev.sam3vision.core.live.SteeringCap
 import dev.sam3vision.core.nav.ManeuverAction
 import dev.sam3vision.core.speech.SpeechLanguage
-import dev.sam3vision.core.voicenav.NavClarify
+import dev.sam3vision.core.voicenav.NavClarifyText
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertNotNull
 import org.junit.Assert.assertTrue
@@ -78,8 +78,8 @@ class GpsPhraseBudgetTest {
         out += "hors route (const)" to VoiceNavPhrases.OFF_ROUTE
         out += "de retour (const)" to VoiceNavPhrases.BACK_ON_ROUTE
         out += "guidage impossible" to NavigationPhrases.GUIDANCE_UNAVAILABLE
-        out += "clarifier FR" to NavClarify.ask(SpeechLanguage.Fr)
-        out += "clarifier EN" to NavClarify.ask(SpeechLanguage.En)
+        out += "clarifier FR" to NavClarifyText.ask(SpeechLanguage.Fr)
+        out += "clarifier EN" to NavClarifyText.ask(SpeechLanguage.En)
         return out.filter { it.second.isNotBlank() }
     }
 
