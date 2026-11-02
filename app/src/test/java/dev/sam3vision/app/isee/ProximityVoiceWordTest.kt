@@ -14,9 +14,9 @@ import org.junit.Test
 
 /**
  * Mot du guidage (SPEC v4) : clip local quand le pack l'a (zéro réseau),
- * sinon synthèse GPS mise en cache (hors GPS : silence) ; directions
- * redites en continu, stop unique ; gardes user, porte et système (niveau
- * 0 excepté).
+ * sinon synthèse réseau mise en cache (tous niveaux, ordre user du
+ * 02/11) ; directions redites en continu, stop unique ; gardes user,
+ * porte et système (niveau 0 excepté).
  */
 class ProximityVoiceWordTest {
 
@@ -83,16 +83,16 @@ class ProximityVoiceWordTest {
     }
 
     @Test
-    fun `clip absent hors GPS, silence sans synthese`() = runTest {
+    fun `clip absent hors GPS, synthese reseau`() = runTest {
         val attempts = mutableListOf<String>()
         val spoken = mutableListOf<String>()
 
         val dit = voice(packVide(), attempts, spoken)
             .speakWord("guide_left", "Gauche.", SpeechLanguage.Fr, level = OutdoorLevel.HUMAN)
 
-        assertFalse(dit)
-        assertTrue(attempts.isEmpty())
-        assertTrue(spoken.isEmpty())
+        assertTrue(dit)
+        assertEquals(listOf("Gauche."), attempts)
+        assertEquals(listOf("Gauche."), spoken.filter { it.isNotBlank() })
     }
 
     @Test

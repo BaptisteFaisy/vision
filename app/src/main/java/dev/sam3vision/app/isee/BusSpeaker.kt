@@ -1,8 +1,10 @@
 package dev.sam3vision.app.isee
 
+import dev.sam3vision.app.BuildConfig
 import dev.sam3vision.app.SpeechPlayer
 import dev.sam3vision.app.VOICE_SLICE_MS
 import dev.sam3vision.core.crossing.CrossingLevels
+import dev.sam3vision.core.speech.IseeClipsEn
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.sync.Mutex
@@ -14,6 +16,9 @@ import java.io.File
  * tranche 700 ms ([playSlice], verdicts exceptés — dits entiers) ou tranche
  * en file (fin rendue, sans rappel — sans libération du bus entre tranches).
  */
+/** Étiquette des diagnostics du mutisme spontané (`logcat -s VoiceMute:*`). */
+private const val TAG_MUTE = "VoiceMute"
+
 internal class SpeechPlayerClipSink(private val player: SpeechPlayer) : ClipSink {
     override suspend fun playFile(file: File): Result<Unit> = player.playFile(file)
     override suspend fun playSlice(file: File, sliceMs: Long): Result<Unit> = player.playSliceFile(file, sliceMs)
@@ -24,8 +29,8 @@ internal class SpeechPlayerClipSink(private val player: SpeechPlayer) : ClipSink
 /**
  * Porte-parole du [VoiceBus] (SPEC v4) : séquence de clips anglais si [clips]
  * est non vide, clip anglais seul sinon (id fourni, ou retrouvé depuis le
- * texte — [spokenClipId]), sinon voix de proximité ([ProximityVoice] : les
- * niveaux GPS synthétisent, les autres se taisent sans clip).
+ * texte — [spokenClipId]), sinon voix de proximité ([ProximityVoice] : clip
+ * enregistré d'abord, synthèse réseau sinon, tous niveaux).
  *
  * Coupe d'abord le lecteur partagé (préemption physique, chat compris — la
  * tranche coupée attend sa reprise), puis parle sous mutex : une séquence en
@@ -58,18 +63,37 @@ internal class BusSpeaker(
             speech.withLock {
                 val current = ++generation
                 if (clips.isNotEmpty()) {
-                    this@BusSpeaker.clips.speakSequence(clips, urgent = true)
+                    val seqOk = this@BusSpeaker.clips.speakSequence(clips, urgent = true)
+                    if (BuildConfig.DEBUG) android.util.Log.d(TAG_MUTE, "bus-seq level=$level ok=$seqOk n=${clips.size}")
                     if (current == generation) VoiceBus.onSpeechIdle()
                     return@withLock
                 }
                 val id = clipId ?: spokenClipId(text)
                 val slice = if (level == CrossingLevels.VERDICT) null else VOICE_SLICE_MS
-                if (id != null && this@BusSpeaker.clips.speak(id, urgent = true, sliceMs = slice)) return@withLock
-                if (!proximity.speak(text, clipId = null, level = level) && current == generation) {
+                val clipOk = id != null && this@BusSpeaker.clips.speak(id, urgent = true, sliceMs = slice)
+                val proxOk = clipOk || proximity.speak(text, clipId = null, level = level)
+                muteOutcome(level, text, clipId, id, clipOk, proxOk)
+                if (!clipOk && !proxOk && current == generation) {
                     VoiceBus.onSpeechIdle()
                 }
             }
         }
+    }
+
+    /**
+     * Issue d'une parole au logcat : warning si jetée (visible en release),
+     * détail en debug — distingue « pas de clip » (`resolu=null`), « clip
+     * fantôme » (`catalogue=false`), « fichier/voix » (`clipOk=false`) et la
+     * synthèse (`proxOk=false`, motif dans `ProximityVoice`).
+     */
+    private fun muteOutcome(level: Int, text: String, clipId: String?, id: String?, clipOk: Boolean, proxOk: Boolean) {
+        if (!clipOk && !proxOk) {
+            android.util.Log.w(TAG_MUTE, "PAROLE JETEE level=$level texte=[$text] clip=[$clipId] resolu=[$id]")
+            return
+        }
+        if (!BuildConfig.DEBUG) return
+        val inCatalog = id != null && IseeClipsEn.all.containsKey(id)
+        android.util.Log.d(TAG_MUTE, "bus-out level=$level texte=[$text] resolu=[$id] catalogue=$inCatalog clipOk=$clipOk proxOk=$proxOk")
     }
 
     /** Coupe la lecture du bus (parole du user) : directe, jamais bloquante. */

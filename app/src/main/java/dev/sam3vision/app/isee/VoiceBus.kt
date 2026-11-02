@@ -1,5 +1,10 @@
 package dev.sam3vision.app.isee
 
+import dev.sam3vision.app.BuildConfig
+
+/** Étiquette des diagnostics du mutisme spontané (`logcat -s VoiceMute:*`). */
+private const val TAG_MUTE = "VoiceMute"
+
 /**
  * Porte-parole du [VoiceBus] : le câblage applicatif (une seule implémentation,
  * posée au démarrage — voir le câblage du ViewModel). [idle] vrai = le lecteur
@@ -13,8 +18,7 @@ interface VoiceBusSpeaker {
 
     /**
      * Parle [text] au niveau [level] : séquence [clips] si non vide, sinon
-     * clip [clipId] d'abord, synthèse GPS sinon (silence pour les autres
-     * niveaux sans clip).
+     * clip [clipId] d'abord, synthèse réseau sinon (tous niveaux).
      */
     fun say(level: Int, text: String, clipId: String?, clips: List<String>)
 
@@ -83,11 +87,27 @@ object VoiceBus {
      */
     @Synchronized
     fun post(level: Int, text: String, clipId: String? = null, clips: List<String> = emptyList()) {
-        if (text.isBlank()) return
-        val target = speaker ?: return
-        if (userHoldsMic && level != OutdoorLevel.CAR_MOVING) return
-        if (activeLevel == OutdoorLevel.STAIRS && level == OutdoorLevel.CAR_MOVING) return
-        if (activeLevel != IDLE_LEVEL && level > activeLevel) return
+        if (text.isBlank()) {
+            android.util.Log.w(TAG_MUTE, "bus-jet motif=vide level=$level")
+            return
+        }
+        val target = speaker
+        if (target == null) {
+            android.util.Log.w(TAG_MUTE, "bus-jet motif=sans-porte-parole level=$level texte=[$text]")
+            return
+        }
+        if (userHoldsMic && level != OutdoorLevel.CAR_MOVING) {
+            android.util.Log.w(TAG_MUTE, "bus-jet motif=micro-user level=$level texte=[$text]")
+            return
+        }
+        if (activeLevel == OutdoorLevel.STAIRS && level == OutdoorLevel.CAR_MOVING) {
+            android.util.Log.w(TAG_MUTE, "bus-jet motif=escaliers-en-cours level=$level texte=[$text]")
+            return
+        }
+        if (activeLevel != IDLE_LEVEL && level > activeLevel) {
+            android.util.Log.w(TAG_MUTE, "bus-jet motif=ecrase level=$level actif=$activeLevel chat=$chatReads texte=[$text]")
+            return
+        }
         activeLevel = level
         lastSayMs = System.currentTimeMillis()
         target.say(level, text, clipId, clips)
@@ -146,6 +166,7 @@ object VoiceBus {
     @Synchronized
     fun chatSpeaking(speaking: Boolean) {
         if (speaking == chatReads) return
+        if (BuildConfig.DEBUG) android.util.Log.d(TAG_MUTE, "bus-chat lit=$speaking actif=$activeLevel")
         chatReads = speaking
         if (speaking) {
             activeLevel = OutdoorLevel.CHAT

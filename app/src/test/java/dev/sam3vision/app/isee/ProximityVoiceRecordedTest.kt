@@ -14,9 +14,8 @@ import org.junit.Test
 
 /**
  * Phrases **fixes** jouées en mp3 enregistré (SPEC v4) : « Car. » /
- * « Cars. » (et leurs FR) partent en clip — zéro synthèse. Hors GPS, une
- * phrase sans clip se tait (pas de synthèse) ; au niveau GPS, elle se
- * synthétise.
+ * « Cars. » (et leurs FR) partent en clip — zéro synthèse. Sans clip,
+ * tous les niveaux partent en synthèse réseau (ordre user du 02/11).
  */
 class ProximityVoiceRecordedTest {
 
@@ -56,17 +55,20 @@ class ProximityVoiceRecordedTest {
     }
 
     @Test
-    fun `phrase sans clip hors GPS = silence sans synthese`() = runTest {
+    fun `phrase sans clip hors GPS = synthese reseau`() = runTest {
         val attempts = mutableListOf<String>()
         val spoken = mutableListOf<String>()
         val v = voice(pack(), attempts, spoken)
 
-        assertFalse(v.speak("Voiture à l'arrêt, à 2 mètres.", level = OutdoorLevel.HUMAN))
+        assertTrue(v.speak("Voiture à l'arrêt, à 2 mètres.", level = OutdoorLevel.HUMAN))
         v.reset()
-        assertFalse(v.speak("2 vehicles moving.", level = OutdoorLevel.HUMAN))
+        assertTrue(v.speak("2 vehicles moving.", level = OutdoorLevel.HUMAN))
 
-        assertTrue(attempts.isEmpty())
-        assertTrue(spoken.isEmpty())
+        assertEquals(listOf("Voiture à l'arrêt, à 2 mètres.", "2 vehicles moving."), attempts)
+        assertEquals(
+            listOf("Voiture à l'arrêt, à 2 mètres.", "2 vehicles moving."),
+            spoken.filter { it.isNotBlank() },
+        )
     }
 
     @Test
@@ -82,15 +84,15 @@ class ProximityVoiceRecordedTest {
     }
 
     @Test
-    fun `sans pack hors GPS = silence`() = runTest {
+    fun `sans pack hors GPS = synthese reseau`() = runTest {
         val attempts = mutableListOf<String>()
         val spoken = mutableListOf<String>()
 
         val dit = voice(clips = null, attempts, spoken).speak("Voiture.", level = OutdoorLevel.CAR_MOVING)
 
-        assertFalse(dit)
-        assertTrue(attempts.isEmpty())
-        assertTrue(spoken.isEmpty())
+        assertTrue(dit)
+        assertEquals(listOf("Voiture."), attempts)
+        assertEquals(listOf("Voiture."), spoken.filter { it.isNotBlank() })
     }
 
     @Test

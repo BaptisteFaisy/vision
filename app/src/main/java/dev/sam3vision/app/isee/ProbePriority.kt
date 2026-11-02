@@ -1,5 +1,6 @@
 package dev.sam3vision.app.isee
 
+import dev.sam3vision.app.BuildConfig
 import dev.sam3vision.core.curb.CurbCue
 import dev.sam3vision.core.hazard.HazardCue
 import dev.sam3vision.core.hazard.HazardKind
@@ -61,6 +62,9 @@ object OutdoorLevel {
     const val FALLBACK = 12
 }
 
+
+/** Étiquette des diagnostics du mutisme spontané (`logcat -s VoiceMute:*`). */
+private const val TAG_MUTE = "VoiceMute"
 
 /**
  * Vœu de parole d'une frame : [level] son niveau sur l'échelle, [text] sa
@@ -124,7 +128,9 @@ internal fun curbWish(cue: CurbCue?, crossingActive: Boolean = false): VoiceWish
  */
 internal fun offer(wish: VoiceWish?, nowMs: Long = System.currentTimeMillis()): Boolean {
     if (wish == null || wish.text.isBlank()) return false
-    if (!AntiRepeat.allow(wish.key, nowMs)) return false
+    val allowed = AntiRepeat.allow(wish.key, nowMs)
+    if (BuildConfig.DEBUG) android.util.Log.d(TAG_MUTE, "offre level=${wish.level} cle=${wish.key} admis=$allowed texte=[${wish.text}]")
+    if (!allowed) return false
     VoiceBus.post(wish.level, wish.text, wish.clipId, wish.clips)
     return true
 }

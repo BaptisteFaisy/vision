@@ -112,7 +112,7 @@ class IseeViewModel(app: Application) : AndroidViewModel(app) {
     private val systemTts = SystemTtsEngine.create(getApplication())
     /** Clips anglais (SPEC v4) : le même pack sert les clips seuls et la voix de proximité. */
     private val voicePack = guideVoicePack(getApplication())
-    /** Voix de proximité (SPEC v4) : clips d'abord, synthèse GPS sinon — parlée par le bus. */
+    /** Voix de proximité (SPEC v4) : clips d'abord, synthèse réseau sinon — parlée par le bus. */
     private val proximity = ProximityVoice(
         player, { settings }, ::speakAnnouncement,
         clips = voicePack,

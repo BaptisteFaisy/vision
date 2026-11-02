@@ -67,7 +67,11 @@ internal fun guideVoicePack(app: Application): VoicePack = VoicePack(
         runCatching { app.assets.open("vp_voice.txt").bufferedReader().readText().trim() }.getOrNull()
     },
     bundledClip = { name -> rawClip(app, name) },
+    log = { android.util.Log.w(TAG_MUTE, it) },
 )
+
+/** Étiquette des diagnostics du mutisme spontané (`logcat -s VoiceMute:*`). */
+private const val TAG_MUTE = "VoiceMute"
 
 /** Clip embarqué `res/raw` par nom de fichier (`vp_guide_left_fr.mp3`), ou `null`. */
 private fun rawClip(app: Application, fileName: String): ByteArray? = runCatching {

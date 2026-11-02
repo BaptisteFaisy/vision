@@ -13,13 +13,14 @@ import java.io.File
  * (`packVoiceId`, `assets/vp_voice.txt`) ; `put` met en cache une synthèse
  * runtime. Purge : [CLIP_TTL_MS], comme les annonces.
  *
- * 100 % injecté (`filesDir`, lecteurs) : testé en JVM sans Android.
+ * 100 % injecté (`filesDir`, lecteurs, `log`) : testé en JVM sans Android.
  */
 class VoicePack(
     private val filesDir: File,
     private val packVoiceId: () -> String?,
     private val bundledClip: (fileName: String) -> ByteArray?,
     private val nowMs: () -> Long = System::currentTimeMillis,
+    private val log: (String) -> Unit = {},
 ) {
 
     /**
@@ -35,7 +36,10 @@ class VoicePack(
         val file = File(dirFor(voiceId), fileNameFor(id, language))
         if (fresh(file)) return file
         val stale = file.takeIf { it.isFile && it.length() > 0L }
-        if (!sameVoice(packVoiceId(), voiceId)) return stale
+        if (!sameVoice(packVoiceId(), voiceId)) {
+            log("pack-voix-differente demandee=[$voiceId] pack=[${packVoiceId()}] id=[$id] perime=${stale != null}")
+            return stale
+        }
         return bundledClip(file.name)?.let { writeClip(file, it) } ?: stale
     }
 
