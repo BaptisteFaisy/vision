@@ -17,12 +17,18 @@ livré et ses preuves (tâche, fichiers, chiffres) dans l'arbre.
     (`onSwipeUp`, Traversée) **ou** vers le bas (`onSwipeDown`, GPS) ; l'horizontal
     n'émet que vers la droite (`onSwipeRight`), la gauche reste muette.
   - `app/isee/vm/IseeSwipeOrders.kt` (nouveau) : `gpsOn()` rejoue l'ordre vocal
-    « active le GPS » puis dit l'accusé (le clip de l'ordre est muet depuis la v4, aucun
-    MP3 ne porte « GPS enabled ») ; `askToFind()` dit « What are you looking for? » par
-    synthèse réseau, ouvre le micro (`IseeDictation` via la nouvelle interface
-    `FindListening`), attend la fin de la parole, puis lance `mode find my X` — le
-    chemin existant (concept SAM, génération à la première détection, ancrage, refus
-    dehors).
+    « active le GPS » (l'accusé parle enfin : le MP3 `nav_gps_enabled` du pack existant
+    est désormais retrouvé par `IseeClipsEn`) ; `askToFind()` joue le clip
+    « What are you looking for? », ouvre le micro (`IseeDictation` via la nouvelle
+    interface `FindListening`), attend la fin de la parole, puis lance
+    `mode find my X` — le chemin existant (concept SAM, génération à la première
+    détection, ancrage, refus dehors). Zéro synthèse réseau ajoutée.
+  - **Clips** (`ELEVENLABS_API_KEY=… python3 tools/gen-isee-clips-en.py`, voix Laure du
+    pack) : 3 nouveaux MP3 — `find_ask` « What are you looking for? », `find_nothing`
+    « I didn't hear anything. », `find_refused` « Indoors only. » — et 2 entrées
+    **reuse** vers l'audio déjà embarqué (`nav_gps_enabled`, `nav_gps_disabled`), sans
+    doublon audio. Catalogue + miroir Kotlin + test de ponctuation mis à jour
+    (123 entrées : 102 neuves + 21 réutilisées).
   - `core/picto/FindAsk.kt` (nouveau) : `FindAskPolicy` (fin d'écoute à la fin de la
     parole, plafond 8 s, silence jeté à 5 s) et `FindLabelFromSpeech` (« mes clés » →
     « cles », déterminants et « please » retirés, le pont FR-EN de la chasse prend le
@@ -32,18 +38,18 @@ livré et ses preuves (tâche, fichiers, chiffres) dans l'arbre.
     `IseeHoldTalk` gagne `busy` (= `IseeSwipeOrders.asking`) : pendant l'écoute, tenue
     et tap se taisent, un seul geste tient le micro. `IseeViewModel` reste à **498**
     lignes (extractions, pas d'ajout).
-  - Textes parlés dans `PictoVoiceText` (`askWhatToFind`, `nothingHeard`) ; docs
-    `docs/ARCHITECTURE.md` (tableau des gestes), `docs/GPS_GUIDE_UTILISATEUR.md` (§ 1
-    balayage bas, § 7 non-régression).
-- **Preuves** : `:core` 3 449 tests / 0 échec (+ `FindAskTest`, `IseeGestureBrainTest`
-  étendu bas/droite/gauche), `:app` 2 179 tests / 0 échec (+ `IseeSwipeOrdersTest`,
-  5 cas : ordre GPS, refus dehors, question→chasse, silence jeté, micro indisponible),
-  `check-kotlin-limits` OK (1 535 fichiers), `check-isee-clips-en` OK,
-  `check-isee-design` OK, `assembleDebug` OK.
-- **Non vérifié** : recette téléphone (appareil occupé par un autre agent au moment du
-  lot) — les gestes n'ont pas encore été balayés sur un vrai écran ; la question et le
-  « rien entendu » passent par la synthèse réseau (à figer en clips avec
-  `ELEVENLABS_API_KEY=… python3 tools/gen-isee-clips-en.py` pour revenir hors-ligne).
+  - Docs `docs/ARCHITECTURE.md` (tableau des gestes), `docs/GPS_GUIDE_UTILISATEUR.md`
+    (§ 1 balayage bas, § 7 non-régression), `docs/NAVIGATION-VOCALE.md` (§ 4, seule la
+    droite ouvre le micro).
+- **Preuves** : `:core` 3 445 tests / 0 échec (+ `FindAskTest`, `IseeGestureBrainTest`
+  étendu bas/droite/gauche, `IseeClipsEnTest` rebasé à 123), `:app` 2 179 tests /
+  0 échec (+ `IseeSwipeOrdersTest`, 5 cas : ordre GPS, refus dehors, question→chasse,
+  silence jeté, micro indisponible), `check-kotlin-limits` OK, `check-isee-clips-en`
+  **strict** OK (les 3 MP3 sont générés), `check-voicepack` OK, `check-isee-design` OK,
+  `assembleDebug` OK.
+- **Non vérifié** : recette téléphone (appareil occupé par d'autres agents au moment du
+  lot) — les gestes n'ont pas encore été balayés sur un vrai écran, et les 3 nouveaux
+  MP3 n'ont pas été écoutés (seul le catalogue et la taille des fichiers le prouvent).
 
 ## 2026-11-02 — Serveur : déploiements Modal réparés (branche `fix-deploy-modal-init`)
 

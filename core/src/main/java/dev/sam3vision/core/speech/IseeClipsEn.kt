@@ -141,12 +141,24 @@ object IseeClipsEn {
     const val FIND_LOOKING_FOR_TEXT = "Looking for"
     const val FIND_STOPPED = "find_stopped"
     const val FIND_STOPPED_TEXT = "Search stopped."
+    // Balayage droite : question, silence jamais transcrit, refus dehors.
+    const val FIND_ASK = "find_ask"
+    const val FIND_ASK_TEXT = "What are you looking for?"
+    const val FIND_NOTHING = "find_nothing"
+    const val FIND_NOTHING_TEXT = "I didn't hear anything."
+    const val FIND_REFUSED = "find_refused"
+    const val FIND_REFUSED_TEXT = "Indoors only."
 
     // Ordres dictée : GPS (la synthèse réseau parle les manœuvres, hors scope).
     const val GPS_STARTED = "gps_started"
     const val GPS_STARTED_TEXT = "Guidance started."
     const val GPS_UNAVAILABLE = "gps_unavailable"
     const val GPS_UNAVAILABLE_TEXT = "Guidance unavailable."
+    // Accusés GPS : MP3 du pack existant (reuse), textes exacts de `VoiceNavPhrases`.
+    const val GPS_ENABLED = "nav_gps_enabled"
+    const val GPS_ENABLED_TEXT = "GPS enabled"
+    const val GPS_DISABLED = "nav_gps_disabled"
+    const val GPS_DISABLED_TEXT = "GPS disabled"
     const val GPS_OFF = "nav_stopped"
     const val GPS_OFF_TEXT = "Guidance stopped."
     const val NO_GUIDANCE = "no_guidance"
@@ -418,8 +430,13 @@ object IseeClipsEn {
         CROSSING_OFF to CROSSING_OFF_TEXT,
         FIND_LOOKING_FOR to FIND_LOOKING_FOR_TEXT,
         FIND_STOPPED to FIND_STOPPED_TEXT,
+        FIND_ASK to FIND_ASK_TEXT,
+        FIND_NOTHING to FIND_NOTHING_TEXT,
+        FIND_REFUSED to FIND_REFUSED_TEXT,
         GPS_STARTED to GPS_STARTED_TEXT,
         GPS_UNAVAILABLE to GPS_UNAVAILABLE_TEXT,
+        GPS_ENABLED to GPS_ENABLED_TEXT,
+        GPS_DISABLED to GPS_DISABLED_TEXT,
         GPS_OFF to GPS_OFF_TEXT,
         GLASSES_ON to GLASSES_ON_TEXT,
         GLASSES_OFF to GLASSES_OFF_TEXT,

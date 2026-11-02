@@ -3,6 +3,7 @@ package dev.sam3vision.app.isee.vm
 import dev.sam3vision.app.isee.IseeUiState
 import dev.sam3vision.core.picto.PictoPlaceMode
 import dev.sam3vision.core.settings.Settings
+import dev.sam3vision.core.speech.IseeClipsEn
 import dev.sam3vision.core.speech.SpeechLanguage
 import kotlinx.coroutines.test.TestScope
 import kotlinx.coroutines.test.advanceTimeBy
@@ -20,7 +21,7 @@ import org.junit.Test
  */
 class IseeSwipeOrdersTest {
 
-    private val spoken = mutableListOf<String>()
+    private val spokenClips = mutableListOf<String>()
     private val modes = mutableListOf<String>()
     private val gpsOrders = mutableListOf<String>()
     private var state = IseeUiState()
@@ -61,10 +62,9 @@ class IseeSwipeOrdersTest {
         runGpsOrder = { gpsOrders += it; true },
         dictation = listening,
         voiceDetected = { voiceOn },
-        speaking = { false },
         settings = { Settings.Default.copy(speechLanguage = language) },
         placeMode = { placeMode },
-        speak = { spoken += it },
+        sayClip = { spokenClips += it },
         update = { fn -> state = fn(state) },
         clock = { testScheduler.currentTime },
     )
@@ -77,7 +77,8 @@ class IseeSwipeOrdersTest {
         advanceUntilIdle()
 
         assertEquals(listOf(IseeSwipeOrders.GPS_ENABLE_ORDER), gpsOrders)
-        assertEquals("accusé audible", listOf("GPS enabled"), spoken)
+        // L'accusé est le clip de l'ordre vocal (« GPS enabled »), pas un mot du geste.
+        assertEquals("aucun clip propre au geste", emptyList<String>(), spokenClips)
     }
 
     @Test
@@ -88,7 +89,7 @@ class IseeSwipeOrdersTest {
         orders.askToFind()
         advanceUntilIdle()
 
-        assertEquals("refus parlé", 1, spoken.size)
+        assertEquals("refus parlé", listOf(IseeClipsEn.FIND_REFUSED), spokenClips)
         assertEquals("micro intact", 0, listening.starts)
         assertTrue("aucune chasse", modes.isEmpty())
         assertFalse("plus d'écoute", orders.asking())
@@ -106,7 +107,7 @@ class IseeSwipeOrdersTest {
         voiceOn = false
         advanceUntilIdle()
 
-        assertEquals("la question posée", "What are you looking for?", spoken.first())
+        assertEquals("la question posée", IseeClipsEn.FIND_ASK, spokenClips.first())
         assertEquals("micro ouvert une fois", 1, listening.starts)
         assertEquals("transcrit une fois", 1, listening.finishes)
         assertEquals(listOf("mode find my cles"), modes)
@@ -124,7 +125,7 @@ class IseeSwipeOrdersTest {
         assertEquals("l'enregistrement est jeté", 1, listening.discards)
         assertEquals("rien de transcrit", 0, listening.finishes)
         assertTrue("aucune chasse", modes.isEmpty())
-        assertEquals(listOf("What are you looking for?", "I didn't hear anything."), spoken)
+        assertEquals(listOf(IseeClipsEn.FIND_ASK, IseeClipsEn.FIND_NOTHING), spokenClips)
     }
 
     @Test
