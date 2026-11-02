@@ -102,15 +102,15 @@
       "id": "find_stopped"
     },
     {
-      "en": "What are you looking for?",
+      "en": "Find what?",
       "id": "find_ask"
     },
     {
-      "en": "I didn't hear anything.",
+      "en": "Say again.",
       "id": "find_nothing"
     },
     {
-      "en": "Indoors only.",
+      "en": "Indoors.",
       "id": "find_refused"
     },
     {

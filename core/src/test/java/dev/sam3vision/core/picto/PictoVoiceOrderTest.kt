@@ -62,7 +62,7 @@ class PictoVoiceOrderTest {
         assertEquals("Cherche keys.", PictoVoiceText.findStarted("keys", SpeechLanguage.Fr))
         assertEquals("Finding keys.", PictoVoiceText.findStarted("keys", SpeechLanguage.En))
         assertEquals("Que dedans.", PictoVoiceText.refused(SpeechLanguage.Fr))
-        assertEquals("Indoors only.", PictoVoiceText.refused(SpeechLanguage.En))
+        assertEquals("Indoors.", PictoVoiceText.refused(SpeechLanguage.En))
     }
 
     @Test

@@ -55,7 +55,7 @@ class IseeClipsEnTest {
                 assertTrue("système $id", text == "GPS enabled" || text == "GPS disabled")
             } else if (id == IseeClipsEn.FIND_ASK) {
                 // Question posée par le geste : elle se ponctue comme une question.
-                assertEquals("What are you looking for?", text)
+                assertEquals("Find what?", text)
             } else {
                 assertTrue("texte $id sans point : $text", text.endsWith("."))
             }

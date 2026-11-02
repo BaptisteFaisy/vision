@@ -97,7 +97,7 @@ object PictoVoiceText {
     /** La recherche dehors : refusée, jamais de picto dehors. */
     fun refused(language: SpeechLanguage = SpeechLanguage.DEFAULT): String = when (language) {
         SpeechLanguage.Fr -> "Que dedans."
-        SpeechLanguage.En -> "Indoors only."
+        SpeechLanguage.En -> "Indoors."
     }
 
     /**
