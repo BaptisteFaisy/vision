@@ -91,6 +91,45 @@ class MaskDetectionsTest {
     }
 
     @Test
+    fun `gris partage bits = meme bbox sans redecodage`() {
+        val b64 = M1.b64(100, 100, objet = { x, y -> x in 10..29 && y in 20..39 })
+        val obj = seg(MASK_ENCODING_BITS, b64)
+        val gray = decodeObjectGray(obj, 100, 100)
+        val shared = listOf(obj).toDetectionsWithExtents(100, 100, listOf(gray))
+        val plain = listOf(obj).toDetectionsWithExtents(100, 100)
+        assertEquals(listOf(10f, 20f, 30f, 40f), shared.first().maskBox)
+        assertEquals(plain.first().maskBox, shared.first().maskBox)
+    }
+
+    @Test
+    fun `gris partage rle reduit revient en pixels frame`() {
+        val levels = Shapes.raster(50, 50) { x, y -> x in 5..14 && y in 10..19 }
+        val obj = seg(MASK_ENCODING_RLE, Rle.b64(Rle.encode(levels)), scale = 0.5f)
+        val gray = decodeObjectGray(obj, 100, 100)
+        val out = listOf(obj).toDetectionsWithExtents(100, 100, listOf(gray))
+        assertEquals(listOf(10f, 20f, 30f, 40f), out.first().maskBox)
+    }
+
+    @Test
+    fun `gris partage poly garde la bbox de sommets`() {
+        val obj = seg(MASK_ENCODING_POLY, poly = listOf(listOf(10, 20), listOf(30, 40)))
+        val gray = decodeObjectGray(obj, 100, 100)
+        val out = listOf(obj).toDetectionsWithExtents(100, 100, listOf(gray))
+        assertEquals(listOf(10f, 20f, 31f, 41f), out.first().maskBox)
+    }
+
+    @Test
+    fun `gris absent ou hors dimensions = repli sans partage`() {
+        val b64 = M1.b64(100, 100, objet = { x, y -> x in 10..29 && y in 20..39 })
+        val obj = seg(MASK_ENCODING_BITS, b64)
+        val want = listOf(10f, 20f, 30f, 40f)
+        assertEquals(want, listOf(obj).toDetectionsWithExtents(100, 100, emptyList()).first().maskBox)
+        assertEquals(want, listOf(obj).toDetectionsWithExtents(100, 100, listOf(null)).first().maskBox)
+        val wrong = GrayMask(64, 64, ByteArray(64 * 64) { -1 })
+        assertEquals(want, listOf(obj).toDetectionsWithExtents(100, 100, listOf(wrong)).first().maskBox)
+    }
+
+    @Test
     fun `objets du tracker enrichis comme les segmentes`() {
         val tracked = TrackedObject(
             id = 3,

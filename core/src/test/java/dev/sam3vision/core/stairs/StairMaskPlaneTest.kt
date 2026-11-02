@@ -1,8 +1,10 @@
 package dev.sam3vision.core.stairs
 
 import dev.sam3vision.core.local.LumaPlane
+import dev.sam3vision.core.mask.GrayMask
 import dev.sam3vision.core.mask.Rle
 import dev.sam3vision.core.mask.Shapes
+import dev.sam3vision.core.mask.decodeObjectGray
 import dev.sam3vision.core.model.MASK_ENCODING_NONE
 import dev.sam3vision.core.model.MASK_ENCODING_POLY
 import dev.sam3vision.core.model.MASK_ENCODING_RLE
@@ -92,5 +94,30 @@ class StairMaskPlaneTest {
         val obj = stairs(Rle.b64(Rle.encode(levels)), MASK_ENCODING_RLE, 0.1f)
 
         assertNull(stairsMaskPlaneOf(listOf(obj), 100, 100))
+    }
+
+    @Test
+    fun `gris partage = meme plan que sans partage`() {
+        val levels = Shapes.raster(10, 10) { _, y -> y >= 5 }
+        val obj = stairs(Rle.b64(Rle.encode(levels)), MASK_ENCODING_RLE, 0.1f)
+        val gray = decodeObjectGray(obj, 100, 100)
+        val plane = stairsMaskPlaneOf(listOf(obj), 100, 100, listOf(gray))!!
+
+        assertEquals(LumaPlane.SIZE, plane.size)
+        assertTrue(band(plane, 0, 40).all { it == 0.toByte() })
+        assertTrue(band(plane, 63, 40).all { it != 0.toByte() })
+    }
+
+    @Test
+    fun `gris absent ou hors dimensions = repli sur le decodage`() {
+        val levels = Shapes.raster(10, 10) { _, y -> y >= 5 }
+        val obj = stairs(Rle.b64(Rle.encode(levels)), MASK_ENCODING_RLE, 0.1f)
+        val wrong = GrayMask(64, 64, ByteArray(64 * 64) { -1 })
+
+        for (grays in listOf<List<GrayMask?>>(emptyList(), listOf(null), listOf(wrong))) {
+            val plane = stairsMaskPlaneOf(listOf(obj), 100, 100, grays)!!
+            assertTrue(band(plane, 0, 40).all { it == 0.toByte() })
+            assertTrue(band(plane, 63, 40).all { it != 0.toByte() })
+        }
     }
 }

@@ -27,6 +27,33 @@ fun List<SegObject>.toDetectionsWithExtents(width: Int, height: Int): List<Detec
 fun List<TrackedObject>.toDetectionsWithExtents(width: Int, height: Int): List<Detection> =
     map { Detection(it.label, it.score, it.box, width, height, trustedMaskBox(it, width, height)) }
 
+/**
+ * Même enrichissement, en réutilisant les masques déjà décodés par le peintre
+ * ([grays], un par objet, `null` = illisible) : `bits`/`rle` ne sont plus redécodés,
+ * leur étendue vient d'[extentOf] sur le gris partagé. `poly` garde sa bbox de
+ * sommets (sans décodage, exacte au sommet près) ; tout gris absent ou hors
+ * dimensions retombe sur le chemin sans partage — mêmes boîtes, un décodage en moins.
+ */
+@JvmName("segObjectsToDetectionsWithSharedGrays")
+fun List<SegObject>.toDetectionsWithExtents(width: Int, height: Int, grays: List<GrayMask?>): List<Detection> =
+    mapIndexed { index, obj ->
+        Detection(obj.label, obj.score, obj.box, width, height, trustedMaskBox(obj, width, height, grays.getOrNull(index)))
+    }
+
+/** Bbox depuis le gris partagé quand il convient, sinon chemin sans partage. */
+private fun trustedMaskBox(obj: SegObject, frameW: Int, frameH: Int, gray: GrayMask?): List<Float>? {
+    if (gray != null && (obj.maskEncoding == MASK_ENCODING_BITS || obj.maskEncoding == MASK_ENCODING_RLE)) {
+        grayBox(gray, frameW, frameH)?.let { return it }
+    }
+    return trustedMaskBox(obj, frameW, frameH)
+}
+
+/** Étendue d'un gris partagé → boîte exclusive, `null` si inexploitable. */
+private fun grayBox(gray: GrayMask, frameW: Int, frameH: Int): List<Float>? {
+    val extent = decodedExtent(gray, frameW, frameH) ?: return null
+    return exclusiveBox(extent, frameW, frameH)
+}
+
 /** Bbox exclusive fiable d'un objet segmenté, `null` sinon (voir le KDoc du fichier). */
 private fun trustedMaskBox(obj: SegObject, frameW: Int, frameH: Int): List<Float>? =
     trustedMaskBox(obj.maskEncoding, obj.maskPngB64, obj.maskPoly, obj.maskScale, frameW, frameH)

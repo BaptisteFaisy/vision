@@ -3,6 +3,7 @@ package dev.sam3vision.app.isee
 import dev.sam3vision.app.BuildConfig
 import dev.sam3vision.core.distance.DistanceReading
 import dev.sam3vision.core.live.LiveSession
+import dev.sam3vision.core.mask.GrayMask
 import dev.sam3vision.core.live.LiveTimings
 import dev.sam3vision.core.live.PlacedLabel
 import dev.sam3vision.core.live.placedLabels
@@ -52,7 +53,9 @@ internal suspend fun LiveProbe.publish(
     active: LiveSession, frame: LiveFrame, jpegB64: String, at: Long, shown: LiveTimings,
 ) {
     publishPixels(active, frame, shown)
-    publishRest(active, frame, computeRest(frame, jpegB64, at))
+    // [publishPixels] vient de poser les gris de CETTE frame : les chiffres les
+    // réutilisent (distances, marches) au lieu de redécoder — même mutex, même frame.
+    publishRest(active, frame, computeRest(frame, jpegB64, at, painter.lastGrays))
 }
 
 /**
@@ -86,8 +89,13 @@ internal suspend fun LiveProbe.publishPixels(
  * Chiffres d'une frame ([ProbeRest]) + effets de bord (impulsion, compteur de
  * marches) : le travail qui sort du chemin pixels, entre les deux écritures.
  */
-internal fun LiveProbe.computeRest(frame: LiveFrame, jpegB64: String, at: Long): ProbeRest {
-    val (rawDetections, pinhole) = detectionsAndReadingsOf(distances, frame)
+internal fun LiveProbe.computeRest(
+    frame: LiveFrame,
+    jpegB64: String,
+    at: Long,
+    grays: List<GrayMask?> = emptyList(),
+): ProbeRest {
+    val (rawDetections, pinhole) = detectionsAndReadingsOf(distances, frame, grays)
     val readings = meters.readingsFor(frame, pinhole)
     val placed = placedLabels(frame, readings)
     val cross = crossingPatchOf(
@@ -110,7 +118,7 @@ internal fun LiveProbe.computeRest(frame: LiveFrame, jpegB64: String, at: Long):
     feedCrossingLateral(_state.value.crossingActive, frame.objects, frame.width, frame.height, readings, distances.effectivePose(), distances.lensSpec, at, speechLanguage)
     pulse.feed(at, voice.lastDecision, placed)
     // Compteur de marches : le masque exact borne les frames suivantes (repli boîte sinon).
-    StairCannyCount.setMaskPlane(stairsMaskPlaneOf(frame.objects, frame.width, frame.height))
+    StairCannyCount.setMaskPlane(stairsMaskPlaneOf(frame.objects, frame.width, frame.height, grays))
     muteProbeLine(frame, readings, phrase)
     return ProbeRest(rawDetections, readings, placed, cross, phrase)
 }
