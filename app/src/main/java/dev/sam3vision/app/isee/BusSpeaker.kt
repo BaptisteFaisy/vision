@@ -403,7 +403,7 @@ internal class BusSpeaker(
                 seqOk
             } else {
                 val id = clipId ?: spokenClipId(text)
-                val slice = VOICE_SLICE_MS.takeUnless { level == CrossingLevels.VERDICT }
+                val slice = sliceMsForLevel(level)
                 val clipOk = id != null && this@BusSpeaker.clips.speak(id, urgent = true, sliceMs = slice)
                 val proxOk = clipOk || proximity.speak(text, clipId = null, level = level)
                 if (proxOk) SpeechLog.play(if (clipOk) "clip" else "synthèse", text)
