@@ -60,6 +60,23 @@ class IseeVoiceSpineTest {
         settings = { Settings.Default },
     )
 
+    private fun spineCrossing(
+        scope: CoroutineScope,
+        crossing: () -> Boolean,
+        onCut: () -> Unit,
+        onStop: () -> Unit,
+        onResume: () -> Unit,
+    ) = IseeVoiceSpine(
+        scope = scope,
+        crossingActive = crossing,
+        placeMode = { PictoPlaceMode.DEHORS },
+        cutSpeech = onCut,
+        stopVoice = onStop,
+        speakPending = { onResume() },
+        speak = { spoken += it },
+        settings = { Settings.Default },
+    )
+
     @Before
     fun brancher() {
         VoiceBus.reset()
@@ -125,6 +142,52 @@ class IseeVoiceSpineTest {
         VoiceBus.reset()
         voice.resumeChatIfDue()
         assertTrue(resumed)
+    }
+
+    @Test
+    fun `vraie bascule coupe a l allumage et reprend le chat a l arret`() = runTest {
+        var crossing = false
+        var cuts = 0
+        var stops = 0
+        var resumes = 0
+        val voice = spineCrossing(this, { crossing }, { cuts++ }, { stops++ }, { resumes++ })
+
+        crossing = true
+        voice.onCrossingChanged()
+        assertEquals(1, cuts)
+        assertEquals(1, stops)
+        assertEquals(0, resumes)
+
+        crossing = false
+        voice.onCrossingChanged()
+        runCurrent()
+        assertEquals(1, cuts)
+        assertEquals(1, stops)
+        assertEquals(1, resumes)
+    }
+
+    @Test
+    fun `ordre repete sans bascule ne coupe ni ne reprend`() = runTest {
+        var crossing = false
+        var cuts = 0
+        var stops = 0
+        var resumes = 0
+        val voice = spineCrossing(this, { crossing }, { cuts++ }, { stops++ }, { resumes++ })
+
+        crossing = true
+        voice.onCrossingChanged()
+        voice.onCrossingChanged()
+        voice.onCrossingChanged()
+        assertEquals(1, cuts)
+        assertEquals(1, stops)
+
+        crossing = false
+        voice.onCrossingChanged()
+        voice.onCrossingChanged()
+        runCurrent()
+        assertEquals(1, cuts)
+        assertEquals(1, stops)
+        assertEquals(1, resumes)
     }
 
     @Test

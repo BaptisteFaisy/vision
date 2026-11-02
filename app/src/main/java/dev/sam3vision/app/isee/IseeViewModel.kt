@@ -301,7 +301,7 @@ class IseeViewModel(app: Application) : AndroidViewModel(app) {
     }
 
     /** Témoins tactiles Traversée + lieu, extraits du ViewModel (limite 500 lignes). */
-    val modeChips = IseeModeChips(viewModelScope, { _state.value.placeMode }, modes::run, { steering.toggleCrossing(); spine.onCrossingChanged() })
+    val modeChips = IseeModeChips(viewModelScope, { _state.value.placeMode }, modes::run, { if (steering.toggleCrossing()) spine.onCrossingChanged() })
 
     override fun onCleared() {
         liveDictation.stop()

@@ -50,10 +50,8 @@ class IseeSteeringOrders(
     private val glassesLens: () -> LensSpec? = { null },
 ) {
 
-    /** Bascule du mode Traversée (puce de la carte caméra) : mêmes masques, voix traversée ou retour. */
-    fun toggleCrossing() {
-        setActive(!probe.state.value.crossingActive)
-    }
+    /** Bascule du mode Traversée (puce de la carte caméra) : mêmes masques, voix traversée ou retour. Rend vrai si l'état a changé. */
+    fun toggleCrossing(): Boolean = setActive(!probe.state.value.crossingActive)
 
     /**
      * Ordre « traverser » / « crossing mode on/off » / « crosswalk on/off » :
@@ -71,11 +69,11 @@ class IseeSteeringOrders(
         return true
     }
 
-    /** Bascule commune : sans effet si la sonde est déjà dans l'état demandé. */
-    private fun setActive(wantActive: Boolean) {
-        if (probe.state.value.crossingActive != wantActive) {
-            probe.setCrossingActive(settings(), wantActive, sensorLens = phoneLens(), glassesLens = glassesLens())
-        }
+    /** Bascule commune : sans effet si la sonde est déjà dans l'état demandé. Rend vrai si l'état a changé. */
+    private fun setActive(wantActive: Boolean): Boolean {
+        if (probe.state.value.crossingActive == wantActive) return false
+        probe.setCrossingActive(settings(), wantActive, sensorLens = phoneLens(), glassesLens = glassesLens())
+        return true
     }
 
     /** Le passage en vue est annoncé, direction seule (ordres minimaux : pas de distance parlée). */
