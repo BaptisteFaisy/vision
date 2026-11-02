@@ -309,7 +309,7 @@ class CrossingLateralTest {
         val lateral = CrossingLateralAnnouncer()
         val arrival = CrossingArrivalWatcher()
         val approach = CrossingApproachWatcher()
-        val box = listOf(156f, 700f, 356f, 1100f)
+        val box = listOf(156f, 700f, 356f, 1000f)
         val objects = listOf(obj("crosswalk", box))
         val readings = listOf(reading("crosswalk", 3.0f, box))
         fun patch(atMs: Long) = crossingLateralPatchOf(
@@ -327,7 +327,7 @@ class CrossingLateralTest {
         val lateral = CrossingLateralAnnouncer()
         val arrival = CrossingArrivalWatcher()
         val approach = CrossingApproachWatcher()
-        val box = listOf(156f, 700f, 356f, 1100f)
+        val box = listOf(156f, 700f, 356f, 1000f)
         val objects = listOf(obj("crosswalk", box))
         val readings = listOf(reading("crosswalk", 3.0f, box))
         fun patch(atMs: Long) = crossingLateralPatchOf(
@@ -343,7 +343,7 @@ class CrossingLateralTest {
     @Test
     fun `feed hors traversee repete le devant, en traversee non`() {
         CrossingLateralWatch.reset()
-        val box = listOf(156f, 700f, 356f, 1100f)
+        val box = listOf(156f, 700f, 356f, 1000f)
         val objects = listOf(obj("crosswalk", box))
         val readings = listOf(reading("crosswalk", 3.0f, box))
         feedCrossingLateral(false, objects, 512, 1138, readings, null, LensSpec.Default, 0L, SpeechLanguage.Fr)
