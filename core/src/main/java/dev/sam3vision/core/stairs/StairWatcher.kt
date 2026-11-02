@@ -244,20 +244,21 @@ class StairWatcher(
             peakSmoothed = maxOf(peakSmoothed ?: 0, smoothed)
         }
         val nearDepth = meters != null && meters.isFinite() && meters < LAST_STEP_METERS
+        val announced = climbCount
         // Dernière marche verrouillée : jamais en première rencontre, jamais
         // sans montée vue, profondeur seule sans compteur (verrou `StairLastStepGateTest`).
         val countLast = opened && !lastStepSaid && smoothed != null &&
             smoothed <= LAST_STEP_LINES && (peakSmoothed ?: 0) > LAST_STEP_LINES
         val depthLast = opened && !lastStepSaid && nearDepth && smoothed == null
         val lastStep = countLast || depthLast
-        val countdown = !lastStep && smoothed != null && climbCount != null &&
-            smoothed < climbCount && smoothed > LAST_STEP_LINES
+        val countdown = !lastStep && smoothed != null && announced != null &&
+            smoothed < announced && smoothed > LAST_STEP_LINES
         // Jalon dû : il parle avant la montée — sans compteur, la fin par
         // profondeur préempterait le 0,5 m en approche (jamais de jalon sur un trou).
         val tier = if (signal.detected) onCountdown(signal, nowMs, language, direction, meters) else null
         if (tier != null) return tier
         if (lastStep || countdown) {
-            return climbCue(signal, lastStep, depthLast, smoothed, climbCount, nowMs, language, direction, meters)
+            return climbCue(signal, lastStep, depthLast, smoothed, announced, nowMs, language, direction, meters)
         }
         if (!signal.detected) {
             hits = 0
