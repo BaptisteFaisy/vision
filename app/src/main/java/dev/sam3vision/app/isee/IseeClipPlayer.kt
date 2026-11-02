@@ -14,7 +14,7 @@ interface ClipSink {
     /** Joue un clip déjà sur disque (coupe la lecture précédente). */
     suspend fun playFile(file: File): Result<Unit>
 
-    /** Joue un clip en tranche ([sliceMs], 350 ms voix) : vitesse adaptée, pitch conservé. */
+    /** Joue un clip en tranche ([sliceMs], 700 ms voix) : vitesse adaptée, pitch conservé. */
     suspend fun playSlice(file: File, sliceMs: Long): Result<Unit>
 
     /** Joue une tranche et suspend jusqu'à sa fin (phrases composées). */
@@ -47,7 +47,7 @@ class IseeClipPlayer(
     /**
      * Joue [clipId] ([IseeClipsEn]) : vrai si le clip est parti, faux si
      * inconnu, manquant sur disque, ou refusé par le lecteur (alors silence).
-     * [sliceMs] non nul : lecture en tranche (350 ms voix, verdicts exceptés).
+     * [sliceMs] non nul : lecture en tranche (700 ms voix, verdicts exceptés).
      */
     suspend fun speak(clipId: String, urgent: Boolean, sliceMs: Long? = null): Boolean {
         val text = IseeClipsEn.all[clipId] ?: return false

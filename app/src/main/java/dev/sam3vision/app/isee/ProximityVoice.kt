@@ -18,7 +18,7 @@ import kotlin.coroutines.coroutineContext
  * [speak] dit une phrase (clip enregistré d'abord — [clips], zéro réseau —,
  * synthèse ElevenLabs sinon) ; [speakWord] dit un mot du guidage en clip
  * local (< 100 ms) ou en synthèse mise en cache. Chaque lecture coupe le
- * lecteur partagé ([SpeechPlayer], tranche 350 ms `playSlice` — chat,
+ * lecteur partagé ([SpeechPlayer], tranche 700 ms `playSlice` — chat,
  * route, annonce), jamais le TTS système (une alerte de sécurité ne se
  * chevauche pas : [systemBusy] tait la phrase).
  *

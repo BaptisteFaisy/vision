@@ -6,7 +6,7 @@ import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
 
 /**
- * Battement vocal (ordre user du 01/11 : la voix parle toutes les 350 ms) :
+ * Battement vocal (ordre user du 01/11 : la voix parle toutes les 700 ms) :
  * toutes les [TICK_MS], le vœu courant le plus prioritaire est proposé au
  * bus ([VoiceBus], écrasement par niveau — le bus garde l'arbitrage global,
  * le battement ne fait que réévaluer).
@@ -38,8 +38,8 @@ import kotlinx.coroutines.launch
  */
 internal object VoiceTick {
 
-    /** Battement : la priorité courante est réévaluée toutes les 350 ms. */
-    const val TICK_MS = 350L
+    /** Battement : la priorité courante est réévaluée toutes les 700 ms. */
+    const val TICK_MS = 700L
 
     /** Fraîcheur d'un vœu rapporté : au-delà, périmé (jamais redit). Prior, à valider rue. */
     const val FRESH_MS = 2_000L
@@ -127,7 +127,7 @@ internal object VoiceTick {
 }
 
 /**
- * Battement voix de la sonde : toutes les [tickMs] (350 ms), le vœu courant
+ * Battement voix de la sonde : toutes les [tickMs] (700 ms), le vœu courant
  * le plus prioritaire ([VoiceTick]) est proposé au bus. Coupé en Traversée
  * (le verdict y est propriétaire du son). Démarré par [observeHazards],
  * avec les guetteurs. Fin fil mince : la boucle vit dans [voiceTickJob].

@@ -69,7 +69,7 @@ sealed interface VoiceNavEvent {
 /**
  * Phrases du guidage vocal, dans la langue de la voix ([SpeechLanguage]).
  *
- * Français (contrat minimal 350 ms, miroirs `nav_voice_*` dans `strings.xml`) :
+ * Français (contrat minimal 700 ms, miroirs `nav_voice_*` dans `strings.xml`) :
  * « Tout droit[, rue X]. » de loin (rues et distances : résiduels, non bornés),
  * « À gauche[, rue X]. » de près (jamais de distance de virage —
  * [VoiceNavPolicy.TURN_NOW_M]), « Tout droit. », « Arrivé[ à X]. », « Hors route. »,
@@ -128,7 +128,7 @@ object VoiceNavPhrases {
         SpeechLanguage.En -> "Straight on$tail"
     }
 
-    /** « Tout droit. » (distance abandonnée : tranche 350 ms). */
+    /** « Tout droit. » (distance abandonnée : tranche 700 ms). */
     private fun continueStraight(meters: Float?, language: SpeechLanguage): String {
         val distance = navDistance(meters, language)
         return when (language) {
@@ -197,7 +197,7 @@ object VoiceNavPhrases {
     /** Côté de virage, sans le cap droit (traité comme ligne droite). */
     private enum class Side { Left, Right }
 
-    // ── Événements moteur (NavEvent) : formes minimales 350 ms ──
+    // ── Événements moteur (NavEvent) : formes minimales 700 ms ──
     // « Off route. », « Back on route. », « Arrived[ at X] »,
     // « Straight on[, rue] » (far) then « Turn right[, rue] » (near).
     // Rues et distances : résiduelles (non bornées, tranche ×3).
@@ -238,7 +238,7 @@ object VoiceNavPhrases {
      * disent en deux temps — préavis directionnel de loin, ordre sec sans
      * distance de près ([VoiceNavPolicy.TURN_NOW_M]) ; le reste
      * (« Roundabout. », « Arrive. ») : verbe seul, sans distance —
-     * tranche 350 ms. Rue inconnue : omise, jamais inventée.
+     * tranche 700 ms. Rue inconnue : omise, jamais inventée.
      * (rues : résiduelles, non bornées).
      */
     fun ahead(action: ManeuverAction, street: String?, distM: Double): String {
@@ -268,7 +268,7 @@ object VoiceNavPhrases {
 
     /**
      * « Crosswalk. » : préavis de traversée (miroir `nav_voice_crossing`,
-     * distance abandonnée : tranche 350 ms).
+     * distance abandonnée : tranche 700 ms).
      * Valhalla ne nomme pas les traversées.
      */
     fun crossingAhead(distM: Double): String {
