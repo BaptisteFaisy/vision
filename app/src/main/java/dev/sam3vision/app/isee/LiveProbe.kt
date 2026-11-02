@@ -89,8 +89,8 @@ class LiveProbe(
 
     internal var session: LiveSession? = null
 
-    /** Session du **premier** appel (délai long : le conteneur Modal endormi met 30-50 s
-     * à démarrer) ; on repasse à la session normale dès qu'une frame est passée. */
+    /** Alias de [session] (session unique, FIX-18) : le délai froid vit sur la session,
+     * pas sur un second objet — les sites `if (warmed)` restent inchangés. */
     internal var coldSession: LiveSession? = null
 
     /**
@@ -217,18 +217,17 @@ class LiveProbe(
     }
 
     /**
-     * (Re)ouvre les sessions normale et froide sur [clean] : même transport, délai long
-     * (60 s) pour la froide — c'est le réveil du conteneur qui parle, pas la frame. La
-     * première analyse passée, on repart sur la normale (10 s) via [goWarm].
+     * Session unique sur [clean], au délai froid (60 s, réveil du conteneur) : [goWarm]
+     * la fait retomber au délai normal dès le 1er succès, sans second handshake (FIX-18).
+     * `coldSession` désigne la même session — les sites `if (warmed)` sont inchangés.
      */
     private fun openSessions(clean: String, prompts: List<String>, maxObjects: Int) {
         closeSessions()
-        session = openSession(clean, prompts, maxObjects, DEFAULT_TIMEOUT_SECONDS)
-        coldSession = openSession(clean, prompts, maxObjects, COLD_TIMEOUT_SECONDS)
-        // Handshake froid pendant la liaison caméra : la 1re frame part sans attendre.
-        // La session chaude préconnecte à `goWarm` (un socket ouvert ici idlerait 45 s
-        // pendant le boot et serait fermé par le serveur avant sa première frame).
-        coldSession?.preconnect()
+        val single = openSession(clean, prompts, maxObjects, COLD_TIMEOUT_SECONDS)
+        session = single
+        coldSession = single
+        // Handshake unique, pendant la liaison caméra : la 1re frame part sans attendre.
+        single?.preconnect()
     }
 
     /**
@@ -454,15 +453,15 @@ _state.update { it.cleared() }
         }
     }
 
-    /** Première frame aboutie : le conteneur est chaud, la session froide a fait son travail. */
+    /** 1re frame aboutie : le conteneur est chaud, le délai froid retombe au délai normal. */
     private fun goWarm() {
         // La première frame paie le démarrage du conteneur (mesuré : 17 s en WebSocket, 40 s
         // en HTTP) : la garder dans la moyenne afficherait « 17 192 ms » pour un lien chaud
         // à ~180 ms, et fausserait aussi le régulateur de créneaux.
         (if (warmed) session else coldSession)?.let { it.stats.reset(); it.serverStats.reset() }
         warmed = true
-        // La session chaude ouvre son socket pendant que la 1re réponse se publie.
-        session?.preconnect()
+        // Session unique (FIX-18) : le budget froid retombe, sans rouvrir le socket.
+        session?.useTimeoutMs(DEFAULT_TIMEOUT_SECONDS * 1000)
         if (warming) {
             warming = false
             _state.update { it.copy(warming = false, timeoutSec = DEFAULT_TIMEOUT_SECONDS) }

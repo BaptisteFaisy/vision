@@ -26,7 +26,7 @@ import org.json.JSONObject
 class WsLiveClient(
     private val baseUrl: String,
     private val transport: WsTransport = OkHttpWsTransport(liveWsClient()),
-    private val timeoutMs: Long = LIVE_TIMEOUT_SECONDS * 1000,
+    private var timeoutMs: Long = LIVE_TIMEOUT_SECONDS * 1000,
     private val http: LiveClient = HttpLiveClient(baseUrl),
     /** Jalons réseau pour la chronologie de l'écran (facultatif : les tests n'en posent pas). */
     private val marks: WireMarks? = null,
@@ -212,6 +212,17 @@ class WsLiveClient(
      */
     override fun preconnect(): Boolean = synchronized(lock) { openLocked() }
 
+    /**
+     * Bascule chaud (FIX-18) : le budget froid (60 s) retombe au budget normal, sur le
+     * socket ouvert — la prochaine frame attend juste moins longtemps, aucun handshake.
+     */
+    fun useTimeoutMs(ms: Long) {
+        synchronized(lock) { timeoutMs = ms }
+    }
+
+    /** Budget courant, exposé aux tests : la preuve de la décroissance froid → normal. */
+    internal val currentTimeoutMs: Long get() = synchronized(lock) { timeoutMs }
+
     /** Le WebSocket ne sert pas au health : un seul appel `/health`, celui du client HTTP. */
     override suspend fun health(): Result<LiveHealth> = http.health()
 
@@ -363,14 +374,18 @@ class WsLiveClient(
         waiting.forEach { frame -> frame.reply.completeExceptionally(failure) }
     }
 
-    private suspend fun awaitReply(reply: CompletableDeferred<String>, gen: Int): Result<String> = try {
-        val raw = withTimeoutOrNull(timeoutMs) { reply.await() }
-        if (raw == null) {
-            dropDeadSocket(gen)
-            Result.failure(ApiError.Timeout())
-        } else Result.success(raw)
-    } catch (e: ApiError) {
-        Result.failure(e)
+    private suspend fun awaitReply(reply: CompletableDeferred<String>, gen: Int): Result<String> {
+        // Budget lu à chaque frame : la bascule chaud (FIX-18) le fait retomber sans rouvrir.
+        val budget = synchronized(lock) { timeoutMs }
+        return try {
+            val raw = withTimeoutOrNull(budget) { reply.await() }
+            if (raw == null) {
+                dropDeadSocket(gen)
+                Result.failure(ApiError.Timeout())
+            } else Result.success(raw)
+        } catch (e: ApiError) {
+            Result.failure(e)
+        }
     }
 
     /**

@@ -149,6 +149,14 @@ class LiveSession(
     fun preconnect(): Boolean = client.preconnect()
 
     /**
+     * Bascule chaud (FIX-18) : le délai froid (60 s) retombe au délai normal, sans rouvrir.
+     * Sans socket (client HTTP), sans effet — comme [socketOpen] qui rend `false`.
+     */
+    fun useTimeoutMs(ms: Long) {
+        (client as? WsLiveClient)?.useTimeoutMs(ms)
+    }
+
+    /**
      * Régulateur de latence : referme à un créneau dès que la moyenne dépasse le budget,
      * ne rouvre qu'après [REOPEN_AFTER] moyennes consécutives **sous** le budget.
      * La durée (et non un seuil bas) fait l'hystérésis : l'ancien seuil de réouverture
