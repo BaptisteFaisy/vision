@@ -55,20 +55,17 @@ class ProximityVoiceRecordedTest {
     }
 
     @Test
-    fun `phrase sans clip hors GPS = synthese reseau`() = runTest {
+    fun `phrase sans clip hors GPS = silence, zero reseau`() = runTest {
         val attempts = mutableListOf<String>()
         val spoken = mutableListOf<String>()
         val v = voice(pack(), attempts, spoken)
 
-        assertTrue(v.speak("Voiture à l'arrêt, à 2 mètres.", level = OutdoorLevel.HUMAN))
+        assertFalse(v.speak("Voiture à l'arrêt, à 2 mètres.", level = OutdoorLevel.HUMAN))
         v.reset()
-        assertTrue(v.speak("2 vehicles moving.", level = OutdoorLevel.HUMAN))
+        assertFalse(v.speak("2 vehicles moving.", level = OutdoorLevel.HUMAN))
 
-        assertEquals(listOf("Voiture à l'arrêt, à 2 mètres.", "2 vehicles moving."), attempts)
-        assertEquals(
-            listOf("Voiture à l'arrêt, à 2 mètres.", "2 vehicles moving."),
-            spoken.filter { it.isNotBlank() },
-        )
+        assertTrue(attempts.isEmpty())
+        assertTrue(spoken.filter { it.isNotBlank() }.isEmpty())
     }
 
     @Test
@@ -84,15 +81,15 @@ class ProximityVoiceRecordedTest {
     }
 
     @Test
-    fun `sans pack hors GPS = synthese reseau`() = runTest {
+    fun `sans pack hors GPS = silence, zero reseau`() = runTest {
         val attempts = mutableListOf<String>()
         val spoken = mutableListOf<String>()
 
         val dit = voice(clips = null, attempts, spoken).speak("Voiture.", level = OutdoorLevel.CAR_MOVING)
 
-        assertTrue(dit)
-        assertEquals(listOf("Voiture."), attempts)
-        assertEquals(listOf("Voiture."), spoken.filter { it.isNotBlank() })
+        assertFalse(dit)
+        assertTrue(attempts.isEmpty())
+        assertTrue(spoken.filter { it.isNotBlank() }.isEmpty())
     }
 
     @Test

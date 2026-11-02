@@ -30,7 +30,7 @@ internal class SpeechPlayerClipSink(private val player: SpeechPlayer) : ClipSink
  * Porte-parole du [VoiceBus] (SPEC v4) : séquence de clips anglais si [clips]
  * est non vide, clip anglais seul sinon (id fourni, ou retrouvé depuis le
  * texte — [spokenClipId]), sinon voix de proximité ([ProximityVoice] : clip
- * enregistré d'abord, synthèse réseau sinon, tous niveaux).
+ * enregistré d'abord, synthèse réseau sinon pour les niveaux GPS seuls).
  *
  * Coupe d'abord le lecteur partagé (préemption physique, chat compris — la
  * tranche coupée attend sa reprise), puis parle sous mutex : une séquence en

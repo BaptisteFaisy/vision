@@ -18,7 +18,7 @@ import kotlin.coroutines.coroutineContext
  * fréquence, en amont).
  *
  * [speak] dit une phrase (clip enregistré d'abord — [clips], zéro réseau —,
- * synthèse ElevenLabs sinon) ; [speakWord] dit un mot du guidage en clip
+ * synthèse ElevenLabs sinon pour les niveaux GPS seuls, silence sinon) ; [speakWord] dit un mot du guidage en clip
  * local (< 100 ms) ou en synthèse mise en cache. Chaque lecture coupe le
  * lecteur partagé ([SpeechPlayer], tranche 700 ms `playSlice` — chat,
  * route, annonce), jamais le TTS système (une alerte de sécurité ne se
@@ -165,8 +165,10 @@ class ProximityVoice(
             playTraced(ou, text, "clip") { player.playSliceFile(file) }
             return true
         }
-        // Sans clip, tous les niveaux synthétisent (ordre user du 02/11 : la
-        // porte GPS D-04 taisait tout le spontané — voir `mute` pour les jets).
+        // Sans clip, seuls les niveaux GPS synthétisent (noms rues/lieux
+        // dynamiques — ordre user : ElevenLabs = LLM + noms GPS, le reste en MP3).
+        if (level != OutdoorLevel.GPS_REMINDER && level != OutdoorLevel.GPS_EVENT)
+            return mute(ou, text, level, "sans-clip")
         if (!current.ttsConfigured) return mute(ou, text, level, "tts-non-configure")
         val bytes = synthesize(current.ttsApiKey, current.ttsVoiceId, text).getOrElse { error ->
             val down = isNetworkVoiceDown(error)
@@ -212,8 +214,10 @@ class ProximityVoice(
             playTraced(ou, text, "clip") { player.playSliceFile(file) }
             return true
         }
-        // Sans clip, tous les niveaux synthétisent (ordre user du 02/11 : la
-        // porte GPS D-04 taisait tout le spontané — voir `mute` pour les jets).
+        // Sans clip, seuls les niveaux GPS synthétisent (noms rues/lieux
+        // dynamiques — ordre user : ElevenLabs = LLM + noms GPS, le reste en MP3).
+        if (level != OutdoorLevel.GPS_REMINDER && level != OutdoorLevel.GPS_EVENT)
+            return mute(ou, text, level, "sans-clip")
         if (!current.ttsConfigured) return mute(ou, text, level, "tts-non-configure")
         val bytes = synthesize(current.ttsApiKey, current.ttsVoiceId, text).getOrElse { error ->
             val down = isNetworkVoiceDown(error)
