@@ -55,13 +55,39 @@ internal fun bitmapSourceCrop(srcW: Int, srcH: Int, dstW: Int, dstH: Int): CropR
 private val ANNEX_B_START = byteArrayOf(0, 0, 0, 1)
 
 /**
+ * Format H.265 mémorisé : stable par session (les deux décodeurs — direct et
+ * pont — lisent le même flux), donc la première détection tranche pour toutes
+ * les poussées suivantes. `null` = indécis (oublié par [resetAnnexBMemo]).
+ */
+private var annexBStable: Boolean? = null
+
+/**
+ * Oublie le format H.265 mémorisé ([annexB]) : la session suivante peut parler
+ * un autre format (réel vs simulé). Appelé en fin de session, voir
+ * `GlassesVideoLink.clear` — et entre chaque cas de `GlassesAnnexBTest`.
+ */
+internal fun resetAnnexBMemo() {
+    annexBStable = null
+}
+
+/**
  * Remet un accès H.265 en Annex B si ses unités sont longueur-préfixées (style hvcC,
  * 4 octets big-endian) : `MediaCodec` veut des start codes, pas des longueurs, et reste
  * muet sinon — sans erreur. Détection par essai : start code présent, longueur
- * incohérente ou reste inexpliqué, et les octets repartent tels quels. Pur, testé en JVM.
+ * incohérente ou reste inexpliqué, et les octets repartent tels quels.
+ *
+ * Détection mémorisée : le format est stable par session, donc un flux détecté
+ * Annex B repart tel quel sans nouveau balayage (15 poussées/s × 2 chemins) ;
+ * un flux longueur-préfixé garde le chemin complet (chaque accès se convertit,
+ * les octets changent à chaque frame). Testé en JVM (`GlassesAnnexBTest`,
+ * mémo réinitialisé entre cas).
  */
 fun annexB(bytes: ByteArray): ByteArray {
-    if (bytes.size < 8 || startsWithAnnexB(bytes)) return bytes
+    if (annexBStable == true) return bytes
+    if (bytes.size < 8 || startsWithAnnexB(bytes)) {
+        if (bytes.size >= 8) annexBStable = true
+        return bytes
+    }
     val out = ByteArrayOutputStream(bytes.size + 16)
     var pos = 0
     while (pos + 4 <= bytes.size) {
@@ -75,6 +101,9 @@ fun annexB(bytes: ByteArray): ByteArray {
         pos += 4 + length
     }
     if (pos != bytes.size) return bytes
+    // Longueur-préfixé avéré : le chemin complet reste la règle (jamais de
+    // raccourci vers `return bytes`, qui laisserait passer du hvcC brut).
+    annexBStable = false
     return out.toByteArray()
 }
 

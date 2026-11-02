@@ -419,6 +419,9 @@ object GlassesVideoLink {
     /** Session terminée : oubli complet, comme si rien n'avait streamé. */
     fun clear() {
         setStreaming(false)
+        // Le format H.265 est mémorisé par session : la suivante peut parler
+        // un autre format (réel vs simulé), on oublie avant de la lire.
+        resetAnnexBMemo()
         // Ici, pas dans setStreaming(false) : le flux émet `false` en ouverture de
         // session, pile entre la pose du repli (mock) et sa lecture (décodeur).
         fallbackCsd = null

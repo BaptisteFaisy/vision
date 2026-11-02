@@ -3,6 +3,7 @@ package dev.sam3vision.app.glasses
 import com.meta.wearable.dat.camera.types.VideoFrame
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertNull
+import org.junit.Before
 import org.junit.Test
 
 /**
@@ -16,6 +17,10 @@ import org.junit.Test
  * la déduplication par séquence et les gardes (vide, dimensions nulles).
  */
 class GlassesBackgroundFramesTest {
+
+    /** Le pont passe par `annexB` (format mémorisé) : chaque cas repart indécis. */
+    @Before
+    fun resetMemo() = resetAnnexBMemo()
 
     /** Faux décodeur : le compressé rend [image], les octets reçus sont relus. */
     private class FakeDecoder(
