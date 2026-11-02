@@ -3,7 +3,6 @@ package dev.sam3vision.app.isee
 import android.graphics.Bitmap
 import dev.sam3vision.app.live.LiveLatencyLog
 import dev.sam3vision.core.live.TimingsText
-import dev.sam3vision.core.live.VeilPolicy
 import dev.sam3vision.core.mask.DecodeProbe
 import dev.sam3vision.core.mask.DecodeSplit
 import dev.sam3vision.core.mask.DecodeStage
@@ -77,7 +76,7 @@ class MaskPainter(
         val grays = frame.objects.map { obj -> decodeObjectGray(obj, frame.width, frame.height, probe) }
         lastGrays = grays
         return grays.mapIndexedNotNull { index, gray ->
-            gray?.let { paint(index, it, paletteArgb(index), frame.objects[index].label, probe) }
+            gray?.let { paint(index, it, paletteArgb(index), probe) }
         }.also { lastSplit = probe?.snapshot(totalMs = -1, masks = it.size) ?: DecodeSplit.EMPTY }
     }
 
@@ -97,16 +96,15 @@ class MaskPainter(
 
     /**
      * Colore [gray] de l'emplacement [index] (`null` = bitmap increé, masque sauté).
-     * Un label de décor ([VeilPolicy]) est colorié en transparent : pastille et
-     * voix inchangées, pas de voile à mi-écran. La passe est datée ([DecodeStage.PAINT])
-     * quand la sonde est armée.
+     * Tous les labels sont peints opaques, décor compris (ordre user du 02/11 :
+     * mur, trottoir et passage piéton visibles). La passe est datée
+     * ([DecodeStage.PAINT]) quand la sonde est armée.
      */
-    private fun paint(index: Int, gray: GrayMask, argb: Int, label: String, probe: DecodeProbe?): Bitmap? {
+    private fun paint(index: Int, gray: GrayMask, argb: Int, probe: DecodeProbe?): Bitmap? {
         val buffer = scratchFor(index, gray.size)
         val pair = targetsFor(index)
-        val effAlpha = if (VeilPolicy.showsVeil(label)) alpha else 0
         return probe.timed(DecodeStage.PAINT) {
-            colorizeGrayToBitmap(gray, lutFor(argb, effAlpha), buffer, pair[front])
+            colorizeGrayToBitmap(gray, lutFor(argb, alpha), buffer, pair[front])
         }.also { pair[front] = it }
     }
 
