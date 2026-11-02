@@ -1,21 +1,22 @@
-MIT License
+Licence propriétaire iSee — Tous droits réservés
 
-Copyright (c) 2026 Baptiste Faisy
+Copyright (c) 2026 Baptiste Faisy. Tous droits réservés.
 
-Permission is hereby granted, free of charge, to any person obtaining a copy
-of this software and associated documentation files (the "Software"), to deal
-in the Software without restriction, including without limitation the rights
-to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
-copies of the Software, and to permit persons to whom the Software is
-furnished to do so, subject to the following conditions:
+Ce logiciel et la documentation associée (le « Logiciel ») sont la propriété
+exclusive de Baptiste Faisy. Tous les droits de reproduction, d'adaptation,
+de distribution, de représentation et de mise à disposition, par quelque moyen
+et sur quelque support que ce soit, sont réservés pour tous pays.
 
-The above copyright notice and this permission notice shall be included in all
-copies or substantial portions of the Software.
+Sans autorisation écrite et préalable du titulaire des droits, il est interdit
+de copier, modifier, fusionner, publier, distribuer, sous-licencier et/ou
+vendre tout ou partie du Logiciel, que ce soit à titre gratuit ou onéreux.
 
-THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
-IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
-FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
-AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
-LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
-OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
-SOFTWARE.
+Le Logiciel est fourni « EN L'ÉTAT », sans garantie d'aucune sorte, expresse
+ou implicite, y compris, sans s'y limiter, les garanties de qualité marchande,
+d'adéquation à un usage particulier et d'absence de contrefaçon. En aucun cas
+l'auteur ou le titulaire des droits ne pourra être tenu responsable de toute
+réclamation, de tout dommage ou de toute autre responsabilité, contractuelle,
+délictuelle ou autre, découlant du Logiciel ou de son utilisation.
+
+Composants tiers : voir `NOTICE` (racine) et `core/NOTICE`. Leurs licences
+d'origine continuent de s'appliquer à ces composants.

@@ -428,7 +428,9 @@ once `ci`, `ci-budget` and `couche0` are green (`docs/CI-QUEUE.md` details the p
 
 ## License and security
 
-MIT — see `LICENSE`. Third-party code: `NOTICE`. **Never a public issue for a
+Proprietary — all rights reserved, see `LICENSE` (copying, modifying or
+distributing this project without prior written authorisation is forbidden).
+Third-party code: `NOTICE`. **Never a public issue for a
 vulnerability** (`SECURITY.md`). No key is versioned: `local.properties` is gitignored,
 keys live in the Android Keystore or the repo secrets (read by the CI's "build keys"
 step). **By default the APK embeds the keys** so a fresh install has nothing to type
