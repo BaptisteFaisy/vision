@@ -43,8 +43,6 @@ internal fun DistanceSettings(draft: Settings, onChange: (Settings) -> Unit) {
     val eyeHeights = remember(context) { EyeHeightStore(context) }
     val calibrationStore = remember(context) { CalibrationStore(context) }
     val lensStore = remember(context) { LensQualityStore(context) }
-    var heightM by remember { mutableStateOf(heights.get()) }
-    var eyeM by remember { mutableStateOf(eyeHeights.get()) }
     Column(Modifier.fillMaxWidth(), verticalArrangement = Arrangement.spacedBy(10.dp)) {
         Text(
             "Distances",
@@ -74,27 +72,29 @@ internal fun DistanceSettings(draft: Settings, onChange: (Settings) -> Unit) {
             // glasses wait for the mire (docs/LUNETTES-RECETTE-TEL.md § 6).
             onChange(draft.copy(glassesFovDeg = parseFov(text)))
         }
-        LabeledField(
-            label = "Camera height in meters (shoulder ~1.5)",
-            value = heightText(heightM),
-            secret = false,
-        ) { text ->
-            val parsed = parseHeight(text) ?: return@LabeledField
-            heightM = parsed
-            heights.set(parsed)
-        }
-        LabeledField(
-            label = "Eye height in meters (glasses ~1.6)",
-            value = heightText(eyeM),
-            secret = false,
-        ) { text ->
-            val parsed = parseHeight(text) ?: return@LabeledField
-            eyeM = parsed
-            eyeHeights.set(parsed)
-        }
+        HeightField("Camera height in meters (shoulder ~1.5)", heights::get, heights::set)
+        HeightField("Eye height in meters (glasses ~1.6)", eyeHeights::get, eyeHeights::set)
         LensFallbackWarning(lensStore)
         CalibrationBlock(draft, onChange, calibrationStore)
         MireBlock()
+    }
+}
+
+/**
+ * Height field backed by a store ([CameraHeightStore], [EyeHeightStore]) : one
+ * definition for both, tolerant input ([parseHeight]), applied on each sample.
+ */
+@Composable
+private fun HeightField(label: String, get: () -> Float, set: (Float) -> Unit) {
+    var meters by remember { mutableStateOf(get()) }
+    LabeledField(
+        label = label,
+        value = heightText(meters),
+        secret = false,
+    ) { text ->
+        val parsed = parseHeight(text) ?: return@LabeledField
+        meters = parsed
+        set(parsed)
     }
 }
 
