@@ -135,7 +135,16 @@ internal class IseeCameraHost(private val context: Context) : CameraBindHost {
             takePhotoNow(target, onSaved)
     }
 
-    private var boundPreview: PreviewView? = null
+    /**
+     * L'aperçu de la fenêtre, possédé dès la construction : `bind()` ne dépend
+     * plus d'un `remember` externe, qui arrivait après la boucle de liaison
+     * (« Preview not attached yet » en boucle, mesuré sur le téléphone).
+     */
+    val previewView: PreviewView = PreviewView(context).apply {
+        scaleType = PreviewView.ScaleType.FILL_CENTER
+        // Sans flux, la surface montre ce fond sombre au lieu du blanc système.
+        setBackgroundColor(AppColors.background.toArgb())
+    }
 
     /**
      * Frame convertie (JPEG base64, 480 px) et **instant d'exposition** du capteur
@@ -171,17 +180,6 @@ internal class IseeCameraHost(private val context: Context) : CameraBindHost {
     /** Caméra liée : sa caractéristique optique sert de calibrage aux distances. */
     private var boundCamera: androidx.camera.core.Camera? = null
 
-    /** Fabrique la `PreviewView` de la fenêtre (une seule fois, conservée côté host). */
-    fun newPreviewView(context: Context): PreviewView {
-        val created = PreviewView(context).apply {
-            scaleType = PreviewView.ScaleType.FILL_CENTER
-            // Sans flux, la surface montre ce fond sombre au lieu du blanc système.
-            setBackgroundColor(AppColors.background.toArgb())
-        }
-        boundPreview = created
-        return created
-    }
-
     /**
      * Lie aperçu + photo + vidéo + analyse au cycle de vie **de l'activité**.
      *
@@ -196,8 +194,7 @@ internal class IseeCameraHost(private val context: Context) : CameraBindHost {
      * dans [IseeCameraBinder] : rien de ce qu'il fait ne peut lever, sinon l'exception
      * sortirait dans la `LaunchedEffect` de la carte et tuerait le process.
      */
-    suspend fun bind(owner: LifecycleOwner): String? =
-        boundPreview?.let { binder.bind(owner, it) } ?: run { android.util.Log.e("sam3vision", "isee: bind with no preview yet (host=${hashCode()})"); "Preview not attached yet" }
+    suspend fun bind(owner: LifecycleOwner): String? = binder.bind(owner, previewView)
 
     /** Drapeau HAL dépouillé des Réglages, `false` si illisible (jamais d'exception). */
     private suspend fun readHalFlag(): Boolean = runCatching {
