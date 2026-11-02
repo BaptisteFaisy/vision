@@ -37,7 +37,7 @@ data class FenceOpeningSignal(
      * ou moins, proche de tout droit par construction. Le fermé, le passage
      * au milieu et l'absence de signal restent muets : le guidage garde son
      * évitement générique. L'humain prime toujours : l'appelant ne part vers
-     * le trou que s'il garantit 80 cm à toute personne.
+     * le trou que s'il garantit 1 m à toute personne.
      */
     fun holeSide(): GuidanceSide? {
         if (!detected || state != FenceOpeningState.Open) return null

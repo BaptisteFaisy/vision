@@ -19,8 +19,11 @@ data class PeoplePath(
 ) {
     companion object {
 
-        /** Écart mini au corps d'une personne (m) : on ne frôle pas les gens. */
-        const val MIN_CLEARANCE_M = 0.8f
+        /**
+         * Écart mini au corps d'une personne (m) : on passe à 1 m ou plus
+         * (ordre user du 02/11 — 0,8 m avant, on frôlait les gens).
+         */
+        const val MIN_CLEARANCE_M = 1.0f
 
         /**
          * Demi-largeur de corps (m) quand la boîte est inconnue : les épaules
@@ -62,8 +65,8 @@ data class PeoplePath(
             if (headingX < 0.5f) GuidanceSide.Left else GuidanceSide.Right
 
         /**
-         * Vrai si marcher côté [side] garantit 80 cm à toute personne : aucune
-         * personne à portée avec un écart latéral < corps + 0,8 m
+         * Vrai si marcher côté [side] garantit 1 m à toute personne : aucune
+         * personne à portée avec un écart latéral < corps + 1 m
          * ([MIN_CLEARANCE_M]), aucune personne non mesurée de ce côté
          * (prudence : l'inconnu bloque le côté — une personne plein centre
          * non mesurée bloque les deux). Les obstacles non humains ne comptent
@@ -91,8 +94,8 @@ data class PeoplePath(
         }
 
         /**
-         * Vrai si marcher dans l'axe garantit 80 cm à toute personne : aucune
-         * personne à portée avec un écart latéral à l'axe < corps + 0,8 m,
+         * Vrai si marcher dans l'axe garantit 1 m à toute personne : aucune
+         * personne à portée avec un écart latéral à l'axe < corps + 1 m,
          * aucune personne non mesurée dans la bande centrale (miroir du
          * couloir : hors bande, l'inconnu passe au large).
          */
@@ -127,7 +130,7 @@ data class PeoplePath(
 
 /**
  * Demi-largeur de boîte en mètres (`null` = bords inconnus), partagée
- * bandes ([ObstacleBands]) et garantie 80 cm ([PeoplePath.clearsSide]).
+ * bandes ([ObstacleBands]) et garantie 1 m ([PeoplePath.clearsSide]).
  */
 internal fun halfBoxM(label: PlacedLabel, lateralPerX: Float): Float? {
     val x0 = label.x0
