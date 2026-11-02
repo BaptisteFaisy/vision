@@ -32,6 +32,8 @@ class ProbeVoiceFenceHoleTest {
     fun `humain devant le trou garde l evitement generique`() {
         val labels = holeLeft() + PlacedLabel("personne", 0.15f, 0.5f, 2f)
 
-        assertEquals("right.", guided().phrase(0L, labels, SteeringCap.Straight))
+        // Même côté qu'avant (jamais vers l'humain), mot SAM : le décalage
+        // passe devant le couloir et l'humain inconnu parle dès 3 m (02/11).
+        assertEquals("Right.", guided().phrase(0L, labels, SteeringCap.Straight))
     }
 }

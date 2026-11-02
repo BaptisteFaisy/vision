@@ -192,11 +192,14 @@ class PersonTrackTest {
 
     @Test
     fun `une distance trop differente n herite pas de la piste`() {
+        // Porte devenue temporelle (ordre user du 02/11) : 2 m en 650 ms
+        // (3,1 m/s), c'est un face-à-face rapide — la même personne. Le saut
+        // impossible se juge à cadence rapide : 2 m en 400 ms (5 m/s).
         val tracker = PersonTracker()
         val a = tracker.onFrame(0L, listOf(label(0.5f, 4.0f))).single()
-        val jump = tracker.onFrame(650L, listOf(label(0.5f, 2.0f))).single()
+        val jump = tracker.onFrame(400L, listOf(label(0.5f, 2.0f))).single()
 
-        assertNotEquals("2 m d'écart en une frame : ce n'est pas la même personne", a.trackId, jump.trackId)
+        assertNotEquals("2 m d'écart en 400 ms : ce n'est pas la même personne", a.trackId, jump.trackId)
     }
 
     @Test
@@ -265,5 +268,34 @@ class PersonTrackTest {
         start.countDown()
         threads.forEach { it.join(60_000) }
         assertTrue("plantage concurrent : ${errors.peek()}", errors.isEmpty())
+    }
+
+    @Test
+    fun `un face-a-face rapide garde son id et sa fermeture`() {
+        // Ordre user du 02/11 : prendre de la distance pour se décaler des
+        // humains. À 0,65 s entre deux décisions, un piéton qui arrive de face
+        // ferme ~1,8 m — au-delà de la porte fixe (1,2 m) : il reprenait un
+        // nouvel id à chaque frame, sans fermeture, et le décalage parlait au
+        // contact. La porte suit désormais le temps écoulé.
+        val tracker = PersonTracker()
+        val a = tracker.onFrame(0L, listOf(label(0.5f, 4.0f))).single()
+        val b = tracker.onFrame(650L, listOf(label(0.5f, 2.2f))).single()
+
+        assertEquals(a.trackId, b.trackId)
+        // 1,8 m fermés en 650 ms = 2,77 m/s, au lissage près.
+        assertEquals(2.8f, b.closingMps!!, 0.6f)
+        assertTrue(Timing.isUrgent(b.ttcS))
+    }
+
+    @Test
+    fun `un bond impossible a cadence rapide donne un nouvel id`() {
+        // Miroir : la porte élargie suit le temps, pas la cadence — 1,8 m en
+        // 250 ms (7,2 m/s), ce n'est pas un marcheur, c'est quelqu'un d'autre.
+        val tracker = PersonTracker()
+        val a = tracker.onFrame(0L, listOf(label(0.5f, 4.0f))).single()
+        val b = tracker.onFrame(250L, listOf(label(0.5f, 2.2f))).single()
+
+        assertNotEquals(a.trackId, b.trackId)
+        assertNull(b.closingMps)
     }
 }

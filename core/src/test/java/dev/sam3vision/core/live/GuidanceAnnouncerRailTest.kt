@@ -26,8 +26,8 @@ class GuidanceAnnouncerRailTest {
     /** Personne plein axe : sert à vérifier que le couloir bouché gagne sur le rail. */
     private fun personne(meters: Float) = PlacedLabel("personne", 0.5f, 0.5f, meters)
 
-    /** Personne à droite, à [meters] : sert à vérifier que le décalage gagne sur le rail. */
-    private fun personneDroite(meters: Float) = PlacedLabel("personne", 0.7f, 0.5f, meters)
+    /** Mur à droite, à [meters] : un humain parlerait dès la 1re frame (3 m, ordre user du 02/11). */
+    private fun murDroite(meters: Float) = PlacedLabel("mur", 0.7f, 0.5f, meters)
 
     private fun dire(state: RailState, language: SpeechLanguage = SpeechLanguage.Fr): String? =
         GuidanceAnnouncer().onFrame(0L, libre, language, rail = state)
@@ -57,9 +57,9 @@ class GuidanceAnnouncerRailTest {
     fun `decalage lateral gagne sur le rail`() {
         val announcer = GuidanceAnnouncer()
         val etat = bordG(0.4f, RailLevel.DRIFT)
-        announcer.onFrame(0L, listOf(personneDroite(3.0f)), SpeechLanguage.Fr, rail = etat)
-        announcer.onFrame(250L, listOf(personneDroite(2.6f)), SpeechLanguage.Fr, rail = etat)
-        assertEquals("Gauche.", announcer.onFrame(500L, listOf(personneDroite(2.2f)), SpeechLanguage.Fr, rail = etat))
+        announcer.onFrame(0L, listOf(murDroite(3.0f)), SpeechLanguage.Fr, rail = etat)
+        announcer.onFrame(250L, listOf(murDroite(2.6f)), SpeechLanguage.Fr, rail = etat)
+        assertEquals("Gauche.", announcer.onFrame(500L, listOf(murDroite(2.2f)), SpeechLanguage.Fr, rail = etat))
         assertNotNull("décalage attendu devant le rail", announcer.lastNudge)
     }
 

@@ -145,10 +145,14 @@ class GuidanceAnnouncerTest {
     @Test
     fun `personne qui s approche a droite dit gauche`() {
         val announcer = GuidanceAnnouncer()
+        // Piste dès la 1re vue (PersonTracker donne l'id à la naissance) :
+        // l'humain inconnu parle dès 3 m (ordre user du 02/11), la redite
+        // tient ensuite le mot 2 s.
+        fun suivi(meters: Float) = PlacedLabel("personne", 0.7f, 0.5f, meters, trackId = 7)
 
-        assertEquals("Straight.", announcer.onFrame(0L, listOf(personneDroite(3.0f))))
-        assertNull(announcer.onFrame(250L, listOf(personneDroite(2.6f))))
-        assertEquals("Left.", announcer.onFrame(500L, listOf(personneDroite(2.2f))))
+        assertEquals("Left.", announcer.onFrame(0L, listOf(suivi(3.0f))))
+        assertNull(announcer.onFrame(250L, listOf(suivi(2.6f))))
+        assertNull(announcer.onFrame(500L, listOf(suivi(2.2f))))
     }
 
     @Test
@@ -165,10 +169,13 @@ class GuidanceAnnouncerTest {
     fun `couloir bouche prime sur le decalage`() {
         val announcer = GuidanceAnnouncer()
         fun bloque(m: Float) = PlacedLabel("personne", 0.5f, 0.5f, m)
+        // Humain au mouvement connu (immobile suivie) : le décalage reste
+        // muet et le couloir bouché parle en TwinLite (un humain inconnu
+        // parlerait, lui, dès 3 m — voir le test ci-dessus).
 
         assertEquals(
             "left.",
-            announcer.onFrame(0L, listOf(bloque(3.4f), personneDroite(3.0f))),
+            announcer.onFrame(0L, listOf(bloque(3.4f), personneDroite(3.0f).copy(closingMps = 0f))),
         )
         assertNull(announcer.lastNudge)
     }
