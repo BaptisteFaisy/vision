@@ -7,6 +7,7 @@ import dev.sam3vision.core.motion.MotionSample
 import dev.sam3vision.core.motion.MotionScenes
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
+import org.junit.Assert.assertNull
 import org.junit.Assert.assertTrue
 import org.junit.Test
 
@@ -139,12 +140,23 @@ class SamResiduTest {
     }
 
     @Test
-    fun `estimateur muet sur scene statique, pas d avis`() {
+    fun `estimateur muet sur scene plate, pas d avis`() {
+        val flat = GrayMask(MotionScenes.WIDTH, MotionScenes.HEIGHT, ByteArray(MotionScenes.WIDTH * MotionScenes.HEIGHT) { 90 })
+        val ego = BlockMotionSource().estimateSince(flat, flat)
+        assertNull("uni identique : muet", ego)
+        val key = mask(MotionScenes.VEHICLE_BOX)
+        assertEquals(ResiduVerdict.UNCERTAIN, decide(key, key, ego).verdict)
+    }
+
+    @Test
+    fun `scene texturee identique - zero prouve, residu nul`() {
         val scene = MotionScenes.scene()
         val ego = BlockMotionSource().estimateSince(scene, scene)
         assertEquals(MotionSample.Zero, ego)
         val key = mask(MotionScenes.VEHICLE_BOX)
-        assertEquals(ResiduVerdict.UNCERTAIN, decide(key, key, ego).verdict)
+        val decision = decide(key, key, ego)
+        assertEquals("$decision", ResiduVerdict.CAMERA_MOVED, decision.verdict)
+        assertEquals(0f, decision.egoPx, 0f)
     }
 
     @Test
