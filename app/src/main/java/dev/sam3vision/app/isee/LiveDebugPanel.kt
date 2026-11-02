@@ -10,11 +10,15 @@ import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.remember
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import dev.sam3vision.core.live.TimingsText
+import kotlinx.coroutines.flow.distinctUntilChanged
+import kotlinx.coroutines.flow.map
 
 /** Fond du panneau : sombre et translucide, lisible sur une image claire comme sur une sombre. */
 private val PanelBackground = Color(0xD010161C)
@@ -38,13 +42,14 @@ fun LiveDebugPanel(
     modifier: Modifier = Modifier,
     dense: Boolean = false,
 ) {
-    // Mixte (chrono #1 + chiffres #2) : plein état ici, chaque Text saute si identique.
-    val state by probe.state.collectAsState()
+    // Tranche chiffres : le panneau ne recompose plus sur les pixels ni sur le chrono
+    // seul (2 recomposes par frame évitées) ; la chrono suit sa tranche (voir ChronoLine).
+    val state = probe.collectRest()
     if (state.idle) return
     // En mode dense (fenêtre caméra, un peu moins d'un demi-écran), le panneau ne garde
     // que la ligne d'état et une éventuelle erreur : le détail complet masquait l'aperçu
     // et les masques, c'est-à-dire exactement ce qu'on vient regarder.
-    val all = panelDetails(state, dense)
+    val all = remember(state, dense) { panelDetails(state, dense) }
     val details = if (dense) all.filter { it.startsWith(ERROR_PREFIX) } else all
     Column(
         modifier
@@ -65,22 +70,35 @@ fun LiveDebugPanel(
             maxLines = if (dense) 2 else Int.MAX_VALUE,
         )
         // Chronologie : une seule ligne, jamais de retour à la ligne dans l'aperçu.
-        // En mode dense elle reste visible — c'est la fenêtre que l'on regarde quand on
-        // mesure la latence —, mais le détail complet de `master` y est réduit aux erreurs.
-        val chronologie = liveProbeTimingsLine(state)
-        if (chronologie.isNotBlank()) {
-            Text(
-                chronologie,
-                color = PanelTimings,
-                fontSize = if (dense) 8.sp else 11.sp,
-                maxLines = 1,
-            )
-        }
+        ChronoLine(probe, dense)
         MotionLine(state, dense)
         details.forEach { line ->
             Text(line, color = PanelDetail, fontSize = if (dense) 8.sp else 11.sp, maxLines = 1)
         }
     }
+}
+
+/**
+ * Chronologie sur sa tranche à elle : le chrono est posé par l'écriture #1 et par
+ * `noteDrawn` (après le dessin), que la tranche chiffres ne voit pas — sans ce relais,
+ * la ligne prendrait une frame de retard (la tranche pixels ne l'émet pas non plus :
+ * le chrono n'est dans aucune clé scopée, voir `ProbeSlicesTest`).
+ * En mode dense elle reste visible — c'est la fenêtre que l'on regarde quand on
+ * mesure la latence —, mais le détail complet de `master` y est réduit aux erreurs.
+ */
+@Composable
+private fun ChronoLine(probe: LiveProbe, dense: Boolean) {
+    val timingsFlow = remember { probe.state.map { it.timings }.distinctUntilChanged() }
+    val initial = remember { probe.state.value.timings }
+    val timings by timingsFlow.collectAsState(initial)
+    val chronologie = TimingsText.compact(timings)
+    if (chronologie.isBlank()) return
+    Text(
+        chronologie,
+        color = PanelTimings,
+        fontSize = if (dense) 8.sp else 11.sp,
+        maxLines = 1,
+    )
 }
 
 /**
