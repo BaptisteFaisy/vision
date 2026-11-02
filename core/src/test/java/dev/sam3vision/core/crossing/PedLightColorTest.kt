@@ -58,6 +58,29 @@ class PedLightColorTest {
     }
 
     @Test
+    fun `un cyan 200 degres est vert - plus de borne haute`() {
+        // p = (0 − 0)/255 = 0,67 : la projection accepte le cyan que la borne 195 refusait.
+        assertEquals(CrossingState.Green, PedLightColor.classify(IntArray(100) { CYAN_200 }, 10, 10))
+    }
+
+    @Test
+    fun `un vert jaunatre 72 degres reste rouge - zone morte`() {
+        // p = (255 − 204)/255 = 0,20 < 0,30 : élargir la borne basse à 55-70 ne passe pas.
+        assertEquals(CrossingState.Red, PedLightColor.classify(IntArray(100) { YELLOW_GREEN_72 }, 10, 10))
+    }
+
+    @Test
+    fun `un vert 78 degres passe juste - equivalent de la borne 80`() {
+        // p = (255 − 178)/255 = 0,302 : c'est la borne 80 reproduite sans la nommer.
+        assertEquals(CrossingState.Green, PedLightColor.classify(IntArray(100) { GREEN_78 }, 10, 10))
+    }
+
+    @Test
+    fun `un bleu pur ne vote pas - p nul sans borne`() {
+        assertEquals(CrossingState.Red, PedLightColor.classify(IntArray(100) { BLUE }, 10, 10))
+    }
+
+    @Test
     fun `un cadre gris delave attend rouge, binaire`() {
         assertEquals(CrossingState.Red, PedLightColor.classify(IntArray(100) { WASHED_GRAY }, 10, 10))
     }
@@ -110,6 +133,10 @@ class PedLightColorTest {
         private const val GRAY = 0xFF808080.toInt()
         private const val CYAN_180 = 0xFF00FFFF.toInt()
         private const val WASHED_GREEN = 0xFF99FFFF.toInt()
+        private const val CYAN_200 = 0xFF00AAFF.toInt()
+        private const val YELLOW_GREEN_72 = 0xFFCCFF00.toInt()
+        private const val GREEN_78 = 0xFFB2FF00.toInt()
+        private const val BLUE = 0xFF0000FF.toInt()
         private const val WASHED_GRAY = 0xFFF0F0F0.toInt()
     }
 }

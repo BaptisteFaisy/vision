@@ -153,12 +153,23 @@ class ThresholdParityTest(unittest.TestCase):
         self.assertEqual(lf.tree_classify(lf.extract(px, 25, 40)), "Red")
 
     def test_micro_bonhomme_bas_vert(self):
-        # 48x48, barre 2x4 en bas : fraction 0,0035, dans l'ancienne bande.
+        # 48x48, barre 3x4 en bas : fraction 0,0052, dans l'ancienne bande.
+        # 02/11 (W5) : 3 px de large au lieu de 2 — le plancher de largeur
+        # (5 % de 48 = 2,4 px) refuse desormais une barre de 2 px (test
+        # suivant, miroir du test JVM `PedLightGateTest`).
+        px = [BLACK] * (48 * 48)
+        for y in range(44, 48):
+            for x in (23, 24, 25):
+                px[y * 48 + x] = GREEN
+        self.assertEqual(lf.verdict(px, 48, 48), "Green")
+
+    def test_micro_bonhomme_2px_refuse_par_largeur(self):
+        # Meme forme, 2 px de large : 2 < 2,4 -> refusee par la largeur.
         px = [BLACK] * (48 * 48)
         for y in range(44, 48):
             for x in (23, 24):
                 px[y * 48 + x] = GREEN
-        self.assertEqual(lf.verdict(px, 48, 48), "Green")
+        self.assertEqual(lf.verdict(px, 48, 48), "Red")
 
 
 class LoadPpmTest(unittest.TestCase):
