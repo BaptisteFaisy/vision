@@ -27,7 +27,7 @@ class LiveAskVoiceTest {
         advanceUntilIdle()
         assertEquals(listOf(HomeModes.DEFAULT.prompts), fakes.restarts)
         assertEquals(
-            listOf("Mode maison activé. Je cherche les objets de l'appartement."),
+            listOf("Mode maison."),
             fakes.spoken,
         )
         assertEquals(0, fakes.llm.calls)
@@ -38,7 +38,7 @@ class LiveAskVoiceTest {
         val fakes = pictoFakes()
         fakes.session.ask("maison")
         advanceUntilIdle()
-        assertEquals(listOf("Déjà en mode maison."), fakes.spoken)
+        assertEquals(listOf("Déjà actif."), fakes.spoken)
         assertTrue(fakes.restarts.isEmpty())
         assertEquals(0, fakes.llm.calls)
     }
@@ -79,7 +79,7 @@ class LiveAskVoiceTest {
         assertEquals(1, fakes.client.calls)
         assertEquals(listOf("medics"), fakes.store.list().map { it.label })
         assertEquals(
-            listOf("Je crée le pictogramme.", "Pictogramme medics prêt. Dis son nom pour être guidé."),
+            listOf("Création picto.", "medics prêt."),
             fakes.spoken,
         )
     }

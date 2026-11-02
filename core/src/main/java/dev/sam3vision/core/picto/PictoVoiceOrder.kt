@@ -202,32 +202,32 @@ object PictoVoiceText {
 
     /** La génération part (~10 s) : le dire, puis se taire jusqu'au résultat. */
     fun started(language: SpeechLanguage = SpeechLanguage.DEFAULT): String = when (language) {
-        SpeechLanguage.Fr -> "Je crée le pictogramme."
-        SpeechLanguage.En -> "Creating the pictogram."
+        SpeechLanguage.Fr -> "Création picto."
+        SpeechLanguage.En -> "Creating picto."
     }
 
     /** Le repère est armé : le nommer et dire comment être guidé. */
     fun created(label: String, language: SpeechLanguage = SpeechLanguage.DEFAULT): String = when (language) {
-        SpeechLanguage.Fr -> "Pictogramme $label prêt. Dis son nom pour être guidé."
-        SpeechLanguage.En -> "Pictogram $label ready. Say its name for guidance."
+        SpeechLanguage.Fr -> "$label prêt."
+        SpeechLanguage.En -> "$label ready."
     }
 
     /** Le repère sans nom (« de ça ») est armé : overlay seul, jamais guidé. */
     fun createdUnnamed(language: SpeechLanguage = SpeechLanguage.DEFAULT): String = when (language) {
-        SpeechLanguage.Fr -> "Pictogramme prêt."
-        SpeechLanguage.En -> "Pictogram ready."
+        SpeechLanguage.Fr -> "Picto prêt."
+        SpeechLanguage.En -> "Picto ready."
     }
 
     /** Échec (photo, clé, réseau : le détail reste à l'écran, jamais dit). */
     fun failed(language: SpeechLanguage = SpeechLanguage.DEFAULT): String = when (language) {
-        SpeechLanguage.Fr -> "Création du pictogramme impossible."
-        SpeechLanguage.En -> "Pictogram creation failed."
+        SpeechLanguage.Fr -> "Picto raté."
+        SpeechLanguage.En -> "Picto failed."
     }
 
     /** Une génération est déjà en vol : la seconde est jetée, et dite. */
     fun busy(language: SpeechLanguage = SpeechLanguage.DEFAULT): String = when (language) {
-        SpeechLanguage.Fr -> "Création déjà en cours."
-        SpeechLanguage.En -> "Creation already running."
+        SpeechLanguage.Fr -> "En cours."
+        SpeechLanguage.En -> "Still running."
     }
 
     /** La démo change d'état : le dire, c'est le seul témoin du basculement. */
@@ -238,7 +238,7 @@ object PictoVoiceText {
 
     /** L'ordre « Find the X » part : SAM suit X, son pictogramme se crée. */
     fun findStarted(label: String, language: SpeechLanguage = SpeechLanguage.Fr): String = when (language) {
-        SpeechLanguage.Fr -> "Je cherche $label."
-        SpeechLanguage.En -> "Looking for $label."
+        SpeechLanguage.Fr -> "Cherche $label."
+        SpeechLanguage.En -> "Finding $label."
     }
 }

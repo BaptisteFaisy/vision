@@ -12,7 +12,7 @@ class CrossingApproachTest {
         val watcher = CrossingApproachWatcher()
         assertNull(watcher.onFrame(0.10f, 2.0f, SpeechLanguage.Fr))
         assertEquals(
-            "Passage piéton à gauche, à 2 mètres.",
+            "Gauche, 2 mètres.",
             watcher.onFrame(0.10f, 2.0f, SpeechLanguage.Fr),
         )
     }
@@ -22,7 +22,7 @@ class CrossingApproachTest {
         val watcher = CrossingApproachWatcher()
         watcher.onFrame(0.50f, 1.0f, SpeechLanguage.En)
         assertEquals(
-            "Crosswalk ahead, 1 meter away.",
+            "Ahead, 1 meter.",
             watcher.onFrame(0.50f, 1.0f, SpeechLanguage.En),
         )
     }
@@ -32,7 +32,7 @@ class CrossingApproachTest {
         val watcher = CrossingApproachWatcher()
         watcher.onFrame(0.90f, null, SpeechLanguage.Fr)
         assertEquals(
-            "Passage piéton à droite.",
+            "Droite.",
             watcher.onFrame(0.90f, Float.NaN, SpeechLanguage.Fr),
         )
     }
@@ -56,7 +56,7 @@ class CrossingApproachTest {
         val watcher = CrossingApproachWatcher()
         assertNull(watcher.onFrame(0.10f, 6.0f, SpeechLanguage.Fr))
         assertEquals(
-            "Passage piéton à gauche, à 6 mètres.",
+            "Gauche, 6 mètres.",
             watcher.onFrame(0.10f, 6.0f, SpeechLanguage.Fr),
         )
     }
@@ -68,7 +68,7 @@ class CrossingApproachTest {
         assertNull(watcher.onFrame(0.10f, 12.0f, SpeechLanguage.Fr))
         assertNull(watcher.onFrame(0.50f, 5.0f, SpeechLanguage.Fr))
         assertEquals(
-            "Passage piéton devant, à 5 mètres.",
+            "Devant, 5 mètres.",
             watcher.onFrame(0.50f, 5.0f, SpeechLanguage.Fr),
         )
     }
@@ -82,7 +82,7 @@ class CrossingApproachTest {
         assertNull(watcher.onFrame(null, null, SpeechLanguage.Fr))
         assertNull(watcher.onFrame(0.10f, 2.0f, SpeechLanguage.Fr))
         assertEquals(
-            "Passage piéton à gauche, à 2 mètres.",
+            "Gauche, 2 mètres.",
             watcher.onFrame(0.10f, 2.0f, SpeechLanguage.Fr),
         )
     }

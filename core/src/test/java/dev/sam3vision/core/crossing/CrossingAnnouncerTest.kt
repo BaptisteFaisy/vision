@@ -43,11 +43,11 @@ class CrossingAnnouncerTest {
         assertNull(announcer.onFrame(3200L, CrossingState.Red))
         announcer.onFrame(3400L, CrossingState.Green)
         val cue = announcer.onFrame(3600L, CrossingState.Red)
-        assertEquals("Flashing green, do not cross.", cue?.phrase)
+        assertEquals("Don't go.", cue?.phrase)
         assertTrue("vert annoncé avant : urgent", cue?.urgent ?: false)
         assertEquals(CrossingState.Red, cue?.state)
         assertNull("veto : pas de traversez tant que ca clignote", announcer.onFrame(3800L, CrossingState.Green))
-        assertEquals("Flashing green, do not cross.", announcer.lastCue?.phrase)
+        assertEquals("Don't go.", announcer.lastCue?.phrase)
     }
 
     @Test
@@ -58,7 +58,7 @@ class CrossingAnnouncerTest {
         assertNull(announcer.onFrame(600L, CrossingState.Red))
         announcer.onFrame(800L, CrossingState.Green)
         val cue = announcer.onFrame(1_000L, CrossingState.Red)
-        assertEquals("Flashing green, do not cross.", cue?.phrase)
+        assertEquals("Don't go.", cue?.phrase)
         assertTrue(cue?.urgent ?: false)
     }
 

@@ -200,15 +200,15 @@ class CrossingGuidanceTest {
     @Test
     fun `phrases approche FR courtes avec distance`() {
         assertEquals(
-            "Passage piéton à gauche, à 2 mètres.",
+            "Gauche, 2 mètres.",
             CrossingText.approach(SteeringCap.Left, 2.0f, SpeechLanguage.Fr),
         )
         assertEquals(
-            "Passage piéton à droite, à 1 mètre.",
+            "Droite, 1 mètre.",
             CrossingText.approach(SteeringCap.Right, 1.0f, SpeechLanguage.Fr),
         )
         assertEquals(
-            "Passage piéton devant, à 3 mètres.",
+            "Devant, 3 mètres.",
             CrossingText.approach(SteeringCap.Straight, 3.0f, SpeechLanguage.Fr),
         )
     }
@@ -216,11 +216,11 @@ class CrossingGuidanceTest {
     @Test
     fun `phrases approche EN courtes avec distance`() {
         assertEquals(
-            "Crosswalk to the left, 2 meters away.",
+            "Left, 2 meters.",
             CrossingText.approach(SteeringCap.Left, 2.0f, SpeechLanguage.En),
         )
         assertEquals(
-            "Crosswalk ahead, 1 meter away.",
+            "Ahead, 1 meter.",
             CrossingText.approach(SteeringCap.Straight, 1.0f, SpeechLanguage.En),
         )
     }
@@ -228,11 +228,11 @@ class CrossingGuidanceTest {
     @Test
     fun `approche sans distance dit direction seule, jamais chiffree`() {
         assertEquals(
-            "Passage piéton à gauche.",
+            "Gauche.",
             CrossingText.approach(SteeringCap.Left, null, SpeechLanguage.Fr),
         )
         assertEquals(
-            "Crosswalk ahead.",
+            "Ahead.",
             CrossingText.approach(SteeringCap.Straight, Float.NaN, SpeechLanguage.En),
         )
         assertFalse(CrossingText.approach(SteeringCap.Right, null).contains("mètre"))
@@ -241,15 +241,15 @@ class CrossingGuidanceTest {
     @Test
     fun `approche cadran optionnel withHour`() {
         assertEquals(
-            "Passage piéton à gauche, à 2 mètres, à 10 heures.",
+            "Gauche, 2 mètres, à 10 heures.",
             CrossingText.approach(SteeringCap.Left, 2.0f, SpeechLanguage.Fr, 0.20f, withHour = true),
         )
         assertEquals(
-            "Passage piéton à gauche, à 2 mètres.",
+            "Gauche, 2 mètres.",
             CrossingText.approach(SteeringCap.Left, 2.0f, SpeechLanguage.Fr, 0.20f, withHour = false),
         )
         assertEquals(
-            "Passage piéton à gauche, à 2 mètres.",
+            "Gauche, 2 mètres.",
             CrossingText.approach(SteeringCap.Left, 2.0f, SpeechLanguage.Fr, null, withHour = true),
         )
     }
@@ -257,7 +257,7 @@ class CrossingGuidanceTest {
     @Test
     fun `anglais defaut de l approche`() {
         assertEquals(
-            "Crosswalk ahead, 2 meters away.",
+            "Ahead, 2 meters.",
             CrossingText.approach(SteeringCap.Straight, 2.0f),
         )
     }

@@ -25,15 +25,15 @@ class CrossingManeuverTest {
     fun `rue en passage ne declenche pas`() {
         assertFalse(
             CrossingManeuver.matches(
-                "Tournez à droite dans Passage du Souvenir.",
-                "Tournez à droite dans Passage du Souvenir.",
+                "À droite dans Passage du Souvenir.",
+                "À droite dans Passage du Souvenir.",
             ),
         )
     }
 
     @Test
     fun `consignes ordinaires ignorees`() {
-        assertFalse(CrossingManeuver.matches("Tournez à droite dans l'allée.", ""))
+        assertFalse(CrossingManeuver.matches("À droite dans l'allée.", ""))
         assertFalse(CrossingManeuver.matches("Marchez vers l'est.", "Marchez vers l'est."))
         assertFalse(CrossingManeuver.matches("", ""))
     }

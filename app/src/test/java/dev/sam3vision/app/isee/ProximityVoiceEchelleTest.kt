@@ -58,10 +58,10 @@ class ProximityVoiceEchelleTest {
         val voice = rig.voice()
 
         assertTrue(voice.speak("Turn left in 20 meters.", level = OutdoorLevel.GPS_EVENT))
-        assertTrue(voice.speak("Continue straight ahead.", level = OutdoorLevel.GPS_REMINDER))
+        assertTrue(voice.speak("Straight on.", level = OutdoorLevel.GPS_REMINDER))
 
-        assertEquals(listOf("Turn left in 20 meters.", "Continue straight ahead."), rig.attempts)
-        assertEquals(listOf("Turn left in 20 meters.", "Continue straight ahead."), rig.said())
+        assertEquals(listOf("Turn left in 20 meters.", "Straight on."), rig.attempts)
+        assertEquals(listOf("Turn left in 20 meters.", "Straight on."), rig.said())
     }
 
     @Test

@@ -27,7 +27,7 @@ class VehicleStateTextTest {
         assertFalse(VehicleStateText.isSafetyPhrase("Car stopped, 2 meters away."))
         assertFalse(VehicleStateText.isSafetyPhrase("Stop."))
         assertFalse(VehicleStateText.isSafetyPhrase("obstacle, stop."))
-        assertFalse(VehicleStateText.isSafetyPhrase("Rouge, attendez."))
+        assertFalse(VehicleStateText.isSafetyPhrase("Rouge."))
     }
 
     /**

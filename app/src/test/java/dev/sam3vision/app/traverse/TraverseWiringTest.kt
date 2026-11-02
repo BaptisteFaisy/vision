@@ -29,7 +29,7 @@ import org.junit.Test
  * L'activation touche Android (TTS, cache) : couverte sur appareil seul.
  *
  * Avec voix attachée (fakes) : le vert maintenu sans véhicule fait parler
- * « Vert, traversez. », et sans vert ce mot d'ordre ne sort jamais.
+ * « Vert. », et sans vert ce mot d'ordre ne sort jamais.
  */
 class TraverseWiringTest {
 
@@ -193,7 +193,7 @@ class TraverseWiringTest {
         wiring.updateLight(CrossingState.Green)
         repeat(5) { wiring.at(emptyList(), it + 1) }
 
-        assertEquals(listOf("Vert, traversez.", "Vert, traversez.", "Vert, traversez."), tts.asked)
+        assertEquals(listOf("Vert.", "Vert.", "Vert."), tts.asked)
     }
 
     @Test
@@ -202,7 +202,7 @@ class TraverseWiringTest {
         val wiring = voicedWiring(tts)
         repeat(5) { wiring.at(emptyList(), it + 1) }
 
-        assertFalse(tts.asked.contains("Vert, traversez."))
+        assertFalse(tts.asked.contains("Vert."))
     }
 
     @Test

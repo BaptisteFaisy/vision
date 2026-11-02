@@ -14,6 +14,23 @@ import kotlinx.coroutines.withContext
 /** Fin d'une lecture en file : jouée jusqu'au bout, ou coupée par [SpeechPlayer.stop]. */
 enum class PlaybackEnd { Done, Stopped }
 
+/** Tranche voix : chaque parole tient dans 350 ms (ordre user du 01/11 — un tick, une phrase). */
+internal const val VOICE_SLICE_MS = 350L
+
+/** Plafond d'accélération d'une tranche (pitch conservé ; au-delà, refus plateforme possible). */
+internal const val MAX_SLICE_RATE = 3f
+
+/**
+ * Vitesse pour tenir [durationMs] dans [sliceMs] : jamais sous [baseSpeed]
+ * (réglage user), jamais au-dessus de [MAX_SLICE_RATE] (au-delà, inintelligible
+ * et refus possible du lecteur — le reliquat dépasse alors la tranche).
+ * Durée inconnue (≤ 0) : vitesse de base. Pur, testé en JVM.
+ */
+internal fun sliceRateFor(durationMs: Long, sliceMs: Long = VOICE_SLICE_MS, baseSpeed: Float = Settings.DEFAULT_TTS_SPEED): Float {
+    if (durationMs <= 0L || sliceMs <= 0L) return baseSpeed
+    return maxOf(baseSpeed, minOf(durationMs.toFloat() / sliceMs, MAX_SLICE_RATE))
+}
+
 /**
  * Lit l'audio MP3 renvoyé par ElevenLabs : fichier temporaire dans le cache privé de
  * l'app, puis `MediaPlayer`. Aucune dépendance ajoutée (pas d'ExoPlayer) et aucun
@@ -89,6 +106,26 @@ class SpeechPlayer(
      * erreur. Les rappels du constructeur ne sont pas appelés : l'appelant tient son
      * état lui-même, tranche par tranche.
      */
+    /**
+     * Joue un fichier en tranche ([sliceMs], 350 ms voix) : la vitesse monte
+     * pour tenir la durée réelle dans la tranche ([sliceRateFor], pitch conservé,
+     * plafond [MAX_SLICE_RATE]). Verdicts et chat : hors tranche (entiers).
+     */
+    suspend fun playSliceFile(file: File, sliceMs: Long = VOICE_SLICE_MS): Result<Unit> = withContext(Dispatchers.IO) {
+        runCatching {
+            stop()
+            playBlocking(file, onComplete, onPlaybackError, sliceMs)
+        }
+    }
+
+    /** Joue [bytes] en tranche ([sliceMs]) : synthèse GPS et confirmations, jamais le chat. */
+    suspend fun playSlice(bytes: ByteArray, sliceMs: Long = VOICE_SLICE_MS): Result<Unit> = withContext(Dispatchers.IO) {
+        runCatching {
+            stop()
+            playBlocking(writeCache(bytes), onComplete, onPlaybackError, sliceMs)
+        }
+    }
+
     suspend fun playQueued(bytes: ByteArray): Result<PlaybackEnd> {
         val gate = CompletableDeferred<Result<PlaybackEnd>>()
         withContext(Dispatchers.IO) {
@@ -114,7 +151,7 @@ class SpeechPlayer(
      * précédente. Les rappels sont ceux du constructeur, sauf en file où l'appelant
      * attend la fin tranche par tranche.
      */
-    private fun playBlocking(file: File, onDone: () -> Unit, onError: (String) -> Unit) {
+    private fun playBlocking(file: File, onDone: () -> Unit, onError: (String) -> Unit, sliceMs: Long? = null) {
         val mp = MediaPlayer()
         player = mp
         mp.setAudioAttributes(audioAttributes())
@@ -132,7 +169,10 @@ class SpeechPlayer(
         mp.prepare()
         // Vitesse locale (PlaybackParams, API 23+ ; minSdk 29) : le MP3 ElevenLabs
         // est synthétisé à vitesse naturelle, la lecture l'accélère — pitch conservé.
-        runCatching { mp.playbackParams = mp.playbackParams.setSpeed(speed) }
+        // Tranche : la vitesse monte (pitch conservé) pour tenir la durée réelle
+        // dans la tranche — un refus plateforme rejoue à la vitesse du réglage.
+        val rate = if (sliceMs == null) speed else runCatching { sliceRateFor(mp.duration.toLong(), sliceMs, speed) }.getOrDefault(speed)
+        runCatching { mp.playbackParams = mp.playbackParams.setSpeed(rate) }
         mp.start()
     }
 

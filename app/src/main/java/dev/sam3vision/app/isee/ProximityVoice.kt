@@ -18,7 +18,7 @@ import kotlin.coroutines.coroutineContext
  * [speak] dit une phrase (clip enregistré d'abord — [clips], zéro réseau —,
  * synthèse ElevenLabs sinon) ; [speakWord] dit un mot du guidage en clip
  * local (< 100 ms) ou en synthèse mise en cache. Chaque lecture coupe le
- * lecteur partagé ([SpeechPlayer] : `play` arrête la précédente — chat,
+ * lecteur partagé ([SpeechPlayer], tranche 350 ms `playSlice` — chat,
  * route, annonce), jamais le TTS système (une alerte de sécurité ne se
  * chevauche pas : [systemBusy] tait la phrase).
  *
@@ -102,7 +102,7 @@ class ProximityVoice(
         }
         if (file != null) {
             markSpoken(text)
-            player.playFile(file).onFailure { onSpeaking("") }
+            player.playSliceFile(file).onFailure { onSpeaking("") }
             return true
         }
         // v4 : seuls les niveaux GPS synthétisent ; sans clip, les autres se taisent.
@@ -113,7 +113,7 @@ class ProximityVoice(
         if (bytes.isEmpty() || (!privileged && !canPlay()) || systemBusy()) return false
         id?.let { clips?.put(it, current.speechLanguage, current.ttsVoiceId, bytes) }
         markSpoken(text)
-        player.play(bytes).onFailure { onSpeaking("") }
+        player.playSlice(bytes).onFailure { onSpeaking("") }
         return true
     }
 
@@ -143,7 +143,7 @@ class ProximityVoice(
         val file = clips?.clipFor(clipId, language, current.ttsVoiceId)?.takeIf { it.isFile }
         if (file != null) {
             markSpoken(text)
-            player.playFile(file).onFailure { onSpeaking("") }
+            player.playSliceFile(file).onFailure { onSpeaking("") }
             return true
         }
         // v4 : seuls les niveaux GPS synthétisent ; sans clip, les autres se taisent.
@@ -154,7 +154,7 @@ class ProximityVoice(
         if (bytes.isEmpty() || (!privileged && !canPlay()) || systemBusy()) return false
         clips?.put(clipId, language, current.ttsVoiceId, bytes)
         markSpoken(text)
-        player.play(bytes).onFailure { onSpeaking("") }
+        player.playSlice(bytes).onFailure { onSpeaking("") }
         return true
     }
 

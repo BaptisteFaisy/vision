@@ -59,7 +59,7 @@ sealed interface VoiceNavEvent {
 
     /**
      * Phrase littérale du moteur ([VoiceNavPhrases.ahead] : demi-tour,
-     * giratoire, « Destination dans X ») : les caps [SteeringCap] ne savent
+     * giratoire, arrivée) : les caps [SteeringCap] ne savent
      * dire que gauche/droit/droite, un demi-tour n'y a pas de verbe juste —
      * mieux vaut la phrase exacte du moteur qu'un cap approximatif.
      */
@@ -69,14 +69,14 @@ sealed interface VoiceNavEvent {
 /**
  * Phrases du guidage vocal, dans la langue de la voix ([SpeechLanguage]).
  *
- * Français (contrat, miroirs `nav_voice_*` dans `strings.xml`) :
- * « Continuez dans cette direction[, rue X]. » de loin,
- * « Tournez à gauche[, rue X]. » de près (jamais de distance de virage —
- * [VoiceNavPolicy.TURN_NOW_M]), « Continuez tout droit. »,
- * « Vous êtes arrivé à X. »,
- * « Vous vous êtes écarté de l'itinéraire. Recalcul en cours. »,
- * « Nouvel itinéraire calculé. », « Guidage arrêté. »,
- * « De retour sur l'itinéraire. » (+ phrases littérales du moteur).
+ * Français (contrat minimal 350 ms, miroirs `nav_voice_*` dans `strings.xml`) :
+ * « Tout droit[, rue X]. » de loin (rues et distances : résiduels, non bornés),
+ * « À gauche[, rue X]. » de près (jamais de distance de virage —
+ * [VoiceNavPolicy.TURN_NOW_M]), « Tout droit. », « Arrivé[ à X]. », « Hors route. »,
+ * « Nouvelle route. », « Guidage coupé. », « De retour. » (+ littérales moteur).
+ * Rues, destinations et littérales moteur : résiduels (non bornés, tranche ×3).
+ * Distances des manœuvres abandonnées (la tranche prime sur la durée).
+ * Anglais : mêmes formes minimales (« Straight on. », « Off route. », …).
  *
  * Distances prononcées via [DistanceText.spoken] (singuliers et décimales
  * déjà réglés), arrondies vers le bas ([roundNavMeters]) et en kilomètres
@@ -102,8 +102,8 @@ object VoiceNavPhrases {
     /** Départ : la branche FR garde le texte historique, l'anglais suit le contrat. */
     private fun started(destination: String, language: SpeechLanguage): String =
         when (language) {
-            SpeechLanguage.Fr -> "Navigation vers ${destination.trim()}"
-            SpeechLanguage.En -> "Navigating to ${destination.trim()}"
+            SpeechLanguage.Fr -> "Vers ${destination.trim()}."
+            SpeechLanguage.En -> "Going to ${destination.trim()}"
         }
 
     /**
@@ -117,56 +117,56 @@ object VoiceNavPhrases {
         val tail = if (street.isEmpty()) "." else ", $street."
         if (!VoiceNavPolicy.isTurnNow(event.meters)) return turnAhead(tail, language)
         return when (language) {
-            SpeechLanguage.Fr -> "Tournez à $side$tail"
+            SpeechLanguage.Fr -> "À $side$tail"
             SpeechLanguage.En -> "Turn $side$tail"
         }
     }
 
     /** Préavis lointain d'un virage franc : la direction, jamais la distance. */
     private fun turnAhead(tail: String, language: SpeechLanguage): String = when (language) {
-        SpeechLanguage.Fr -> "Continuez dans cette direction$tail"
-        SpeechLanguage.En -> "Continue in this direction$tail"
+        SpeechLanguage.Fr -> "Tout droit$tail"
+        SpeechLanguage.En -> "Straight on$tail"
     }
 
-    /** « Continuez tout droit[ pendant 200 mètres]. » */
+    /** « Tout droit. » (distance abandonnée : tranche 350 ms). */
     private fun continueStraight(meters: Float?, language: SpeechLanguage): String {
         val distance = navDistance(meters, language)
         return when (language) {
-            SpeechLanguage.Fr -> if (distance == null) "Continuez tout droit." else "Continuez tout droit pendant $distance."
-            SpeechLanguage.En -> if (distance == null) "Continue straight ahead." else "Continue straight ahead for $distance."
+            SpeechLanguage.Fr -> "Tout droit."
+            SpeechLanguage.En -> "Straight on."
         }
     }
 
-    /** « Vous êtes arrivé à X. » (destination vide = « Vous êtes arrivé. »). */
+    /** « Arrivé à X. » (vide = « Arrivé. »). */
     private fun arrival(destination: String, language: SpeechLanguage): String {
         val clean = destination.trim()
         return when (language) {
-            SpeechLanguage.Fr -> if (clean.isEmpty()) "Vous êtes arrivé." else "Vous êtes arrivé à $clean."
-            SpeechLanguage.En -> if (clean.isEmpty()) "You have arrived." else "You have arrived at $clean."
+            SpeechLanguage.Fr -> if (clean.isEmpty()) "Arrivé." else "Arrivé à $clean."
+            SpeechLanguage.En -> if (clean.isEmpty()) "Arrived." else "Arrived at $clean."
         }
     }
 
-    /** Hors-trace : la sortie se dit avec le recalcul, jamais seule. */
+    /** Hors-trace, sec : « Hors route. » / « Off route. ». */
     private fun offRoute(language: SpeechLanguage): String = when (language) {
-        SpeechLanguage.Fr -> "Vous vous êtes écarté de l'itinéraire. Recalcul en cours."
-        SpeechLanguage.En -> "You are off route. Recalculating."
+        SpeechLanguage.Fr -> "Hors route."
+        SpeechLanguage.En -> "Off route."
     }
 
-    /** Nouvel itinéraire calculé après recalcul. */
+    /** Recalcul : « Nouvelle route. » / « New route. ». */
     private fun rerouted(language: SpeechLanguage): String = when (language) {
-        SpeechLanguage.Fr -> "Nouvel itinéraire calculé."
-        SpeechLanguage.En -> "New route calculated."
+        SpeechLanguage.Fr -> "Nouvelle route."
+        SpeechLanguage.En -> "New route."
     }
 
     /** Fin de guidage sur ordre de l'utilisateur. */
     private fun stopped(language: SpeechLanguage): String = when (language) {
-        SpeechLanguage.Fr -> "Guidage arrêté."
-        SpeechLanguage.En -> "Guidance stopped."
+        SpeechLanguage.Fr -> "Guidage coupé."
+        SpeechLanguage.En -> "Stopped."
     }
 
     /** Retour sur le tracé (point final : style des phrases parlées). */
     private fun backOnRoute(language: SpeechLanguage): String = when (language) {
-        SpeechLanguage.Fr -> "De retour sur l'itinéraire."
+        SpeechLanguage.Fr -> "De retour."
         SpeechLanguage.En -> "Back on route."
     }
 
@@ -197,22 +197,22 @@ object VoiceNavPhrases {
     /** Côté de virage, sans le cap droit (traité comme ligne droite). */
     private enum class Side { Left, Right }
 
-    // ── Événements moteur (NavEvent) : textes du contrat moteur ──
-    // « You have left the route. Recalculating. »,
-    // « Back on route. », « You have arrived at X »,
-    // « Continue in this direction, rue de la Paix » (far) then
-    // « Turn right, rue de la Paix » (near, no distance).
+    // ── Événements moteur (NavEvent) : formes minimales 350 ms ──
+    // « Off route. », « Back on route. », « Arrived[ at X] »,
+    // « Straight on[, rue] » (far) then « Turn right[, rue] » (near).
+    // Rues et distances : résiduelles (non bornées, tranche ×3).
+    // Distances des manœuvres abandonnées (la tranche prime).
     // Miroirs `nav_voice_left_route`, `nav_voice_back_on_route`,
     // `nav_voice_arrived[_plain]`, `nav_voice_maneuver` dans `strings.xml`.
 
     /** Écart : l'appelant recalcule pendant que la voix prévient. */
-    const val OFF_ROUTE = "You have left the route. Recalculating."
+    const val OFF_ROUTE = "Off route."
 
     /** Retour sur le tracé sans recalcul. */
     const val BACK_ON_ROUTE = "Back on route."
 
     /** Arrivé, sans destination nommée. */
-    const val ARRIVED_PLAIN = "You have arrived at your destination"
+    const val ARRIVED_PLAIN = "Arrived"
 
     /**
      * Phrase d'un événement moteur [event] : annonce de manœuvre, traversée,
@@ -237,20 +237,18 @@ object VoiceNavPhrases {
      * que [toSteeringCap][dev.sam3vision.app.voicenav.toSteeringCap]) se
      * disent en deux temps — préavis directionnel de loin, ordre sec sans
      * distance de près ([VoiceNavPolicy.TURN_NOW_M]) ; le reste
-     * (« [verb] in [distance] ») et l'arrivée à venir
-     * (« Destination in X ») sont inchangés. Rue inconnue : la phrase
-     * omet la rue au lieu d'inventer.
+     * (« Roundabout. », « Arrive. ») : verbe seul, sans distance —
+     * tranche 350 ms. Rue inconnue : omise, jamais inventée.
+     * (rues : résiduelles, non bornées).
      */
     fun ahead(action: ManeuverAction, street: String?, distM: Double): String {
         val where = street?.trim()?.takeIf { it.isNotEmpty() }?.let { ", $it" } ?: ""
         if (isFrankTurn(action) && !VoiceNavPolicy.isTurnNow(distM)) {
-            return "Continue in this direction$where"
+            return "Straight on$where"
         }
         val verb = verb(action)
         if (isFrankTurn(action)) return "$verb$where"
-        val distance = DistanceText.spoken(distM.toFloat(), SpeechLanguage.En)
-        if (action == ManeuverAction.Arrive) return "Destination in $distance"
-        return "$verb in $distance$where"
+        return "$verb."
     }
 
     /** Virages francs : les actions routées au cap parlé (tourner, serrer). */
@@ -262,20 +260,19 @@ object VoiceNavPhrases {
         ManeuverAction.Arrive -> false
     }
 
-    /** « You have arrived at X » (ou [ARRIVED_PLAIN] sans nom). */
+    /** « Arrived at X » (ou [ARRIVED_PLAIN] sans nom). */
     fun arrived(destinationName: String?): String {
         val name = destinationName?.trim()?.takeIf { it.isNotEmpty() } ?: return ARRIVED_PLAIN
-        return "You have arrived at $name"
+        return "Arrived at $name"
     }
 
     /**
-     * « Crosswalk in X » : préavis de traversée (miroir
-     * `nav_voice_crossing` dans `strings.xml`). Sans rue : Valhalla ne
-     * donne pas de nom aux traversées.
+     * « Crosswalk. » : préavis de traversée (miroir `nav_voice_crossing`,
+     * distance abandonnée : tranche 350 ms).
+     * Valhalla ne nomme pas les traversées.
      */
     fun crossingAhead(distM: Double): String {
-        val distance = DistanceText.spoken(distM.toFloat(), SpeechLanguage.En)
-        return "Crosswalk in $distance"
+        return "Crosswalk."
     }
 
     /** Traversée passée, dans la langue de la voix. */
@@ -285,50 +282,50 @@ object VoiceNavPhrases {
     }
 
     /** Traversée passée : le guidage reprend (miroir `nav_voice_crossing_done`). */
-    const val CROSSING_DONE = "Crossing finished."
+    const val CROSSING_DONE = "Crossed."
 
     /** Rappel 5 s : demi-tour (consigne relative, jamais de rue ni de distance). */
     const val TURN_AROUND = "Turn around."
 
     /** Rappel 5 s : traverser (immobile près d'un passage, jamais de rue). */
-    const val CROSS_NOW = "Cross the street."
+    const val CROSS_NOW = "Cross now."
 
     /** Rappel 5 s : giratoire (repli sans cap, même verbe que [verb]). */
-    const val ROUNDABOUT_FOLLOW = "At the roundabout, follow the road."
+    const val ROUNDABOUT_FOLLOW = "Roundabout."
 
     /** Traversée passée, voix française de compatibilité (clip pack `nav_crossing_done`). */
-    const val CROSSING_DONE_FR = "Traversée terminée."
+    const val CROSSING_DONE_FR = "Traversé."
 
-    // ── Confirmation (session) : complètent NavigationPhrases ──
-    // Question vocale (toujours en anglais, exigence produit), « Here is the
-    // page for X », « Guidance stopped », « Arrived at destination ». Miroirs
+    // ── Confirmation (session) : formes minimales, anglais exigé produit ──
+    // « Go to X? », « Page: X. », « Stopped », « Arrived ». Miroirs
+    // (destinations : résiduelles, non bornées).
     // `nav_confirm_question[_no_time]`, `nav_confirm_cancelled`,
     // `nav_confirm_loading`, `nav_place_opened`, `nav_stop_done`,
     // `nav_arrived` dans `strings.xml`.
 
     /**
-     * Question de confirmation, toujours en anglais : « Do you really want
-     * to go to X? Travel time: Y. Answer yes or no. » — [destination] brute,
-     * espaces rognés. [durationEn] `null` (résumé indisponible, repli Maps) :
-     * la question omet le temps au lieu d'inventer.
+     * Question de confirmation, toujours en anglais : « Go to X?[ Y.] Yes? »
+     * — [destination] brute, espaces rognés. [durationEn] `null` (résumé
+     * indisponible, repli Maps) : temps omis au lieu d'inventer.
+     * (destination : résiduelle, non bornée).
      */
     fun confirmQuestion(destination: String, durationEn: String?): String {
         val clean = destination.trim()
-        val time = durationEn?.trim()?.takeIf { it.isNotEmpty() }?.let { " Travel time: $it." } ?: ""
-        return "Do you really want to go to $clean?$time Answer yes or no."
+        val time = durationEn?.trim()?.takeIf { it.isNotEmpty() }?.let { " $it." } ?: ""
+        return "Go to $clean?$time Yes?"
     }
 
     /** Confirmation refusée (« no ») : accusé bref, en anglais. */
     const val CONFIRM_CANCELLED = "Cancelled."
 
     /** « yes » pendant le chargement du résumé : patienter, en anglais. */
-    const val CONFIRM_LOADING = "Your route is still loading, one moment."
+    const val CONFIRM_LOADING = "Loading route."
 
     /** « Here is the page for X » — guidage éteint, fiche lieu ouverte. */
-    fun placeOpened(destination: String): String = "Here is the page for ${destination.trim()}"
+    fun placeOpened(destination: String): String = "Page: ${destination.trim()}."
 
     /** Ordre stop consommé, session fermée. */
-    const val STOP_DONE = "Guidance stopped"
+    const val STOP_DONE = "Stopped"
 
     /** GPS désactivé sur ordre de l'utilisateur (« turn off the GPS »). */
     const val GPS_DISABLED = "GPS disabled"
@@ -337,19 +334,19 @@ object VoiceNavPhrases {
     const val GPS_ENABLED = "GPS enabled"
 
     /** Arrivée signalée par le moteur d'itinéraire (jamais devinée). */
-    const val ARRIVED = "Arrived at destination"
+    const val ARRIVED = "Arrived"
 
     /** Verbe d'annonce d'une action (le départ ne s'annonce jamais). */
     private fun verb(action: ManeuverAction): String = when (action) {
         ManeuverAction.Start -> "Go"
-        ManeuverAction.Continue -> "Continue straight ahead"
+        ManeuverAction.Continue -> "Straight on"
         ManeuverAction.SlightLeft -> "Bear left"
         ManeuverAction.TurnLeft -> "Turn left"
         ManeuverAction.SlightRight -> "Bear right"
         ManeuverAction.TurnRight -> "Turn right"
         ManeuverAction.UTurn -> "Make a U-turn"
-        ManeuverAction.Roundabout -> "At the roundabout, follow the road"
-        ManeuverAction.Arrive -> "You are arriving"
+        ManeuverAction.Roundabout -> "Roundabout"
+        ManeuverAction.Arrive -> "Arrive"
     }
 }
 
@@ -368,9 +365,9 @@ object VoiceNavPolicy {
 
     /**
      * Seuil de l'ordre sec, en mètres : à cette distance ou moins (ou sans
-     * distance), le virage franc se dit « Tournez à gauche[, rue X]. » ;
-     * au-delà, préavis « Continuez dans cette direction[, rue X]. », dit
-     * une seule fois (signature [key]). Aligné sur
+     * distance), le virage franc se dit « À gauche » / « À droite »[, rue X] ;
+     * au-delà, préavis « Tout droit[, rue X]. », dit une seule fois.
+     * Aligné sur
      * [NavTuning.announceNearM][dev.sam3vision.core.nav.NavTuning] : le
      * rappel proche du moteur parle l'ordre sec, l'annonce lointaine le
      * préavis — jamais « dans X mètres » pour un virage franc.

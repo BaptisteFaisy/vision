@@ -16,7 +16,7 @@ class VoiceNavPolicyTest {
     @Test
     fun `depart reprend le contrat navigation vers X`() {
         assertEquals(
-            "Navigating to la gare de Lyon",
+            "Going to la gare de Lyon",
             VoiceNavPhrases.phrase(VoiceNavEvent.Started("la gare de Lyon")),
         )
     }
@@ -24,7 +24,7 @@ class VoiceNavPolicyTest {
     @Test
     fun `virage lointain dit la direction`() {
         assertEquals(
-            "Continue in this direction.",
+            "Straight on.",
             VoiceNavPhrases.phrase(VoiceNavEvent.Turn(SteeringCap.Left, 100f)),
         )
     }
@@ -52,7 +52,7 @@ class VoiceNavPolicyTest {
     @Test
     fun `virage lointain avec rue`() {
         assertEquals(
-            "Continue in this direction, rue de Rivoli.",
+            "Straight on, rue de Rivoli.",
             VoiceNavPhrases.phrase(VoiceNavEvent.Turn(SteeringCap.Left, 60f, "rue de Rivoli")),
         )
     }
@@ -75,7 +75,7 @@ class VoiceNavPolicyTest {
     @Test
     fun `virage tout droit se dit ligne droite`() {
         assertEquals(
-            "Continue straight ahead.",
+            "Straight on.",
             VoiceNavPhrases.phrase(VoiceNavEvent.Turn(SteeringCap.Straight)),
         )
     }
@@ -83,7 +83,7 @@ class VoiceNavPolicyTest {
     @Test
     fun `ligne droite avec distance`() {
         assertEquals(
-            "Continue straight ahead for 200 meters.",
+            "Straight on.",
             VoiceNavPhrases.phrase(VoiceNavEvent.ContinueStraight(200f)),
         )
     }
@@ -91,7 +91,7 @@ class VoiceNavPolicyTest {
     @Test
     fun `arrivee nommee`() {
         assertEquals(
-            "You have arrived at la gare de Lyon.",
+            "Arrived at la gare de Lyon.",
             VoiceNavPhrases.phrase(VoiceNavEvent.Arrival("la gare de Lyon")),
         )
     }
@@ -99,7 +99,7 @@ class VoiceNavPolicyTest {
     @Test
     fun `arrivee sans nom`() {
         assertEquals(
-            "You have arrived.",
+            "Arrived.",
             VoiceNavPhrases.phrase(VoiceNavEvent.Arrival("  ")),
         )
     }
@@ -107,15 +107,15 @@ class VoiceNavPolicyTest {
     @Test
     fun `hors trace dit la sortie et le recalcul`() {
         assertEquals(
-            "You are off route. Recalculating.",
+            "Off route.",
             VoiceNavPhrases.phrase(VoiceNavEvent.OffRoute),
         )
     }
 
     @Test
     fun `recalcul et arret`() {
-        assertEquals("New route calculated.", VoiceNavPhrases.phrase(VoiceNavEvent.Rerouted))
-        assertEquals("Guidance stopped.", VoiceNavPhrases.phrase(VoiceNavEvent.Stopped))
+        assertEquals("New route.", VoiceNavPhrases.phrase(VoiceNavEvent.Rerouted))
+        assertEquals("Stopped.", VoiceNavPhrases.phrase(VoiceNavEvent.Stopped))
     }
 
     // ── Distances : arrondi vers le bas, kilomètres au-delà d'un kilomètre ──
@@ -140,7 +140,7 @@ class VoiceNavPolicyTest {
     @Test
     fun `virage lointain ne dit jamais la distance`() {
         assertEquals(
-            "Continue in this direction.",
+            "Straight on.",
             VoiceNavPhrases.phrase(VoiceNavEvent.Turn(SteeringCap.Left, 127f)),
         )
     }
@@ -148,11 +148,11 @@ class VoiceNavPolicyTest {
     @Test
     fun `kilometres au-dela d'un kilometre`() {
         assertEquals(
-            "Continue in this direction.",
+            "Straight on.",
             VoiceNavPhrases.phrase(VoiceNavEvent.Turn(SteeringCap.Left, 1250f)),
         )
         assertEquals(
-            "Continue straight ahead for 2.0 kilometers.",
+            "Straight on.",
             VoiceNavPhrases.phrase(VoiceNavEvent.ContinueStraight(2000f)),
         )
     }
@@ -162,7 +162,7 @@ class VoiceNavPolicyTest {
     @Test
     fun `phrases anglaises`() {
         assertEquals(
-            "Continue in this direction.",
+            "Straight on.",
             VoiceNavPhrases.phrase(VoiceNavEvent.Turn(SteeringCap.Left, 100f), SpeechLanguage.En),
         )
         assertEquals(
@@ -170,20 +170,20 @@ class VoiceNavPolicyTest {
             VoiceNavPhrases.phrase(VoiceNavEvent.Turn(SteeringCap.Right, 20f, "Main Street"), SpeechLanguage.En),
         )
         assertEquals(
-            "You have arrived at Lyon station.",
+            "Arrived at Lyon station.",
             VoiceNavPhrases.phrase(VoiceNavEvent.Arrival("Lyon station"), SpeechLanguage.En),
         )
         assertEquals(
-            "You are off route. Recalculating.",
+            "Off route.",
             VoiceNavPhrases.phrase(VoiceNavEvent.OffRoute, SpeechLanguage.En),
         )
         assertEquals(
-            "New route calculated.",
+            "New route.",
             VoiceNavPhrases.phrase(VoiceNavEvent.Rerouted, SpeechLanguage.En),
         )
-        assertEquals("Guidance stopped.", VoiceNavPhrases.phrase(VoiceNavEvent.Stopped, SpeechLanguage.En))
+        assertEquals("Stopped.", VoiceNavPhrases.phrase(VoiceNavEvent.Stopped, SpeechLanguage.En))
         assertEquals(
-            "Continue straight ahead for 1.2 kilometers.",
+            "Straight on.",
             VoiceNavPhrases.phrase(VoiceNavEvent.ContinueStraight(1250f), SpeechLanguage.En),
         )
     }
@@ -224,7 +224,7 @@ class VoiceNavPolicyTest {
 
         val phrase = announcer.onEvent(0L, VoiceNavEvent.Turn(SteeringCap.Left, 100f))
 
-        assertEquals("Continue in this direction.", phrase)
+        assertEquals("Straight on.", phrase)
         assertEquals(phrase, announcer.lastPhrase)
     }
 
@@ -264,7 +264,7 @@ class VoiceNavPolicyTest {
         announcer.onEvent(0L, VoiceNavEvent.Turn(SteeringCap.Left, 100f))
 
         assertEquals(
-            "You are off route. Recalculating.",
+            "Off route.",
             announcer.onEvent(1_000L, VoiceNavEvent.OffRoute),
         )
     }
@@ -274,7 +274,7 @@ class VoiceNavPolicyTest {
         val announcer = VoiceNavAnnouncer()
         announcer.onEvent(0L, VoiceNavEvent.OffRoute)
 
-        assertEquals("New route calculated.", announcer.onEvent(500L, VoiceNavEvent.Rerouted))
+        assertEquals("New route.", announcer.onEvent(500L, VoiceNavEvent.Rerouted))
     }
 
     @Test
@@ -291,7 +291,7 @@ class VoiceNavPolicyTest {
 
         announcer.reset()
 
-        assertEquals("Navigating to la gare de Lyon", announcer.onEvent(1_000L, started))
+        assertEquals("Going to la gare de Lyon", announcer.onEvent(1_000L, started))
     }
 
     @Test
@@ -306,9 +306,9 @@ class VoiceNavPolicyTest {
 
     @Test
     fun `phrase litterale reprise telle quelle jamais blanche`() {
-        val literal = VoiceNavEvent.Literal("Make a U-turn in 50 meters")
-        assertEquals("Make a U-turn in 50 meters", VoiceNavPhrases.phrase(literal))
-        assertEquals("Guidance stopped.", VoiceNavPhrases.phrase(VoiceNavEvent.Literal("  ")))
+        val literal = VoiceNavEvent.Literal("Make a U-turn.")
+        assertEquals("Make a U-turn.", VoiceNavPhrases.phrase(literal))
+        assertEquals("Stopped.", VoiceNavPhrases.phrase(VoiceNavEvent.Literal("  ")))
         assertFalse(VoiceNavPolicy.isUrgent(literal))
     }
 }

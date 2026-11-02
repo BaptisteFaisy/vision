@@ -389,19 +389,19 @@ object GlassesMessages {
     /** Ordre vocal « iSee » : la session demandée s'ouvre, le lien est là. */
     fun toggleStarted() = GlassesMessage(
         MessageKind.INFO,
-        "Glasses session: opening the session.",
+        "Glasses on.",
     )
 
     /** Ordre vocal « iSee » : la session en cours s'arrête. */
     fun toggleStopped() = GlassesMessage(
         MessageKind.INFO,
-        "Glasses session stopped.",
+        "Glasses off.",
     )
 
     /** Ordre vocal « iSee » sans paire liée : refusé, dit par iSee à voix haute. */
     fun toggleNotLinked() = GlassesMessage(
         MessageKind.WARNING,
-        "Glasses not connected over Bluetooth: session not opened.",
+        "No glasses.",
     )
 }
 

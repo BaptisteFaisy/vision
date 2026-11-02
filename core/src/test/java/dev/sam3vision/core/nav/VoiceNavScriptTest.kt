@@ -20,7 +20,7 @@ import org.junit.Test
  * → LLM). Si un motif change, ce test casse avant la recette, pas pendant.
  *
  * Ce que le téléphone vérifie en plus (non testable en JVM) : l'overlay et la
- * voix « Navigation vers X » ([NavigationPhrases], module `:app`), l'ouverture
+ * voix « Vers X » ([NavigationPhrases], module `:app`), l'ouverture
  * de Google Maps, son annonce d'arrivée et son recalcul hors-trace, et le
  * silence d'iSee pendant ces deux phases (iSee ne suit rien, par design).
  */

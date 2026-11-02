@@ -5,13 +5,13 @@ import dev.sam3vision.core.speech.SpeechLanguage
 /**
  * Guetteur d'annonce du passage piéton (SPEC v4, niveau 8, couche 1/3 :
  * annonce une fois par vue) : [CONFIRM_FRAMES] frames de suite
- * avec un passage en vue parlent une fois (« Passage piéton à gauche, à 2
- * mètres. »), à 6 m ou moins ([ANNOUNCE_METERS], mesurés — sans
- * mesure, la direction seule parle), puis silence jusqu'à la prochaine
+ * avec un passage en vue parlent une fois (« Gauche, 2 mètres »),
+ * à 6 m ou moins ([ANNOUNCE_METERS], mesurés ; sans mesure,
+ * la direction seule parle), puis silence jusqu'à la prochaine
  * disparition (changement seul). Doux, comme l'arrivée : l'appelant parle
  * via `say` (`urgent = false`), jamais en clip.
  *
- * La phrase nomme le passage ET le localise ([CrossingText.approach]) :
+ * La phrase localise ([CrossingText.approach], « passage » implicite) :
  * direction (gauche / devant / droite, [CrossingGuidance.directionOf]) puis
  * distance courte quand elle est mesurée. Sans mesure, la direction seule —
  * jamais de chiffre deviné, jamais de crash sur données manquantes.

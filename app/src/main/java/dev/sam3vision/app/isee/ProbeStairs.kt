@@ -27,7 +27,7 @@ import kotlinx.coroutines.launch
  * marche, par compteur Canny frais de la caméra ([StairCannyCount] — 0 = non
  * compté, pas « zéro marche ») ou par profondeur (< 1 m, lue ici). Lecture
  * séquentielle, comme le trottoir : une alerte confirmée ne s'annule pas.
- * L'annonce part au bus (niveau et clé du signalement, SPEC v4).
+ * L'annonce part au bus (niveau et clé du signalement, SPEC v4) et au battement 350 ms ([VoiceTick]).
  * L'esquive en cours ([stairsYieldToAvoidance]) tait l'annonce : les humains
  * priment, même sur les escaliers.
  */
@@ -68,11 +68,11 @@ internal fun LiveProbe.observeStairs(
             if (found.detected) {
                 android.util.Log.d(
                     "sam3vision",
-                    "escaliers: n=$stairsCount ageMs=${StairCannyCount.countAgeMs()} " +
-                        "m=$stairsMeters annonce=${cue?.phrase}",
+                    "escaliers: n=$stairsCount ageMs=${StairCannyCount.countAgeMs()} m=$stairsMeters annonce=${cue?.phrase}",
                 )
             }
             cue ?: return@collect
+            VoiceTick.report(VoiceTick.SRC_STAIRS, VoiceWish(cue.level, cue.phrase, cue.antiRepeatKey), System.currentTimeMillis())
             if (AntiRepeat.allow(cue.antiRepeatKey, System.currentTimeMillis())) {
                 VoiceBus.post(cue.level, cue.phrase)
             }
@@ -126,7 +126,7 @@ internal fun LiveProbe.stairsYieldToAvoidance(): Boolean {
  * s'arrête jamais pour une synthèse lente (le bus écrase, dernier gagnant).
  * Sans escalier nommé ou sans compte frais : silence (auto-muet caméra
  * coupée, séance finie). Rend le compteur pour le `reset()` de séance.
- * [nowMs] est l'horloge du compteur (injectée en test).
+ * [nowMs] est l'horloge du compteur (injectée en test). Le compte est aussi rapporté au battement 350 ms ([VoiceTick]).
  */
 internal fun LiveProbe.observeStairsCount(
     scope: CoroutineScope,
@@ -149,6 +149,11 @@ internal fun LiveProbe.observeStairsCount(
             ) ?: continue
             // Cle par compte (stairs-count:5 marches.) : le changement parle
             // aussitot, le meme compte attend 0,5 s (ordre user du 01/11).
+            VoiceTick.report(
+                VoiceTick.SRC_STAIRS_COUNT,
+                VoiceWish(OutdoorLevel.STAIRS, phrase, AntiRepeat.KEY_STAIRS_COUNT + ":" + phrase),
+                nowMs(),
+            )
             if (AntiRepeat.allow(AntiRepeat.KEY_STAIRS_COUNT + ":" + phrase, nowMs())) {
                 VoiceBus.post(OutdoorLevel.STAIRS, phrase)
             }

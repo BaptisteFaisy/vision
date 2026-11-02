@@ -26,8 +26,8 @@ object CrossingText {
                 CrossingState.Green -> "You can cross"
             }
             SpeechLanguage.Fr -> when (state) {
-                CrossingState.Red -> "Rouge, attendez."
-                CrossingState.Green -> "Vert, traversez."
+                CrossingState.Red -> "Rouge."
+                CrossingState.Green -> "Vert."
             }
         }
 
@@ -37,8 +37,8 @@ object CrossingText {
      */
     fun blinking(language: SpeechLanguage = SpeechLanguage.DEFAULT): String =
         when (language) {
-            SpeechLanguage.En -> "Flashing green, do not cross."
-            SpeechLanguage.Fr -> "Vert clignotant, ne pas s'engager."
+            SpeechLanguage.En -> "Don't go."
+            SpeechLanguage.Fr -> "Attends."
         }
 
     /**
@@ -58,8 +58,8 @@ object CrossingText {
      */
     fun contradiction(language: SpeechLanguage = SpeechLanguage.DEFAULT): String =
         when (language) {
-            SpeechLanguage.En -> "Conflicting lights, wait."
-            SpeechLanguage.Fr -> "Feux contradictoires, attendez."
+            SpeechLanguage.En -> "Mixed lights."
+            SpeechLanguage.Fr -> "Feux mixtes."
         }
 
 
@@ -76,15 +76,15 @@ object CrossingText {
      */
     fun mode(on: Boolean, language: SpeechLanguage = SpeechLanguage.DEFAULT): String =
         when (language) {
-            SpeechLanguage.En -> if (on) "Crossing mode on." else "Crossing mode off."
-            SpeechLanguage.Fr -> if (on) "Mode traversée activé." else "Mode traversée coupé."
+            SpeechLanguage.En -> if (on) "Crossing on." else "Crossing off."
+            SpeechLanguage.Fr -> if (on) "Traversée on." else "Traversée off."
         }
 
     /**
-     * Position du passage piéton sur le trottoir : « Passage piéton à gauche,
-     * à 2 mètres. » ([cap] = côté du passage, [meters] = distance courte
-     * profondeur/sol, jamais sténopé). Sans distance mesurable, la direction
-     * seule (« Passage piéton à gauche. ») — jamais de chiffre deviné.
+     * Position du passage : « Gauche, 2 mètres. » ([cap] = côté,
+     * [meters] = distance courte profondeur/sol, jamais sténopé).
+     * Sans distance mesurable, la direction seule (« Gauche. »).
+     * Jamais de chiffre deviné ; « traversée » implicite (ordre passé).
      * [withHour] vrai + [centerX] renseigné : le cadran suit
      * (« …, à 10 heures. »), via [PositionText.withHour].
      */
@@ -99,19 +99,19 @@ object CrossingText {
         val base = when (language) {
             SpeechLanguage.En -> {
                 val head = when (cap) {
-                    SteeringCap.Left -> "Crosswalk to the left"
-                    SteeringCap.Right -> "Crosswalk to the right"
-                    SteeringCap.Straight -> "Crosswalk ahead"
+                    SteeringCap.Left -> "Left"
+                    SteeringCap.Right -> "Right"
+                    SteeringCap.Straight -> "Ahead"
                 }
-                if (valid != null) "$head, ${DistanceText.spokenShort(valid, language)} away" else head
+                if (valid != null) "$head, ${DistanceText.spokenShort(valid, language)}" else head
             }
             SpeechLanguage.Fr -> {
                 val head = when (cap) {
-                    SteeringCap.Left -> "Passage piéton à gauche"
-                    SteeringCap.Right -> "Passage piéton à droite"
-                    SteeringCap.Straight -> "Passage piéton devant"
+                    SteeringCap.Left -> "Gauche"
+                    SteeringCap.Right -> "Droite"
+                    SteeringCap.Straight -> "Devant"
                 }
-                if (valid != null) "$head, à ${DistanceText.spokenShort(valid, language)}" else head
+                if (valid != null) "$head, ${DistanceText.spokenShort(valid, language)}" else head
             }
         }
         if (withHour && centerX != null) return PositionText.withHour(base, centerX, language)
@@ -119,12 +119,12 @@ object CrossingText {
     }
 
     /**
-     * Arrivée sur le passage (« Sur le passage. ») : douce (appelant :
+     * Arrivée sur le passage (« Here. » / « Sur le passage. »), douce :
      * `urgent = false`, ne coupe rien), dite une fois par [CrossingGuidance].
      */
     fun arrived(language: SpeechLanguage = SpeechLanguage.DEFAULT): String =
         when (language) {
-            SpeechLanguage.En -> "On the crosswalk."
+            SpeechLanguage.En -> "Here."
             SpeechLanguage.Fr -> "Sur le passage."
         }
 }

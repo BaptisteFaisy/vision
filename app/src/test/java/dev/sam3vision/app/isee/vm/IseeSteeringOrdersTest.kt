@@ -110,7 +110,7 @@ class IseeSteeringOrdersTest {
 
         assertTrue(probe.state.value.crossingActive)
         assertEquals(
-            listOf("Mode traversée activé.", "Passage piéton devant, à 5 mètres."),
+            listOf("Traversée on.", "Devant, 5 mètres."),
             dites,
         )
     }
@@ -127,7 +127,7 @@ class IseeSteeringOrdersTest {
         orders.runCrossing("traverser")
 
         assertTrue(probe.state.value.crossingActive)
-        assertEquals(listOf("Crossing mode on."), dites)
+        assertEquals(listOf("Crossing on."), dites)
     }
 
     @Test
@@ -144,7 +144,7 @@ class IseeSteeringOrdersTest {
         orders.runCrossing("crossing mode off")
 
         assertFalse(probe.state.value.crossingActive)
-        assertEquals(listOf("Crossing mode off."), dites)
+        assertEquals(listOf("Crossing off."), dites)
     }
 
     @Test
@@ -163,7 +163,7 @@ class IseeSteeringOrdersTest {
 
             orders.runCrossing("crossing mode on")
 
-            assertEquals(listOf("Mode traversée activé."), dites)
+            assertEquals(listOf("Traversée on."), dites)
         } finally {
             CrossingLateralWatch.reset()
         }

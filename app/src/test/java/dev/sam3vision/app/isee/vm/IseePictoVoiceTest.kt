@@ -43,8 +43,8 @@ class IseePictoVoiceTest {
         assertTrue(voice(created = created).run("fais un pictogramme de ces médics"))
         assertEquals(listOf("medics"), created)
         assertTrue(opened.isEmpty())
-        assertEquals(listOf("Je crée le pictogramme."), spoken)
-        assertEquals("Je crée le pictogramme.", state.status)
+        assertEquals(listOf("Création picto."), spoken)
+        assertEquals("Création picto.", state.status)
     }
 
     @Test
@@ -53,7 +53,7 @@ class IseePictoVoiceTest {
         assertTrue(voice(created = created).run("fais un pictogramme de ça"))
         assertTrue(created.isEmpty())
         assertEquals(listOf(Pair(LiveVoiceRequest.Request(pictoCreate = ""), null)), opened)
-        assertEquals(listOf("Je crée le pictogramme."), spoken)
+        assertEquals(listOf("Création picto."), spoken)
     }
 
     @Test
@@ -62,7 +62,7 @@ class IseePictoVoiceTest {
         assertTrue(voice(language = SpeechLanguage.En, created = created).run("create a picto for my keys"))
         assertEquals(listOf("keys"), created)
         assertTrue(opened.isEmpty())
-        assertEquals(listOf("Creating the pictogram."), spoken)
+        assertEquals(listOf("Creating picto."), spoken)
     }
 
     @Test
@@ -76,8 +76,8 @@ class IseePictoVoiceTest {
     fun `mot visant un repere reste sur place et confirme`() = runBlocking {
         assertTrue(voice().run("médicament"))
         assertTrue(opened.isEmpty())
-        assertEquals(listOf("Je cherche medicament."), spoken)
-        assertEquals("Je cherche medicament.", state.status)
+        assertEquals(listOf("Cherche medicament."), spoken)
+        assertEquals("Cherche medicament.", state.status)
     }
 
     @Test
@@ -91,7 +91,7 @@ class IseePictoVoiceTest {
     fun `le repere prime sur sam`() = runBlocking {
         assertTrue(voice(listOf("clés")).run("clé"))
         assertTrue(opened.isEmpty())
-        assertEquals(listOf("Je cherche cle."), spoken)
+        assertEquals(listOf("Cherche cle."), spoken)
     }
 
     @Test
@@ -132,8 +132,8 @@ class IseePictoVoiceTest {
         assertTrue(voice(language = SpeechLanguage.En, found = found).run("Find the keys"))
         assertEquals(listOf("keys"), found)
         assertTrue(opened.isEmpty())
-        assertEquals(listOf("Looking for keys."), spoken)
-        assertEquals("Looking for keys.", state.status)
+        assertEquals(listOf("Finding keys."), spoken)
+        assertEquals("Finding keys.", state.status)
     }
 
     @Test
@@ -142,7 +142,7 @@ class IseePictoVoiceTest {
         assertTrue(voice(listOf("keys"), found = found).run("find the keys"))
         assertTrue(found.isEmpty())
         assertTrue(opened.isEmpty())
-        assertEquals(listOf("Je cherche keys."), spoken)
+        assertEquals(listOf("Cherche keys."), spoken)
     }
 
     @Test
@@ -162,8 +162,8 @@ class IseePictoVoiceTest {
         assertTrue(voice(emptyList(), SpeechLanguage.En, found).run("Where are my keys"))
         assertEquals(listOf("keys"), found)
         assertTrue(opened.isEmpty())
-        assertEquals(listOf("Looking for keys."), spoken)
-        assertEquals("Looking for keys.", state.status)
+        assertEquals(listOf("Finding keys."), spoken)
+        assertEquals("Finding keys.", state.status)
     }
 
     @Test
@@ -172,8 +172,8 @@ class IseePictoVoiceTest {
         assertTrue(voice(listOf("keys"), SpeechLanguage.En, found).run("Where are my keys"))
         assertTrue(found.isEmpty())
         assertTrue(opened.isEmpty())
-        assertEquals(listOf("Looking for keys."), spoken)
-        assertEquals("Looking for keys.", state.status)
+        assertEquals(listOf("Finding keys."), spoken)
+        assertEquals("Finding keys.", state.status)
     }
 
     @Test
@@ -199,8 +199,8 @@ class IseePictoVoiceTest {
         assertTrue(voice(found = found).run("où sont mes clés"))
         assertEquals(listOf("keys"), found)
         assertTrue(opened.isEmpty())
-        assertEquals(listOf("Je cherche keys."), spoken)
-        assertEquals("Je cherche keys.", state.status)
+        assertEquals(listOf("Cherche keys."), spoken)
+        assertEquals("Cherche keys.", state.status)
     }
 
     @Test

@@ -37,15 +37,15 @@ class ValhallaShapeTest {
     @Test
     fun `les libelles parles couvrent le guidage pieton`() {
         assertEquals("Start.", maneuverShort(1))
-        assertEquals("You have arrived.", maneuverShort(4))
-        assertEquals("Continue straight ahead.", maneuverShort(8))
+        assertEquals("Arrived.", maneuverShort(4))
+        assertEquals("Straight on.", maneuverShort(8))
         assertEquals("Turn right.", maneuverShort(10))
         assertEquals("Turn left.", maneuverShort(15))
         assertEquals("Bear right.", maneuverShort(9))
         assertEquals("Bear left.", maneuverShort(16))
         assertEquals("Make a U-turn.", maneuverShort(12))
-        assertEquals("Enter the roundabout.", maneuverShort(26))
-        assertEquals("Exit the roundabout.", maneuverShort(27))
+        assertEquals("Roundabout.", maneuverShort(26))
+        assertEquals("Exit.", maneuverShort(27))
     }
 
     @Test

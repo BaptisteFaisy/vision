@@ -21,9 +21,9 @@ const val GPS_REMINDER_MS = 15_000L
  * droite — le rappel ne se tait jamais sur une consigne vide.
  */
 fun gpsReminderPhrase(instruction: String, remainingMeters: Long): String {
-    val clean = instruction.trim().trimEnd('.').ifBlank { "Continue straight ahead" }
+    val clean = instruction.trim().trimEnd('.').ifBlank { "Straight on" }
     val distance = DistanceText.spoken(remainingMeters.coerceAtLeast(0).toFloat(), SpeechLanguage.En)
-    return "$clean. $distance remaining."
+    return "$clean. $distance left."
 }
 
 /**
