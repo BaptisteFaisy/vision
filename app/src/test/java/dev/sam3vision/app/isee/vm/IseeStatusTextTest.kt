@@ -47,7 +47,6 @@ class IseeStatusTextTest {
         assertEquals("Microphone unavailable", IseeStatusText.MIC_UNAVAILABLE)
         assertEquals("Camera not ready — try again", IseeStatusText.CAMERA_NOT_READY)
         assertEquals("Nothing heard", IseeStatusText.NOTHING_HEARD)
-        assertEquals("Answer still coming — ask again after it", IseeStatusText.ANSWER_PENDING)
         assertEquals("No LLM key configured (Settings)", IseeStatusText.NO_LLM_KEY)
         assertEquals("Recording lost", IseeStatusText.RECORDING_LOST)
         assertEquals(

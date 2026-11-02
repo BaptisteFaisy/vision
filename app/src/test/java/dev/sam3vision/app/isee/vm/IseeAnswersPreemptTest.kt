@@ -15,8 +15,9 @@ import org.junit.Test
 
 /**
  * Concurrence des réponses : une nouvelle parole écrase la précédente (overwrite)
- * au lieu d'être jetée — sans jamais lancer deux appels LLM en parallèle
- * (409 « limite atteinte »). Socle : [IseeAnswersTestBase].
+ * au lieu d'être jetée — annulée puis attendue (jamais deux appels LLM en
+ * parallèle, 409 « limite atteinte »), volée passé le plafond si elle ignore
+ * l'annulation (overwrite forcé). Socle : [IseeAnswersTestBase].
  */
 class IseeAnswersPreemptTest : IseeAnswersTestBase() {
 
@@ -48,11 +49,11 @@ class IseeAnswersPreemptTest : IseeAnswersTestBase() {
         assertTrue("la première est coupée", first.isCancelled)
         assertEquals("la seconde passe", "Devant toi", dao.byId(row.id)?.texteIA)
         assertEquals("jamais deux appels à la fois", 1, maxConcurrent.get())
-        assertFalse("aucune erreur busy/thinking", state.value.status == IseeStatusText.ANSWER_PENDING)
+        assertEquals("la seconde répond sans erreur", IseeStatusText.STEP_SPEAKING, state.value.status)
     }
 
     @Test
-    fun `reponse qui ignore l'annulation — la suivante renonce sans second appel`() = runBlocking {
+    fun `reponse qui ignore l'annulation — la suivante vole le drapeau et repond quand meme`() = runBlocking {
         val calls = AtomicInteger()
         val never = CompletableDeferred<Unit>()
         val answers = IseeAnswers(
@@ -64,9 +65,12 @@ class IseeAnswersPreemptTest : IseeAnswersTestBase() {
             photo = shots,
             prune = {},
             ask = { _, _, _, _ ->
-                calls.incrementAndGet()
-                withContext(NonCancellable) { never.await() }
-                Result.success("jamais")
+                if (calls.incrementAndGet() == 1) {
+                    withContext(NonCancellable) { never.await() }
+                    Result.success("jamais")
+                } else {
+                    Result.success("Écrasée")
+                }
             },
             preemptTimeoutMs = 100L,
         )
@@ -74,13 +78,20 @@ class IseeAnswersPreemptTest : IseeAnswersTestBase() {
         val first = launch { answers.answer(row, "première") }
         withTimeout(2_000) { while (calls.get() == 0) delay(5) }
 
-        // La précédente est coincée : passé le plafond, la suivante renonce plutôt
-        // que de lancer un second appel (409 « limite atteinte »).
-        answers.answer(row, "seconde")
+        // La précédente est coincée : passé le plafond, la nouvelle vole le
+        // drapeau et part quand même (overwrite forcé, ordre user) — jamais jetée.
+        try {
+            answers.answer(row, "seconde")
 
-        assertEquals(IseeStatusText.ANSWER_PENDING, state.value.status)
-        assertEquals("un seul appel LLM", 1, calls.get())
-        never.complete(Unit)
+            assertEquals("la seconde répond malgré la précédente coincée", "Écrasée", dao.byId(row.id)?.texteIA)
+            assertEquals("le second appel LLM part", 2, calls.get())
+            assertEquals("la seconde répond sans erreur", IseeStatusText.STEP_SPEAKING, state.value.status)
+            assertFalse("le « … » est retiré", state.value.thinking)
+        } finally {
+            // Échec comme succès : la première ignore l'annulation, seule cette
+            // libération l'empêche de pendre le worker de test.
+            never.complete(Unit)
+        }
         withTimeout(2_000) { first.join() }
     }
 }
