@@ -18,6 +18,9 @@ import org.junit.Test
  */
 class PedLightGateTest {
 
+    /** Cyan 200° : vert-de-mer français, refusé par l'ancienne borne 195. */
+    private val CYAN_200 = 0xFF00AAFF.toInt()
+
     /**
      * Tache verte **plus large que haute** (16 x 8) dans la moitie basse :
      * pleine (disque de face, remplissage ~0,78) ou creuse (contour,
@@ -135,14 +138,96 @@ class PedLightGateTest {
     }
 
     @Test
-    fun `verdict - micro bonhomme bas accepte (fraction 0,0035)`() {
-        // 48x48, barre 2x4 en bas : fraction 0,0035, dans l'ancienne bande
+    fun `verdict - micro bonhomme bas accepte (fraction 0,0052)`() {
+        // 48x48, barre 3x4 en bas : fraction 0,0052, dans l'ancienne bande
         // (rouge aux seuils 0,0035 et 0,0048) — miroir Python en vis-à-vis.
+        // 3 px de large depuis le 02/11 : la barre de 2 px de la version
+        // d'origine (5 % de 48 = 2,4 px) tombe sous le plancher de largeur,
+        // voir le test suivant — c'est le seul cas de rappel perdu ici.
+        val pixels = IntArray(48 * 48) { BLACK }
+        for (y in 44 until 48) {
+            for (x in 23..25) pixels[y * 48 + x] = GREEN
+        }
+        assertEquals(CrossingState.Green, PedLightGate.verdict(pixels, 48, 48))
+    }
+
+    @Test
+    fun `largeur - micro bonhomme de 2 px sur 48 - refuse (plancher 2,4 px)`() {
         val pixels = IntArray(48 * 48) { BLACK }
         for (y in 44 until 48) {
             for (x in 23..24) pixels[y * 48 + x] = GREEN
         }
-        assertEquals(CrossingState.Green, PedLightGate.verdict(pixels, 48, 48))
+        assertEquals(CrossingState.Red, PedLightGate.verdict(pixels, 48, 48))
+    }
+
+    @Test
+    fun `largeur - bandes vertes de 1 a 4 px sur crop 96 - refusees`() {
+        // 5 % de 96 = 4,8 px : ce sont les bandes de 1 à 4 px du feu voisin
+        // ou du panneau cycliste entré dans le crop — 22 faux verts sur 40
+        // rouges à l'échelle de production (96 px) avant cette règle.
+        for (widthPx in 1..4) {
+            val pixels = band(96, widthPx, 20)
+            assertFalse("acceptGreen, bande $widthPx px", PedLightGate.acceptGreen(pixels, 96, 96))
+            assertEquals("verdict, bande $widthPx px", CrossingState.Red, PedLightGate.verdict(pixels, 96, 96))
+        }
+    }
+
+    @Test
+    fun `largeur - 4 px refuse, 5 px accepte sur crop 96 (frontiere 4,8)`() {
+        assertFalse(PedLightGate.acceptGreen(band(96, 4, 20), 96, 96))
+        assertTrue(PedLightGate.acceptGreen(band(96, 5, 20), 96, 96))
+    }
+
+    @Test
+    fun `largeur - tache verte de 7 px sur crop 96 - acceptee`() {
+        assertEquals(CrossingState.Green, PedLightGate.verdict(band(96, 7, 25), 96, 96))
+    }
+
+    @Test
+    fun `largeur - vrai vert large sur crop 96 - accepte`() {
+        assertTrue(PedLightGate.acceptGreen(band(96, 12, 30), 96, 96))
+    }
+
+    @Test
+    fun `largeur - fraction, pas pixels - 4 px refuse a 96, accepte a 48`() {
+        // Même bande, deux échelles : la règle suit le crop (5 % de 48 = 2,4).
+        assertFalse(PedLightGate.acceptGreen(band(96, 4, 20), 96, 96))
+        assertTrue(PedLightGate.acceptGreen(band(48, 4, 12), 48, 48))
+    }
+
+    @Test
+    fun `largeur - crop 1x1 et degeneres - pas de crash`() {
+        assertFalse(PedLightGate.acceptGreen(IntArray(1) { GREEN }, 1, 1))
+        assertFalse(PedLightGate.acceptGreen(IntArray(1) { BLACK }, 1, 1))
+        assertEquals(CrossingState.Red, PedLightGate.verdict(IntArray(1) { GREEN }, 1, 1))
+    }
+
+    @Test
+    fun `largeur - crop tout vert - accepte (largeur = crop)`() {
+        assertTrue(PedLightGate.acceptGreen(IntArray(96 * 96) { CYAN_GREEN }, 96, 96))
+        assertEquals(CrossingState.Green, PedLightGate.verdict(IntArray(96 * 96) { CYAN_GREEN }, 96, 96))
+    }
+
+    /** Bande verte verticale de [w] px, [h] px de haut, calée en bas d'un crop carré. */
+    private fun band(size: Int, w: Int, h: Int): IntArray {
+        val pixels = IntArray(size * size) { BLACK }
+        val x0 = size / 2
+        for (y in size - h until size) {
+            for (x in x0 until minOf(x0 + w, size)) pixels[y * size + x] = GREEN
+        }
+        return pixels
+    }
+
+    @Test
+    fun `projection - un bonhomme cyan 200 degres passe la porte (plus de borne haute)`() {
+        // Le vert-de-mer français monte au cyan : la projection lit p = 0,67 sur
+        // 0x00AAFF là où la borne 195 refusait la teinte 200. La décision de
+        // l'arbre reste sur ses traits de teinte (contrat séparé, pas réentraîné).
+        val pixels = IntArray(20 * 20) { BLACK }
+        for (y in 10 until 20) {
+            for (x in 8..11) pixels[y * 20 + x] = CYAN_200
+        }
+        assertTrue(PedLightGate.acceptGreen(pixels, 20, 20))
     }
 
     @Test

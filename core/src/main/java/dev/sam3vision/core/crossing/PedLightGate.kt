@@ -25,6 +25,21 @@ package dev.sam3vision.core.crossing
  * 100 voiture, 6 éteints), seuils existants intacts.
  * 01/11 : bande élargie 20-35 % → 15-35 % (même ordre, jitter ±1 px).
  *
+ * Largeur du nuage (02/11/2026, lot W5) : la tache verte retenue doit faire
+ * au moins [GREEN_MIN_WIDTH_FRACTION] du plus grand côté du crop — exprimée
+ * en **fraction** et non en pixels, seule forme invariante au
+ * rééchantillonnage (voir la KDoc de la constante).
+ *
+ * **Dette assumée, non corrigée ici : des règles en pixels.** [BBOX_MIN_PX]
+ * raisonne en pixels bruts (3 px de haut) et les autres seuils en fractions
+ * du **nuage** ou du crop, calibrés sur un corpus rendu à **48 px** alors
+ * que la production tourne à **96 px** (`docs/MESURES-SAM3-FEUX.md` §11,
+ * rapport A1 §7) : à 96 px, **29,6 % des verdicts changent** pour les mêmes
+ * boîtes. Toute règle en pixels doit donc être relue avant d'être durcie, et
+ * toute nouvelle règle géométrique s'écrit en fraction du crop
+ * ([GREEN_MIN_WIDTH_FRACTION] est le modèle). Rien n'est changé ici pour ne
+ * pas rouvrir les 33 ancres : c'est une dette tracée, pas un oubli.
+ *
  * Seuils publics (surface de calibrage, voir aussi [PedLightColor]).
  */
 object PedLightGate {
@@ -68,6 +83,30 @@ object PedLightGate {
      * (autre pays, contrôle indépendant) les faux verts sont inchangés (13).
      */
     private const val WIDE_FILL_MAX = 0.35f
+
+    /**
+     * Largeur minimale du nuage vert : **fraction du plus grand côté du
+     * crop**, jamais des pixels. 0,05 depuis le 02/11/2026 (lot W5).
+     *
+     * Pourquoi une fraction : tout le corpus étiqueté est rendu à **48 px**
+     * alors que la production tourne à **96 px**, et une règle en pixels
+     * calibrée à 48 px ne dit rien du domaine de production. C'est
+     * précisément à 96 px que le faux vert apparaît — **22 crops rouges sur
+     * 40** pour les mêmes boîtes — sous forme de **bandes vertes de 1 à
+     * 4 px de large** (feu voisin ou panneau cycliste entré dans le crop),
+     * alors qu'un vrai vert porte une tache d'au moins **7 px** à la même
+     * échelle. Exprimée en fraction, la règle vaut 4,8 px sur un crop de 96
+     * et 2,4 px sur un crop de 48 : elle suit l'échelle au lieu de la subir
+     * (à 48 px les mêmes bandes font 1-2 px parce que le rééchantillonnage
+     * délave le vert, la tache de 96 px y tombe à 1 px).
+     *
+     * Mesuré (miroir `tools/light_features.py`, 02/11/2026) : à 96 px
+     * **22/22 faux verts supprimés, rappel inchangé 201/240** ; FR jour
+     * 133 → **132** verts sur 183 (1 perdu, 0 faux vert) ; téléphone
+     * **20/20 et 0 faux vert** sur 49 ; PTL 12 → 11 faux verts (127 → 126
+     * verts sur 238) ; **33 ancres intactes** (22 verts / 11 rouges).
+     */
+    const val GREEN_MIN_WIDTH_FRACTION = 0.05f
 
     /** Hauteur minimale de la tache verte, en pixels (pas un point). */
     const val BBOX_MIN_PX = 3
@@ -133,6 +172,8 @@ object PedLightGate {
         if (boxHeight < BBOX_MIN_PX) return false
         val wide = boxHeight.toFloat() < boxWidth * ELONGATION_MIN
         if (wide && scan.green.toFloat() > boxWidth * boxHeight * WIDE_FILL_MAX) return false
+        // Invariance d'échelle : plancher de largeur en fraction du crop, pas en pixels.
+        if (boxWidth < GREEN_MIN_WIDTH_FRACTION * maxOf(width, height)) return false
         val bottomFraction = scan.greenBottom.toFloat() / scan.green
         if (bottomFraction >= GREEN_BOTTOM_MIN) return true
         if (bottomFraction <= R1B_BOTTOM_FLOOR) return false
@@ -147,7 +188,7 @@ object PedLightGate {
         for (index in argb.indices) {
             val pixel = argb[index]
             if (!isLit(pixel)) continue
-            if (!isGreenHue(PedLightColor.hueDeg(pixel))) continue
+            if (!isGreenSide(PedLightColor.projectionOf(pixel))) continue
             xs.add(index % width)
             ys.add(index / width)
         }
@@ -213,10 +254,10 @@ object PedLightGate {
         for (index in argb.indices) {
             val pixel = argb[index]
             if (!isLit(pixel)) continue
-            val hue = PedLightColor.hueDeg(pixel)
-            if (isRedHue(hue)) {
+            val projection = PedLightColor.projectionOf(pixel)
+            if (isRedSide(projection)) {
                 scan.red += 1
-            } else if (isGreenHue(hue)) {
+            } else if (isGreenSide(projection)) {
                 scan.green += 1
                 if (index / width >= half) scan.greenBottom += 1
                 scan.minX = minOf(scan.minX, index % width)
@@ -231,15 +272,15 @@ object PedLightGate {
     /** Pixel retenu : la seule définition ([PedLightColor.isLit], francs + délavés). */
     private fun isLit(pixel: Int): Boolean = PedLightColor.isLit(pixel)
 
-    private fun isRedHue(hue: Float): Boolean {
-        if (hue <= PedLightColor.RED_HUE_DEG) return true
-        return hue >= 360f - PedLightColor.RED_HUE_DEG
-    }
+    /**
+     * Côté rouge de la projection signée — même seuil que la décision de
+     * [PedLightColor] (un seul discriminant dans tout le paquet, plus aucune
+     * conversion HSV sur le chemin chaud).
+     */
+    private fun isRedSide(projection: Float): Boolean = projection <= PedLightColor.RED_PROJECTION_MAX
 
-    private fun isGreenHue(hue: Float): Boolean {
-        if (hue < PedLightColor.GREEN_HUE_MIN_DEG) return false
-        return hue <= PedLightColor.GREEN_HUE_MAX_DEG
-    }
+    /** Côté vert de la projection signée (même seuil que la décision). */
+    private fun isGreenSide(projection: Float): Boolean = projection >= PedLightColor.GREEN_PROJECTION_MIN
 
     /** Compteurs du balayage, boîte du vert en coordonnées pixels. */
     private class Scan(

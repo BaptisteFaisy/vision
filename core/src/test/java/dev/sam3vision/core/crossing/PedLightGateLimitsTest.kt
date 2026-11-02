@@ -46,8 +46,13 @@ class PedLightGateLimitsTest {
 
     @Test
     fun `fraction verte - 19px refuse, 20px accepte sur 100x100`() {
-        assertFalse(PedLightGate.acceptGreen(verticalLine(19), 100, 100))
-        assertTrue(PedLightGate.acceptGreen(verticalLine(20), 100, 100))
+        // 02/11 (W5) : nuage de 5 px de large — le plancher de largeur vaut
+        // 5 px sur 100 et refuse la ligne de 1 px d'origine, qui ne testait
+        // donc plus la frontière 0,002 par elle-même. 4 lignes espacées de
+        // 5 px : 20 px verts = 0,002 exactement ; la 4e ligne à 4 px donne
+        // 19 px = 0,0019, refusé par le seul plancher de fraction.
+        assertFalse(PedLightGate.acceptGreen(sparseColumn(19), 100, 100))
+        assertTrue(PedLightGate.acceptGreen(sparseColumn(20), 100, 100))
     }
 
     @Test
@@ -83,9 +88,14 @@ class PedLightGateLimitsTest {
     }
 
     /** Ligne verticale verte d'un pixel de large, calée en bas d'un cadre 100x100. */
-    private fun verticalLine(heightPx: Int, width: Int = 100, height: Int = 100): IntArray {
+    /** Colonne verte de 5 px de large, [greenPx] pixels verts sur 4 lignes espacées. */
+    private fun sparseColumn(greenPx: Int, width: Int = 100, height: Int = 100): IntArray {
         val pixels = IntArray(width * height) { BLACK }
-        for (y in height - heightPx until height) pixels[y * width + 50] = GREEN
+        var left = greenPx
+        for (y in intArrayOf(96, 91, 86, 81)) {
+            for (x in 48 until 48 + minOf(5, left)) pixels[y * width + x] = GREEN
+            left -= minOf(5, left)
+        }
         return pixels
     }
 

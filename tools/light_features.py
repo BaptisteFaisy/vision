@@ -29,6 +29,10 @@ ELONGATION_MIN = 1.0  # 31/10, ordre user : suit PedLightGate.kt (détection au 
 # 01/11 : tache plus large que haute = disque de face, sauf si elle est ajourée.
 # Un disque allumé remplit 0,75-0,88 de sa boîte, un bonhomme large 0,09-0,16.
 WIDE_FILL_MAX = 0.35
+# 02/11 (W5) : la tache verte doit faire >= 5 % du plus grand cote du crop.
+# En FRACTION et non en pixels : le corpus est a 48 px, la prod a 96 px ;
+# a 96 px les faux verts sont des bandes de 1-4 px, les vrais verts >= 7 px.
+GREEN_MIN_WIDTH_FRACTION = 0.05
 BBOX_MIN_PX = 3
 GREEN_BOTTOM_MIN = 0.35
 R1B_BOTTOM_FLOOR = 0.15  # 01/11, ordre user : suit PedLightGate.kt (jitter boite)
@@ -219,6 +223,8 @@ def accept_green(argb: list, w: int, h: int) -> bool:
     if bh < BBOX_MIN_PX:
         return False
     if float(bh) < bw * ELONGATION_MIN and s["green"] > bw * bh * WIDE_FILL_MAX:
+        return False
+    if bw < GREEN_MIN_WIDTH_FRACTION * max(w, h):
         return False
     bottom = s["green_bot"] / s["green"]
     if bottom >= GREEN_BOTTOM_MIN:
