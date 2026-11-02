@@ -3,8 +3,6 @@ package dev.sam3vision.core.traverse
 import dev.sam3vision.core.depth.DepthConfirm
 import dev.sam3vision.core.live.PositionText
 import dev.sam3vision.core.model.Detection
-import dev.sam3vision.core.motion.EgoMotion
-import dev.sam3vision.core.motion.GyroMotion
 import dev.sam3vision.core.motion.MotionSample
 import dev.sam3vision.core.predict.Box
 import dev.sam3vision.core.predict.BoxPredictor
@@ -138,10 +136,7 @@ class VehicleApproach {
      * [radialMpsByKey] porte les vitesses radiales Kalman (m/s, négatif en
      * approche) par clé d'instance (`null` = pas de signal distance :
      * comportement inchangé) : une radiale franche confirme l'approche,
-     * jamais elle ne supprime un tau. [gyro] (gyro-arret, `null` = verdicts
-     * visuels seuls, strictement inchanges) : rotation camera datee dans les
-     * unites du plan luma — repli quand le fond optique est muet (pan rapide),
-     * ignoree devant un fond sur. Le gyro ne decote jamais la croissance.
+     * jamais elle ne supprime un tau.
      */
     fun update(
         detections: List<Detection>,
@@ -149,13 +144,12 @@ class VehicleApproach {
         motion: FrameMotion? = null,
         depthByBox: Map<List<Float>, Float>? = null, // PISTE2
         radialMpsByKey: Map<String, Float>? = null,
-        gyro: GyroMotion? = null,
     ): ApproachVerdict {
         val frameWidth = detections.maxOfOrNull { it.width }?.takeIf { it > 0 } ?: FALLBACK_WIDTH
         val frameHeight = detections.maxOfOrNull { it.height }?.takeIf { it > 0 } ?: FALLBACK_HEIGHT
         associate(vehiclesOf(detections), atMs, frameWidth, depthByBox)
         dropStale(atMs)
-        evaluateMotion(motion, gyro, frameWidth, frameHeight)
+        evaluateMotion(motion, frameWidth, frameHeight)
         return verdict(frameWidth, frameHeight, radialMpsByKey, atMs)
     }
 
@@ -166,10 +160,10 @@ class VehicleApproach {
     /**
      * Verdicts fond des pistes à vitesse établie : la vitesse lissée de la
      * piste (px/s) passe en fractions d'image par frame pour [VehicleBackground].
-     * Sans [motion] ni [gyro], verdicts vides et [cameraMoved] faux (comportement inchange).
+     * Sans [motion], verdicts vides et [cameraMoved] faux (comportement inchange).
      */
-    private fun evaluateMotion(motion: FrameMotion?, gyro: GyroMotion?, frameWidth: Int, frameHeight: Int) {
-        if (motion == null && gyro == null) {
+    private fun evaluateMotion(motion: FrameMotion?, frameWidth: Int, frameHeight: Int) {
+        if (motion == null) {
             lastVerdicts = emptyMap()
             cameraMoved = false
             cameraMovedKeys = emptySet()
@@ -179,11 +173,11 @@ class VehicleApproach {
             return
         }
         fondFranc = VehicleBackground.groundOf( // FUSION : arrêt coupé sous fond franc, sans piste suiveuse.
-            fusedSample(motion, gyro), fusedLumaWidth(motion, gyro), fusedLumaHeight(motion, gyro), fusedDtMs(motion, gyro),
+            motion.global, motion.lumaWidth, motion.lumaHeight, motion.dtMs,
         )?.let { it > VehicleBackground.LATERAL_RATIO } == true
-        lastGlobal = motion?.global // PISTE1 (visuel seul : le gyro, rotation pure, ne decote jamais la croissance)
-        lastGlobalDtMs = motion?.dtMs ?: 0L // PISTE1
-        val dtSeconds = fusedDtMs(motion, gyro) / 1000f
+        lastGlobal = motion.global // PISTE1
+        lastGlobalDtMs = motion.dtMs // PISTE1
+        val dtSeconds = motion.dtMs / 1000f
         // PISTE3+FUSION : corroborer ici par SamResidu.decide (résidu masque compensé ego-motion,
         // verdict via ResiduDecision.toVerdict — null = doute, garder le verdict V1) dès que les
         // pistes retiendront le masque SAM de l'objet (prérequis : décodage + association inter-frames).
@@ -191,7 +185,7 @@ class VehicleApproach {
             if (!track.motion.velocityReliable) return@mapNotNull null
             val boxDx = track.motion.velocity.x / frameWidth * dtSeconds
             val boxDy = track.motion.velocity.y / frameHeight * dtSeconds
-            id to VehicleBackground.decide(id, boxDx, boxDy, motion?.global, fusedLumaWidth(motion, gyro), fusedLumaHeight(motion, gyro), fusedDtMs(motion, gyro), 0f, gyro?.hint)
+            id to VehicleBackground.decide(id, boxDx, boxDy, motion.global, motion.lumaWidth, motion.lumaHeight, motion.dtMs, 0f)
         }.toMap()
         cameraMoved = lastVerdicts.isNotEmpty() && lastVerdicts.all { it.value.verdict == Verdict.CAMERA_MOVED }
         cameraMovedKeys = lastVerdicts.entries
@@ -202,22 +196,6 @@ class VehicleApproach {
             .filterValues { group -> group.all { it.value.verdict == Verdict.CAMERA_MOVED } }
             .keys
     }
-
-    /** Echantillon ego-motion fusionne (visuel puis gyro) : le fond franc gyro coupe l'arret comme le visuel. */
-    private fun fusedSample(motion: FrameMotion?, gyro: GyroMotion?): MotionSample? =
-        EgoMotion.fusedSample(motion?.global, gyro?.hint)
-
-    /** Largeur luma du signal disponible (fond puis gyro), 0 sans signal. */
-    private fun fusedLumaWidth(motion: FrameMotion?, gyro: GyroMotion?): Int =
-        motion?.lumaWidth ?: gyro?.lumaWidth ?: 0
-
-    /** Hauteur luma du signal disponible (fond puis gyro), 0 sans signal. */
-    private fun fusedLumaHeight(motion: FrameMotion?, gyro: GyroMotion?): Int =
-        motion?.lumaHeight ?: gyro?.lumaHeight ?: 0
-
-    /** Delai inter-frames du signal disponible (ms, fond puis gyro), 0 sans signal. */
-    private fun fusedDtMs(motion: FrameMotion?, gyro: GyroMotion?): Long =
-        motion?.dtMs ?: gyro?.dtMs ?: 0L
 
     /** Véhicules confiants à boîte saine, seuls suivis. */
     private fun vehiclesOf(detections: List<Detection>): List<VehicleBox> =

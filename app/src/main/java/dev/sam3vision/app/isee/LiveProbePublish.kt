@@ -1,5 +1,6 @@
 package dev.sam3vision.app.isee
 
+import dev.sam3vision.app.BuildConfig
 import dev.sam3vision.core.distance.DistanceReading
 import dev.sam3vision.core.live.LiveSession
 import dev.sam3vision.core.live.LiveTimings
@@ -9,6 +10,12 @@ import dev.sam3vision.core.model.Detection
 import dev.sam3vision.core.model.LiveFrame
 import dev.sam3vision.core.stairs.stairsMaskPlaneOf
 import kotlinx.coroutines.flow.update
+
+/** Étiquette des diagnostics du mutisme spontané (`logcat -s VoiceMute:*`). */
+private const val TAG_MUTE = "VoiceMute"
+
+/** Dernière ligne sonde émise (une toutes les 2 s, debug seul). */
+private var lastMuteProbeMs = 0L
 
 /**
  * Chiffres d'une frame, calculés entre les deux écritures de [publish] : tout
@@ -96,7 +103,23 @@ internal fun LiveProbe.computeRest(frame: LiveFrame, jpegB64: String, at: Long):
     pulse.feed(at, voice.lastDecision, placed)
     // Compteur de marches : le masque exact borne les frames suivantes (repli boîte sinon).
     StairCannyCount.setMaskPlane(stairsMaskPlaneOf(frame.objects, frame.width, frame.height))
+    muteProbeLine(frame, readings, phrase)
     return ProbeRest(rawDetections, readings, placed, cross, phrase)
+}
+
+/**
+ * Une ligne toutes les 2 s : ce que la sonde voit — distingue « rien à dire »
+ * (pas de lectures) de « dit mais jeté » (bus). Tourne avant la publication,
+ * donc même quand les guetteurs abandonnent sans un mot. Debug seul.
+ */
+private fun LiveProbe.muteProbeLine(frame: LiveFrame, readings: List<DistanceReading>, phrase: String?) {
+    if (!BuildConfig.DEBUG) return
+    val nowMs = System.currentTimeMillis()
+    if (nowMs - lastMuteProbeMs < 2000L) return
+    lastMuteProbeMs = nowMs
+    val labels = frame.objects.take(6).joinToString(",") { it.label }
+    val poseOk = distances.effectivePose() != null
+    android.util.Log.d(TAG_MUTE, "sonde objets=${frame.objects.size} lectures=${readings.size} pose=$poseOk etiquettes=[$labels] phrase=[$phrase]")
 }
 
 /**

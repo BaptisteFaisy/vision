@@ -15,15 +15,15 @@ import org.junit.Test
 class IseeClipsEnTest {
 
     @Test
-    fun `le registre couvre les 70 nouveaux clips et les 15 réutilisés`() {
-        assertEquals(85, IseeClipsEn.all.size)
+    fun `le registre couvre les 70 nouveaux clips et les 19 réutilisés`() {
+        assertEquals(89, IseeClipsEn.all.size)
     }
 
     @Test
     fun `chaque entrée du catalogue JSON est dans le registre au caractère près`() {
         val catalog = JSONObject(catalogFile().readText())
         val entries = catalog.getJSONArray("clips") + catalog.getJSONArray("reuse")
-        assertEquals(85, entries.size)
+        assertEquals(89, entries.size)
         for ((id, text) in entries) {
             assertEquals("clip $id", text, IseeClipsEn.all[id])
         }
@@ -139,6 +139,33 @@ class IseeClipsEnTest {
         assertEquals("Twelve.", IseeClipsEn.all[IseeClipsEn.N_12])
         assertEquals("12 o'clock.", IseeClipsEn.all[IseeClipsEn.CLOCK_12])
         assertEquals("20 meters.", IseeClipsEn.all[IseeClipsEn.METERS_20])
+    }
+
+    @Test
+    fun `idForText retrouve le clip d une phrase exacte, nul sinon`() {
+        assertEquals(IseeClipsEn.SIDEWALK_AHEAD, IseeClipsEn.idForText("Sidewalk ahead."))
+        assertEquals(IseeClipsEn.SIDEWALK_LEFT, IseeClipsEn.idForText("Sidewalk on the left."))
+        assertEquals(IseeClipsEn.SIDEWALK_RIGHT, IseeClipsEn.idForText("Sidewalk on the right."))
+        assertEquals(IseeClipsEn.SIDEWALK_ACROSS, IseeClipsEn.idForText("Sidewalk across the street."))
+        assertEquals(IseeClipsEn.HUMAN_IMMINENT, IseeClipsEn.idForText("Stop."))
+        assertEquals(IseeClipsEn.HUMAN_PERSON, IseeClipsEn.idForText("Person."))
+        assertEquals(IseeClipsEn.CAR, IseeClipsEn.idForText("Car."))
+        assertEquals(IseeClipsEn.TL_LEFT, IseeClipsEn.idForText("left."))
+        assertEquals(IseeClipsEn.TL_RIGHT, IseeClipsEn.idForText("right."))
+        assertEquals(IseeClipsEn.TL_STRAIGHT, IseeClipsEn.idForText("straight ahead."))
+        assertEquals(IseeClipsEn.TL_STOP, IseeClipsEn.idForText("obstacle, stop."))
+        assertNull(IseeClipsEn.idForText("Trottoir à gauche."))
+        assertNull(IseeClipsEn.idForText("Stairs up at 4 meters."))
+        assertNull(IseeClipsEn.idForText(""))
+    }
+
+    @Test
+    fun `idForText sans collision - un texte, un clip`() {
+        val texts = IseeClipsEn.all.values.toList()
+        assertEquals(texts.size, texts.toSet().size)
+        for ((id, text) in IseeClipsEn.all) {
+            assertEquals("texte $text", id, IseeClipsEn.idForText(text))
+        }
     }
 
     @Test
