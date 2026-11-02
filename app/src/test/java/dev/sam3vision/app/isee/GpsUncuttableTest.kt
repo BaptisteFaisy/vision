@@ -7,11 +7,9 @@ import dev.sam3vision.core.distance.DistanceReading
 import dev.sam3vision.core.hazard.HazardWatcher
 import dev.sam3vision.core.live.AntiRepeat
 import dev.sam3vision.core.speech.SpeechLanguage
-import dev.sam3vision.core.traverse.VehicleStateWatcher
 import kotlinx.coroutines.test.runTest
 import org.junit.After
 import org.junit.Assert.assertEquals
-import org.junit.Assert.assertTrue
 import org.junit.Before
 import org.junit.Test
 
@@ -140,7 +138,7 @@ class GpsUncuttableTest {
     }
 
     private fun rig(): ObstacleWatchers =
-        ObstacleWatchers(VehicleStateWatcher(), CurbWatcher(), HazardWatcher())
+        ObstacleWatchers(CurbWatcher(), HazardWatcher())
 
     /** Lecture centrée 640×480 : boîte de [largeur] px à [meters] m. */
     private fun lecture(label: String, largeur: Float, meters: Float): DistanceReading {
@@ -157,20 +155,15 @@ class GpsUncuttableTest {
     )
 
     @Test
-    fun `frame tue pendant le mot sans consommer son tour`() = runTest {
+    fun `frame tue pendant le mot, seul le mot est dit`() = runTest {
         VoiceBus.post(OutdoorLevel.GPS_EVENT, "Left.")
         val guetteurs = rig()
-        val t0 = System.currentTimeMillis()
 
-        obstacleFrame(etat(1, lecture("car", 100f, 8f)), { SpeechLanguage.Fr }, guetteurs)
-        obstacleFrame(etat(2, lecture("car", 120f, 7f)), { SpeechLanguage.Fr }, guetteurs)
-        obstacleFrame(etat(3, lecture("car", 145f, 6f)), { SpeechLanguage.Fr }, guetteurs)
+        obstacleFrame(etat(1, lecture("person", 100f, 3.5f)), { SpeechLanguage.Fr }, guetteurs)
+        obstacleFrame(etat(2, lecture("person", 100f, 3.5f)), { SpeechLanguage.Fr }, guetteurs)
+        obstacleFrame(etat(3, lecture("person", 100f, 3.5f)), { SpeechLanguage.Fr }, guetteurs)
 
-        // La 3e frame confirmerait (3 frames croissantes = mouvement parlé
-        // hors mot) : tue par le mot en cours, rien de posté.
+        // Mot de guidage en cours : la frame est tuée, seul le mot est dit.
         assertEquals(1, speaker.said.size)
-        // Tour d'antirépétition intact (le bus jetterait le vœu, tour mangé) :
-        // la voiture reparle dès la fin du mot, côté bus.
-        assertTrue(AntiRepeat.allow(AntiRepeat.KEY_CAR_MOVING, t0))
     }
 }
