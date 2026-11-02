@@ -209,17 +209,19 @@ class MainActivity : ComponentActivity() {
         )
     }
 
-    /** Option C : minuteur d'inactivité démarré / annulé autour de l'arrière-plan. */
+    /** Fond : grâce 60 s iSee (pas d'extinction immédiate) ou coupure directe hors sonde. */
     override fun onPause() {
         root.cancelGesture()
         // L'app n'est plus visible (bouton home, changement d'app, écran éteint) : on coupe
-        // le GPU ici et pas à onStop — sur ce téléphone, home ne déclenche pas toujours onStop
-        // et un minuteur ne servirait à rien, Android gèle le processus en arrière-plan.
+        // le GPU ici et pas à onStop — sur ce téléphone, home ne déclenche pas toujours onStop.
         // Session lunettes-iSee en cours : la carte reste allumée, la veille ne coupe rien.
-        if (!isChangingConfigurations && !glassesKeepAlive()) viewModel.releaseGpu()
+        // Sonde iSee vivante : pas d'extinction immédiate, la grâce (60 s) éteint sans
+        // retour avant — un aller-retour rapide retrouve la carte chaude.
         // Rotation : l'activité est recréée mais les ViewModels survivent — le direct
         // (socket `/live/ws`, sessions) survit avec eux au lieu d'être coupé/rouvert.
         if (!isChangingConfigurations) isee.onBackground()
+        val probeAlive = isee.probe.session != null
+        if (!isChangingConfigurations && !glassesKeepAlive() && !probeAlive) viewModel.releaseGpu()
         super.onPause()
     }
 
@@ -260,9 +262,11 @@ class MainActivity : ComponentActivity() {
      * récentes en est une, même sans `isFinishing`.
      */
     override fun onDestroy() {
-        // App quittée pour de bon (pas une simple rotation) : on éteint le GPU, sinon la
-        // carte A100 reste facturée jusqu'à sa fenêtre de réduintage.
-        if (isFinishing) viewModel.releaseGpu()
+        // App quittée pour de bon (pas une simple rotation — le balayage des apps
+        // récentes en est une, même sans `isFinishing`) : extinction immédiate,
+        // sinon la carte A100 reste facturée jusqu'à sa fenêtre de réduintage.
+        // La grâce éventuelle est annulée par `onAppClosed` : une seule extinction.
+        if (!isChangingConfigurations) viewModel.releaseGpu()
         if (!isChangingConfigurations) isee.onAppClosed()
         // Rotation comprise : sans ça, l'ancien contrôleur (et sa session SDK) survivait
         // en fantôme et la session suivante butait dessus (`SESSION_ALREADY_EXISTS`,

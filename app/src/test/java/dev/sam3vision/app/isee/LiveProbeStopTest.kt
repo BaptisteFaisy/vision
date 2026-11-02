@@ -116,6 +116,35 @@ class LiveProbeStopTest {
     }
 
     @Test
+    fun `stopLocal ferme les sessions sans eteindre`() = runTest {
+        val (probe, fake) = probeHarness(this)
+        var calls = 0
+        releaseOnStop = {
+            calls += 1
+            Result.success(ReleaseOutcome(released = true, code = 200, body = "{}"))
+        }
+        probe.stopLocal()
+        advanceUntilIdle()
+
+        assertFalse(probe.wantsFrame())
+        assertEquals("une session à fermer (FIX-19)", 1, fake.closed)
+        assertEquals("mise en fond : l'extinction attend la grâce", 0, calls)
+    }
+
+    @Test
+    fun `stopLocal jette la reponse en vol`() = runTest {
+        val (probe, fake) = probeHarness(this)
+        probe.onFrame("A")
+        advanceUntilIdle()
+        probe.stopLocal()
+
+        fake.respond("A", LiveFrame(width = 512, height = 512, elapsedMs = 111, objects = emptyList()))
+        advanceUntilIdle()
+
+        assertEquals(0, probe.state.value.frames)
+    }
+
+    @Test
     fun `stop sans endpoint n eteint rien`() = runTest {
         val probe = LiveProbe(
             scope = this,
