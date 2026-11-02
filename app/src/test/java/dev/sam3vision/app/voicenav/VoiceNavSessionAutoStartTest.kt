@@ -45,10 +45,10 @@ class VoiceNavSessionAutoStartTest {
     private val gpsFlags = mutableListOf<Boolean>()
     private val summary = RouteSummary("la gare", "Place Louis-Armand, Paris", 2450, 900)
     private val questionGare =
-        "Do you really want to go to la gare? Travel time: 15 minutes. Answer yes or no."
+        "Go to la gare? 15 minutes. Yes?"
     private val questionTour =
-        "Do you really want to go to la tour Eiffel? Travel time: 15 minutes. Answer yes or no."
-    private val questionTourNoTime = "Do you really want to go to la tour Eiffel? Answer yes or no."
+        "Go to la tour Eiffel? 15 minutes. Yes?"
+    private val questionTourNoTime = "Go to la tour Eiffel? Yes?"
 
     private fun session(
         launcher: AutoStartLauncher = AutoStartLauncher(),
@@ -79,7 +79,7 @@ class VoiceNavSessionAutoStartTest {
         val state = session.state.value as VoiceNavUiState.Guiding
         assertEquals("la gare", state.destination)
         assertTrue(launcher.launched.isEmpty())
-        // Une seule voix : le moteur dit « Navigating to X », pas la session.
+        // Une seule voix : le moteur dit « Going to X », pas la session.
         assertTrue(spoken.isEmpty())
     }
 

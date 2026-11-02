@@ -35,7 +35,7 @@ class IseePlayback(
     private val player: SpeechPlayer,
     private val update: ((IseeUiState) -> IseeUiState) -> Unit,
     private val synthesize: suspend (String) -> ByteArray,
-    private val playBytes: suspend (ByteArray) -> Result<Unit> = { bytes -> player.play(bytes) },
+    private val playBytes: suspend (ByteArray) -> Result<Unit> = { bytes -> player.playSlice(bytes) },
     private val playSlice: suspend (ByteArray) -> Result<PlaybackEnd> = { bytes -> player.playQueued(bytes) },
 ) {
 

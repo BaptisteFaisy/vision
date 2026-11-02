@@ -141,11 +141,11 @@ class TraverseVetoPriorityTest {
         assertEquals("Don't cross yet", TraversePhrases.RED)
         assertEquals("You can cross", TraversePhrases.GREEN)
         assertEquals("Sidewalk across the street.", TraversePhrases.SIDEWALK_ACROSS)
-        assertEquals("On the crosswalk.", TraversePhrases.ON_CROSSWALK)
+        assertEquals("Here.", TraversePhrases.ON_CROSSWALK)
         assertEquals(
             listOf(
                 "Don't cross yet", "You can cross",
-                "Sidewalk across the street.", "On the crosswalk.",
+                "Sidewalk across the street.", "Here.",
             ),
             TraversePhrases.ALL,
         )

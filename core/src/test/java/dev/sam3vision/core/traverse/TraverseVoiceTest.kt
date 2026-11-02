@@ -27,7 +27,7 @@ class TraverseVoiceTest {
         assertEquals(CrossingText.phrase(CrossingState.Red), TraversePhrases.RED)
         assertEquals(CrossingText.phrase(CrossingState.Green), TraversePhrases.GREEN)
         assertEquals("Sidewalk across the street.", TraversePhrases.SIDEWALK_ACROSS)
-        assertEquals("On the crosswalk.", TraversePhrases.ON_CROSSWALK)
+        assertEquals("Here.", TraversePhrases.ON_CROSSWALK)
         assertEquals(
             listOf(
                 TraversePhrases.RED, TraversePhrases.GREEN,

@@ -163,7 +163,7 @@ class IseeViewModel(app: Application) : AndroidViewModel(app) {
         camera = { camera },
         update = ::update,
         scope = viewModelScope,
-        onRecordingStarted = { probe.begin(); proximity.reset(); hazards?.reset(); VoiceBus.reset(); AntiRepeat.reset() },
+        onRecordingStarted = { probe.begin(); proximity.reset(); hazards?.reset(); VoiceBus.reset(); AntiRepeat.reset(); VoiceTick.reset() },
         prune = ::enforceFifo,
     )
 
@@ -465,7 +465,7 @@ class IseeViewModel(app: Application) : AndroidViewModel(app) {
         val audio = voice.synthesize(text)
         if (audio.isEmpty()) return
         speakAnnouncement(text)
-        player.play(audio).onFailure { update { it.copy(speakingEntryId = null, speakingText = "") } }
+        player.playSlice(audio).onFailure { update { it.copy(speakingEntryId = null, speakingText = "") } }
     }
 
     /** Sécurité FIFO silencieuse après chaque écriture de fichier multimédia. */

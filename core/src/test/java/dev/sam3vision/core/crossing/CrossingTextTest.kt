@@ -8,8 +8,8 @@ class CrossingTextTest {
 
     @Test
     fun `phrases francaises courtes, rouge vert`() {
-        assertEquals("Rouge, attendez.", CrossingText.phrase(CrossingState.Red, SpeechLanguage.Fr))
-        assertEquals("Vert, traversez.", CrossingText.phrase(CrossingState.Green, SpeechLanguage.Fr))
+        assertEquals("Rouge.", CrossingText.phrase(CrossingState.Red, SpeechLanguage.Fr))
+        assertEquals("Vert.", CrossingText.phrase(CrossingState.Green, SpeechLanguage.Fr))
     }
 
     @Test
@@ -19,10 +19,10 @@ class CrossingTextTest {
     }
 
     @Test
-    fun `le clignotant dit ne pas s'engager`() {
-        assertEquals("Vert clignotant, ne pas s'engager.", CrossingText.blinking(SpeechLanguage.Fr))
-        assertEquals("Flashing green, do not cross.", CrossingText.blinking(SpeechLanguage.En))
-        assertEquals("Flashing green, do not cross.", CrossingText.blinking())
+    fun `le clignotant dit Attends`() {
+        assertEquals("Attends.", CrossingText.blinking(SpeechLanguage.Fr))
+        assertEquals("Don't go.", CrossingText.blinking(SpeechLanguage.En))
+        assertEquals("Don't go.", CrossingText.blinking())
     }
 
     @Test
@@ -33,10 +33,10 @@ class CrossingTextTest {
     }
 
     @Test
-    fun `la contradiction dit feux contradictoires, attendez`() {
-        assertEquals("Feux contradictoires, attendez.", CrossingText.contradiction(SpeechLanguage.Fr))
-        assertEquals("Conflicting lights, wait.", CrossingText.contradiction(SpeechLanguage.En))
-        assertEquals("Conflicting lights, wait.", CrossingText.contradiction())
+    fun `la contradiction dit feux mixtes`() {
+        assertEquals("Feux mixtes.", CrossingText.contradiction(SpeechLanguage.Fr))
+        assertEquals("Mixed lights.", CrossingText.contradiction(SpeechLanguage.En))
+        assertEquals("Mixed lights.", CrossingText.contradiction())
     }
 
     @Test
@@ -51,9 +51,9 @@ class CrossingTextTest {
 
     @Test
     fun `confirmation parlee du mode`() {
-        assertEquals("Crossing mode on.", CrossingText.mode(true))
-        assertEquals("Crossing mode off.", CrossingText.mode(false))
-        assertEquals("Crossing mode on.", CrossingText.mode(true, SpeechLanguage.En))
-        assertEquals("Crossing mode off.", CrossingText.mode(false, SpeechLanguage.En))
+        assertEquals("Crossing on.", CrossingText.mode(true))
+        assertEquals("Crossing off.", CrossingText.mode(false))
+        assertEquals("Crossing on.", CrossingText.mode(true, SpeechLanguage.En))
+        assertEquals("Crossing off.", CrossingText.mode(false, SpeechLanguage.En))
     }
 }

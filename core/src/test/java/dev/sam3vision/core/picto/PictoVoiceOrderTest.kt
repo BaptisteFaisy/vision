@@ -161,24 +161,24 @@ class PictoVoiceOrderTest {
 
     @Test
     fun `les phrases parlent la langue de la voix`() {
-        assertEquals("Je crée le pictogramme.", PictoVoiceText.started(SpeechLanguage.Fr))
+        assertEquals("Création picto.", PictoVoiceText.started(SpeechLanguage.Fr))
         assertEquals(
-            "Pictogramme medics prêt. Dis son nom pour être guidé.",
+            "medics prêt.",
             PictoVoiceText.created("medics", SpeechLanguage.Fr),
         )
-        assertEquals("Création du pictogramme impossible.", PictoVoiceText.failed(SpeechLanguage.Fr))
-        assertEquals("Création déjà en cours.", PictoVoiceText.busy(SpeechLanguage.Fr))
-        assertEquals("Creating the pictogram.", PictoVoiceText.started(SpeechLanguage.En))
+        assertEquals("Picto raté.", PictoVoiceText.failed(SpeechLanguage.Fr))
+        assertEquals("En cours.", PictoVoiceText.busy(SpeechLanguage.Fr))
+        assertEquals("Creating picto.", PictoVoiceText.started(SpeechLanguage.En))
         assertEquals(
-            "Pictogram medics ready. Say its name for guidance.",
+            "medics ready.",
             PictoVoiceText.created("medics", SpeechLanguage.En),
         )
-        assertEquals("Pictogramme prêt.", PictoVoiceText.createdUnnamed(SpeechLanguage.Fr))
-        assertEquals("Pictogram ready.", PictoVoiceText.createdUnnamed(SpeechLanguage.En))
+        assertEquals("Picto prêt.", PictoVoiceText.createdUnnamed(SpeechLanguage.Fr))
+        assertEquals("Picto ready.", PictoVoiceText.createdUnnamed(SpeechLanguage.En))
         assertEquals("Démo picto activée.", PictoVoiceText.demo(true, SpeechLanguage.Fr))
         assertEquals("Démo picto coupée.", PictoVoiceText.demo(false, SpeechLanguage.Fr))
         assertEquals("Picto demo on.", PictoVoiceText.demo(true, SpeechLanguage.En))
-        assertEquals("Je cherche keys.", PictoVoiceText.findStarted("keys", SpeechLanguage.Fr))
-        assertEquals("Looking for keys.", PictoVoiceText.findStarted("keys", SpeechLanguage.En))
+        assertEquals("Cherche keys.", PictoVoiceText.findStarted("keys", SpeechLanguage.Fr))
+        assertEquals("Finding keys.", PictoVoiceText.findStarted("keys", SpeechLanguage.En))
     }
 }

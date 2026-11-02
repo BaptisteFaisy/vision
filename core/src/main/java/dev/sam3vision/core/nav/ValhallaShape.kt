@@ -62,8 +62,8 @@ private fun decodeChunk(shape: String, from: Int): Pair<Int, Int>? {
  */
 fun maneuverShort(type: Int): String = when (type) {
     1, 2, 3 -> "Start."
-    4, 5, 6 -> "You have arrived."
-    8, 22 -> "Continue straight ahead."
+    4, 5, 6 -> "Arrived."
+    8, 22 -> "Straight on."
     9 -> "Bear right."
     10 -> "Turn right."
     11 -> "Sharp right."
@@ -76,9 +76,9 @@ fun maneuverShort(type: Int): String = when (type) {
     23 -> "Stay right."
     24 -> "Stay left."
     25, 37, 38 -> "Merge."
-    26 -> "Enter the roundabout."
-    27 -> "Exit the roundabout."
+    26 -> "Roundabout."
+    27 -> "Exit."
     28 -> "Take the ferry."
-    29 -> "Leave the ferry."
+    29 -> "Leave ferry."
     else -> "Continue."
 }

@@ -28,8 +28,8 @@ class IseeGlassesOrderTest {
     fun `isee bascule la session et confirme a voix haute`() = runBlocking {
         assertTrue(order(SessionToggle.START).run("iSee"))
         assertEquals(1, toggles)
-        assertEquals(listOf("Glasses session: opening the session."), spoken)
-        assertEquals("Glasses session: opening the session.", state.status)
+        assertEquals(listOf("Glasses on."), spoken)
+        assertEquals("Glasses on.", state.status)
     }
 
     @Test
@@ -37,7 +37,7 @@ class IseeGlassesOrderTest {
         assertTrue(order(SessionToggle.STOP).run("iSee"))
         assertTrue(order(SessionToggle.NOT_LINKED).run("iSee"))
         assertEquals(
-            listOf("Glasses session stopped.", "Glasses not connected over Bluetooth: session not opened."),
+            listOf("Glasses off.", "No glasses."),
             spoken,
         )
     }

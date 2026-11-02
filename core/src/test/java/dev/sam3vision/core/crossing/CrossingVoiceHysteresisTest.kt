@@ -50,8 +50,8 @@ class CrossingVoiceHysteresisTest {
 
     @Test
     fun `phrases francaises litterales de la voix`() {
-        assertEquals("Rouge, attendez.", CrossingText.phrase(CrossingState.Red, SpeechLanguage.Fr))
-        assertEquals("Vert, traversez.", CrossingText.phrase(CrossingState.Green, SpeechLanguage.Fr))
+        assertEquals("Rouge.", CrossingText.phrase(CrossingState.Red, SpeechLanguage.Fr))
+        assertEquals("Vert.", CrossingText.phrase(CrossingState.Green, SpeechLanguage.Fr))
     }
 
     @Test

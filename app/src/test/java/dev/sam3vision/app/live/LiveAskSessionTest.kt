@@ -205,8 +205,8 @@ class LiveAskSessionTest {
         assertEquals(listOf("medics"), fakes.store.list().map { it.label })
         assertEquals(
             listOf(
-                "Je crée le pictogramme.",
-                "Pictogramme medics prêt. Dis son nom pour être guidé.",
+                "Création picto.",
+                "medics prêt.",
             ),
             fakes.spoken,
         )
@@ -219,7 +219,7 @@ class LiveAskSessionTest {
         val fakes = pictoFakes(jpeg = "")
         fakes.session.ask("fais un pictogramme de ces médics")
         advanceUntilIdle()
-        assertEquals(listOf("Création du pictogramme impossible."), fakes.spoken)
+        assertEquals(listOf("Picto raté."), fakes.spoken)
         assertEquals(0, fakes.client.calls)
         assertTrue(fakes.store.list().isEmpty())
     }
@@ -233,7 +233,7 @@ class LiveAskSessionTest {
         fakes.session.ask("fais un pictogramme de ces médics")
         advanceUntilIdle()
         assertEquals(
-            listOf("Je crée le pictogramme.", "Création du pictogramme impossible."),
+            listOf("Création picto.", "Picto raté."),
             fakes.spoken,
         )
         assertTrue(fakes.store.list().isEmpty())

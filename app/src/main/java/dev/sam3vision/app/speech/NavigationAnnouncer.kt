@@ -5,20 +5,20 @@ import dev.sam3vision.core.settings.Settings
 /**
  * Phrases de navigation prononcées via le chemin TTS existant.
  *
- * Textes exacts du contrat : « Navigating to X » quand le guidage démarre,
- * « I can't open the guidance » quand il est impossible à ouvrir.
+ * Formes minimales 350 ms : « Going to X » au démarrage,
+ * « No guidance. » quand il est impossible à ouvrir.
  * Pures et sans Android : testables en JVM (JUnit seul).
  */
 object NavigationPhrases {
 
     /**
-     * « Navigating to X » — [destination] brute, espaces rognés.
+     * « Going to X » — [destination] brute, espaces rognés (résiduelle).
      * L'appelant refuse les destinations blanches avant de parler.
      */
-    fun started(destination: String): String = "Navigating to ${destination.trim()}"
+    fun started(destination: String): String = "Going to ${destination.trim()}"
 
     /** Guidage impossible à ouvrir (aucune app de navigation, lancement refusé…). */
-    const val GUIDANCE_UNAVAILABLE = "I can't open the guidance"
+    const val GUIDANCE_UNAVAILABLE = "No guidance."
 }
 
 /**
@@ -39,7 +39,7 @@ class NavigationAnnouncer(
 ) {
 
     /**
-     * Annonce « Navigating to X ». Une destination blanche est refusée par
+     * Annonce « Going to X ». Une destination blanche est refusée par
      * [Result.failure] sans rien dire ; un [speak] qui jette devient aussi
      * [Result.failure] — jamais d'exception levée.
      */
@@ -49,7 +49,7 @@ class NavigationAnnouncer(
     }
 
     /**
-     * Annonce « I can't open the guidance ». Ne lève jamais : un [speak]
+     * Annonce « No guidance. ». Ne lève jamais : un [speak]
      * qui jette est converti en [Result.failure].
      */
     suspend fun announceGuidanceUnavailable(): Result<Unit> =

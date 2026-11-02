@@ -58,7 +58,7 @@ class IseeSteeringOrders(
      * Ordre « traverser » / « crossing mode on/off » / « crosswalk on/off » :
      * consommé ici (jamais LLM), confirmé à voix haute par le chemin
      * navigation — puis, à l'activation, le passage en vue est annoncé
-     * (« Passage piéton devant, à 5 mètres. »). Vrai si [text] portait l'ordre.
+     * (« Devant, 5 mètres. »). Vrai si [text] portait l'ordre.
      */
     suspend fun runCrossing(text: String): Boolean {
         val command = CrossingVoiceCommand.parse(text) ?: return false

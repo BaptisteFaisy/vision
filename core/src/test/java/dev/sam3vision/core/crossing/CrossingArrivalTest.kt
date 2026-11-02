@@ -13,8 +13,8 @@ class CrossingArrivalTest {
     @Test
     fun `phrase arrivee douce FR EN`() {
         assertEquals("Sur le passage.", CrossingText.arrived(SpeechLanguage.Fr))
-        assertEquals("On the crosswalk.", CrossingText.arrived())
-        assertEquals("On the crosswalk.", CrossingText.arrived(SpeechLanguage.En))
+        assertEquals("Here.", CrossingText.arrived())
+        assertEquals("Here.", CrossingText.arrived(SpeechLanguage.En))
     }
 
     @Test
@@ -74,7 +74,7 @@ class CrossingArrivalTest {
         val watcher = CrossingArrivalWatcher()
         assertNull(watcher.onFrame(true))
         val cue = watcher.onFrame(true)
-        assertEquals("On the crosswalk.", cue?.phrase)
+        assertEquals("Here.", cue?.phrase)
         assertFalse(cue?.urgent ?: true)
     }
 
@@ -94,7 +94,7 @@ class CrossingArrivalTest {
         watcher.onFrame(true)
         watcher.onFrame(false)
         assertNull(watcher.onFrame(true))
-        assertEquals("On the crosswalk.", watcher.onFrame(true)?.phrase)
+        assertEquals("Here.", watcher.onFrame(true)?.phrase)
     }
 
     @Test
@@ -103,7 +103,7 @@ class CrossingArrivalTest {
         watcher.onFrame(true)
         watcher.onFrame(false)
         assertNull(watcher.onFrame(true))
-        assertEquals("On the crosswalk.", watcher.onFrame(true)?.phrase)
+        assertEquals("Here.", watcher.onFrame(true)?.phrase)
     }
 
     @Test
@@ -114,7 +114,7 @@ class CrossingArrivalTest {
         watcher.reset()
         assertNull(watcher.lastCue)
         assertNull(watcher.onFrame(true))
-        assertEquals("On the crosswalk.", watcher.onFrame(true)?.phrase)
+        assertEquals("Here.", watcher.onFrame(true)?.phrase)
     }
 
     @Test
@@ -122,7 +122,7 @@ class CrossingArrivalTest {
         val watcher = CrossingArrivalWatcher()
         watcher.onFrame(true, SpeechLanguage.En)
         val cue = watcher.onFrame(true, SpeechLanguage.En)
-        assertEquals("On the crosswalk.", cue?.phrase)
+        assertEquals("Here.", cue?.phrase)
         assertFalse(cue?.urgent ?: true)
     }
 }

@@ -187,7 +187,7 @@ internal fun LiveProbe.observeSpoken(
 
 /**
  * Guetteur grillage de la sonde (SPEC v4, niveau 4) : les pans suivis lus
- * dans l'état, postés au bus avec le niveau et la clé du signalement.
+ * dans l'état, postés au bus avec le niveau et la clé du signalement, et rapportés au battement 350 ms ([VoiceTick]).
  * Coupé en mode Traversée (le verdict y est propriétaire du son).
  */
 internal fun LiveProbe.observeFenceOpening(
@@ -203,6 +203,11 @@ internal fun LiveProbe.observeFenceOpening(
             val readings = st.distanceLayer?.readings ?: return@collect
             val signal = FenceOpeningSignal.of(readings, st.width, st.height)
             val cue = watcher.onSignal(signal, System.currentTimeMillis(), language()) ?: return@collect
+            VoiceTick.report(
+                VoiceTick.SRC_FENCE,
+                VoiceWish(cue.level, cue.phrase, cue.antiRepeatKey),
+                System.currentTimeMillis(),
+            )
             if (AntiRepeat.allow(cue.antiRepeatKey, System.currentTimeMillis())) {
                 VoiceBus.post(cue.level, cue.phrase)
             }
@@ -346,7 +351,7 @@ internal fun LiveProbe.phraseOf(
 /**
  * Guetteur trottoir-nommé de la sonde (SPEC v4, niveau 10) : la position lue
  * dans la voix guidée (rien dans l'état ne porte le plan du trottoir, non
- * mesuré), postée au bus avec le niveau et la clé du signalement. Coupé en
+ * mesuré), postée au bus avec le niveau et la clé du signalement, et au battement 350 ms ([VoiceTick]). Coupé en
  * mode Traversée (le verdict y est propriétaire du son).
  */
 internal fun LiveProbe.observeSidewalk(
@@ -361,6 +366,11 @@ internal fun LiveProbe.observeSidewalk(
             if (placeMode() != PictoPlaceMode.DEHORS) return@collect
             val position = this@observeSidewalk.voice.lastSidewalk
             val cue = watcher.onPosition(position, System.currentTimeMillis(), language()) ?: return@collect
+            VoiceTick.report(
+                VoiceTick.SRC_SIDEWALK,
+                VoiceWish(cue.level, cue.phrase, cue.antiRepeatKey),
+                System.currentTimeMillis(),
+            )
             if (AntiRepeat.allow(cue.antiRepeatKey, System.currentTimeMillis())) {
                 VoiceBus.post(cue.level, cue.phrase)
             }
@@ -397,7 +407,7 @@ internal class ProbeHazards(
  * Les sept guetteurs en un appel : le ViewModel n'y tient qu'une ligne
  * (plafond 500 — voir `observeSpoken`, même contrat). Véhicules, bordure et
  * mobilier partagent le guetteur obstacles (une frame, un seul gagnant au
- * bus). Tous postent au bus ([VoiceBus]) : plus de voix directe ici.
+ * bus). Tous postent au bus ([VoiceBus]) : plus de voix directe ici. Le battement voix 350 ms ([observeVoiceTick]) démarre avec eux.
  */
 internal fun LiveProbe.observeHazards(
     scope: CoroutineScope,
@@ -405,6 +415,7 @@ internal fun LiveProbe.observeHazards(
     placeMode: () -> PictoPlaceMode = { PictoPlaceMode.DEHORS },
 ): ProbeHazards {
     val obstacles = observeObstacles(scope, language, placeMode = placeMode)
+    observeVoiceTick(scope, indoor = { placeMode() == PictoPlaceMode.DEDANS })
     return ProbeHazards(
         obstacles.curb,
         observeStairs(scope, language, placeMode = placeMode),

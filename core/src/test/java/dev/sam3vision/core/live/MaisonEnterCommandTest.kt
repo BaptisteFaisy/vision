@@ -37,15 +37,15 @@ class MaisonEnterCommandTest {
     @Test
     fun `la confirmation parle la langue de la voix`() {
         assertEquals(
-            "Mode maison activé. Je cherche les objets de l'appartement.",
+            "Mode maison.",
             MaisonEnterText.entered(SpeechLanguage.Fr),
         )
         assertEquals(
-            "Home mode on. Looking for household objects.",
+            "Home mode.",
             MaisonEnterText.entered(SpeechLanguage.En),
         )
         assertEquals(MaisonEnterText.entered(), MaisonEnterText.entered(SpeechLanguage.En))
-        assertEquals("Déjà en mode maison.", MaisonEnterText.already(SpeechLanguage.Fr))
-        assertEquals("Already in home mode.", MaisonEnterText.already(SpeechLanguage.En))
+        assertEquals("Déjà actif.", MaisonEnterText.already(SpeechLanguage.Fr))
+        assertEquals("Already on.", MaisonEnterText.already(SpeechLanguage.En))
     }
 }
