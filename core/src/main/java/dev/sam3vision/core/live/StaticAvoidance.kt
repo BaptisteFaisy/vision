@@ -44,6 +44,17 @@ object StaticAvoidance {
         HazardConcepts.isPole(label) || HazardConcepts.isBarrier(label)
 
     /**
+     * Statique mesuré le plus proche (poteau/barrière) : le danger le plus
+     * imminent parle ; `null` = main au couloir.
+     */
+    fun nearest(labels: List<PlacedLabel>): PlacedLabel? =
+        labels.mapNotNull { label ->
+            label.meters?.takeIf { it.isFinite() && it > 0f }?.let { label to it }
+        }.filter { (label, _) ->
+            label.centerX.isFinite() && isStaticObstacle(label.label)
+        }.minByOrNull { it.second }?.first
+
+    /**
      * Mot d'évitement pour [obstacle] dans la scène [labels] (obstacle inclus),
      * `null` = silence. [score] `null` = déjà filtré serveur. [active] = mot en
      * cours (hysteresis : sortie à [EXIT_RANGE_METERS]).
@@ -117,7 +128,12 @@ class StaticAvoidanceTracker(
     private var lastWord: GuidanceWord? = null
     private var lastMs: Long = Long.MIN_VALUE
 
-    /** Mot à dire pour [obstacle] à [nowMs], `null` = silence ou redite trop tôt. */
+    /**
+     * Mot à dire pour [obstacle] à [nowMs], `null` = silence ou redite trop
+     * tôt. Trigger actif ([isActive]) = frame possédée (l'appelant se tait
+     * sur `null`) ; [GuidanceWord.Stop] = bouché total, l'appelant rend la
+     * main au couloir, qui dit la sortie (aucun stop produit côté voix).
+     */
     fun onFrame(
         obstacle: PlacedLabel,
         labels: List<PlacedLabel>,

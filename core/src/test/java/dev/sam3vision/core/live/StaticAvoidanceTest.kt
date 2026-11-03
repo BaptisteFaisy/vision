@@ -156,4 +156,22 @@ class StaticAvoidanceTest {
         assertFalse(tracker.isActive())
         assertEquals(GuidanceWord.Right, tracker.onFrame(poteau, listOf(poteau), 100L))
     }
+
+    @Test
+    fun `nearest retient le statique mesure le plus proche`() {
+        val loin = placed("poteau", 0.3f, 3f)
+        val proche = placed("barrière", 0.7f, 2f)
+        val personne = placed("personne", 0.5f, 1f)
+
+        assertTrue(StaticAvoidance.nearest(listOf(loin, personne, proche)) === proche)
+    }
+
+    @Test
+    fun `nearest ignore non statiques et sans mesure`() {
+        val chaise = placed("chaise", 0.3f, 1f)
+        val flou = placed("poteau", 0.3f, null)
+
+        assertNull(StaticAvoidance.nearest(listOf(chaise, flou)))
+        assertNull(StaticAvoidance.nearest(emptyList()))
+    }
 }
