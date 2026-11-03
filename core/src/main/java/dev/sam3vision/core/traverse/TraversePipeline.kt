@@ -81,6 +81,8 @@ class TraversePipeline(
      * l'approche compte), annoncés puis parlés à [atMs]. [background] estime
      * le mouvement global fond, qui fait taire l'approche suivie des pistes
      * embarquées par la caméra (le veto instantané reste conservateur).
+     * [noLight] vrai (absence de feu confirmée par l'appelant) vaut vert
+     * pour la phase, veto armé (voir [TraverseVeto.update]).
      */
     suspend fun onFrame(
         objects: List<SegObject>,
@@ -91,6 +93,7 @@ class TraversePipeline(
         atMs: Long,
         language: SpeechLanguage = SpeechLanguage.DEFAULT,
         background: BackgroundFrame? = null,
+        noLight: Boolean = false,
     ): TraverseOutput {
         val filtered = state.update(objects)
         // Extrêmes masque inclus : le veto lit `.box` (inchangé), le direct mesure
@@ -100,7 +103,7 @@ class TraversePipeline(
         // PISTE2 (câblage sonde embarquée reporté) : proximités serveur (SegObject.depth),
         // seule source branchée — pas un repli, `boxCloseness` n'est câblée nulle part.
         val depthByBox = DepthReadings.serverCloseness(filtered).takeIf { it.isNotEmpty() }
-        val decision = veto.update(lightGreen, detections, focalPx, atMs, lastFrameMotion, depthByBox)
+        val decision = veto.update(lightGreen, detections, focalPx, atMs, lastFrameMotion, depthByBox, noLight)
         val cue = announcer.onFrame(atMs, decision.crossingState(), language)
         val outcome = speak(cue)
         return TraverseOutput(filtered, detections, decision, cue, outcome)

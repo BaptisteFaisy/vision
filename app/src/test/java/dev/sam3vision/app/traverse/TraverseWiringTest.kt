@@ -223,6 +223,81 @@ class TraverseWiringTest {
     }
 
     @Test
+    fun `sans feu confirme sans vehicule - Vert parle`() = runBlocking {
+        // Le passage sans feu ni voiture dit « Vert. » (« You can cross »
+        // en anglais) : l'absence de feu confirmée vaut vert, le veto
+        // gardant la main sur les véhicules.
+        val played = mutableListOf<String>()
+        val asked = mutableListOf<String>()
+        val wiring = voicedWiring(played, asked)
+        repeat(6) { i ->
+            wiring.updateLight(CrossingLight(null, CrossingState.Red))
+            wiring.at(emptyList(), i + 1)
+        }
+
+        assertTrue("sans feu ni voiture : Vert. parlé", asked.contains("Vert."))
+    }
+
+    @Test
+    fun `sans feu avec voiture qui approche - Vert ne parle pas`() = runBlocking {
+        // Sans feu, le veto reste armé (pas de « vert gagne ») : une voiture
+        // en approche force l'attente. Boîtes croissantes (sinon l'arrêt
+        // prouvé exempte et le test ne verrouille rien).
+        val played = mutableListOf<String>()
+        val asked = mutableListOf<String>()
+        val wiring = voicedWiring(played, asked)
+        listOf(100f, 120f, 140f, 160f, 180f, 200f).forEachIndexed { i, w ->
+            val h = w * 0.6f
+            val box = listOf(320f - w / 2f, 240f - h / 2f, 320f + w / 2f, 240f + h / 2f)
+            wiring.updateLight(CrossingLight(null, CrossingState.Red))
+            wiring.at(listOf(SegObject("car", 0.9f, box, "")), i + 1)
+        }
+
+        assertFalse("voiture en approche sans feu : Vert. jamais parlé", asked.contains("Vert."))
+    }
+
+    @Test
+    fun `sans feu puis boite rouge - retour a l attente aussitot`() = runBlocking {
+        // Une boîte réapparue rebascule côté feu sans délai : la phase
+        // retombe à ATTENDRE dès la frame suivante.
+        val lines = mutableListOf<String>()
+        val wiring = TraverseWiring(TraversePipeline(), log = { lines += it })
+        repeat(4) { i ->
+            wiring.updateLight(CrossingLight(null, CrossingState.Red))
+            wiring.at(emptyList(), i + 1)
+        }
+        wiring.updateLight(CrossingLight(listOf(0.1f, 0.1f, 0.2f, 0.2f), CrossingState.Red))
+        wiring.at(emptyList(), 5)
+
+        assertEquals(
+            listOf(
+                "traversee phase=ATTENDRE veto=false",
+                "traversee phase=PRET veto=false",
+                "traversee phase=ATTENDRE veto=false",
+            ),
+            lines,
+        )
+    }
+
+    @Test
+    fun `reset et deactivate oublient le sans feu`() = runBlocking {
+        for (forget in listOf<(TraverseWiring) -> Unit>({ it.reset() }, { it.deactivate() })) {
+            val lines = mutableListOf<String>()
+            val wiring = TraverseWiring(TraversePipeline(), log = { lines += it })
+            repeat(4) { i ->
+                wiring.updateLight(CrossingLight(null, CrossingState.Red))
+                wiring.at(emptyList(), i + 1)
+            }
+            assertTrue("sans feu confirmé avant l'oubli", lines.any { it.startsWith("traversee phase=PRET") })
+            lines.clear()
+            forget(wiring)
+            wiring.updateLight(CrossingLight(null, CrossingState.Red))
+            wiring.at(emptyList(), 9)
+            assertFalse("une seule frame ne reconfirme pas", lines.any { it.startsWith("traversee phase=PRET") })
+        }
+    }
+
+    @Test
     fun `transitions phase - une ligne par phase`() = runBlocking {
         val lines = mutableListOf<String>()
         val wiring = TraverseWiring(TraversePipeline(), log = { lines += it })

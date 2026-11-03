@@ -159,6 +159,9 @@ class TraverseVeto {
      * [motion] (`null` = pas de signal fond) fait taire l'approche suivie des
      * pistes qui suivent la caméra, ainsi que la croissance instantanée de
      * leur clé — le guidage obstacles, lui, reste actif devant un objet proche.
+     * [noLight] vrai (absence de feu confirmée par l'appelant) vaut vert pour
+     * la phase, mais le veto reste armé : sans feu, ce sont les véhicules
+     * qui tranchent — un passage sans feu ni voiture dit « traversez ».
      */
     @Synchronized
     fun update(
@@ -168,6 +171,7 @@ class TraverseVeto {
         atMs: Long = -1L,
         motion: FrameMotion? = null,
         depthByBox: Map<List<Float>, Float>? = null, // PISTE2 : proximités par boîte vers le suivi — null = repli géométrie.
+        noLight: Boolean = false,
     ): TraverseDecision {
         val stopped = stoppedKeys(detections, focalPx, atMs, motion)
         val hushed = if (atMs < 0L) emptySet() else approach.cameraMovedKeys
@@ -179,7 +183,7 @@ class TraverseVeto {
         // suivi (instantané + pistes) tourne quand même, tenu chaud pour
         // trancher dès le flip rouge ; seule la sortie veto est tue.
         val veto = (blocking != null || tracked.approaching) && !lightGreen
-        currentState = nextState(lightGreen, veto)
+        currentState = nextState(lightGreen || noLight, veto)
         return TraverseDecision(
             state = currentState,
             cue = cueOf(currentState),
