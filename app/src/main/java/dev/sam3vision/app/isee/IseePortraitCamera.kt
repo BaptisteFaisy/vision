@@ -18,6 +18,7 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.blur
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.draw.shadow
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.graphicsLayer
@@ -65,6 +66,7 @@ internal fun BoxWithConstraintsScope.PortraitCamera(
             .padding(horizontal = IseeBlockSide)
             .fillMaxWidth()
             .height(height)
+            .shadow(6.dp, IseeBlockShape)
             .clip(IseeBlockShape)
             .background(Color(0xFF14161B))
             .graphicsLayer { alpha = open.coerceIn(0f, 1f) },
