@@ -68,6 +68,8 @@ class HttpLiveClient(
     private val binaryUpload: Boolean = false,
     /** Masques demandés (`mask_encoding`) ; `false` = boîtes et scores seuls (`none`). */
     private val masks: Boolean = true,
+    /** Profondeur fusionnée (`with_depth`) : médiane de proximité par objet en réponse. */
+    private val withDepth: Boolean = false,
     /** Attente avant le 2e essai de `/health` (transitoire) : injectée pour les tests. */
     private val retryDelayMs: Long = HEALTH_RETRY_DELAY_MS,
 ) : LiveClient {
@@ -92,7 +94,7 @@ class HttpLiveClient(
         endpointRefusal("endpoint direct", baseUrl, "/live")?.let { return Result.failure(it) }
         if (!binaryUpload) return client.executeBytesBuilt(marks) {
             val body = OneShotJsonBody(
-                liveFrameJson(jpegB64, prompts, workEdge, maxObjects, maskFormat = maskFormat, maskEdge = maskEdge, masks = masks),
+                liveFrameJson(jpegB64, prompts, workEdge, maxObjects, maskFormat = maskFormat, maskEdge = maskEdge, withDepth = withDepth, masks = masks),
             )
             requestTo(baseUrl, "/live", "POST", body, LIVE_USER_AGENT)
         }.then { bytes -> catchingResult { parseLiveFrameBytes(bytes) } }
