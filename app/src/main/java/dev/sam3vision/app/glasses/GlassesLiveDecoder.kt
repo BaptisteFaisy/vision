@@ -474,7 +474,8 @@ class GlassesLiveDecoder(
 
     private companion object {
         const val TAG = "GlassesVideo"
-        const val INPUT_TIMEOUT_US = 5_000L
+        /** Entrée libre sous 1 ms ou frame conflée : attendre ne rajeunit rien. */
+        const val INPUT_TIMEOUT_US = 1_000L
         /** Attente de la première sortie d'un accès : une demi-période image à 15 i/s. */
         const val OUTPUT_WAIT_US = 33_000L
         /** Cadence annoncée au décodeur (clé `operating-rate`), en images par seconde. */

@@ -82,9 +82,9 @@ class GlassesVideoDecoderTest {
 
     @Test
     fun `le pont n attend jamais plus d une periode image`() {
-        // Pire cas 5 + 40 = ~45 ms : l'ancien 50 + 300 = 350 ms était le seul
+        // Pire cas 1 + 40 = ~41 ms : l'ancien 50 + 300 = 350 ms était le seul
         // poste au-delà du budget 250 ms. Une frame manquée est conflée.
-        assertEquals(5_000L, GlassesVideoDecoder.INPUT_TIMEOUT_US)
+        assertEquals(1_000L, GlassesVideoDecoder.INPUT_TIMEOUT_US)
         assertEquals(40L, GlassesVideoDecoder.OUTPUT_WAIT_MS)
         assertEquals(15, GlassesVideoDecoder.OPERATING_RATE)
     }
