@@ -13,10 +13,12 @@ import dev.sam3vision.core.live.TimingsText
  *
  * La ligne est exactement [TimingsText.compact] (la même chaîne que l'écran) : une
  * seule source de mise en forme, et le parseur ne connaît qu'elle. Une seconde
- * ligne ([TimingsText.servers]) détaille les étages serveur (`timings_ms`) pour
- * le diagnostic — le parseur l'ignore (pas de `latency N`). Les frames
- * incomplètes (pas de poste capteur, écran sorti) ne sont jamais loggées : une
- * latence inventée vaudrait moins que rien.
+ * ligne ([TimingsText.servers]) détaille les étages serveur (`timings_ms`) **une
+ * frame sur [SERVER_LINE_EVERY]** : le mode `--servers` agrège par étage, sans
+ * jointure aux frames — l'échantillonner ne fausse aucun verdict et économise un
+ * `Log.i` (et son formatage) quatre frames sur cinq. Les frames incomplètes (pas
+ * de poste capteur, écran sorti) ne sont jamais loggées : une latence inventée
+ * vaudrait moins que rien.
  *
  * Les **échecs** de frame passent par [failure] : une ligne par seconde au plus
  * (compteur d'échecs consécutifs joint), là où le `Log.w` nu en écrivait une par
@@ -32,9 +34,15 @@ object LiveLatencyLog {
     /** Fenêtre du throttle d'échec : une ligne par seconde, pas une par frame. */
     const val FAILURE_EVERY_MS = 1_000L
 
+    /** Une ligne `server:` toutes les N frames complètes (diagnostic seul, voir [frame]). */
+    const val SERVER_LINE_EVERY = 5L
+
     /** Dernière ligne d'échec écrite (ms) et nombre de lignes écrasées depuis. */
     private var lastFailureMs: Long? = null
     private var suppressedFailures = 0
+
+    /** Frames complètes journalisées : cadence la ligne serveur (voir [serverDue]). */
+    private var serverLineTicks = 0L
 
     /**
      * Ligne brute d'une frame dessinée, `null` si elle est incomplète. Pure (aucun
@@ -49,10 +57,31 @@ object LiveLatencyLog {
     fun serverLine(t: FrameTimings): String? =
         if (t.complete && t.server.isNotEmpty()) TimingsText.servers(t.server) else null
 
-    /** Écrit la frame complète en logcat (perçu + détail serveur) ; silencieuse sinon. Ne lève jamais. */
+    /**
+     * Écrit la frame complète en logcat : la ligne perçue à **chaque** frame (série du
+     * verdict, jamais échantillonnée), le détail serveur une frame sur [SERVER_LINE_EVERY]
+     * (diagnostic `--servers`, agrégé par étage). Silencieuse si incomplète. Ne lève jamais.
+     */
     fun frame(t: FrameTimings) {
-        line(t)?.let { Log.i(TAG, it) }
-        serverLine(t)?.let { Log.i(TAG, it) }
+        val line = line(t) ?: return
+        Log.i(TAG, line)
+        synchronized(this) {
+            val ticks = serverLineTicks
+            serverLineTicks += 1
+            if (serverDue(ticks)) serverLine(t)?.let { Log.i(TAG, it) }
+        }
+    }
+
+    /**
+     * La ligne serveur est-elle due au [ticks]e passage ? Vraie à la première frame puis
+     * une sur [every]. Pure (aucun Android), testée en JVM — [frame] n'ajoute que
+     * l'écriture logcat.
+     */
+    fun serverDue(ticks: Long, every: Long = SERVER_LINE_EVERY): Boolean = ticks % every == 0L
+
+    /** Oublie la cadence de la ligne serveur (nouvelle séance, tests). */
+    fun resetServerSampling() {
+        synchronized(this) { serverLineTicks = 0L }
     }
 
     /** Annonce le transport WS de la session ([TimingsText.leg]) ; ne lève jamais. */

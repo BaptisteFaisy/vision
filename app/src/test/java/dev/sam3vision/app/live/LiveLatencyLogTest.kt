@@ -110,4 +110,22 @@ class LiveLatencyLogTest {
     fun `drop ne leve jamais`() {
         DropCause.entries.forEach { LiveLatencyLog.drop(it) }
     }
+
+    @Test
+    fun `ligne serveur due a la premiere frame puis une sur cinq`() {
+        assertTrue(LiveLatencyLog.serverDue(0))
+        (1L..4L).forEach { assertFalse("frame $it", LiveLatencyLog.serverDue(it)) }
+        assertTrue(LiveLatencyLog.serverDue(5))
+        assertTrue(LiveLatencyLog.serverDue(10))
+    }
+
+    @Test
+    fun `cadence de la ligne serveur documentee en constante`() {
+        assertEquals(5L, LiveLatencyLog.SERVER_LINE_EVERY)
+    }
+
+    @Test
+    fun `reset de la cadence serveur ne leve jamais`() {
+        LiveLatencyLog.resetServerSampling()
+    }
 }
