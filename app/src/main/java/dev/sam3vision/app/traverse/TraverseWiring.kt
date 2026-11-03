@@ -248,7 +248,7 @@ class TraverseWiring(
 /**
  * Concepts écartés en traversée (ordre user 03/11) : poubelle, souvenirs et
  * lampadaire ne servent pas à traverser ; les écarter tient la liste sous
- * le plafond 22 et conserve chien et enfant.
+ * le plafond 22 et conserve le chien.
  */
 private val TRAVERSE_DROPPED = setOf("trash can", "souvenir shop", "street lamp")
 
@@ -258,7 +258,7 @@ private val TRAVERSE_DROPPED = setOf("trash can", "souvenir shop", "street lamp"
  * (filtrée des wordings voiture : un Follow `feu tricolore` oublié ne doit
  * pas activer un veto fantôme en traversée, §10). Poubelle, souvenirs et
  * lampadaire sont écartés ([TRAVERSE_DROPPED], ordre user 03/11) : la liste
- * tient sous le plafond 22 et chien/enfant sont conservés. Sans le concept
+ * tient sous le plafond 22 et le chien est conservé. Sans le concept
  * feu, aucun vert ne serait jamais lu. Pur, testé en JVM (l'activation
  * autour touche Android : TTS, cache, appareil seul).
  */

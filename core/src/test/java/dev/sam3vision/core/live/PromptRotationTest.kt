@@ -5,17 +5,17 @@ import org.junit.Assert.assertTrue
 import org.junit.Test
 
 /**
- * Rotation 3 groupes : `person` partout, les 20 autres en round-robin —
+ * Rotation 3 groupes : `person` partout, les 19 autres en round-robin —
  * découpage exhaustif (chaque concept suivi), sans trou ni doublon, cyclé par
  * [PromptRotation.groupFor]. Pur, déterministe.
  */
 class PromptRotationTest {
 
     @Test
-    fun `defaut 21 concepts en 3 groupes de 8 8 7`() {
+    fun `defaut 20 concepts en 3 groupes de 8 7 7`() {
         val split = PromptRotation.split(LivePrompts.default)
         assertEquals(3, split.size)
-        assertEquals(listOf(8, 8, 7), split.map { it.size })
+        assertEquals(listOf(8, 7, 7), split.map { it.size })
     }
 
     @Test
@@ -29,8 +29,8 @@ class PromptRotationTest {
     fun `decoupage exhaustif sans doublon hors person`() {
         val split = PromptRotation.split(LivePrompts.default)
         val rest = split.flatten().filter { !it.equals("person", ignoreCase = true) }
-        assertEquals("20 autres concepts, une fois chacun", 20, rest.size)
-        assertEquals(20, rest.toSet().size)
+        assertEquals("19 autres concepts, une fois chacun", 19, rest.size)
+        assertEquals(19, rest.toSet().size)
         assertEquals(LivePrompts.default.toSet(), split.flatten().toSet())
     }
 
@@ -85,11 +85,11 @@ class PromptRotationTest {
     }
 
     @Test
-    fun `find the X au plafond - 22 concepts, groupes de 8 8 8`() {
+    fun `find the X sous le plafond - 21 concepts, groupes de 8 8 7`() {
         val full = LivePrompts.withConcept(LivePrompts.default, "suitcase")
-        assertEquals(22, full.size)
+        assertEquals(21, full.size)
         val split = PromptRotation.split(full)
-        assertEquals(listOf(8, 8, 8), split.map { it.size })
+        assertEquals(listOf(8, 8, 7), split.map { it.size })
         assertTrue(split.flatten().contains("suitcase"))
     }
 }

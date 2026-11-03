@@ -38,7 +38,7 @@ import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 
 /**
- * Câblage du **mode Traversée** de la sonde : les 21 filtrés du mode
+ * Câblage du **mode Traversée** de la sonde : les 20 filtrés du mode
  * ([crossingPrompts], comme le direct), couleur du feu lue dans la frame,
  * annonces et vibrations.
  *
@@ -65,7 +65,7 @@ class CrossingChipZone {
 
 /**
  * Active ou coupe le mode Traversée ([crossingPrompts]) : en traversée, les
- * 21 filtrés du mode (comme le direct) ; à la coupure, retour à la liste du
+ * 20 filtrés du mode (comme le direct) ; à la coupure, retour à la liste du
  * monde ; simple reconfiguration : base rejouée. La voix bascule aussi (feu
  * + veto trafic au lieu du guidage, ordres d'évitement gardés devant). Toute
  * bascule est manuelle (puce, ordre vocal).

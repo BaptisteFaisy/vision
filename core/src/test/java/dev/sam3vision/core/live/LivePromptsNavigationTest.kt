@@ -17,7 +17,7 @@ class LivePromptsNavigationTest {
                 "person", "car", "pedestrian traffic light", "curb", "sidewalk",
                 "crosswalk", "pole", "stairs", "fence", "wall", "barrier", "sign",
                 "street lamp", "animal", "trash can", "souvenir shop", "bus",
-                "van", "stroller", "dog", "child",
+                "van", "stroller", "dog",
             ),
             LivePrompts.default,
         )

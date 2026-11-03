@@ -102,7 +102,7 @@ private fun rawClip(app: Application, fileName: String): ByteArray? = runCatchin
 /**
  * Prompts d'une bascule Traversée côté sonde : à l'activation, la base passe
  * par [traversePrompts] (véhicules en tête, poubelle/souvenirs/lampadaire
- * écartés — ordre user 03/11, les mêmes 21 que le direct) ; à la coupure
+ * écartés — ordre user 03/11, les mêmes 20 que le direct) ; à la coupure
  * après traversée, retour à la liste du monde ([LivePrompts.forMode], comme
  * le direct qui rend `default`) ; simple reconfiguration (réglages, lens) :
  * base rejouée telle quelle. Pur, testé en JVM.

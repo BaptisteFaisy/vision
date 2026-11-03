@@ -23,8 +23,8 @@ import org.junit.Test
 class DeadConceptsRemovedTest {
 
     @Test
-    fun `defaut 21 concepts, bus restaure, sans velo moto cles ni portail`() {
-        assertEquals(21, LivePrompts.default.size)
+    fun `defaut 20 concepts, bus restaure, sans velo moto cles ni portail`() {
+        assertEquals(20, LivePrompts.default.size)
         assertTrue("car" in LivePrompts.default)
         assertTrue("person" in LivePrompts.default)
         assertTrue("wall" in LivePrompts.default)

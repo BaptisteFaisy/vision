@@ -113,11 +113,10 @@ An ordinary phone, a remote GPU card, and voice as the only interface:
   only the current sentence below the bubble. Tap = video, long-press = speak; the
   whole surface is the interface (`app/src/main/java/dev/sam3vision/app/isee/`,
   `docs/ISEE-DESIGN-PORTRAIT.md`).
-- **Live** — **21 outdoor concepts** by default (spec v4 + 03/11 restore:
+- **Live** — **20 outdoor concepts** by default (spec v4 + 03/11 restore, `child` removed per user order:
   `person`, `car`, `pedestrian traffic light`, `curb`, `sidewalk`, `crosswalk`,
   `pole`, `stairs`, `fence`, `wall`, `barrier`, `sign`, `street lamp`,
-  `animal`, `trash can`, `souvenir shop`, `bus`, `van`, `stroller`, `dog`,
-  `child`) plus a **10-object indoor preset**, **22 at most**
+  `animal`, `trash can`, `souvenir shop`, `bus`, `van`, `stroller`, `dog`) plus a **10-object indoor preset**, **22 at most**
   (`LivePrompts.MAX`, `MAX_PROMPTS` server-side), one frame in flight (WebSocket `/live/ws`, or tracker sessions
   when the *Tracker* chip is on), pills, distances, and voice announcements
   (`docs/LIVE-SPEC.md`, `core/…/live/LivePrompts.kt:29-73`). The Direct tries the tracker first and falls back to `/live`

@@ -114,7 +114,7 @@ class CheckMasquesTest(unittest.TestCase):
             self.assertIn(mot, sortie)
 
     def test_arbre_reel_conforme(self):
-        self.assertGuard(ROOT, True, "12/12")
+        self.assertGuard(ROOT, True, "11/11")
 
     def test_prompt_manquant_refuse(self):
         tmp = fake_tree(drop_concept("stairs"))
@@ -136,7 +136,7 @@ class CheckMasquesTest(unittest.TestCase):
             [sys.executable, SCRIPT, "--root", ROOT],
             capture_output=True, text=True, timeout=60, check=True,
         )
-        self.assertIn("12/12", proc.stdout)
+        self.assertIn("11/11", proc.stdout)
 
 
 if __name__ == "__main__":

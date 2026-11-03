@@ -140,16 +140,16 @@ frappe ne fait jamais taire une annonce).
 
 ## 7. Listes de détection (SAM 3.1, anglais)
 
-- **Dehors (21)** : `person`, `car`, `pedestrian traffic light`, `curb`,
+- **Dehors (20)** : `person`, `car`, `pedestrian traffic light`, `curb`,
   `sidewalk`, `crosswalk`, `pole`, `stairs`, `fence`, `wall`, `barrier`,
   `sign`, `street lamp`, `animal`, `trash can`, `souvenir shop`, `bus`,
-  `van`, `stroller`, `dog`, `child` (restauration 03/11, ordre user ;
+  `van`, `stroller`, `dog` (restauration 03/11, ordre user, enfant retiré le 03/11 ;
   garde `tools/check-masques.py`).
 - **Dedans (10)** : `keys`, `medicine box`, `glasses`, `glasses case`,
   `phone`, `shoes`, `door`, `wall`, `person`, `socks`.
 - `mode find my X` ajoute le concept (le dernier cède son slot au plafond).
   Base unique normal/traversée : sonde et direct écartent poubelle,
-  souvenirs, lampadaire en traversée armée (21 envoyés — voir
+  souvenirs, lampadaire en traversée armée (20 envoyés — voir
   `docs/TRAVERSEE.md` § 4).
 
 ## 8. Contrats partagés (l'intégration suppose ces signatures)

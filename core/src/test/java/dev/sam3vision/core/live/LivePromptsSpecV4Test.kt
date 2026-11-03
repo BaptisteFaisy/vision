@@ -7,24 +7,23 @@ import org.junit.Test
 
 /**
  * Spec v4 + restauration 03/11 : listes de concepts caméra verrouillées.
- * Dehors = 21 concepts, dedans = 10 objets, plafond respecté, « Find my X »
+ * Dehors = 20 concepts, dedans = 10 objets, plafond respecté, « Find my X »
  * ajoute (éviction du dernier au plafond), champ « Follow » gardé, bascule
  * indoor-outdoor des listes.
  */
 class LivePromptsSpecV4Test {
 
     @Test
-    fun `dehors vingt et un concepts exacts dans l ordre`() {
+    fun `dehors vingt concepts exacts dans l ordre`() {
         assertEquals(
             listOf(
                 "person", "car", "pedestrian traffic light", "curb", "sidewalk", "crosswalk",
                 "pole", "stairs", "fence", "wall", "barrier", "sign", "street lamp",
                 "animal", "trash can", "souvenir shop", "bus", "van", "stroller", "dog",
-                "child",
             ),
             LivePrompts.default,
         )
-        assertEquals(21, LivePrompts.default.size)
+        assertEquals(20, LivePrompts.default.size)
     }
 
     @Test
@@ -45,7 +44,7 @@ class LivePromptsSpecV4Test {
         listOf(
             "bicycle", "truck", "motorcycle", "keys", "bollard", "tree",
             "gate", "boat", "pedestrian signal head", "electric scooter",
-            "beanie",
+            "beanie", "child",
         ).forEach { concept ->
             assertFalse(concept, concept in dehors)
         }
@@ -77,7 +76,7 @@ class LivePromptsSpecV4Test {
     @Test
     fun `find my x ajoute sous le plafond sans rien chasser`() {
         val next = LivePrompts.withConcept(LivePrompts.default, "wallet")
-        assertEquals(22, next.size)
+        assertEquals(21, next.size)
         assertEquals(LivePrompts.default + "wallet", next)
         val indoorNext = LivePrompts.withConcept(LivePrompts.indoor, "wallet")
         assertEquals(LivePrompts.indoor + "wallet", indoorNext)
@@ -111,7 +110,7 @@ class LivePromptsSpecV4Test {
     fun `bascule indoor-outdoor des listes`() {
         assertEquals(LivePrompts.default, LivePrompts.forMode(true))
         assertEquals(LivePrompts.indoor, LivePrompts.forMode(false))
-        assertEquals(21, LivePrompts.forMode(true).size)
+        assertEquals(20, LivePrompts.forMode(true).size)
         assertEquals(10, LivePrompts.forMode(false).size)
     }
 

@@ -253,7 +253,7 @@ Choisir une région **n'allume aucune carte** : elle élit seulement l'URL appel
 (`SamRegion.kt:4-9`).
 
 **Plafonds** : `core/model/ObjectLimits.kt:26-28` → 16 objets affichés par défaut, réglable de
-1 à 32. `core/live/LivePrompts.kt` → **21 concepts suivis par défaut** (`:75-81`), maximum 22
+1 à 32. `core/live/LivePrompts.kt` → **20 concepts suivis par défaut** (`:75-81`), maximum 22
 (`:156`), 32 caractères (`:159`).
 
 ## 6. Le direct : transport, cadence, délais
