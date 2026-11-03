@@ -278,12 +278,12 @@ object GlassesVideoLink {
     private const val SUMMARY_NS = 1_000_000_000L
 
     /**
-     * Une ligne détaillée [TimingsText.link] toutes les N frames : à 15 i/s, une
-     * par seconde. Le format ne bouge pas (`scripts/parse_glasses_link.py` lit
-     * toujours `link seq … · lien … · dec … · aff … · percu …`) ; seule la
-     * fréquence change — formatage + I/O logcat ne vivaient que par frame.
+     * Une ligne détaillée [TimingsText.link] toutes les N frames : à 15 i/s,
+     * ~3 par seconde — la jointure E2E (`parse_glasses_e2e.py`, N >= 100) en
+     * manquait à 1/s (30 jointes/120 s en recette 15b). Le format ne bouge pas
+     * ; formatage + I/O logcat restent échantillonnés, pas par frame.
      */
-    private const val LINK_LINE_EVERY = 15L
+    private const val LINK_LINE_EVERY = 5L
     private val clockOffset = GlassesClockOffset()
     private val linkStats = GlassesLinkStats()
     private var awaitingNote = false
