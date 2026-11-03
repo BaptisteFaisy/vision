@@ -3,6 +3,32 @@
 Le journal part du 2026-10-26 après 19 h : le commit de départ, puis une entrée par fait
 livré et ses preuves (tâche, fichiers, chiffres) dans l'arbre.
 
+## 2026-11-04 — Direct : repli automatique WebSocket → POST /live (branche `feat/live-http-fallback`)
+
+- **Demande** : si iSee n'arrive pas à se connecter en WebSocket, basculer sur
+  quelque chose qui tient mieux (ordre user du 03/11/2026) — avec amendement
+  explicite de la règle 7 (ancien interdit « pas de repli HTTP »).
+- **Fait** :
+  - `core/net/WsLiveClient.kt` : la frame que le socket ne peut pas servir
+    (ouverture impossible, envoi refusé, fermeture en vol) part en `POST /live`
+    via le délégué HTTP ; pas de repli sur délai, endpoint, hors-ligne, backoff
+    ni après `close`. Aides de trames déménagées dans `WsWire.kt` (496 lignes).
+  - `core/net/WsHttpFallback.kt` (neuf) : repli collant + re-sonde WS toutes les
+    10 frames HTTP, retour au socket dès qu'il sert (compteur, sans horloge).
+  - `core/net/LiveClientFactory.kt` + `HttpLiveClient.kt` (`with_depth` ajouté) :
+    le repli porte les mêmes knobs que le WS et date la chronologie.
+  - Écran : trois libellés « WebSocket » / « HTTP » / « WebSocket down »
+    (`LiveMessages.kt`, `LiveState.kt`, `LiveBars.kt`, `ProbeFrame.kt`,
+    `LiveSession.httpFallback`).
+  - Tests : `WsLiveHttpFallbackTest` (15 cas, sans réseau) ; attentes WS
+    existantes mises à jour (HTTP en panne + re-sonde à chaque frame, l'erreur
+    du POST remonte quand tout est tombé).
+  - Docs : règle 7 amendée (`AGENTS.md`), `LIVE-SPEC.md` §1, `NOTES.md`,
+    `ARCHITECTURE.md`, `ELEVENLABS-TTS.md` alignés.
+- **Preuves** : `:core:testDebugUnitTest` + `:app:testDebugUnitTest` verts (r630,
+  1 min 23, 6 010 `@Test` statiques), `check-kotlin-limits.py` OK, UBS 0 finding
+  (scanner kotlin indisponible dans l'env, la CI `lint` tranche).
+
 ## 2026-11-03 — iSee : wordmark retiré, caméra ×1,25 vers le bas (branche `isee-sans-wordmark-camera-plus`)
 
 - **Demande** : virer le « iSee » blanc en haut de l'écran iSee, et agrandir
