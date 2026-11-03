@@ -95,6 +95,7 @@ class IseeVoiceNav(
     val session: VoiceNavSession by lazy {
         val loader = ValhallaRouteLoader(
             geocode = { address, near -> chain.geocode(address, near = near) },
+            geocodeAlternate = { address, near -> chain.geocodeFallback(address, near = near) },
             originNow = ::awaitOrigin,
             baseUrl = { settings().routeBaseUrl },
         )

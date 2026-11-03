@@ -158,4 +158,16 @@ class GeocodeChainTest {
         val result = chain(primary, fallback).geocode("gare")
         assertFailsWith(result, GeocodeError.TimedOut::class.java)
     }
+
+    @Test
+    fun `le second geocodage ne lit que le repli, sans cache`() = runBlocking {
+        val primary = FakeSource(Result.success(listOf(place("Principal"))))
+        val fallback = FakeSource(Result.success(listOf(place("Repli"))))
+        val cache = GeocodeCache.fresh()
+        val found = chain(primary, fallback, cache).geocodeFallback("gare de Lyon").getOrThrow()
+
+        assertEquals("Repli", found.label)
+        assertTrue(primary.seen.isEmpty())
+        assertTrue(cache.isEmpty())
+    }
 }

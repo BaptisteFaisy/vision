@@ -23,8 +23,9 @@ import kotlinx.coroutines.withTimeout
  *   échec « service d'itinéraire non configuré » (jamais de résumé à zéro :
  *   des zéros affichés comme des distances mentent — « Dans 0 m ») ;
  * - géocodage en échec → échec (son message français, affiché tel quel) ;
- * - appel `/route` : 2 tentatives max (1 essai + 1 reprise), chacune bornée
- *   à [ROUTE_TIMEOUT_SECONDS] ; échec final → échec « itinéraire
+ * - appel `/route` : 2 tentatives max (1 essai + 1 reprise vers le second
+ *   géocodage, identique sans second), chacune bornée à
+ *   [ROUTE_TIMEOUT_SECONDS] ; échec final → échec « itinéraire
  *   indisponible (motif) » (l'écran montre l'adresse + le motif, et
  *   « Démarrer » annonce l'indisponibilité).
  *
@@ -38,6 +39,8 @@ import kotlinx.coroutines.withTimeout
  */
 class ValhallaRouteLoader(
     private val geocode: suspend (String, RoutePoint?) -> Result<GeocodedPlace>,
+    /** Second géocodage (repli BAN) : la reprise `/route` part vers lui quand le premier gagne hors graphe. */
+    private val geocodeAlternate: suspend (String, RoutePoint?) -> Result<GeocodedPlace> = { _, _ -> Result.failure(NoSuchElementException("no alternate")) },
     private val originNow: suspend () -> RoutePoint?,
     private val routeClient: (String) -> RouteClient = ::HttpRouteClient,
     private val baseUrl: () -> String,
@@ -81,32 +84,41 @@ class ValhallaRouteLoader(
         } catch (t: Exception) {
             return Result.failure(routeFailure(t))
         }
-        val trip = loadRoute(client, origin, RoutePoint(place.latitude, place.longitude))
-            .onSuccess { runCatching { onPreview(it.toNavRoute(destination).getOrNull()) } }
+        val (trip, winner) = loadRoute(client, origin, destination, place)
+            .onSuccess { (t, _) -> runCatching { onPreview(t.toNavRoute(destination).getOrNull()) } }
             .getOrElse { return Result.failure(routeFailure(it)) }
         lastLoad = PreloadedRoute(
             destination = DestinationQuery.normalize(destination).getOrNull() ?: destination,
             origin = origin,
-            dest = RoutePoint(place.latitude, place.longitude),
-            destLabel = place.label,
+            dest = RoutePoint(winner.latitude, winner.longitude),
+            destLabel = winner.label,
             trip = trip,
             loadedAtMs = runCatching { nowMs() }.getOrDefault(0L),
         )
         return Result.success(
             RouteSummary(
                 destination,
-                place.label,
+                winner.label,
                 trip.lengthMeters.toLong().coerceAtLeast(0),
                 trip.timeSeconds.toLong().coerceAtLeast(0),
             ),
         )
     }
 
-    /** Appel `/route` : 1 reprise sur échec (réseau, délai, jeté). */
-    private suspend fun loadRoute(client: RouteClient, from: RoutePoint, to: RoutePoint): Result<RouteTrip> {
-        val first = timedRoute(client, from, to)
-        if (first.isSuccess) return first
-        return timedRoute(client, from, to)
+    /**
+     * Appel `/route` : 1 reprise sur échec, vers le second géocodage (le 1er
+     * gagne parfois hors graphe — GMS « Gare de Cergy » → 500 Valhalla) ;
+     * sans second, reprise identique (transitoire). Gagnant renvoyé avec.
+     */
+    private suspend fun loadRoute(client: RouteClient, from: RoutePoint, destination: String, place: GeocodedPlace): Result<Pair<RouteTrip, GeocodedPlace>> {
+        timedRoute(client, from, RoutePoint(place.latitude, place.longitude))
+            .onSuccess { return Result.success(it to place) }
+        val alt = try {
+            geocodeAlternate(destination, from).getOrNull()
+        } catch (_: Exception) {
+            null
+        } ?: place
+        return timedRoute(client, from, RoutePoint(alt.latitude, alt.longitude)).map { it to alt }
     }
 
     /** Une tentative `/route`, bornée : tout échec devient un `Result`. */

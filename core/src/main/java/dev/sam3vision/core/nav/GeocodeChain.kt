@@ -35,12 +35,10 @@ class GeocodeChain(
         limit: Int = GeocodeSource.DEFAULT_LIMIT,
         near: RoutePoint? = null,
     ): Result<GeocodedPlace> {
-        val query = DestinationQuery.normalize(rawAddress).getOrElse {
-            return Result.failure(GeocodeError.BlankQuery())
-        }
+        val query = normalizedQuery(rawAddress).getOrElse { return Result.failure(it) }
         val key = cacheKey(query, near)
         cache[key]?.let { return Result.success(it) }
-        val effectiveLimit = if (near == null) limit else maxOf(limit, NEARBY_LIMIT)
+        val effectiveLimit = limitFor(near, limit)
         val first = guarded(primary, query, effectiveLimit, primaryTimeoutMs)
         first.getOrNull()?.pickNear(near)?.let { return hit(key, it) }
         val second = guarded(fallback, query, effectiveLimit, fallbackTimeoutMs)
@@ -52,6 +50,28 @@ class GeocodeChain(
         GeocodeCache.put(cache, key, place)
         return Result.success(place)
     }
+
+    /**
+     * Meilleur candidat du seul repli (BAN) : second géocodage quand le
+     * premier gagne hors graphe Valhalla (500 « No suitable edges ») — la
+     * reprise `/route` part vers lui au lieu de répéter l'échec. Sans
+     * cache : n'est appelé qu'en reprise, jamais au premier essai.
+     */
+    suspend fun geocodeFallback(rawAddress: String, near: RoutePoint? = null): Result<GeocodedPlace> {
+        val query = normalizedQuery(rawAddress).getOrElse { return Result.failure(it) }
+        val places = guarded(fallback, query, limitFor(near, GeocodeSource.DEFAULT_LIMIT), fallbackTimeoutMs)
+            .getOrElse { return Result.failure(it) }
+        return places.pickNear(near)?.let { Result.success(it) }
+            ?: Result.failure(GeocodeError.NotFound(query))
+    }
+
+    /** Requête normalisée ou échec vierge, partagée par les deux géocodages. */
+    private fun normalizedQuery(rawAddress: String): Result<String> =
+        DestinationQuery.normalize(rawAddress).mapError { GeocodeError.BlankQuery() }
+
+    /** Candidats demandés : élargis à [NEARBY_LIMIT] avec une origine. */
+    private fun limitFor(near: RoutePoint?, limit: Int): Int =
+        if (near == null) limit else maxOf(limit, NEARBY_LIMIT)
 
     /**
      * Retient un candidat : le plus proche de [near] (haversine) quand
