@@ -232,14 +232,14 @@ class GlassesVideoLinkTest {
     }
 
     @Test
-    fun `dix sept poussees un rendu seize conflations sans double`() {
+    fun `vingt cinq poussees un rendu vingt quatre conflations sans double`() {
         repeat(GlassesVideoLink.LINK_NOTE_WINDOW + 1) { i ->
             GlassesVideoLink.push(dated(arrivedAtNs = 1_000_000_000L + i * 66_000_000L))
         }
         val seq = GlassesVideoLink.frames.value?.seq ?: 0L
         GlassesVideoLink.noteRendered(seq, dated(arrivedAtNs = 2_000_000_000L), 2_010_000_000L, 2_018_000_000L)
-        // 1 évincée + 15 sautées : ni oubli, ni double compte.
-        assertEquals(16L, GlassesVideoLink.linkDrops()[LinkDrop.CONFLATED.ordinal])
+        // 1 évincée + 23 sautées : ni oubli, ni double compte.
+        assertEquals(24L, GlassesVideoLink.linkDrops()[LinkDrop.CONFLATED.ordinal])
         GlassesVideoLink.markPixel(atNs = 2_026_000_000L)
         assertEquals(1L, GlassesVideoLink.linkSamples)
     }
