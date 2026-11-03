@@ -74,11 +74,11 @@ class TraverseVoiceTest {
     }
 
     @Test
-    fun `non urgent sur lecteur occupe - garde sans preempter ni reseau`() = runBlocking {
+    fun `non urgent sur lecteur occupe - jete sans preempter ni reseau`() = runBlocking {
         val player = FakePlayer(isBusy = true)
         val outcome = voice(player = player).speak(TraversePhrases.GREEN, urgent = false)
 
-        assertEquals(TraverseVoiceOutcome.QUEUED, outcome)
+        assertEquals(TraverseVoiceOutcome.SKIPPED_BUSY, outcome)
         assertTrue(player.events.isEmpty())
     }
 
@@ -150,12 +150,12 @@ class TraverseVoiceTest {
     }
 
     @Test
-    fun `file - le doublon ne se garde pas deux fois`() = runBlocking {
+    fun `doublon sur lecteur occupe - jete aussi`() = runBlocking {
         ready()
         val player = FakePlayer(isBusy = true)
         val v = voice(player = player)
 
-        assertEquals(TraverseVoiceOutcome.QUEUED, v.speak(TraversePhrases.GREEN, urgent = false))
+        assertEquals(TraverseVoiceOutcome.SKIPPED_BUSY, v.speak(TraversePhrases.GREEN, urgent = false))
         assertEquals(TraverseVoiceOutcome.SKIPPED_BUSY, v.speak(TraversePhrases.GREEN, urgent = false))
         player.isBusy = false
         assertEquals(TraverseVoiceOutcome.OFFLINE, v.speak(TraversePhrases.GREEN, urgent = false))
@@ -164,40 +164,40 @@ class TraverseVoiceTest {
     }
 
     @Test
-    fun `file - la gardee se dit au silence avant la courante`() = runBlocking {
+    fun `au silence seule la courante parle`() = runBlocking {
         ready()
         val player = FakePlayer(isBusy = true)
         val v = voice(player = player)
 
-        assertEquals(TraverseVoiceOutcome.QUEUED, v.speak(TraversePhrases.GREEN, urgent = false))
+        assertEquals(TraverseVoiceOutcome.SKIPPED_BUSY, v.speak(TraversePhrases.GREEN, urgent = false))
         player.isBusy = false
         val outcome = v.speak(TraversePhrases.RED, urgent = false)
 
         assertEquals(TraverseVoiceOutcome.OFFLINE, outcome)
-        assertEquals(listOf("playFile", "playFile"), player.events)
+        assertEquals(listOf("playFile"), player.events)
     }
 
     @Test
-    fun `file - la plus fraiche seule, l ancienne est remplacee`() = runBlocking {
+    fun `rien de garde entre deux paroles`() = runBlocking {
         ready()
         val player = FakePlayer(isBusy = true)
         val v = voice(player = player)
 
-        assertEquals(TraverseVoiceOutcome.QUEUED, v.speak(TraversePhrases.GREEN, urgent = false))
-        assertEquals(TraverseVoiceOutcome.QUEUED, v.speak(TraversePhrases.ON_CROSSWALK, urgent = false))
+        assertEquals(TraverseVoiceOutcome.SKIPPED_BUSY, v.speak(TraversePhrases.GREEN, urgent = false))
+        assertEquals(TraverseVoiceOutcome.SKIPPED_BUSY, v.speak(TraversePhrases.ON_CROSSWALK, urgent = false))
         player.isBusy = false
-        assertEquals(TraverseVoiceOutcome.OFFLINE, v.speak(TraversePhrases.ON_CROSSWALK, urgent = false))
+        assertEquals(TraverseVoiceOutcome.OFFLINE, v.speak(TraversePhrases.RED, urgent = false))
 
         assertEquals(listOf("playFile"), player.events)
     }
 
     @Test
-    fun `urgent - la file est jetee, jamais de traversez apres coup`() = runBlocking {
+    fun `urgent - preempte et joue, jamais de traversez apres coup`() = runBlocking {
         ready()
         val player = FakePlayer(isBusy = true)
         val v = voice(player = player)
 
-        assertEquals(TraverseVoiceOutcome.QUEUED, v.speak(TraversePhrases.GREEN, urgent = false))
+        assertEquals(TraverseVoiceOutcome.SKIPPED_BUSY, v.speak(TraversePhrases.GREEN, urgent = false))
         assertEquals(TraverseVoiceOutcome.OFFLINE, v.speak(TraversePhrases.RED, urgent = true))
         player.isBusy = false
         assertEquals(TraverseVoiceOutcome.OFFLINE, v.speak(TraversePhrases.RED, urgent = false))
@@ -206,12 +206,12 @@ class TraverseVoiceTest {
     }
 
     @Test
-    fun `prewarm - vide la file d une session precedente`() = runBlocking {
+    fun `prewarm - prepare les clips sans rien garder`() = runBlocking {
         ready()
         val player = FakePlayer(isBusy = true)
         val v = voice(player = player)
 
-        assertEquals(TraverseVoiceOutcome.QUEUED, v.speak(TraversePhrases.GREEN, urgent = false))
+        assertEquals(TraverseVoiceOutcome.SKIPPED_BUSY, v.speak(TraversePhrases.GREEN, urgent = false))
         v.prewarm()
         player.isBusy = false
         assertEquals(TraverseVoiceOutcome.OFFLINE, v.speak(TraversePhrases.RED, urgent = false))
@@ -232,17 +232,17 @@ class TraverseVoiceTest {
     }
 
     @Test
-    fun `trace - gardee drainee - DRAIN puis issue avant la courante`() = runBlocking {
+    fun `trace - jete puis courante, sans DRAIN`() = runBlocking {
         ready()
         val events = mutableListOf<String>()
         val player = FakePlayer(isBusy = true)
         val v = voice(player = player, onEvent = { events += it })
 
-        assertEquals(TraverseVoiceOutcome.QUEUED, v.speak(TraversePhrases.GREEN, urgent = false))
+        assertEquals(TraverseVoiceOutcome.SKIPPED_BUSY, v.speak(TraversePhrases.GREEN, urgent = false))
         player.isBusy = false
         assertEquals(TraverseVoiceOutcome.OFFLINE, v.speak(TraversePhrases.RED, urgent = false))
 
-        assertEquals(listOf("EXPECT", "QUEUED", "EXPECT", "DRAIN", "OFFLINE", "OFFLINE"), events)
+        assertEquals(listOf("EXPECT", "SKIPPED_BUSY", "EXPECT", "OFFLINE"), events)
     }
 
     @Test

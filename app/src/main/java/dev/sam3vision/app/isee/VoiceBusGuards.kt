@@ -1,5 +1,7 @@
 package dev.sam3vision.app.isee
 
+import dev.sam3vision.core.stairs.StairCountVoice
+
 /**
  * Gardes du bus vocal ([VoiceBus], sorties pour le plafond 500 lignes) :
  * niveau incoupable orphelin (escaliers 6, trottoir 10 — sans elles, un
@@ -24,11 +26,11 @@ internal const val STAIRS_BUS_TTL_MS = 4_000L
 internal const val STAIRS_QUIET_MS = 2_000L
 
 /**
- * Fraîcheur d'une phrase escaliers retenue : 1,5 s. Au-delà, le compte a été
- * dit pour l'image d'avant (la phrase en cours a duré plus longtemps qu'un
- * cycle) — le redire serait périmé ; le tick suivant repostera le compte courant.
+ * Fraîcheur d'une phrase escaliers retenue : un cycle de compte
+ * ([StairCountVoice.REPEAT_MS]) — au-delà, le compte a été dit pour l'image
+ * d'avant ; le redire serait périmé (ordre user du 03/11 : pas d'ancienne donnée).
  */
-internal const val STAIRS_PENDING_TTL_MS = 1_500L
+internal const val STAIRS_PENDING_TTL_MS = StairCountVoice.REPEAT_MS
 
 /**
  * Bus bloqué sur un trottoir : niveau 10 en cours depuis plus de

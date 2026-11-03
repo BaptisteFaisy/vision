@@ -18,9 +18,9 @@ import kotlin.coroutines.EmptyCoroutineContext
  * leur post immédiat (la première détection parle sans attendre le battement) :
  * escaliers, compte des marches, grillage, trottoir. [pick] prend le plus
  * petit niveau parmi les vœux frais ([FRESH_MS]) ; [tick] le propose via
- * [offer] (antirépétition SPEC v4 puis bus — un vœu écrasé ou tu par
- * l'antirépétition est re-proposé au battement suivant, jamais perdu dans
- * sa fenêtre de fraîcheur).
+ * [offer] (antirépétition SPEC v4 puis bus — un vœu servi est consommé,
+ * jamais redit, ordre user du 03/11 ; un vœu refusé est re-proposé au
+ * battement suivant, jamais perdu dans sa fenêtre de fraîcheur).
  *
  * Hors battement, par construction : les obstacles (re-postés à chaque frame
  * SAM, ~200 ms — plus rapide que le battement), la Traversée (verdict
@@ -100,21 +100,26 @@ internal object VoiceTick {
      */
     @Synchronized
     fun pick(nowMs: Long, indoor: Boolean = false): VoiceWish? =
-        pickEntry(nowMs, indoor)?.wish
+        pickKeyed(nowMs, indoor)?.second?.wish
 
-    /** Comme [pick], avec l'instant du rapport : [tick] en tire le retard d'annonce. */
-    @Synchronized
-    private fun pickEntry(nowMs: Long, indoor: Boolean): Entry? =
-        current.values
-            .filter { it.indoor == indoor && nowMs - it.atMs < FRESH_MS && it.wish.text.isNotBlank() }
-            .minWithOrNull(compareBy({ it.wish.level }, { -it.atMs }))
+    /**
+     * Comme [pick], avec la source : [tick] en tire le retard d'annonce et
+     * consomme l'entrée servie. Sous le verrou de l'appelant.
+     */
+    private fun pickKeyed(nowMs: Long, indoor: Boolean): Pair<String, Entry>? =
+        current.entries
+            .filter { it.value.indoor == indoor && nowMs - it.value.atMs < FRESH_MS && it.value.wish.text.isNotBlank() }
+            .minWithOrNull(compareBy({ it.value.wish.level }, { -it.value.atMs }))
+            ?.let { it.key to it.value }
 
     /**
      * Un battement à [nowMs] : propose [pick] via [offer] (antirépétition
      * puis bus). `false` sans rien offrir (silence, même vœu dans [SAME_MS],
-     * ou refus de [offer] — retenté au battement suivant). Chaque vœu servi
-     * journalise son retard détection → annonce ([TAG]) ; [onServed] le livre
-     * aux tests. Testé en JVM.
+     * ou refus de [offer] — retenté au battement suivant, jamais consommé).
+     * Un vœu servi est consommé (retiré : le battement ne redit pas une
+     * vieille annonce, ordre user du 03/11). Chaque vœu servi journalise son
+     * retard détection → annonce ([TAG]) ; [onServed] le livre aux tests.
+     * Testé en JVM.
      */
     @Synchronized
     fun tick(
@@ -123,7 +128,7 @@ internal object VoiceTick {
         offer: (VoiceWish?, Long) -> Boolean = ::offer,
         onServed: (Long) -> Unit = {},
     ): Boolean {
-        val entry = pickEntry(nowMs, indoor) ?: return false
+        val (source, entry) = pickKeyed(nowMs, indoor) ?: return false
         val wish = entry.wish
         val last = lastOffer
         if (last != null && last.level == wish.level && last.text == wish.text &&
@@ -132,6 +137,7 @@ internal object VoiceTick {
             return false
         }
         if (!offer(wish, nowMs)) return false
+        current.remove(source)
         lastOffer = Offered(wish.level, wish.text, nowMs)
         // Le battement (700 ms) + l'antirépétition (1 s) dominent l'E2E parlé
         // (0-1700 ms) : mesuré ici, pas deviné. Le rappel début TTS du lecteur

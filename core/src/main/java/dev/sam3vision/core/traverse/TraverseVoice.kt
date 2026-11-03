@@ -68,10 +68,7 @@ enum class TraverseVoiceOutcome {
     /** Clip local joué (MP3 embarqué copié au préchauffage). */
     OFFLINE,
 
-    /** Phrase non urgente gardée (lecteur occupé) : dite au silence, la plus fraîche seule. */
-    QUEUED,
-
-    /** Doublon : la phrase est déjà en file — on ne la garde pas deux fois. */
+    /** Lecteur occupé : phrase non urgente jetée (aucune file — l'écrasé n'est jamais redit, ordre user du 03/11). */
     SKIPPED_BUSY,
 
     /** Rien de jouable : clip absent (ou texte vide). */
@@ -134,12 +131,10 @@ interface TraverseClipStore {
  * `urgent = true`) :
  * - **urgente** — [TraversePlayer.stop] (préemption de la verte en cours) puis
  *   lecture immédiate du clip. Jamais tue pour cause de lecteur occupé : le
- *   `stop` l'a libéré avant. La file est jetée (un ordre nouveau périme le
- *   précédent — jamais de « traversez » après coup).
- * - **non urgente** — gardée ([TraverseVoiceOutcome.QUEUED], doublon
- *   [TraverseVoiceOutcome.SKIPPED_BUSY]) si le lecteur parle déjà (file courte :
- *   une seule, la plus fraîche — miroir `ProximityVoice`), dite au silence avant
- *   la phrase courante, sinon lecture du clip.
+ *   `stop` l'a libéré avant, aucune file (jamais de « traversez » après coup).
+ * - **non urgente** — jetée ([TraverseVoiceOutcome.SKIPPED_BUSY]) si le lecteur
+ *   parle déjà, aucune file (miroir `ProximityVoice` SPEC v4, désormais vrai),
+ *   sinon lecture du clip.
  *
  * Hors-ligne ([prewarm], au premier lancement) : chaque phrase est copiée
  * depuis les MP3 embarqués (voix Laure) vers le cache local.
@@ -147,9 +142,7 @@ interface TraverseClipStore {
  * Pur et testé en JVM : aucune API Android ici, les trois ports sont moqués.
  *
  * Trace voix ([onEvent], défaut muet) : `EXPECT` à l'entrée de [speak], puis
- * l'issue (`OFFLINE`, `QUEUED`, `SKIPPED_BUSY`, `UNAVAILABLE`) à chaque
- * retour. Une phrase gardée, drainée au silence avant la courante, émet
- * `DRAIN` puis sa propre issue, dans l'ordre parlé.
+ * l'issue (`OFFLINE`, `SKIPPED_BUSY`, `UNAVAILABLE`) à chaque retour.
  */
 class TraverseVoice(
     private val player: TraversePlayer,
@@ -158,17 +151,10 @@ class TraverseVoice(
     private val onEvent: (String) -> Unit = {},
 ) {
     /**
-     * Phrase douce gardée (file courte : une seule, la plus fraîche), `null` si aucune.
-     */
-    private var pending: String? = null
-
-    /**
      * Copie les phrases depuis les MP3 embarqués. À appeler au premier
      * lancement ; les appels suivants ne coûtent qu'une vérification de présence.
-     * Vide aussi la file (nouvelle session : un ordre gardé ne survit pas à l'activation).
      */
     suspend fun prewarm(phrases: List<String> = TraversePhrases.ALL): TraversePrewarm {
-        pending = null
         var ready = 0
         var generated = 0
         val missing = mutableListOf<String>()
@@ -186,23 +172,17 @@ class TraverseVoice(
 
     /**
      * Prononce [phrase] : [urgent] `= true` préempte et joue toujours (la rouge,
-     * la file est jetée — un ordre nouveau périme le précédent),
-     * `false` se garde si le lecteur est occupé ([TraverseVoiceOutcome.QUEUED],
-     * doublon [TraverseVoiceOutcome.SKIPPED_BUSY]) et se dit au silence avant la
-     * phrase courante. Clip local dans tous les cas.
+     * aucune file — jamais de « traversez » après coup), `false` se jette si le
+     * lecteur est occupé ([TraverseVoiceOutcome.SKIPPED_BUSY]). Clip local dans
+     * tous les cas.
      */
     suspend fun speak(phrase: String, urgent: Boolean): TraverseVoiceOutcome {
         onEvent("EXPECT")
         if (phrase.isBlank()) return outcome(TraverseVoiceOutcome.UNAVAILABLE)
         if (urgent) {
-            pending = null
             player.stop()
         } else if (player.isBusy) {
-            if (phrase == pending) return outcome(TraverseVoiceOutcome.SKIPPED_BUSY)
-            pending = phrase
-            return outcome(TraverseVoiceOutcome.QUEUED)
-        } else {
-            drainPending(phrase)
+            return outcome(TraverseVoiceOutcome.SKIPPED_BUSY)
         }
         return outcome(playChain(phrase))
     }
@@ -217,20 +197,6 @@ class TraverseVoice(
     private suspend fun playChain(phrase: String): TraverseVoiceOutcome =
         if (playOffline(phrase)) TraverseVoiceOutcome.OFFLINE
         else TraverseVoiceOutcome.UNAVAILABLE
-
-    /**
-     * Dit la phrase gardée avant [phrase] (au silence : l'appelant est libre) —
-     * sauf doublon (la lecture courante la dit déjà). La phrase courante suit
-     * dans tous les cas ; la gardée trace `DRAIN` puis sa propre issue.
-     */
-    private suspend fun drainPending(phrase: String) {
-        val due = pending
-        pending = null
-        if (due != null && due != phrase) {
-            onEvent("DRAIN")
-            onEvent(playChain(due).name)
-        }
-    }
 
     /** Repli hors-ligne : clip pré-copié rejoué tel quel. */
     private suspend fun playOffline(phrase: String): Boolean {

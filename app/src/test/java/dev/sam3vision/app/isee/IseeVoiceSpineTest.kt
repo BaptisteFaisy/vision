@@ -25,6 +25,8 @@ class IseeVoiceSpineTest {
     private val spoken = mutableListOf<String>()
     private val clipSeqs = mutableListOf<List<String>>()
     private val posted = mutableListOf<Pair<Int, String>>()
+    private val journal = mutableListOf<String>()
+    private val defaultSink = SpeechLog.sink
 
     private fun spine(scope: CoroutineScope, language: SpeechLanguage = SpeechLanguage.En) = IseeVoiceSpine(
         scope = scope,
@@ -49,7 +51,11 @@ class IseeVoiceSpineTest {
         settings = { Settings.Default },
     )
 
-    private fun spineDehors(scope: CoroutineScope, onResume: () -> Unit = {}) = IseeVoiceSpine(
+    private fun spineDehors(
+        scope: CoroutineScope,
+        onResume: () -> Unit = {},
+        clock: () -> Long = { System.currentTimeMillis() },
+    ) = IseeVoiceSpine(
         scope = scope,
         crossingActive = { false },
         placeMode = { PictoPlaceMode.DEHORS },
@@ -58,6 +64,7 @@ class IseeVoiceSpineTest {
         speakPending = { onResume() },
         speak = { spoken += it },
         settings = { Settings.Default },
+        clock = clock,
     )
 
     private fun spineCrossing(
@@ -80,6 +87,7 @@ class IseeVoiceSpineTest {
     @Before
     fun brancher() {
         VoiceBus.reset()
+        SpeechLog.sink = { _, line -> journal += line }
         VoiceBus.speaker = object : VoiceBusSpeaker {
             override fun idle(): Boolean = true
             override fun say(level: Int, text: String, clipId: String?, clips: List<String>) {
@@ -94,7 +102,9 @@ class IseeVoiceSpineTest {
     fun debrancher() {
         VoiceBus.speaker = null
         VoiceBus.reset()
+        SpeechLog.sink = defaultSink
         posted.clear()
+        journal.clear()
     }
 
     @Test
@@ -133,7 +143,7 @@ class IseeVoiceSpineTest {
     @Test
     fun `reprise chat attendue sous des escaliers`() = runTest {
         var resumed = false
-        val voice = spineDehors(this) { resumed = true }
+        val voice = spineDehors(this, onResume = { resumed = true })
         VoiceBus.post(OutdoorLevel.STAIRS, "5 marches.")
 
         voice.resumeChatIfDue()
@@ -230,5 +240,74 @@ class IseeVoiceSpineTest {
             ),
             posted,
         )
+    }
+
+    @Test
+    fun `gps differe perime jete`() = runTest {
+        val voice = spineDehors(this, clock = { testScheduler.currentTime })
+        VoiceBus.post(OutdoorLevel.STAIRS, "5 marches.")
+
+        voice.speakGps("Tournez à droite.", OutdoorLevel.GPS_EVENT)
+        runCurrent()
+        assertEquals(listOf(OutdoorLevel.STAIRS to "5 marches."), posted)
+
+        // Les marches tiennent le bus 2,5 s : à la sortie, la manœuvre est périmée.
+        advanceTimeBy(2_500L)
+        VoiceBus.onSpeechIdle()
+        runCurrent()
+
+        assertEquals(listOf(OutdoorLevel.STAIRS to "5 marches."), posted)
+        assertTrue(journal.any { it.contains("report-perime") })
+    }
+
+    @Test
+    fun `gps differe dernier gagne`() = runTest {
+        val voice = spineDehors(this, clock = { testScheduler.currentTime })
+        VoiceBus.post(OutdoorLevel.STAIRS, "5 marches.")
+
+        voice.speakGps("Tournez à droite.", OutdoorLevel.GPS_EVENT)
+        voice.speakGps("Tournez à gauche.", OutdoorLevel.GPS_EVENT)
+        runCurrent()
+        assertEquals(listOf(OutdoorLevel.STAIRS to "5 marches."), posted)
+
+        VoiceBus.onSpeechIdle()
+        advanceTimeBy(500L)
+        runCurrent()
+
+        assertEquals(
+            listOf(
+                OutdoorLevel.STAIRS to "5 marches.",
+                OutdoorLevel.GPS_EVENT to "Tournez à gauche.",
+            ),
+            posted,
+        )
+        assertTrue(journal.any { it.contains("report-ecrase") })
+    }
+
+    @Test
+    fun `gps differe jete si dedans entre-temps`() = runTest {
+        var mode = PictoPlaceMode.DEHORS
+        val voice = IseeVoiceSpine(
+            scope = this,
+            crossingActive = { false },
+            placeMode = { mode },
+            cutSpeech = {},
+            stopVoice = {},
+            speakPending = {},
+            speak = { spoken += it },
+            settings = { Settings.Default },
+        )
+        VoiceBus.post(OutdoorLevel.STAIRS, "5 marches.")
+
+        voice.speakGps("Tournez à droite.", OutdoorLevel.GPS_EVENT)
+        runCurrent()
+
+        mode = PictoPlaceMode.DEDANS
+        VoiceBus.onSpeechIdle()
+        advanceTimeBy(500L)
+        runCurrent()
+
+        assertEquals(listOf(OutdoorLevel.STAIRS to "5 marches."), posted)
+        assertTrue(journal.any { it.contains("report-jet-contexte") })
     }
 }

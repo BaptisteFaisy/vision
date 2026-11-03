@@ -32,6 +32,8 @@ internal class IseeVoiceSpine(
     private val settings: () -> Settings,
     private val speakClips: suspend (List<String>) -> Unit =
         { ids -> ids.mapNotNull { IseeClipsEn.all[it] }.forEach { speak(it) } },
+    /** Horloge du report GPS (temps virtuel sous test). */
+    private val clock: () -> Long = { System.currentTimeMillis() },
 ) {
     /**
      * Bus vocal (SPEC v4) : le haut-parleur parle, la fin de parole reprend
@@ -54,6 +56,12 @@ internal class IseeVoiceSpine(
      */
     private var lastCrossing: Boolean = crossingActive()
 
+    /** Manœuvre reportée au silence : texte, rang, instant du report (place unique, dernier gagnant). */
+    private data class DeferredGps(val text: String, val level: Int, val atMs: Long)
+
+    /** Report en cours (`null` = aucun) : écrasé par le plus frais, sous verrou. */
+    private var deferredGps: DeferredGps? = null
+
     /**
      * Traversée basculée : à l'allumage tout se tait (verdict propriétaire), à
      * l'arrêt le chat reprend. Sans effet si l'état n'a pas changé.
@@ -75,13 +83,19 @@ internal class IseeVoiceSpine(
      * rang 3 — tus en Traversée (le verdict y est propriétaire du son) et
      * dedans (chaîne dedans : find, user, humain, chat, porte et murs).
      * Sous un compte (§ 42) ou un trottoir (§ 45) : reportée au silence
-     * (un cycle au plus), jamais perdue (une manœuvre ne se re-propose pas).
+     * (place unique, dernier gagnant ; périmée au-delà de [GPS_DEFER_TTL_MS],
+     * Traversée ou dedans entre-temps : jetée — ordre user du 03/11 : pas
+     * d'ancienne donnée ; une manœuvre ne se re-propose pas, la fraîche écrase).
      */
     fun speakGps(text: String, level: Int) {
         if (crossingActive()) return
         if (placeMode() != PictoPlaceMode.DEHORS) return
         if (VoiceBus.stairsSpeaking() || VoiceBus.sidewalkSpeaking()) {
-            scope.launch { deferGpsToGap(text, level) }
+            val crushed = synchronized(this) {
+                (deferredGps != null).also { deferredGps = DeferredGps(text, level, clock()) }
+            }
+            if (crushed) SpeechLog.fail("gps", "report-ecrase")
+            scope.launch { deferGpsToGap() }
             return
         }
         VoiceBus.post(level, text)
@@ -94,10 +108,28 @@ internal class IseeVoiceSpine(
         runCatching { speakPending() }
     }
 
-    /** Manœuvre sous un compte ou un trottoir : attendue au silence, puis postée (Traversée entre-temps : jetée). */
-    private suspend fun deferGpsToGap(text: String, level: Int) {
+    /**
+     * Manœuvre reportée : attendue au silence (scrutation [GPS_GAP_POLL_MS]),
+     * puis postée si elle a toujours le créneau (dernier gagnant), si elle
+     * est fraîche ([GPS_DEFER_TTL_MS]) et si on est toujours dehors hors
+     * Traversée — sinon jetée (journal `gps`).
+     */
+    private suspend fun deferGpsToGap() {
+        val due = synchronized(this) { deferredGps } ?: return
         while (VoiceBus.stairsSpeaking() || VoiceBus.sidewalkSpeaking()) delay(GPS_GAP_POLL_MS)
-        if (!crossingActive()) VoiceBus.post(level, text)
+        val mine = synchronized(this) {
+            (deferredGps === due).also { if (it) deferredGps = null }
+        }
+        if (!mine) return
+        if (clock() - due.atMs > GPS_DEFER_TTL_MS) {
+            SpeechLog.fail("gps", "report-perime")
+            return
+        }
+        if (crossingActive() || placeMode() != PictoPlaceMode.DEHORS) {
+            SpeechLog.fail("gps", "report-jet-contexte")
+            return
+        }
+        if (!VoiceBus.post(due.level, due.text)) SpeechLog.fail("gps", "report-jet-bus")
     }
 
     /**
@@ -130,3 +162,9 @@ internal class IseeVoiceSpine(
 
 /** Scrutation du silence sous un compte (report GPS, § 42). */
 private const val GPS_GAP_POLL_MS = 100L
+
+/**
+ * Péremption d'une manœuvre reportée : 2 s (un cycle d'escaliers au plus —
+ * au-delà, le virage est passé ; ordre user du 03/11 : pas d'ancienne donnée).
+ */
+private const val GPS_DEFER_TTL_MS = 2_000L
