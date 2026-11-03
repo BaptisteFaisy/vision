@@ -154,14 +154,17 @@ class SeuilsDehorsV4Test {
     }
 
     @Test
-    fun `grillage anti repetition 4s`() {
+    fun `grillage mot continu niveau 4 sans cooldown`() {
         val watcher = HazardWatcher()
         val signal = HazardSignal(detected = true, meters = 3f, label = "fence", centerX = 0.5f)
-        watcher.onSignal(signal, 1_000L, En)
-        assertNotNull(watcher.onSignal(signal, 1_100L, En))
-        watcher.onSignal(signal, 4_000L, En)
-        assertNull(watcher.onSignal(signal, 4_100L, En))
-        assertNotNull(watcher.onSignal(signal, 5_200L, En))
+        assertEquals("Right.", watcher.onSignal(signal, 1_000L, En)!!.phrase)
+        assertNull(watcher.onSignal(signal, 1_100L, En))
+        assertEquals("Right.", watcher.onSignal(signal, 1_300L, En)!!.phrase)
+        val cue = watcher.onSignal(signal, 5_200L, En)
+        assertEquals("Right.", cue!!.phrase)
+        assertEquals(4, cue.level)
+        assertEquals("fence-avoid", cue.antiRepeatKey)
+        assertTrue(cue.urgent)
     }
 
     // Poteaux, mobilier vertical, divers — niveau 7.
@@ -187,11 +190,12 @@ class SeuilsDehorsV4Test {
             assertTrue("parlé $label", HazardConcepts.isSpoken(label))
             val watcher = HazardWatcher()
             val signal = HazardSignal(detected = true, meters = 4f, label = label, centerX = 0.5f)
-            watcher.onSignal(signal, 1_000L, En)
-            val cue = watcher.onSignal(signal, 1_100L, En)
+            val cue = watcher.onSignal(signal, 1_000L, En)
             assertNotNull("label $label", cue)
-            assertEquals("label $label", 7, cue!!.level)
-            assertEquals("label $label", "pole", cue.antiRepeatKey)
+            assertEquals("label $label", "Right.", cue!!.phrase)
+            assertEquals("label $label", 7, cue.level)
+            assertEquals("label $label", "misc-avoid", cue.antiRepeatKey)
+            assertTrue("label $label", cue.urgent)
         }
     }
 
