@@ -85,8 +85,8 @@ internal class GlassesCamera(
      * il doublait la charge du lien). Un codec refusé par le flux ne doit ni
      * priver l'app de la caméra, ni lui faire croire que le micro fonctionne.
      *
-     * Et en descendant l'échelle de cadence ([GLASSES_FRAME_RATE_LADDER], 15 i/s
-     * seul, borne basse) : un refus reste un verdict explicite, jamais muet.
+     * Et en descendant l'échelle de cadence ([GLASSES_FRAME_RATE_LADDER], 24 puis 15,
+     * le repli prouvé) : un refus reste un verdict explicite, jamais muet.
      */
     fun start(): Boolean {
         if (camera != null) return true

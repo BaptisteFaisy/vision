@@ -12,39 +12,39 @@ import org.junit.Test
  * Configuration du flux des lunettes pour l'écran iSee ([glassesStreamConfiguration]),
  * prouvée sur JVM : le SDK s'instancie hors Android.
  *
- * Ce que ces tests verrouillent : la rue iSee est nourrie en **haute qualité**
- * (720×1280, ~1,5× d'upscale au lieu de ~2,1× en moyenne), à **15 i/s** (le
- * maximum de bits par image à 750 kbit/s fixe, borne basse du ladder),
- * en **H.265** (rendu direct, sans ré-échantillonnage intermédiaire). Baisser
- * la qualité ici, c'est reflouter la rue : tout changement doit être volontaire
- * et commenté.
+ * Ce que ces tests verrouillent : la rue iSee est nourrie en **qualité moyenne**
+ * (504×896 — SAM reçoit du 320/q55 dans tous les cas, suréchantillonné 1,6×,
+ * avec plus de bits par pixel qu'en haute à 15 i/s), à **24 i/s** (sur la
+ * grille du SDK, repli 15 annoncé), en **H.265** (rendu direct, sans
+ * ré-échantillonnage intermédiaire). Remonter la qualité ici, c'est reflouter
+ * par manque de bits : tout changement doit être volontaire et commenté.
  */
 class GlassesStreamConfigTest {
 
     @Test
-    fun `le direct iSee demande la haute qualite`() {
-        assertEquals(VideoQuality.HIGH, glassesStreamConfiguration(null).videoQuality)
+    fun `le direct iSee demande la qualite moyenne`() {
+        assertEquals(VideoQuality.MEDIUM, glassesStreamConfiguration(null).videoQuality)
     }
 
     @Test
-    fun `un lien sature replie en qualite moyenne`() {
-        assertEquals(0.05, GLASSES_MEDIUM_DROP_RATE, 0.0)
-        assertEquals(VideoQuality.HIGH, glassesVideoQuality(0.0))
-        assertEquals(VideoQuality.HIGH, glassesVideoQuality(0.05))
-        assertEquals(VideoQuality.MEDIUM, glassesVideoQuality(0.051))
-        assertEquals(VideoQuality.MEDIUM, glassesStreamConfiguration(null, dropRate = 0.2).videoQuality)
-        assertEquals(VideoQuality.HIGH, glassesStreamConfiguration(null, dropRate = 0.0).videoQuality)
+    fun `un lien sature replie en qualite basse`() {
+        assertEquals(0.05, GLASSES_LOW_DROP_RATE, 0.0)
+        assertEquals(VideoQuality.MEDIUM, glassesVideoQuality(0.0))
+        assertEquals(VideoQuality.MEDIUM, glassesVideoQuality(0.05))
+        assertEquals(VideoQuality.LOW, glassesVideoQuality(0.051))
+        assertEquals(VideoQuality.LOW, glassesStreamConfiguration(null, dropRate = 0.2).videoQuality)
+        assertEquals(VideoQuality.MEDIUM, glassesStreamConfiguration(null, dropRate = 0.0).videoQuality)
     }
 
     @Test
-    fun `le direct iSee demande 15 images par seconde`() {
+    fun `le direct iSee demande 24 images par seconde`() {
         assertEquals(GLASSES_FRAME_RATE, glassesStreamConfiguration(null).frameRate)
-        assertEquals(15, GLASSES_FRAME_RATE)
+        assertEquals(24, GLASSES_FRAME_RATE)
     }
 
     @Test
-    fun `l echelle ne porte que 15 sans jamais passer en dessous`() {
-        assertEquals(listOf(15), GLASSES_FRAME_RATE_LADDER)
+    fun `l echelle tente 24 puis replie sur 15 prouve`() {
+        assertEquals(listOf(24, 15), GLASSES_FRAME_RATE_LADDER)
         assertEquals(GLASSES_FRAME_RATE, GLASSES_FRAME_RATE_LADDER.first())
         assertEquals(15, GLASSES_FRAME_RATE_LADDER.last())
     }

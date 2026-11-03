@@ -21,7 +21,7 @@ s'il était mesuré.
 | `GlassesController.kt` (471 l.) | le seul point d'entrée : init SDK, enregistrement, session, permissions, routage des gestes, analyse des frames collectées, connexion mock de recette |
 | `GlassesPolicy.kt` (225 l.) | **logique pure** : gravité + textes des messages, phases joignables, libellés, raison de non-collecte — testée en JVM |
 | `GlassesStatus.kt` (44 l.) | les 4 lignes d'état, en texte pur (testées) ; l'écran ne fait que les afficher |
-| `GlassesCamera.kt` (225 l.) | flux 15 i/s `HIGH` `compressVideo = true`, photo à la demande, pompe vidéo vers l'accueil (cadence reçue au logcat) + collecteur derrière flag |
+| `GlassesCamera.kt` (225 l.) | flux 24 i/s `MEDIUM` (repli 15) `compressVideo = true`, photo à la demande, pompe vidéo vers l'accueil (cadence reçue au logcat) + collecteur derrière flag |
 | `GlassesFrameCollector.kt` (83 l.) | pompe de production : `videoStream` → `JpegFrame`, 1 frame / 1,5 s, testée sur JVM |
 | `GlassesVideoDecoder.kt` (253 l.) | bitstream H.265 → `ArgbImage` via `MediaCodec` (collecte), **jamais essayé** |
 | `GlassesLiveDecoder.kt` (377 l.) | rendu du direct sur la surface de l'accueil (bitmap, sinon H.265 `MediaCodec` Annex B + `csd-0`), correction `TextureView` centrée (`textureViewCrop`), cadence rendue au logcat |
@@ -181,24 +181,25 @@ Une relecture de permission qui échoue (lien instable) garde l'état connu au l
 révoquer à tort : un vrai refus se dit à l'attache (`CAPABILITY_DENIED`), pas sur une
 lecture ratée.
 
-## 5. Flux d'images : 15 i/s demandés (max bits/image), photo à la demande
+## 5. Flux d'images : 24 i/s demandés en moyenne, photo à la demande
 
 - Configuration demandée au SDK : `StreamConfiguration(audioCodec = choice.toCodec(),
-  videoQuality = HIGH, frameRate = GLASSES_FRAME_RATE, compressVideo = true)`
-  (`glassesStreamConfiguration`, `GlassesStreamConfig.kt`), `GLASSES_FRAME_RATE = 15`,
-  échelle `GLASSES_FRAME_RATE_LADDER` réduite à [15] (borne basse, pas de repli plus bas).
+  videoQuality = MEDIUM, frameRate = GLASSES_FRAME_RATE, compressVideo = true)`
+  (`glassesStreamConfiguration`, `GlassesStreamConfig.kt`), `GLASSES_FRAME_RATE = 24`,
+  échelle `GLASSES_FRAME_RATE_LADDER` = [24, 15] (15 = repli prouvé, annoncé).
   Le SDK fixe `bitRate = 750000` bps pour toutes les qualités
-  (`StreamImpl.createVideoFormat` / `VideoFormat.defaultFormat`, mwdat-camera 1.0.0).
-  Il borne `frameRate` à {30, 24, 15, 7, 2} : demander 60 rend 30, sans erreur ni avertissement.
-  D'où 0,054 bit/pixel à 720×1280 / 15 i/s — le maximum de bits par image à débit fixe,
-  contre 0,034 à 24 i/s (cause de la pixelisation et des déchirures au mouvement).
+  (`StreamImpl.createVideoFormat` / `VideoFormat.defaultFormat`, mwdat-camera 1.0.x).
+  Il borne `frameRate` à {30, 24, 15, 7, 2} : 24 est tenu sans accrochage.
+  D'où 0,069 bit/pixel à 504×896 / 24 i/s — plus qu'en haute à 15 i/s (0,054),
+  et SAM reçoit du 320/q55 dans tous les cas (suréchantillonné 1,6×).
   Mesuré 01/11/2026 (60 demandés, ramenés à 30 par le SDK) : ~30 i/s émis, ~24.5 i/s rendus à l'écran
-  (plafond CPU, voir `LUNETTES-RECETTE-TEL.md` §7). La haute qualité (720×1280)
-  reste un choix de piqué : si la rue saccade, revenir à `MEDIUM` au même endroit.
+  (plafond CPU, voir `LUNETTES-RECETTE-TEL.md` §7). La qualité moyenne (504×896)
+  reste un choix de fluidité : si la rue saccade, le repli `LOW` automatique
+  (abandon > 5 %) prend le relais à l'attache suivante.
   La cadence réellement reçue et rendue se lit au logcat
   (`logcat -s GlassesVideo,GlassesChain` : « N images rendues (X i/s) »,
-  « N frames (…o) (Y i/s) ») — X < Y = le téléphone perd des images, Y < 15
-  = c'est le lien qui ne suit pas.
+  « N frames (…o) (Y i/s) ») — X < Y = le téléphone perd des images, Y < 24
+  = repli 15 ou lien qui ne suit pas.
 - L'audio n'est pas `null` : `grep -n "audioCodec = null" app/src/main` → 0. Le code monte un
   **palier** (`GlassesAudioPlan.ladder`, `GlassesAudioPlan.kt:28-29`) — 16 kHz mono préféré,
   48 kHz mono en repli, puis « sans micro » — et `GlassesCamera.start()` essaie les trois
@@ -356,7 +357,7 @@ Rien de cette liste n'a été exécuté ici : **jamais essayé**, à vérifier a
 - toute session réelle : `createSession`, `start()`, `PAUSED` sur paire reposée ;
 - la permission caméra réelle du SDK et son passage en « Always allow » ;
 - la photo réelle et sa latence ; le décodage `PhotoData.HEIC` sur un vrai téléphone ;
-- le lien à 15 i/s : qualité, perte de trames, débit réel ;
+- le lien à 24 i/s : qualité, perte de trames, débit réel ;
 - le comportement du bouton capture réel (le doublon `SHORT_PRESS` puis `DOUBLE_PRESS` est
   traité par le code, pas constaté) ;
 - le mock : il n'a pas été lancé non plus (il demande un appareil Android) ;

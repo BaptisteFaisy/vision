@@ -10,8 +10,8 @@
 ## 1. Cibles
 
 - **(A) Cadrage** : la rue des lunettes est nette, non déformée, sans freeze, au
-  bon ratio (HIGH = 720×1280 portrait natif, 15 i/s demandés, H.265 :
-  le maximum de bits par image à débit fixe, borne basse du ladder).
+  bon ratio (MEDIUM = 504×896 portrait, 24 i/s demandés, H.265 :
+  0,069 bit/pixel à débit fixe, repli 15 annoncé).
 - **(B) Latence lunettes → téléphone** : frame affichée en **< 100 ms** (p95,
   60 s à la cadence tenue), mesurée comme ci-dessous.
 - **(C) Latence vers le GPU Modal** : voir § 5 — l'aller-retour cloud a un
