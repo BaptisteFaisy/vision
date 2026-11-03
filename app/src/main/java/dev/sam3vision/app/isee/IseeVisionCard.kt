@@ -287,6 +287,7 @@ internal fun BoxScope.CrossingChip(
             }
             .padding(8.dp)
             .background(Color(0x99000000), RoundedCornerShape(8.dp))
+            .neonEdge(dot, RoundedCornerShape(8.dp))
             .clickable(onClick = onToggle)
             .padding(horizontal = 8.dp, vertical = 4.dp),
         verticalAlignment = Alignment.CenterVertically,
