@@ -80,11 +80,6 @@ internal fun BoxWithConstraintsScope.PortraitCamera(
         ProbeNoticeScoped(probe)
         PictureFade(Modifier.fillMaxSize())
         ModeToggles(probe, viewModel, state.placeMode)
-        // Dense = pas d'inset de barre d'état : posé en haut, le panneau passait sous
-        // l'horloge et derrière le wordmark « iSee » (constaté sur l'appareil le
-        // 2026-10-29). En bas à gauche, au-dessus du fondu, il ne recouvre plus rien :
-        // la chip reste en bas à droite, le wordmark garde le haut.
-        LiveDebugPanel(probe, Modifier.align(Alignment.BottomStart).padding(8.dp), dense = true)
     }
 }
 

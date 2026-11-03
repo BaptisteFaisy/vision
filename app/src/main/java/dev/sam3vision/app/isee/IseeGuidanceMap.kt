@@ -6,37 +6,31 @@ import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
-import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
-import androidx.compose.ui.text.font.FontWeight
-import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
-import androidx.compose.ui.unit.sp
 import dev.sam3vision.app.guidemap.GuidanceMapCard
 import dev.sam3vision.app.voicenav.OffRouteBanner
 import dev.sam3vision.app.voicenav.VoiceNavUiState
-import dev.sam3vision.core.iseedesign.IseePortrait
 import dev.sam3vision.core.nav.NavFix
 import dev.sam3vision.core.nav.NavRoute
 
 /**
  * Le guidage GPS sur l'accueil iSee, sous la caméra et tout en bas de
- * l'écran : carte réduite (tracé + position, repli schéma si les tuiles
- * échouent) et instruction en cours, sans le reste du trajet (ni km ni
- * temps). Caméra ouverte, la boule s'efface entre la rue et la carte
- * ([hideGuidanceOrb]) et la phrase d'iSee garde sa place — sauf quand
- * le user parle : son transcript prend le milieu ([showGuidanceTranscript]).
+ * l'écran : carte réduite seule (tracé + position, repli schéma si les
+ * tuiles échouent), sans texte ni chiffres. Caméra ouverte, la boule
+ * s'efface entre la rue et la carte ([hideGuidanceOrb]) et la phrase
+ * d'iSee garde sa place — sauf quand le user parle : son transcript
+ * prend le milieu ([showGuidanceTranscript]).
  * La caméra et la sonde continuent (évitement préservé). L'arrêt
  * se fait à la voix (« arrête le guidage »).
  *
  * Affichée par `IseeScenePane` quand la session est en
- * [VoiceNavUiState.Guiding] ; rien sans tracé (la carte ne se compose pas,
- * l'instruction reste).
+ * [VoiceNavUiState.Guiding] ; rien sans tracé (ni carte ni texte).
  */
 @Composable
 internal fun IseeGuidanceBlock(
@@ -54,22 +48,7 @@ internal fun IseeGuidanceBlock(
             // Fond de la scène Portrait : les coins repeints s'y fondent.
             cornerColor = Color.White,
         )
-        GuidanceInstruction(state)
     }
-}
-
-/** Instruction en cours, en grand et encre Portrait (sans le reste : ni km ni temps). */
-@Composable
-private fun GuidanceInstruction(state: VoiceNavUiState.Guiding) {
-    Text(
-        state.update.instruction,
-        color = Color(IseePortrait.INK),
-        fontSize = 20.sp,
-        fontWeight = FontWeight.Bold,
-        lineHeight = 24.sp,
-        maxLines = 2,
-        overflow = TextOverflow.Ellipsis,
-    )
 }
 
 /**

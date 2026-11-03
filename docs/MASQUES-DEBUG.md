@@ -25,8 +25,10 @@ l'arrête** (`IseeViewModel.kt:248-251`, gestualité dans `IseeVisionCard.kt`) :
   `transport : WebSocket` (ou `WebSocket KO`), `suivis (N) :`, `reconnus :`, `gpu :`, `distances :`
   (3 max, du plus proche au plus loin — `DISTANCE_LINES_MAX`, `:12`), `dit : <phrase prononcée>`,
   `erreur : <dernière>`. En mode dense (petite fenêtre flottante), le détail est réduit aux erreurs et
-  `endpoint`/`frame`/`gpu` sont retirés (`LiveDebugPanel.kt:43-47`, `:92-99`) — l'ancienne note
+  `endpoint`/`frame`/`gpu` sont retirés — l'ancienne note
   « panneau inchangé pendant le REC » est donc fausse : le panneau **s'allège** en dense.
+  (Panneau supprimé de l'écran le 2026-11-03, demande user : ce § décrit les
+  textes `LiveProbeText`, lus dans les logs et les tests.)
 
 Avant la première frame analysée, un message central s'affiche (`liveProbeNotice`,
 `LiveProbeText.kt:89-94`) : `réveil du GPU SAM… (≈ 30 s au premier lancement)` pendant le warming,
@@ -70,7 +72,7 @@ Une frame de réserve est convertie pendant que la requête court (emplacement d
 | Envoi `/live/ws`, masques, stats | `app/…/isee/LiveProbe.kt` (l'appel passe par `liveClient()`, **WS uniquement**) |
 | Coloriage des masques (tampons réutilisés) | `app/…/isee/MaskPainter.kt:37-50` |
 | Formatage (pur, testé JVM) | `app/…/isee/LiveProbeText.kt` (21 tests `LiveProbeTextTest`) |
-| Panneau à l'écran | `app/…/isee/LiveDebugPanel.kt` |
+| Panneau à l'écran | supprimé le 2026-11-03 (textes : `LiveProbeText.kt`) |
 | Rendu des masques sur l'aperçu | `app/…/CameraSurface.kt` (partagé avec le Direct, `LiveScreen.kt:194-198`) |
 | Pastilles de distance | `app/…/DistanceOverlay.kt` (`LiveDistanceLayer`, `:38`) + câblage `IseeVisionCard.kt:144-149` |
 | Câblage Réglages → sonde | `app/…/isee/ProbeWiring.kt` (`configureFrom`, `:22-31`) |

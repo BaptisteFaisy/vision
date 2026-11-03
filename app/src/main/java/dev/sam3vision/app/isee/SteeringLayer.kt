@@ -7,7 +7,6 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.Path
 import androidx.compose.ui.graphics.drawscope.DrawScope
-import androidx.compose.ui.graphics.drawscope.Stroke
 import dev.sam3vision.core.live.SteeringCap
 import dev.sam3vision.core.live.SteeringCue
 
@@ -30,7 +29,7 @@ internal fun SteeringLayer(cue: SteeringCue?, modifier: Modifier = Modifier) {
     Canvas(modifier.fillMaxSize()) { drawSteeringArrow(cue.arrowDir(), color) }
 }
 
-/** Triangle bas-centré pointant [dir], ~1/6 de la largeur de carte : tube néon évidé (halo + liseré). */
+/** Triangle bas-centré pointant [dir], ~1/6 de la largeur de carte : aplati plein. */
 private fun DrawScope.drawSteeringArrow(dir: SteeringCap, color: Color) {
     val cx = size.width / 2f
     val cy = size.height * 0.82f
@@ -41,9 +40,7 @@ private fun DrawScope.drawSteeringArrow(dir: SteeringCap, color: Color) {
         SteeringCap.Left -> arrowLeft(path, cx, cy, arm)
         SteeringCap.Right -> arrowRight(path, cx, cy, arm)
     }
-    drawPath(path, color.copy(alpha = 0.18f), style = Stroke(arm * 0.22f))
-    drawPath(path, color.copy(alpha = 0.45f), style = Stroke(arm * 0.12f))
-    drawPath(path, color.copy(alpha = 0.95f), style = Stroke(arm * 0.055f))
+    drawPath(path, color)
 }
 
 /** Pointe en haut : « tout droit ». */

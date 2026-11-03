@@ -35,11 +35,11 @@ import kotlinx.coroutines.flow.distinctUntilChangedBy
  *   (`distanceLayer`) et Traversée — pastilles, flèche, consigne, feu, chip ;
  * - notice ([noticeKeyOf]) : ce que lit [liveProbeNotice] — centre de la rue.
  *
- * Hors clés, donc lus dans le panneau plein état ([LiveDebugPanel], chaque
- * ligne `Text` saute quand sa chaîne est identique) : le chrono (`timings`,
- * posé aussi par `noteDrawn` après le dessin), la phrase (`spoken`), les
- * libellés et les chiffres stables (endpoint, GPU, concepts). La voix ne passe
- * pas par ici : ses guetteurs restent branchés sur l'état brut, avec
+ * Hors clés, donc non affichés à l'écran (panneau debug supprimé le
+ * 2026-11-03) : le chrono (`timings`, lu dans les logs [LiveLatencyLog]),
+ * la phrase (`spoken`), les libellés et les chiffres stables (endpoint,
+ * GPU, concepts, textes testés [liveProbeDetails]). La voix ne passe pas
+ * par ici : ses guetteurs restent branchés sur l'état brut, avec
  * exactement les mêmes événements qu'avant (mêmes écritures, mêmes compteurs).
  */
 
