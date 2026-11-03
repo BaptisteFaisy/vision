@@ -154,6 +154,17 @@ internal class IseeGlassesInbox(
     }
 
     /**
+     * Bouton « Describe » : la photo affichée part au LLM, qui la décrit comme
+     * une réponse à une question dictée (bulle + voix). La photo reste affichée
+     * — pas de `dismiss`, qui effacerait le contexte épinglé avant l'appel.
+     */
+    fun describePhoto() {
+        if (snapshot().glassesPhoto == null) return
+        silence()
+        scope.launch { answer(DESCRIBE_PHOTO_QUESTION, ByteArray(0)) }
+    }
+
+    /**
      * Question entendue aux lunettes (écoute seule, sans photo) : même
      * traitement qu'une dictée tenue-relâchée. Le téléphone reste en poche.
      */

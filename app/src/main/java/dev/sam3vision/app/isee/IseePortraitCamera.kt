@@ -119,6 +119,7 @@ private fun BoxScope.StreetFeed(
     val photo = state.glassesPhoto
     if (photo != null) {
         GlassesPhotoStreet(photo, Modifier.fillMaxSize())
+        DescribePhotoButton(viewModel.navButtons, viewModel::describeGlassesPhoto, Modifier.padding(bottom = 16.dp))
     } else if (showGlasses) {
         GlassesLive(Modifier.fillMaxSize())
         GlassesMasksScoped(probe)

@@ -103,6 +103,35 @@ class IseeGlassesInboxTest {
     }
 
     @Test
+    fun `bouton Describe — photo gardee, question en conserve posee`() = runTest {
+        testScope = this
+        val inbox = TestScopeInbox()
+        inbox.onPhoto(photo("lunettes-1.jpg"), CaptureAction.PHOTO)
+
+        inbox.describePhoto()
+        testScheduler.advanceUntilIdle()
+
+        assertEquals(listOf(DESCRIBE_PHOTO_QUESTION), answers.map { it.first })
+        assertEquals("pcm vide : repli sans audio", listOf(emptyList<Byte>()), answers.map { it.second.asList() })
+        assertEquals(1, silences)
+        assertNotNull("photo toujours affichée", state.value.glassesPhoto)
+        assertEquals("contexte épinglé joint", "b64:lunettes-1.jpg", shots.imageBase64())
+        assertEquals("caméra non relancée", 0, restarts)
+    }
+
+    @Test
+    fun `bouton Describe sans photo — rien ne part`() = runTest {
+        testScope = this
+        val inbox = TestScopeInbox()
+
+        inbox.describePhoto()
+        testScheduler.advanceUntilIdle()
+
+        assertTrue(answers.isEmpty())
+        assertEquals(0, silences)
+    }
+
+    @Test
     fun `question entendue — sans photo, repondue comme une dictee`() = runTest {
         testScope = this
         val inbox = TestScopeInbox()

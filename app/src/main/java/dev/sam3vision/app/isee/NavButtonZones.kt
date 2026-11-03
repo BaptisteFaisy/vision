@@ -16,6 +16,9 @@ internal const val CONFIRM_CANCEL_ID = "confirm-cancel"
 /** Saisie clavier de secours du bloc confirmation sur l'accueil. */
 internal const val CONFIRM_TEXT_ID = "confirm-text"
 
+/** Bouton « Describe » posé sur la photo lunettes affichée. */
+internal const val GLASSES_DESCRIBE_ID = "glasses-describe"
+
 /**
  * Zones tactiles des boutons navigation de l'accueil (coordonnées fenêtre) :
  * la racine y exempte ses gestes, comme pour les chips Picto et Traversée.

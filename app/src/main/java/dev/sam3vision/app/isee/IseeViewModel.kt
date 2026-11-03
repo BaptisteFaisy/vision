@@ -343,6 +343,7 @@ class IseeViewModel(app: Application) : AndroidViewModel(app) {
 
     fun onGlassesPhoto(file: File, action: CaptureAction) = glassesInbox.onPhoto(file, action)
     fun dismissGlassesPhoto() = glassesInbox.dismiss()
+    fun describeGlassesPhoto() = glassesInbox.describePhoto()
     fun onGlassesListening() = silenceForGlasses()
     fun onGlassesHeard(text: String, pcm: ByteArray) = glassesInbox.heard(text, pcm)
 
