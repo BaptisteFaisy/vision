@@ -302,7 +302,14 @@ class CrossingArrivalWatcher(
 ) {
 
     private var hits = 0
-    private var announced = false
+
+    /**
+     * Arrivée annoncée (latch d'entrée « sur le passage ») : vrai depuis les
+     * 2 frames d'arrivée jusqu'à la prochaine frame non arrivée ou [reset].
+     * Lu par le déclencheur sur-passage, écrit par ce seul guetteur.
+     */
+    var announced = false
+        private set
 
     /** Dernier signal produit (`null` tant que rien n'a été annoncé). */
     var lastCue: CrossingArrivalCue? = null
