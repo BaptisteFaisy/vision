@@ -4,8 +4,19 @@ import android.media.MediaCodec
 import android.media.MediaCodecInfo
 import android.media.MediaFormat
 
-/** Débit du son enregistré : 64 kbit/s mono suffit très largement à de la parole. */
-private const val BITRATE = 64_000
+/** Débit du son enregistré au-delà de la voix (48 kHz, stéréo) : le réglage historique. */
+private const val BITRATE_FULL = 64_000
+
+/** Débit voix 16 kHz mono : transparent pour la parole, moitié moins d'octets muxés. */
+private const val BITRATE_VOICE = 32_000
+
+/**
+ * Débit AAC selon le format négocié (mesuré à l'attache, pas supposé) : la voix 16 kHz
+ * mono tient en 32 kbit/s AAC-LC sans perte de parole ; le reste garde 64 kbit/s. La
+ * dictée n'est pas concernée : elle lit le PCM direct, pas cette piste AAC (MP4 seul).
+ */
+internal fun audioBitrateFor(sampleRate: Int, channels: Int): Int =
+    if (sampleRate <= PcmRate.DOWNSTREAM_HZ && channels <= 1) BITRATE_VOICE else BITRATE_FULL
 
 /** Taille maximale d'un tampon d'entrée : une trame PCM des lunettes tient dedans. */
 private const val MAX_INPUT = 32_768
@@ -44,7 +55,7 @@ internal class GlassesAudioEncoder(
         return runCatching {
             val format = MediaFormat.createAudioFormat(MediaFormat.MIMETYPE_AUDIO_AAC, sampleRate, channels).apply {
                 setInteger(MediaFormat.KEY_AAC_PROFILE, MediaCodecInfo.CodecProfileLevel.AACObjectLC)
-                setInteger(MediaFormat.KEY_BIT_RATE, BITRATE)
+                setInteger(MediaFormat.KEY_BIT_RATE, audioBitrateFor(sampleRate, channels))
                 setInteger(MediaFormat.KEY_MAX_INPUT_SIZE, MAX_INPUT)
             }
             val created = MediaCodec.createEncoderByType(MediaFormat.MIMETYPE_AUDIO_AAC).apply {
