@@ -27,7 +27,8 @@ from pathlib import Path
 if __name__ == "__main__": sys.modules.setdefault("test_units", sys.modules["__main__"])
 
 from tests_units import (boot_tests, concepts_street_tests, crossing_concepts_tests,  # noqa: E402
-                         depth_tests, detr_evict_tests, feux_guard_tests, latency_tests,
+                         depth_shortlist_tests, depth_tests, detr_evict_tests, feux_guard_tests,
+                         latency_tests,
                          live_fast_tests, live_fast_perf_tests, llm_tests, m1_vectors_tests,
                          merge_tests, native_tests, post_tests, preproc_tests, segmentation_tests,
                          tracking_tests,
@@ -391,9 +392,9 @@ RUNNERS = (
     ("profondeur : run_frame saute depth à 0 objet", "fast_core",
      depth_tests.test_run_frame_depth_skip_empty),
     ("profondeur : shortlist des médianes (top + rescapés)", "depth",
-     depth_tests.test_depth_shortlist),
+     depth_shortlist_tests.test_depth_shortlist),
     ("profondeur : shortlist câblée au run_frame", "fast_core",
-     depth_tests.test_depth_shortlist_frame),
+     depth_shortlist_tests.test_depth_shortlist_frame),
     ("live_fast : passage (décision)", "passage", live_fast_tests.test_passage_decision),
     ("live_fast : passage (tolérance)", "passage", live_fast_tests.test_passage_tolerance),
     # Apport du 20:30 (poids embarqués + snapshot mémoire) préservé par la fusion.
