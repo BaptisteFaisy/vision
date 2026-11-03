@@ -1,5 +1,9 @@
 package dev.sam3vision.core.net
 
+import dev.sam3vision.core.model.LiveFrame
+import kotlinx.coroutines.CompletableDeferred
+import org.json.JSONObject
+
 /**
  * Textes d'erreur du direct : une seule source, hors de [WsLiveClient] (garde des 500
  * lignes). Ce sont **les messages que lit l'écran** quand une frame n'aboutit pas : ils
@@ -36,3 +40,41 @@ internal fun cancelMessage(id: Int): String = "{\"id\":$id,\"cancel\":true}"
 
 /** Fermeture propre : la seule valeur que `closeCodeOf` invente (transport = `null`). */
 internal const val NORMAL_CLOSE_CODE = 1000
+
+/** Une frame en vol : son réveil, et si elle est partie en binaire (repli JSON). */
+internal class PendingFrame(val reply: CompletableDeferred<String>, val binary: Boolean)
+
+/** Signal interne : `id: -1` reçu — la frame binaire en vol repart en JSON. */
+internal object FallbackToJson : Exception("WS binaire refusé (id -1) : repli JSON")
+
+/** Message de requête : le corps de `POST /live` (mêmes knobs) plus l'`id` de corrélation. */
+internal fun frameMessage(
+    id: Int,
+    jpegB64: String,
+    prompts: List<String>?,
+    workEdge: Int,
+    maxObjects: Int,
+    maskFormat: String?,
+    maskEdge: Int,
+    withDepth: Boolean,
+    masks: Boolean,
+): String = liveFrameJson(jpegB64, prompts, workEdge, maxObjects, id, maskFormat, maskEdge, withDepth, masks)
+
+/** Trame M1 : les knobs du client appliqués à [frameMessageBinary]. */
+internal fun binaryFrame(
+    id: Int,
+    jpeg: ByteArray,
+    prompts: List<String>?,
+    workEdge: Int,
+    maxObjects: Int,
+    maskFormat: String?,
+    maskEdge: Int,
+    withDepth: Boolean,
+    masks: Boolean,
+): ByteArray = frameMessageBinary(id, jpeg, prompts, workEdge, maxObjects, maskFormat, maskEdge, withDepth, masks)
+
+/** Réponse serveur : JSON construit **une seule fois**, partagé par garde et frame. */
+internal fun parseReply(raw: String, readJson: (String) -> JSONObject?): Result<LiveFrame> {
+    val json = readJson(raw) ?: return Result.failure(ApiError.BadResponse(WS_UNREADABLE))
+    return liveReplyOf(json)
+}
