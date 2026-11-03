@@ -26,7 +26,8 @@ import json
 import time
 
 from gpu_guard import note_success, note_timeout
-from ws_session import dumps, send_reply, ws_metrics
+from ws_session import (close_bounded, dumps, send_reply, send_text_bounded,
+                        ws_metrics)
 
 # Réveil/keepalive (P1-1) : le client ping le **protocole** toutes les 30 s
 # (``WsTransport`` ``pingInterval``) ; ces pings ne sont JAMAIS livrés à
@@ -139,7 +140,7 @@ async def _next_message(websocket, idle_seconds) -> tuple:
     kind, raw = await _recv_idle(websocket, idle_seconds)
     if kind == "idle":
         print(f"ws: inactif depuis {idle_seconds:g} s, fermeture 1001 idle", flush=True)
-        await websocket.close(code=1001, reason="idle")
+        await close_bounded(websocket, code=1001, reason="idle")
         return ("stop", "idle")
     if kind == "disconnect":
         print("ws: disconnect client (fin propre côté app)", flush=True)
@@ -148,12 +149,8 @@ async def _next_message(websocket, idle_seconds) -> tuple:
 
 
 async def _pong(websocket, raw) -> bool:
-    """Pong immédiat d'un ping applicatif ; False = client parti."""
-    try:
-        await websocket.send_text(dumps(ping_reply(raw)))
-    except Exception:  # noqa: BLE001 — client parti pendant le pong
-        return False
-    return True
+    """Pong immédiat d'un ping applicatif ; False = client parti (P0-2 : borné)."""
+    return await send_text_bounded(websocket, dumps(ping_reply(raw)))
 
 
 async def _infer_guarded(service, raw, depth_state, every) -> dict:
@@ -434,10 +431,7 @@ async def _close_session(websocket, stats, reason, started) -> None:
     stats[f"close_{reason}"] = stats.get(f"close_{reason}", 0) + 1
     print(f"ws: close reason={reason} open={stats['open']} "
           f"dur={time.monotonic() - started:.1f}s frames={stats['frames']}", flush=True)
-    try:
-        await websocket.close()
-    except Exception:  # noqa: BLE001 — déjà fermé, rien à faire
-        pass
+    await close_bounded(websocket)  # déjà fermé ou parqué : rien à faire
 
 
 async def ws_loop(service, websocket, idle_seconds, frame_seconds, every=None) -> None:

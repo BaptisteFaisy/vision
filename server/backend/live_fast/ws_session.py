@@ -15,12 +15,20 @@ autorité du contrat, bancs et doublures peuvent le surcharger.
 
 from __future__ import annotations
 
+import asyncio
 import json
 import time
 
 # Motif « réponse trop grosse » servi dans la ``reason`` : OkHttp la remonte telle
 # quelle, le client sait quoi baisser (``max_objects``) ou passer (``mask_format``).
 OVERSIZE_REASON = "response too large: lower max_objects or use mask_format=rle"
+
+# Borne d'envoi (P0-2) : un ``send_text`` sans borne sur un pair parti ne revient
+# jamais — la session reste « open », l'idle (qui ne surveille que ``receive()``)
+# ne la ferme pas, et le créneau d'entrée Modal (``max_inputs``) reste occupé à vie.
+# À 4 sockets parqués, ``/health`` et ``/live`` font la queue au proxy sans fin.
+# 5 s : un pair vivant absorbe une réponse en millisecondes ; au-delà il est parti.
+WS_SEND_SECONDS = 5.0
 
 
 def dumps(reply) -> str:
@@ -82,31 +90,66 @@ def degrade_reply(reply: dict, limit_bytes: int) -> dict | None:
     return light if len(dumps(light)) <= limit_bytes else None
 
 
-async def send_reply(service, websocket, raw, reply, limit_bytes) -> str | None:
+async def _bounded(coro, seconds: float) -> bool:
+    """Une opération socket bornée : ``False`` = pair parti (timeout ou erreur)."""
+    try:
+        await asyncio.wait_for(coro, timeout=seconds)
+        return True
+    except asyncio.TimeoutError:
+        return False
+    except Exception:  # noqa: BLE001 — socket déjà fermé : pair parti
+        return False
+
+
+async def send_text_bounded(websocket, text: str,
+                            seconds: float | None = None) -> bool:
+    """Envoi borné : ``False`` = le pair est parti, la session doit se fermer."""
+    bound = WS_SEND_SECONDS if seconds is None else seconds
+    return await _bounded(websocket.send_text(text), bound)
+
+
+async def close_bounded(websocket, code: int = 1000, reason: str | None = None,
+                        seconds: float | None = None) -> bool:
+    """Fermeture bornée : un ``close()`` peut parquer comme un envoi."""
+    bound = WS_SEND_SECONDS if seconds is None else seconds
+    return await _bounded(websocket.close(code=code, reason=reason), bound)
+
+
+async def send_reply(service, websocket, raw, reply, limit_bytes,
+                     send_seconds: float | None = None) -> str | None:
     """Log + dégradation/borne 1009 + envoi ; motif d'arrêt (``None`` = on continue).
 
     ``"oversize"`` seulement quand la réponse ne peut pas être dégradée : une réponse
-    trop grosse devient une réponse plus petite, la session survit.
+    trop grosse devient une réponse plus petite, la session survit. ``"client"``
+    quand l'envoi borné échoue : le pair est parti, la boucle sort et le créneau
+    d'entrée est rendu au lieu de parquer la session (P0-2).
     """
+    bound = WS_SEND_SECONDS if send_seconds is None else send_seconds
     text = dumps(reply)
     err = reply.get("error")
     status = err.get("status", "ok") if isinstance(err, dict) else "ok"
     print(f"ws id={reply.get('id')} status={status} in={len(raw) if raw else 0}B "
           f"out={len(text)}B objs={len(reply.get('objects', []))}", flush=True)
     if len(text) <= limit_bytes:
-        await websocket.send_text(text)
-        return None
+        if await send_text_bounded(websocket, text, bound):
+            return None
+        print(f"ws id={reply.get('id')}: envoi impossible (pair parti), "
+              "session fermée", flush=True)
+        return "client"
     light = degrade_reply(reply, limit_bytes)
     if light is None:
         print(f"ws id={reply.get('id')}: {len(text)}B > {limit_bytes}B, "
               "aucune dégradation possible, fermeture 1009", flush=True)
         ws_metrics(service)["close_oversize"] += 1
-        await websocket.close(code=1009, reason=OVERSIZE_REASON)
+        await close_bounded(websocket, code=1009, reason=OVERSIZE_REASON)
         return "oversize"
     stats = ws_metrics(service)
     stats["degraded"] += 1
     light_text = dumps(light)
     print(f"ws id={reply.get('id')}: {len(text)}B > {limit_bytes}B, réponse "
           f"dégradée ({len(light_text)}B, masques retirés)", flush=True)
-    await websocket.send_text(light_text)
-    return None
+    if await send_text_bounded(websocket, light_text, bound):
+        return None
+    print(f"ws id={reply.get('id')}: envoi dégradé impossible (pair parti), "
+          "session fermée", flush=True)
+    return "client"
