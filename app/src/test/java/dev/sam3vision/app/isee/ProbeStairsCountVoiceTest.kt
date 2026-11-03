@@ -252,7 +252,7 @@ class ProbeStairsCountVoiceTest {
     }
 
     @Test
-    fun `compteur poste devant le chat en lecture`() = runTest {
+    fun `compteur retenu pendant le chat, parle a la fin`() = runTest {
         val (probe, fake, scope) = harness(this)
         try {
             VoiceBus.chatSpeaking(true)
@@ -264,8 +264,10 @@ class ProbeStairsCountVoiceTest {
             assertTrue(stairsFoundOf(probe.state.value).detected)
             runCurrent()
 
-            // Le compte parle malgré le chat en lecture (la cadence, elle,
-            // est verrouillée par le test de répétition).
+            // Le compte attend la fin du chat (retenu, jamais par-dessus),
+            // puis se dit (la cadence, elle, est verrouillée par le test
+            // de répétition).
+            VoiceBus.chatSpeaking(false)
             assertTrue(textes().isNotEmpty())
             assertTrue(textes().all { it == "$offered marches." })
         } finally {

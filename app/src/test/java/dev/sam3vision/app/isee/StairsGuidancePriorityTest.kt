@@ -53,10 +53,13 @@ class StairsGuidancePriorityTest {
     }
 
     @Test
-    fun `escaliers coupent la manoeuvre en cours`() {
+    fun `escaliers attendent la fin de la manoeuvre`() {
         VoiceBus.post(OutdoorLevel.GPS_EVENT, "Left.")
         VoiceBus.post(OutdoorLevel.STAIRS, "Stairs 2 m.")
 
+        assertEquals(1, speaker.said.size)
+
+        VoiceBus.onSpeechIdle()
         assertEquals(
             listOf(
                 StairsPriorityFakeSpeaker.Said(OutdoorLevel.GPS_EVENT, "Left."),
@@ -67,10 +70,12 @@ class StairsGuidancePriorityTest {
     }
 
     @Test
-    fun `escaliers coupent le rappel en cours`() {
+    fun `escaliers attendent la fin du rappel`() {
         VoiceBus.post(OutdoorLevel.GPS_REMINDER, "Right.")
         VoiceBus.post(OutdoorLevel.STAIRS, "Stairs 1 m.")
 
+        assertEquals(1, speaker.said.size)
+        VoiceBus.onSpeechIdle()
         assertEquals(2, speaker.said.size)
         assertEquals(OutdoorLevel.STAIRS, speaker.said[1].level)
     }
@@ -100,7 +105,7 @@ class StairsGuidancePriorityTest {
     }
 
     @Test
-    fun `jalon 2m coupe le mot via le chemin sonde`() {
+    fun `jalon 2m parle a la fin du mot via le chemin sonde`() {
         // Jalon réel du guetteur (confirmFrames = 2, miroir `ProbeStairs`),
         // proposé au bus comme la sonde (antirépétition puis post).
         val watcher = StairWatcher(confirmFrames = 2)
@@ -115,6 +120,8 @@ class StairsGuidancePriorityTest {
         val offered = offer(VoiceWish(cue.level, cue.phrase, cue.antiRepeatKey), 3000L)
 
         assertEquals(true, offered)
+        assertEquals(1, speaker.said.size)
+        VoiceBus.onSpeechIdle()
         assertEquals(2, speaker.said.size)
         assertEquals(OutdoorLevel.STAIRS, speaker.said[1].level)
     }

@@ -255,41 +255,8 @@ class EchelleOverwriteTest {
         assertEquals(listOf(FakeSpeaker.Said(OutdoorLevel.FALLBACK, "repli", null)), speaker.said)
     }
 
-    @Test
-    fun `pendant une parole seul un niveau plus petit ou egal coupe`() {
-        speaker.idleValue = false
-        VoiceBus.post(OutdoorLevel.CURB, "bordure")
-        // Le trottoir (10) ne démontre plus l'écrasé : absolu depuis le § 45
-        // (il couperait la bordure) — le repli (12) garde le rôle.
-        VoiceBus.post(OutdoorLevel.FALLBACK, "repli")
-        VoiceBus.post(OutdoorLevel.HUMAN, "personne")
-        VoiceBus.post(OutdoorLevel.HUMAN, "personne encore")
-
-        assertEquals(
-            listOf(
-                FakeSpeaker.Said(OutdoorLevel.CURB, "bordure", null),
-                FakeSpeaker.Said(OutdoorLevel.HUMAN, "personne", null),
-                FakeSpeaker.Said(OutdoorLevel.HUMAN, "personne encore", null),
-            ),
-            speaker.said,
-        )
-    }
-
-    @Test
-    fun `verdict 100 coupe le 101, le 101 ne coupe jamais le 100`() {
-        speaker.idleValue = false
-        VoiceBus.post(CrossingLevels.HUMAN, "personne")
-        VoiceBus.post(CrossingLevels.VERDICT, "Don't cross.", "verdict_dont_cross")
-        VoiceBus.post(CrossingLevels.HUMAN, "personne encore")
-
-        assertEquals(
-            listOf(
-                FakeSpeaker.Said(CrossingLevels.HUMAN, "personne", null),
-                FakeSpeaker.Said(CrossingLevels.VERDICT, "Don't cross.", "verdict_dont_cross"),
-            ),
-            speaker.said,
-        )
-    }
+    // Attente en place unique (plus prioritaire, à égalité le dernier) :
+    // `NoCutPendingTest` (contrat sans coupe du 03/11).
 
     @Test
     fun `parole user tait tout sauf niveau 0`() {
@@ -312,15 +279,19 @@ class EchelleOverwriteTest {
     }
 
     @Test
-    fun `chat tient le niveau 9, repli ecrase reponse coupe`() {
+    fun `chat tient le niveau 9, l humain parle a la fin de la reponse`() {
         speaker.idleValue = false
         VoiceBus.chatSpeaking(true)
         VoiceBus.post(OutdoorLevel.FALLBACK, "repli")
         VoiceBus.post(OutdoorLevel.HUMAN, "personne")
 
+        // Repli jeté (sous le rang 9), humain retenu : rien ne coupe le chat.
+        assertEquals(0, speaker.said.size)
+
+        // Fin de la réponse : l'humain retenu se dit avant la reprise.
+        VoiceBus.chatSpeaking(false)
         assertEquals(listOf(FakeSpeaker.Said(OutdoorLevel.HUMAN, "personne", null)), speaker.said)
 
-        VoiceBus.chatSpeaking(false)
         speaker.idleValue = true
         // La personne parlait encore : seule la fin de lecture rend le repos.
         VoiceBus.onSpeechIdle()
@@ -334,6 +305,9 @@ class EchelleOverwriteTest {
 
         assertTrue(offer(wish, nowMs = 0L))
         assertFalse(offer(wish, nowMs = 1_000L))
+        // Fin du mot : la redite parle au repos (sans ça, doublon du mot en
+        // cours — jeté, pas remis en file).
+        VoiceBus.onSpeechIdle()
         assertTrue(offer(wish, nowMs = 2_000L))
         assertFalse(offer(null, nowMs = 3_000L))
 
@@ -379,12 +353,17 @@ class EchelleOverwriteTest {
     }
 
     @Test
-    fun `offre trottoir passe sous un compte et coupe`() {
+    fun `offre trottoir passe sous un compte et parle a la fin`() {
         VoiceBus.post(OutdoorLevel.STAIRS, "5 marches.")
 
         assertTrue(offer(VoiceWish(OutdoorLevel.SIDEWALK, "Trottoir à gauche.", "test-trottoir-passe"), nowMs = 0L))
 
-        // Le trottoir absolu (§ 45) coupe le compte en cours, sans attendre.
+        // Le trottoir absolu (§ 45) attend la fin du compte, sans le couper.
+        assertEquals(
+            listOf(FakeSpeaker.Said(OutdoorLevel.STAIRS, "5 marches.", null)),
+            speaker.said,
+        )
+        VoiceBus.onSpeechIdle()
         assertEquals(
             listOf(
                 FakeSpeaker.Said(OutdoorLevel.STAIRS, "5 marches.", null),

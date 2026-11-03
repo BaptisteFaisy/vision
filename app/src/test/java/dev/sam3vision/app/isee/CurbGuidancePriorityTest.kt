@@ -29,10 +29,10 @@ private class CurbFakeSpeaker : VoiceBusSpeaker {
 
 /**
  * Bordure devant « droite » / « gauche » (ordre user du 02/11/2026) : la
- * bordure (niveau 5) coupe un mot de guidage en cours (manœuvre 11, rappel
- * 3) et n'est jamais coupée par eux (ni par le repli 12). Les paliers
- * 2 / 1 / 0,5 m sont couverts côté cœur ([CurbWatcher.COUNTDOWN_METERS],
- * `CurbAnnounceTest`).
+ * bordure (niveau 5) attend la fin d'un mot de guidage en cours (manœuvre
+ * 11, rappel 3 — sans le couper depuis le 03/11) et n'est jamais coupée
+ * par eux (ni par le repli 12). Les paliers 2 / 1 / 0,5 m sont couverts
+ * côté cœur ([CurbWatcher.COUNTDOWN_METERS], `CurbAnnounceTest`).
  */
 class CurbGuidancePriorityTest {
 
@@ -55,10 +55,13 @@ class CurbGuidancePriorityTest {
     }
 
     @Test
-    fun `bordure coupe la manoeuvre en cours`() {
+    fun `bordure attend la fin de la manoeuvre`() {
         VoiceBus.post(OutdoorLevel.GPS_EVENT, "Left.")
         VoiceBus.post(OutdoorLevel.CURB, "Bordure 2 m.")
 
+        assertEquals(1, speaker.said.size)
+
+        VoiceBus.onSpeechIdle()
         assertEquals(
             listOf(
                 CurbFakeSpeaker.Said(OutdoorLevel.GPS_EVENT, "Left."),
@@ -69,10 +72,12 @@ class CurbGuidancePriorityTest {
     }
 
     @Test
-    fun `bordure coupe le rappel en cours`() {
+    fun `bordure attend la fin du rappel`() {
         VoiceBus.post(OutdoorLevel.GPS_REMINDER, "Left.")
         VoiceBus.post(OutdoorLevel.CURB, "Bordure 1 m.")
 
+        assertEquals(1, speaker.said.size)
+        VoiceBus.onSpeechIdle()
         assertEquals(2, speaker.said.size)
         assertEquals(OutdoorLevel.CURB, speaker.said[1].level)
     }
@@ -102,15 +107,17 @@ class CurbGuidancePriorityTest {
     }
 
     @Test
-    fun `frame bordure parlee pendant le mot de guidage`() {
+    fun `frame bordure parlee a la fin du mot de guidage`() {
         VoiceBus.post(OutdoorLevel.GPS_EVENT, "Left.")
         val guetteurs = ObstacleWatchers(CurbWatcher(), HazardWatcher())
         val bordure = lecture("curb", 100f, 2.0f)
 
-        // Deux frames confirment la détection : elle coupe le mot, pas l'inverse.
+        // Deux frames confirment la détection : retenue pendant le mot, dite à la fin.
         obstacleFrame(etat(1, bordure), { SpeechLanguage.Fr }, guetteurs)
         obstacleFrame(etat(2, bordure), { SpeechLanguage.Fr }, guetteurs)
 
+        assertEquals(1, speaker.said.size)
+        VoiceBus.onSpeechIdle()
         assertEquals(2, speaker.said.size)
         assertEquals(OutdoorLevel.CURB, speaker.said[1].level)
         assertTrue(speaker.said[1].text.startsWith("Bordure détectée"))
