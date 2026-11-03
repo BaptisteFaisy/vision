@@ -2,8 +2,11 @@ package dev.sam3vision.app.isee
 
 import dev.sam3vision.core.distance.CameraPose
 import dev.sam3vision.core.distance.DistanceMeter
+import dev.sam3vision.core.live.LiveSession
 import dev.sam3vision.core.model.LiveFrame
 import dev.sam3vision.core.model.SegObject
+import dev.sam3vision.core.net.WsLiveClient
+import dev.sam3vision.core.net.WsTransport
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertNull
 import org.junit.Assert.assertTrue
@@ -63,5 +66,33 @@ class ProbeFrameTest {
         assertNull(meter.effectivePose())
         meter.groundPlaneEnabled = false
         assertNull(meter.effectivePose())
+    }
+
+    @Test
+    fun `libelle sonde dit le cellulaire impose en lunettes`() {
+        val open = LiveSession(openWsClient(), clock = { 0L })
+        assertEquals("WebSocket", transportLabel(open, cellular = false))
+        assertEquals("WebSocket (cell)", transportLabel(open, cellular = true))
+        open.close()
+    }
+
+    /** Client WS optimiste : `preconnect` suffit à ouvrir le socket, sans réseau. */
+    private fun openWsClient(): WsLiveClient {
+        val transport = object : WsTransport {
+            override fun open(
+                url: String,
+                onText: (String) -> Unit,
+                onClosed: (Throwable?) -> Unit,
+                onOpen: () -> Unit,
+                headers: Map<String, String>,
+            ): Boolean = true
+
+            override fun send(text: String): Boolean = true
+
+            override fun sendBytes(bytes: ByteArray): Boolean = true
+
+            override fun close() = Unit
+        }
+        return WsLiveClient("https://exemple.invalid", transport = transport).also { it.preconnect() }
     }
 }

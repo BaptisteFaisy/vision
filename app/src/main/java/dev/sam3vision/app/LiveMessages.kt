@@ -2,6 +2,7 @@ package dev.sam3vision.app
 
 import dev.sam3vision.core.live.TimelineText
 import dev.sam3vision.core.model.TimelineSummary
+import dev.sam3vision.core.net.BackendRoute
 import dev.sam3vision.core.speech.SpeechLanguage
 
 /**
@@ -23,6 +24,9 @@ const val TRANSPORT_WS: String = "WebSocket"
 /** Socket tombé : plus aucun transport (le POST a été retiré), à signaler franchement. */
 const val TRANSPORT_WS_KO: String = "WebSocket down"
 
+/** Direct en WebSocket via le cellulaire imposé (session lunettes, Wi-Fi lunettes sans internet). */
+const val TRANSPORT_WS_CELL: String = "WebSocket (cell)"
+
 /**
  * Direct sur le **tracker** (`/session` + `/frame`) : les ids d'objets sont stables d'une
  * frame à l'autre, une frame en vol dans un `FrameGate`.
@@ -34,12 +38,18 @@ const val LLM_ABSENT_LINE = "LLM key missing — enter it in Settings"
 
 /**
  * Libellé du transport : le tracker prime, sinon WebSocket ou KO selon le socket.
- * Fonction pure, testée en JVM.
+ * [cellular] se lit seul en session lunettes ([BackendRoute.active]) ; injecté
+ * pour rester testable en JVM sans état global.
  */
-fun transportLabel(trackerEnabled: Boolean, wsConnected: Boolean): String = when {
+fun transportLabel(
+    trackerEnabled: Boolean,
+    wsConnected: Boolean,
+    cellular: Boolean = BackendRoute.active,
+): String = when {
     trackerEnabled -> TRANSPORT_TRACK
-    wsConnected -> TRANSPORT_WS
-    else -> TRANSPORT_WS_KO
+    !wsConnected -> TRANSPORT_WS_KO
+    cellular -> TRANSPORT_WS_CELL
+    else -> TRANSPORT_WS
 }
 
 /** Question posée avant la première frame gardée : on le dit clairement, sans bloquer. */

@@ -2,6 +2,7 @@ package dev.sam3vision.app.isee
 
 import dev.sam3vision.app.DistanceLayer
 import dev.sam3vision.app.TRANSPORT_WS
+import dev.sam3vision.app.TRANSPORT_WS_CELL
 import dev.sam3vision.app.TRANSPORT_WS_KO
 import dev.sam3vision.core.distance.CameraPose
 import dev.sam3vision.core.distance.DistanceMeter
@@ -16,6 +17,7 @@ import dev.sam3vision.core.mask.GrayMask
 import dev.sam3vision.core.mask.toDetectionsWithExtents
 import dev.sam3vision.core.model.Detection
 import dev.sam3vision.core.model.LiveFrame
+import dev.sam3vision.core.net.BackendRoute
 import kotlinx.coroutines.flow.update
 
 /**
@@ -34,9 +36,17 @@ import kotlinx.coroutines.flow.update
 /** Étiquettes de la frame, sans doublon (ensemble réutilisé, voir [FrameLabels]). */
 internal fun labelsOf(labels: FrameLabels, frame: LiveFrame): List<String> = labels.of(frame.objects)
 
-/** Libellé de transport : ce que le socket fait vraiment, pas ce qu'on voudrait. */
-internal fun transportLabel(active: LiveSession): String =
-    if (active.socketOpen) TRANSPORT_WS else TRANSPORT_WS_KO
+/**
+ * Libellé de transport : ce que le socket fait vraiment, pas ce qu'on voudrait.
+ * [cellular] se lit seul en session lunettes ([BackendRoute.active]) ; injecté
+ * pour rester testable en JVM sans état global.
+ */
+internal fun transportLabel(active: LiveSession, cellular: Boolean = BackendRoute.active): String =
+    when {
+        !active.socketOpen -> TRANSPORT_WS_KO
+        cellular -> TRANSPORT_WS_CELL
+        else -> TRANSPORT_WS
+    }
 
 /**
  * Pose exploitable pour cette frame : `null` en lunettes-live (branche sol

@@ -102,14 +102,15 @@ private fun LiveStatusLines(state: LiveUiState, pixel: FrameTimings) {
 
 /**
  * Pastille du transport du direct : « Tracker » = sessions à ids stables (`/session` +
- * `/frame`), « WebSocket » = `/live`, « WebSocket down » = socket tombé (aucun repli POST,
- * donc une chute se voit tout de suite).
+ * `/frame`), « WebSocket » = `/live`, « WebSocket (cell) » = `/live` via le cellulaire
+ * (session lunettes), « WebSocket down » = socket tombé (aucun repli POST, donc une
+ * chute se voit tout de suite).
  */
 @Composable
 fun TransportChip(transport: String) {
     if (transport.isBlank()) return
     val color = when (transport) {
-        TRANSPORT_WS, TRANSPORT_TRACK -> AppColors.success
+        TRANSPORT_WS, TRANSPORT_TRACK, TRANSPORT_WS_CELL -> AppColors.success
         TRANSPORT_WS_KO -> AppColors.danger
         else -> AppColors.surfaceHigh
     }
