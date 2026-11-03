@@ -462,7 +462,7 @@ class WsLiveClient(
             if (raw == null) {
                 // Le serveur annule l'inférence abandonnée (one-way, sans réponse).
                 runCatching { transport.send(cancelMessage(id)) }
-                dropDeadSocket(gen)
+                dropDeadSocket(gen, id)
                 Result.failure(ApiError.Timeout())
             } else {
                 Result.success(raw)
@@ -474,20 +474,20 @@ class WsLiveClient(
 
     /**
      * Délai dépassé sans fermeture = socket **apparemment** vivant mais mort (conteneur
-     * arrêté, passerelle changée). On ferme, on marque l'échec et on **rouvre aussitôt**
-     * (FIX-16) — seulement si aucune frame n'a rouvert entre-temps ([gen] périmé).
+     * arrêté, passerelle changée). On ferme, on marque l'échec, on **réveille les sœurs**
+     * (leurs réponses ne peuvent plus arriver : le socket qui les portait meurt ici — les
+     * laisser payer leur budget viderait la queue en série) et on **rouvre aussitôt**
+     * (FIX-16) — sauf [gen] périmé. La coupe est sous le premier verrou, avant la
+     * fermeture : une frame enregistrée après part sur le socket neuf et survit.
      */
-    private fun dropDeadSocket(gen: Int) {
-        val mine = synchronized(lock) {
-            if (connected && socketGen == gen) {
-                connected = false
-                link.onFailure()
-                true
-            } else {
-                false
-            }
+    private fun dropDeadSocket(gen: Int, id: Int) {
+        val orphaned = synchronized(lock) {
+            if (!(connected && socketGen == gen)) return
+            connected = false
+            link.onFailure()
+            pending.keys.filter { it != id }.mapNotNull { pending.remove(it) }
         }
-        if (!mine) return
+        orphaned.forEach { it.reply.completeExceptionally(ApiError.Timeout()) }
         runCatching { transport.close() }
         synchronized(lock) { openLocked() }
     }
