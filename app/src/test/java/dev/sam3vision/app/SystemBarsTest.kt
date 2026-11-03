@@ -29,4 +29,24 @@ class SystemBarsTest {
         assertFalse(whiteStatusBar(Route.Tap(autoStart = false)))
         assertFalse(whiteStatusBar(Route.Tap(autoStart = true)))
     }
+
+    @Test
+    fun `isee scene and live hide the status bar over the camera`() {
+        assertTrue(hidesStatusBar(Route.Isee))
+        assertTrue(hidesStatusBar(Route.Live))
+    }
+
+    @Test
+    fun `other screens keep the status bar`() {
+        assertFalse(hidesStatusBar(Route.Settings))
+        assertFalse(hidesStatusBar(Route.Caregiver))
+        assertFalse(hidesStatusBar(Route.Onboarding))
+        assertFalse(hidesStatusBar(Route.Capture))
+        assertFalse(hidesStatusBar(Route.Analysis))
+        assertFalse(hidesStatusBar(Route.Chat))
+        assertFalse(hidesStatusBar(Route.Bench))
+        assertFalse(hidesStatusBar(Route.VoiceNav))
+        assertFalse(hidesStatusBar(Route.Tap(autoStart = false)))
+        assertFalse(hidesStatusBar(Route.Tap(autoStart = true)))
+    }
 }
