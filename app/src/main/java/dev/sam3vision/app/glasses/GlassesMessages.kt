@@ -61,6 +61,17 @@ object GlassesMessages {
         "Glasses link refused $asked fps: the stream holds $held fps instead.",
     )
 
+    /**
+     * Le lien de la session précédente saturait ([dropRate] > 5 %) : l'attache
+     * est en qualité moyenne, mesurée — la rue réduite à temps plutôt que la
+     * rue pleine en retard. Remonte en haute dès qu'une session tient le lien.
+     */
+    fun mediumQualityFallback(dropRate: Double) = GlassesMessage(
+        MessageKind.WARNING,
+        "Glasses link saturated (${(dropRate * 100).toInt()}% frames lost last session): " +
+            "the stream attaches in medium quality instead of high.",
+    )
+
     fun headPoseUnavailable() = GlassesMessage(
         MessageKind.WARNING,
         "Head pose unavailable: glasses distances run pinhole-only.",
