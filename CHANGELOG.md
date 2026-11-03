@@ -66,6 +66,34 @@ livré et ses preuves (tâche, fichiers, chiffres) dans l'arbre.
   arrondies (`/tmp/isee-shot-sep.png`, 23:14) ; master `be7106d9` réinstallé
   après test. isee-sim inutilisable ce soir (qemu 37.2.12 segfault ×3 à
   l'ouverture caméra, avec et sans `videofile`).
+## 2026-11-03 — iSee : caméra en bloc comme la carte, 60 % de l'écran (branche `camera-bloc-map`)
+
+- **Demande** : la caméra comme la map — mêmes bords, même genre de bloc,
+  en grand, 60 % de l'écran (ordre user du 03/11/2026). Avant : rue
+  plein-bord, 50 % en parole, fondu blanc en bas.
+- **Fait** :
+  - `core/iseedesign/IseePortrait.kt` : `PICTURE_H = 0.60f` unique
+    (`PICTURE_IDLE_H`/`SPEAKING_H`/`GUIDING_H` supprimées),
+    `portraitGeometry(width, height, open)` sans paramètres parole/guidage.
+  - `isee/IseeCardStyle.kt` (nouveau) : `IseeBlockShape`/`IseeBlockSide`
+    (16 dp, rayon source unique `GuideMapCornerRadius`) et
+    `View.clipToIseeBlock()` (contour natif : le clip Compose ne rogne pas
+    les surfaces Android) ; `PreviewView` en `COMPATIBLE` (TextureView,
+    seule rogniable), appliqué à la caméra et au direct lunettes.
+  - `isee/IseePortraitCamera.kt` : bloc inset (8 dp haut, 16 dp côtés),
+    arrondi 16 dp, même ombre que la carte, fondu bas supprimé (voile haut
+    conservé pour l'en-tête) ; `isee/IseeScenePane.kt` : appel simplifié.
+  - Carte vectorielle inchangée (coins peints + ombre déjà à 16 dp, décision
+    perf SurfaceView conservée) ; repli schéma sur `IseeBlockShape`.
+  - Docs : `docs/ISEE-DESIGN-PORTRAIT.md` §1/§3 (bloc 60 %, plus de fondu).
+- **Preuves** : `IseePortraitTest` 12/12 (rouge `1440 vs 1536` puis vert),
+  suites complètes `:core` 3628/3628 et `:app` 2356/2356, `assembleDebug`
+  OK, `check-isee-design.py` OK (boule gelée intacte),
+  `check-kotlin-limits.py` OK. Recette Redmi `2c6852ac` (isee-sim
+  inutilisable : qemu segfault à l'ouverture caméra, 3/3 ce soir) :
+  bloc 57,9 % mesuré (60 % de la hauteur utile), marges 16 dp, 4 coins
+  arrondis vidéo incluse, boule + phrase dessous sans chevauchement
+  (12/12 mesures, `/tmp/measure-card.py`, `/tmp/isee-phone-bloc.png`).
 
 ## 2026-11-03 — iSee : swipe droit crée un picto, swipe gauche connecte les lunettes (branche `feat/swipe-right-picto`)
 
