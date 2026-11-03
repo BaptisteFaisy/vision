@@ -7,6 +7,7 @@ Déployé avec chaque copie de ``segmentation.py`` (racine ``backend/`` et
 
 from __future__ import annotations
 
+import functools
 import unicodedata
 
 
@@ -292,6 +293,7 @@ def _deaccent(text: str) -> str:
 _ALIASES_NORM = {_deaccent(key): value for key, value in CONCEPT_ALIASES.items()}
 
 
+@functools.lru_cache(maxsize=1024)
 def model_concept(prompt: str) -> str:
     """Concept anglais remis au modèle.
 
@@ -301,6 +303,10 @@ def model_concept(prompt: str) -> str:
     ``segmentation.normalize_prompts``, donc « chaise », « Chair » et
     « une chaise » ne peuvent plus désigner deux concepts différents pour le
     serveur — pas plus que « barriere » et « une barrière ».
+
+    Mémoïsé (fonction pure, ~1,5 µs l'appel) : la garde anti-éviction teste
+    chaque entrée jusqu'à six fois par frame (~0,8 ms à 100 entrées) pour une
+    vingtaine de labels distincts — le cache warm ne coûte que les hits.
     """
     key = prompt.strip().lower()
     for article in _ARTICLES:
