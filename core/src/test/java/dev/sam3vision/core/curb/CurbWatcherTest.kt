@@ -298,4 +298,53 @@ class CurbWatcherTest {
         assertEquals(CurbEdge.Uncertain, plein.edge)
         assertEquals("Attention bordure, à midi.", CurbText.phrase(plein.edge!!, SpeechLanguage.Fr, plein.centerX))
     }
+
+    @Test
+    fun `montee a 11h dans le couloir = silence`() {
+        // Centre à 0,40 (11 h) : dans le couloir marché mais à côté du pas.
+        val cote = reading("curb", 0.8f, listOf(150f, 800f, 260f, 1130f))
+
+        assertFalse(CurbSignal.of(listOf(cote), 512, 1138).detected)
+    }
+
+    @Test
+    fun `montee a 1h dans le couloir = silence`() {
+        // Centre à 0,60 (1 h) : symétrique du 11 h, même silence.
+        val cote = reading("curb", 0.8f, listOf(252f, 800f, 362f, 1130f))
+
+        assertFalse(CurbSignal.of(listOf(cote), 512, 1138).detected)
+    }
+
+    @Test
+    fun `montee a midi = detecte`() {
+        // Centre à 0,50 (midi) : en face, la montée parle.
+        val face = reading("curb", 0.8f, listOf(206f, 800f, 306f, 1130f))
+
+        val signal = CurbSignal.of(listOf(face), 512, 1138)
+
+        assertTrue(signal.detected)
+        assertEquals(CurbEdge.Up, signal.edge)
+    }
+
+    @Test
+    fun `descente a 11h = detecte encore`() {
+        // Seule la montée est frontale : la descente garde le couloir (sécurité).
+        val descente = reading("sidewalk", 0.3f, listOf(150f, 700f, 260f, 1130f))
+
+        val signal = CurbSignal.of(listOf(descente), 512, 1138)
+
+        assertTrue(signal.detected)
+        assertEquals(CurbEdge.Down, signal.edge)
+    }
+
+    @Test
+    fun `route a 11h = incertain encore`() {
+        // Chemin/route : bord incertain, consigne prudente même à côté.
+        val route = reading("road", 0.8f, listOf(150f, 800f, 260f, 1130f))
+
+        val signal = CurbSignal.of(listOf(route), 512, 1138)
+
+        assertTrue(signal.detected)
+        assertEquals(CurbEdge.Uncertain, signal.edge)
+    }
 }
