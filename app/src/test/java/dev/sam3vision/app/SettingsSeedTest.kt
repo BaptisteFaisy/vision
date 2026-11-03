@@ -254,7 +254,7 @@ class SettingsSeedTest {
 
     @Test
     fun `une URL SAM manuelle sans scheme retombe sur le preset de la region`() {
-        val cassee = Settings.Default.copy(samBaseUrl = "baptiste-faisy--sam3-eu-a100.web.modal.run")
+        val cassee = Settings.Default.copy(samBaseUrl = "gaiamelie--sam3-eu-a100.web.modal.run")
 
         val seed = seeded(cassee, build)
 

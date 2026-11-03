@@ -15,7 +15,7 @@ import java.util.Locale
 class LiveProbeTextTest {
 
     private fun ready() = LiveProbeState(
-        endpoint = "https://baptiste-faisy--sam3-eu-a100-sam3live-web.eu-west.modal.run",
+        endpoint = "https://gaiamelie--sam3-eu-a100-sam3live-web.eu-west.modal.run",
         labels = listOf("person", "chair"),
         conceptsSent = listOf("person", "chair", "table", "laptop", "bottle", "cup", "bag", "door"),
         objects = 8,
@@ -53,7 +53,7 @@ class LiveProbeTextTest {
     @Test
     fun `detail complet quand une frame est passee`() {
         val details = liveProbeDetails(ready())
-        assertTrue(details.any { it.startsWith("endpoint: baptiste-faisy--") })
+        assertTrue(details.any { it.startsWith("endpoint: gaiamelie--") })
         assertTrue(details.contains("frame: 512×384"))
         assertTrue(details.contains("latency: 640 ms · p95 910 ms · server 520 ms"))
         assertTrue(details.contains("12 frames · 0 masks"))
@@ -74,7 +74,7 @@ class LiveProbeTextTest {
 
     @Test
     fun `endpoint long raccourci au milieu`() {
-        val short = shortEndpoint("https://baptiste-faisy--sam3-eu-a100-sam3live-web.eu-west.modal.run")
+        val short = shortEndpoint("https://gaiamelie--sam3-eu-a100-sam3live-web.eu-west.modal.run")
         assertTrue(short.length <= ENDPOINT_MAX_CHARS)
         assertTrue(short.contains("…"))
         assertFalse(short.startsWith("https"))

@@ -9,7 +9,7 @@ val localProps = Properties().apply {
 fun localProp(key: String): String = localProps.getProperty(key) ?: ""
 
 /** Backend Valhalla public (Modal CPU, tuiles IdF) — pas un secret. */
-val routeBaseUrlDefault = "https://baptiste-faisy--valhalla-idf-cpu-valhallarouter-web.us-east.modal.run"
+val routeBaseUrlDefault = "https://gaiamelie--valhalla-idf-cpu-valhallarouter-web.us-east.modal.run"
 
 /** Caractères admis dans une valeur venue de git : le manifeste reste sûr. */
 val gitTokenChars = Regex("[^A-Za-z0-9._-]")
