@@ -164,8 +164,7 @@ internal fun stairsDisplayText(crossingActive: Boolean, found: StairLabelSignal,
 /**
  * Texte verdict : la phrase du verdict voix (« Cross. » / « Don't cross. »,
  * littéraux des clips, anglais comme la voix) en Traversée — seul
- * [TraversePhase.TRAVERSER] autorise (même règle que [traverseTag]) ;
- * `null` sinon. Pur, testé en JVM.
+ * [TraversePhase.TRAVERSER] autorise ; `null` sinon. Pur, testé en JVM.
  */
 internal fun verdictDisplayText(crossingActive: Boolean, phase: TraversePhase?): String? {
     if (!crossingActive || phase == null) return null

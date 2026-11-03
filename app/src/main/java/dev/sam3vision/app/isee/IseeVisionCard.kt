@@ -224,7 +224,7 @@ internal fun ProbeVideoRest(probe: LiveProbe) {
  * couleur est le dernier état **annoncé** (rouge par défaut), jamais une
  * lecture instantanée : voix, vibration et affichage parlent d'une seule
  * voix confirmée (ordre user du 31/10, certitude rouge/vert). Le scan
- * traversée s'y lit sous le verdict, en miroir de la voix.
+ * traversée s'y lit en miroir de la voix.
  */
 @Composable
 internal fun CrossingOnVideo(probe: LiveProbeState) {
@@ -235,7 +235,6 @@ internal fun CrossingOnVideo(probe: LiveProbeState) {
         state = probe.crossing,
         frameWidth = probe.width,
         frameHeight = probe.height,
-        phase = probe.traversePhase,
     )
     CrosswalkScanBanner(probe.scanLines)
 }
