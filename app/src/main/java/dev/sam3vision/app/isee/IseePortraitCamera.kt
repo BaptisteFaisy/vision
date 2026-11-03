@@ -4,6 +4,7 @@ import androidx.compose.animation.core.Animatable
 import androidx.compose.animation.core.FastOutSlowInEasing
 import androidx.compose.animation.core.tween
 import androidx.compose.foundation.background
+import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.BoxScope
 import androidx.compose.foundation.layout.BoxWithConstraintsScope
@@ -24,13 +25,13 @@ import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import dev.sam3vision.app.FirstPixelWatcher
+import dev.sam3vision.core.iseedesign.IseePortrait
 import dev.sam3vision.core.iseedesign.focusPull
-import dev.sam3vision.core.iseedesign.pictureAlpha
 import dev.sam3vision.core.picto.PictoPlaceMode
 
 /**
- * La caméra du design « Portrait » : la rue occupe le haut, sa hauteur suit la parole et se fond dans
- * le blanc par le bas ; pas de cadre, pas de carte. À l'ouverture la rue arrive floue et un peu
+ * La caméra du design « Portrait » : la rue occupe le haut, sa hauteur suit la parole et un trait
+ * clair l'en sépare ; pas de cadre, pas de carte. À l'ouverture la rue arrive floue et un peu
  * agrandie, puis devient nette (mise au point). L'aperçu porte toujours les masques SAM et les
  * distances.
  *
@@ -73,6 +74,7 @@ internal fun BoxWithConstraintsScope.PortraitCamera(
         ) {
             StreetFeed(state, glue, probe, viewModel, showGlasses)
         }
+        CameraDivider()
         if (state.placeMode.pictoEnabled && state.recordingVideo && !showGlasses) {
             PictoChip(
                 state.picto,
@@ -82,14 +84,14 @@ internal fun BoxWithConstraintsScope.PortraitCamera(
             )
         }
         ProbeNoticeScoped(probe)
-        PictureFade(Modifier.fillMaxSize())
+        HeaderShade(Modifier.fillMaxSize())
         ModeToggles(probe, viewModel, state.placeMode)
     }
 }
 
 /**
  * Bascules manuelles Traversée et lieu (sans elles, l'ordre vocal seul les arme) :
- * ex-puce de l'ancienne carte, remontée en haut-centre après le fondu.
+ * ex-puce de l'ancienne carte, remontée en haut-centre.
  */
 @Composable
 private fun BoxScope.ModeToggles(probe: LiveProbe, viewModel: IseeViewModel, mode: PictoPlaceMode) {
@@ -148,26 +150,34 @@ private fun GlassesMasksScoped(probe: LiveProbe) {
 }
 
 /**
- * Le fondu vers le blanc : un dégradé posé sur le bas de la rue, échantillonné sur la courbe
- * de [pictureAlpha] (même courbe que la maquette), plus une ombre douce en haut pour la pastille.
+ * L'ombre douce du haut de la rue, pour la pastille : le nuage blanc du bas est viré
+ * (demande user 2026-11-03), seul l'ombrage du haut reste — voir [CameraDivider].
  */
 @Composable
-private fun PictureFade(modifier: Modifier) {
-    // Les deux dégradés sont fixes : les reconstruire à chaque tick
-    // d'ouverture (un recompose par frame pendant 0,8 s) alloue pour rien.
-    val fade = remember {
-        val n = 12
-        val stops = Array(n + 1) { i ->
-            val y = i / n.toFloat()
-            y to Color.White.copy(alpha = 1f - pictureAlpha(y, 1f))
-        }
-        Brush.verticalGradient(*stops)
-    }
+private fun HeaderShade(modifier: Modifier) {
+    // Dégradé fixe : le reconstruire à chaque tick d'ouverture (un recompose
+    // par frame pendant 0,8 s) alloue pour rien.
     val shade = remember {
         Brush.verticalGradient(0f to Color(0x5C0B1220), 0.22f to Color.Transparent, 1f to Color.Transparent)
     }
-    Box(modifier.background(fade))
     Box(modifier.background(shade))
+}
+
+/**
+ * Le trait de séparation entre la rue et le bloc blanc : fin, gris clair, arrondi
+ * aux seules extrémités (demande user 2026-11-03). Premier overlay pour que les
+ * chips (Picto) restent au-dessus.
+ */
+@Composable
+private fun BoxScope.CameraDivider() {
+    Box(
+        Modifier
+            .align(Alignment.BottomCenter)
+            .fillMaxWidth()
+            .padding(horizontal = 16.dp)
+            .height(IseePortrait.DIVIDER_H_DP.dp)
+            .background(Color(IseePortrait.DIVIDER), RoundedCornerShape(IseePortrait.DIVIDER_CORNER_DP.dp)),
+    )
 }
 
 

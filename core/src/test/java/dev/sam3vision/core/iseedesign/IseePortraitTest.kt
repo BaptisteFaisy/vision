@@ -49,14 +49,10 @@ class IseePortraitTest {
     }
 
     @Test
-    fun `la rue est pleine en haut, se fond en bas, nulle dessous`() {
-        val h = 1392f
-        assertEquals(1f, pictureAlpha(10f, h), 1e-4f)
-        assertEquals(1f, pictureAlpha(h * 0.5f, h), 1e-4f)
-        val mid = pictureAlpha(h * (1f - IseePortrait.FADE / 2f), h)
-        assertTrue(mid > 0.2f && mid < 0.8f)
-        assertEquals(0f, pictureAlpha(h + 5f, h), 0f)
-        assertEquals(0f, pictureAlpha(10f, 0f), 0f)
+    fun `le trait de separation rue-blanc est fige`() {
+        assertEquals(0xFFE2E8F0.toInt(), IseePortrait.DIVIDER)
+        assertEquals(4f, IseePortrait.DIVIDER_H_DP, 0f)
+        assertEquals(10f, IseePortrait.DIVIDER_CORNER_DP, 0f)
     }
 
     @Test
@@ -115,7 +111,6 @@ class IseePortraitTest {
         assertEquals(0.725f, IseePortrait.PICTURE_H, 0f)
         assertEquals(0.555f, IseePortrait.CAM_Y, 0f)
         assertEquals(0.20f, IseePortrait.CAM_R, 0f)
-        assertEquals(0.34f, IseePortrait.FADE, 0f)
     }
 
     @Test

@@ -26,8 +26,9 @@
 - **Caméra = la rue en haut**, sans cadre ni carte (`IseePortraitCamera`) :
   elle occupe 62,5 % du haut quand elle est affichée (la taille parole,
   `PICTURE_SPEAKING_H`), 75 % en guidage (`PICTURE_GUIDING_H`, la boule
-  s'efface entre la rue et la carte, la phrase reste), et **se fond dans
-  le blanc** sur ses 34 % du bas (`FADE`, courbe `pictureAlpha`). À l'ouverture
+  s'efface entre la rue et la carte, la phrase reste), et un **trait gris
+  clair** l'en sépare (`DIVIDER`, 4 dp de haut, arrondi 10 dp aux extrémités).
+  À l'ouverture
   elle arrive **floue et agrandie** (×1,05, flou max 24) puis devient nette (`focusPull`).
   Elle reste visible **tant qu'une capture est vivante** (`captureLive`),
   quel que soit l'état (tenir le micro sous vidéo ne la cache pas).
@@ -68,11 +69,11 @@
 ## 3. Où vit le code
 
 - **Logique pure, `:core`** : `core/…/iseedesign/IseePortrait.kt` —
-  géométrie (`portraitGeometry`), fondu (`pictureAlpha`), mise au point
-  (`focusPull`), voix (`voiceEnvelope`, `wordsSpoken`), palettes. Testé sur
-  JVM, aucune dépendance Android.
+  géométrie (`portraitGeometry`), trait de séparation (`DIVIDER_*`), mise au
+  point (`focusPull`), voix (`voiceEnvelope`, `wordsSpoken`), palettes. Testé
+  sur JVM, aucune dépendance Android.
 - **UI fine, `:app`** : `app/…/isee/IseeScenePane.kt` (assemblage),
-  `IseePortraitOrb.kt` (boule), `IseePortraitCamera.kt` (rue + fondu),
+  `IseePortraitOrb.kt` (boule), `IseePortraitCamera.kt` (rue + trait),
   `IseeSpokenLine.kt` (phrase mot à mot). Le contrat `iseeSceneLayers`
   (caméra vivante → carte caméra) est conservé ; le paramètre `dissolving`
   n'est gardé que pour le contrat — **le design n'a plus de dissolution
@@ -96,7 +97,7 @@ référence ; il exige aussi le câblage Portrait dans `IseeScenePane`
 
 Ne pas réintroduire satellites, grille de pixels, dissolution en pixels ni
 texte multi-pages ; ne pas modifier palettes, géométrie ni constantes
-(`REST_*`, `CAM_*`, `PICTURE_H`, `FADE`) sans demande explicite du user ;
+(`REST_*`, `CAM_*`, `PICTURE_H`, `DIVIDER_*`) sans demande explicite du user ;
 tout nouvel écran iSee reprend ce design. En cas de doute : le code
 `IseePortrait.kt` + ses tests font foi, pas la maquette d'origine.
 
