@@ -144,6 +144,11 @@ class VoiceNavSession(
      * chaque changement d'état — `GpsDestinationMemory` la suit.
      */
     private val onActiveDestination: (String?) -> Unit = {},
+    /**
+     * Observabilité du démarrage (refusé/éteint/indisponible/démarré : une
+     * ligne par tentative). Injecté pour rester testable en JVM.
+     */
+    private val log: (String) -> Unit = {},
 ) {
 
     private val _state = MutableStateFlow<VoiceNavUiState>(VoiceNavUiState.Idle)
@@ -216,6 +221,7 @@ class VoiceNavSession(
      */
     private suspend fun startFromVoice(destination: String) {
         if (!guidanceEnabled()) {
+            log("démarrage refusé : guidage éteint")
             guidanceOff()
             return
         }
@@ -225,11 +231,13 @@ class VoiceNavSession(
         if (_state.value !== loading) return
         if (startEngine(destination, summary)) {
             if (_state.value === loading) setState(guiding(destination, summary))
+            log("moteur démarré")
             return
         }
         // Échec périmé (stop ou autre destination pendant le moteur) : l'état
         // courant n'est plus le nôtre, on le laisse intact, sans annonce.
         if (_state.value === loading) {
+            log("moteur indisponible")
             goIdle()
             announcer.announceGuidanceUnavailable()
         }
