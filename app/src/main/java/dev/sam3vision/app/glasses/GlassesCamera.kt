@@ -19,6 +19,7 @@ import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.flow.emptyFlow
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.sync.Mutex
 
 /** Journal de la chaîne lunettes (recette : `logcat -s GlassesChain`). */
 private const val TAG = "GlassesChain"
@@ -63,6 +64,7 @@ internal class GlassesCamera(
     private var camera: Camera? = null
     private var stream: Stream? = null
     private var collectorJob: Job? = null
+    private val captureMutex = Mutex()
     private var collector: GlassesFrameCollector? = null
     private var framesJob: Job? = null
     private var pushed = 0L
@@ -230,13 +232,24 @@ internal class GlassesCamera(
      * en cours, photo HEIC non décodable).
      */
     suspend fun capture(): Bitmap? {
-        photoRefusal(stream != null, GlassesVideoLink.live.value)?.let { return fail(it) }
-        // Garde de course : le flux a pu s'arrêter entre le verdict et sa lecture.
-        val active = stream ?: return fail(GlassesMessages.streamStopped())
-        return active.capturePhoto().fold(
-            onSuccess = { data -> data.toBitmapOrNull() ?: fail(GlassesMessages.photoUndecodable()) },
-            onFailure = { error, _ -> fail(captureErrorMessage(error)) },
-        )
+        // Une seule capture à la fois : deux déclencheurs simultanés (bouton +
+        // écran, rafale) ne prennent qu'une photo. `null` muet (journal seul) :
+        // ce n'est pas une panne, juste un doublon.
+        if (!captureMutex.tryLock()) {
+            Log.i(TAG, "photo lunettes : capture déjà en cours, doublon ignoré")
+            return null
+        }
+        try {
+            photoRefusal(stream != null, GlassesVideoLink.live.value)?.let { return fail(it) }
+            // Garde de course : le flux a pu s'arrêter entre le verdict et sa lecture.
+            val active = stream ?: return fail(GlassesMessages.streamStopped())
+            return active.capturePhoto().fold(
+                onSuccess = { data -> data.toBitmapOrNull() ?: fail(GlassesMessages.photoUndecodable()) },
+                onFailure = { error, _ -> fail(captureErrorMessage(error)) },
+            )
+        } finally {
+            captureMutex.unlock()
+        }
     }
 
     /** Un `null` expliqué : la photo n'a pas abouti, et le message dit pourquoi. */

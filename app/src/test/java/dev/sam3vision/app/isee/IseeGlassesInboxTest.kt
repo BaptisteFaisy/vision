@@ -148,6 +148,31 @@ class IseeGlassesInboxTest {
     }
 
     @Test
+    fun `seconde description pendant l encours — ignoree, une seule reponse`() = runTest {
+        testScope = this
+        val inbox = TestScopeInbox()
+        inbox.onPhoto(photo("lunettes-1.jpg"), CaptureAction.PHOTO)
+
+        inbox.describePhoto()
+        testScheduler.advanceUntilIdle()
+
+        assertEquals("l'auto en cours n'est pas préemptée", 1, answers.size)
+        assertEquals(1, silences)
+    }
+
+    @Test
+    fun `nouvelle photo pendant une description — decrite quand meme`() = runTest {
+        testScope = this
+        val inbox = TestScopeInbox()
+        inbox.onPhoto(photo("lunettes-1.jpg"), CaptureAction.PHOTO)
+        inbox.onPhoto(photo("lunettes-2.jpg"), CaptureAction.PHOTO)
+        testScheduler.advanceUntilIdle()
+
+        assertEquals(2, answers.size)
+        assertEquals("lunettes-2.jpg", state.value.glassesPhoto?.file?.name)
+    }
+
+    @Test
     fun `photo ASK — affichee mais pas decrite, attend la dictee`() = runTest {
         testScope = this
         val inbox = TestScopeInbox()

@@ -28,10 +28,19 @@ val CaptureAction.takesPhoto: Boolean get() = this == CaptureAction.PHOTO
  * (bug documenté dans les known issues). Un appui court isolé est donc retenu
  * pendant [graceMs] avant d'être confirmé, et jeté si un double-appui arrive avant
  * l'échéance. Pur et sans horloge interne : l'appelant fournit les timestamps.
+ *
+ * Après une photo confirmée, les appuis courts sont jetés pendant
+ * [photoCooldownMs] : sans ça, une source répétitive (bouton collé, SDK qui
+ * ré-émet) prenait une photo toutes les ~430 ms, indéfiniment. L'appui long
+ * (question sur la photo à l'écran) et le double appui ne sont pas freinés.
  */
-class CaptureGestureBuffer(private val graceMs: Long = DEFAULT_GRACE_MS) {
+class CaptureGestureBuffer(
+    private val graceMs: Long = DEFAULT_GRACE_MS,
+    private val photoCooldownMs: Long = DEFAULT_PHOTO_COOLDOWN_MS,
+) {
 
     private var pendingShortAt: Long? = null
+    private var lastPhotoAt: Long? = null
 
     /** Vrai tant qu'un appui court attend sa confirmation. */
     val hasPending: Boolean get() = pendingShortAt != null
@@ -50,7 +59,7 @@ class CaptureGestureBuffer(private val graceMs: Long = DEFAULT_GRACE_MS) {
             CaptureAction.LIVE
         }
         CapturePress.SHORT -> {
-            pendingShortAt = atMs
+            if (lastPhotoAt?.let { atMs - it < photoCooldownMs } != true) pendingShortAt = atMs
             null
         }
     }
@@ -63,16 +72,20 @@ class CaptureGestureBuffer(private val graceMs: Long = DEFAULT_GRACE_MS) {
         val at = pendingShortAt ?: return null
         if (nowMs - at < graceMs) return null
         pendingShortAt = null
+        lastPhotoAt = nowMs
         return CaptureAction.PHOTO
     }
 
-    /** Oublie l'appui en attente (arrêt du flux, perte de session). */
+    /** Oublie l'appui en attente et le délai photo (arrêt du flux, perte de session). */
     fun reset() {
         pendingShortAt = null
+        lastPhotoAt = null
     }
 
     companion object {
         /** Délai de grâce : assez long pour laisser arriver le `DOUBLE_PRESS`. */
         const val DEFAULT_GRACE_MS = 350L
+        /** Après une photo, les appuis courts sont jetés pendant ce délai. */
+        const val DEFAULT_PHOTO_COOLDOWN_MS = 1_200L
     }
 }

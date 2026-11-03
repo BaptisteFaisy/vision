@@ -366,6 +366,7 @@ class GlassesController(
             // Session ouverte : l'écoute part au premier flux montant.
             autoListen.arm()
         }
+        inputs?.stop()
         inputs = GlassesInputs(created, scope, clock, ::onGesture, ::note).also { it.start() }
         GlassesVideoLink.attachHeadPose(scope, ::note, created, EyeHeightStore(context)::get)
     }

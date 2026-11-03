@@ -8,6 +8,7 @@ import com.meta.wearable.dat.inputs.types.CapturePressType
 import com.meta.wearable.dat.inputs.types.InputEvent
 import com.meta.wearable.dat.inputs.types.InputSource
 import com.meta.wearable.dat.inputs.types.InputsConfiguration
+import android.util.Log
 import dev.sam3vision.core.glasses.CaptureAction
 import dev.sam3vision.core.glasses.CaptureGestureBuffer
 import dev.sam3vision.core.glasses.CapturePress
@@ -36,6 +37,7 @@ internal class GlassesInputs(
     private var attached = false
     private var pump: Job? = null
     private var listenJob: Job? = null
+    private var lastEvent: Pair<CapturePressType, Long>? = null
 
     fun start(): Boolean {
         if (attached) return true
@@ -64,7 +66,22 @@ internal class GlassesInputs(
 
     private fun handle(event: InputEvent) {
         val capture = event as? InputEvent.Capture ?: return
-        gesture.onPress(capture.pressType.toCorePress(), clock())?.let(onAction)
+        // Seul le bouton capture déclenche : un `Capture` venu d'une autre
+        // source déclarée (pavé, bouton d'action…) ne prend jamais de photo.
+        // `UNKNOWN` reste accepté (filet : le mock debug passe par ici).
+        if (capture.source != InputSource.CAPTURE_BUTTON && capture.source != InputSource.UNKNOWN) {
+            Log.i(TAG, "bouton lunettes : source ${capture.source} ignorée")
+            return
+        }
+        val id = capture.pressType to capture.timestampMs
+        if (id == lastEvent) {
+            Log.i(TAG, "bouton lunettes : doublon ${capture.pressType} @${capture.timestampMs} ignoré")
+            return
+        }
+        lastEvent = id
+        val action = gesture.onPress(capture.pressType.toCorePress(), clock())
+        Log.i(TAG, "bouton lunettes : ${capture.pressType} @${capture.timestampMs} -> ${action ?: "attente"}")
+        action?.let(onAction)
     }
 
     private fun startPump() {
@@ -72,7 +89,10 @@ internal class GlassesInputs(
         pump = scope.launch {
             while (isActive) {
                 delay(TICK_MS)
-                gesture.flush(clock())?.let(onAction)
+                gesture.flush(clock())?.let { action ->
+                    Log.i(TAG, "bouton lunettes : appui court confirmé -> $action")
+                    onAction(action)
+                }
             }
         }
     }
@@ -84,10 +104,13 @@ internal class GlassesInputs(
         listenJob = null
         if (attached) session.removeInputs()
         attached = false
+        lastEvent = null
         gesture.reset()
     }
 
     private companion object {
+        /** Journal de la chaîne lunettes (recette : `logcat -s GlassesChain`). */
+        const val TAG = "GlassesChain"
         const val TICK_MS = 80L
     }
 }
