@@ -118,7 +118,7 @@ class VoiceNavSpeakerTest {
     }
 
     @Test
-    fun `hors trace ne coupe pas, grave sans flush`() {
+    fun `hors trace coupe, grave avec flush`() {
         val driver = FakeSpeakerDriver()
         val voice = speaker(driver)
         voice.onTurn(SteeringCap.Left, 20f)
@@ -127,7 +127,7 @@ class VoiceNavSpeakerTest {
 
         assertEquals("Hors route.", phrase)
         assertEquals(2, driver.calls.size)
-        assertEquals(false, driver.calls[1].flush)
+        assertEquals(true, driver.calls[1].flush)
         assertEquals(SystemTtsEngine.SAFETY_PITCH, driver.calls[1].pitch, 0f)
     }
 
@@ -140,7 +140,7 @@ class VoiceNavSpeakerTest {
         )
         val reroutes = FakeSpeakerDriver()
         assertEquals("Nouvelle route.", speaker(reroutes).onRerouted())
-        assertEquals(false, reroutes.calls.single().flush)
+        assertEquals(true, reroutes.calls.single().flush)
         val starts = FakeSpeakerDriver()
         assertEquals(
             "Vers la gare de Lyon.",
@@ -281,75 +281,54 @@ class VoiceNavSpeakerTest {
     }
 
     @Test
-    fun `douce admise en parole part en file, dite au silence`() {
+    fun `douce admise en parole coupe et parle aussitot`() {
         val driver = FakeSpeakerDriver().apply { speakingValue = true }
         val voice = speaker(driver)
 
-        assertNull(voice.onTurn(SteeringCap.Left, 20f))
-        assertTrue(driver.calls.isEmpty())
+        assertEquals("Left.", voice.onTurn(SteeringCap.Left, 20f))
+        assertEquals(1, driver.calls.size)
+        assertEquals(true, driver.calls.single().flush)
 
         driver.speakingValue = false
-        // Le créneau est pris par la file : l'événement courant se réessaiera.
-        assertNull(voice.onTurn(SteeringCap.Right, 20f))
-        assertEquals(1, driver.calls.size)
-        assertEquals("Left.", driver.calls.single().text)
-
         now += 5_000L
         assertEquals("Right.", voice.onTurn(SteeringCap.Right, 20f))
         assertEquals(2, driver.calls.size)
     }
 
     @Test
-    fun `file garde la plus fraiche seule`() {
+    fun `en parole la fraiche coupe l ancienne`() {
         val driver = FakeSpeakerDriver().apply { speakingValue = true }
         val voice = speaker(driver)
-        voice.onTurn(SteeringCap.Left, 20f)
-        voice.onLiteral("Au giratoire, prenez la deuxième sortie.")
 
-        driver.speakingValue = false
-        voice.onTurn(SteeringCap.Right, 20f)
-
-        assertEquals(1, driver.calls.size)
-        assertEquals("Au giratoire, prenez la deuxième sortie.", driver.calls.single().text)
-    }
-
-    @Test
-    fun `file perimee jetee sans parler`() {
-        assertEquals(5_000L, VoiceNavSpeaker.PENDING_TTL_MS)
-        val driver = FakeSpeakerDriver().apply { speakingValue = true }
-        val voice = speaker(driver)
-        voice.onTurn(SteeringCap.Left, 20f)
-
-        driver.speakingValue = false
-        now += 6_000L
-        assertEquals("Right.", voice.onTurn(SteeringCap.Right, 20f))
-
-        assertEquals(1, driver.calls.size)
-    }
-
-    @Test
-    fun `danger file devant, grave au silence, jamais de coupe`() {
-        val driver = FakeSpeakerDriver().apply { speakingValue = true }
-        val voice = speaker(driver)
-        voice.onTurn(SteeringCap.Left, 20f)
-
-        // En parole : le danger prend le créneau (le plus frais), sans parler.
-        assertNull(voice.onOffRoute())
-        assertTrue(driver.calls.isEmpty())
-
-        // Au silence : le danger d'abord (voix grave, sans flush) ; l'événement
-        // courant attend son tour (délai de porte), il se dit au tick suivant.
-        driver.speakingValue = false
-        assertNull(voice.onTurn(SteeringCap.Right, 20f))
-
-        assertEquals(1, driver.calls.size)
-        assertEquals("Hors route.", driver.calls[0].text)
-        assertEquals(SystemTtsEngine.SAFETY_PITCH, driver.calls[0].pitch, 0f)
-        assertEquals(false, driver.calls[0].flush)
-
+        assertEquals("Left.", voice.onTurn(SteeringCap.Left, 20f))
+        now += 3_000L
+        assertEquals("Au giratoire, prenez la deuxième sortie.", voice.onLiteral("Au giratoire, prenez la deuxième sortie."))
         now += 3_000L
         assertEquals("Right.", voice.onTurn(SteeringCap.Right, 20f))
+
+        assertEquals(3, driver.calls.size)
+        assertTrue(driver.calls.all { it.flush })
+        assertEquals("Au giratoire, prenez la deuxième sortie.", driver.calls[1].text)
+    }
+
+    @Test
+    fun `danger coupe aussitot, grave avec flush`() {
+        val driver = FakeSpeakerDriver().apply { speakingValue = true }
+        val voice = speaker(driver)
+        voice.onTurn(SteeringCap.Left, 20f)
+
+        // En parole : le danger coupe et parle aussitôt (voix grave).
+        assertEquals("Hors route.", voice.onOffRoute())
+
         assertEquals(2, driver.calls.size)
+        assertEquals("Hors route.", driver.calls[1].text)
+        assertEquals(SystemTtsEngine.SAFETY_PITCH, driver.calls[1].pitch, 0f)
+        assertEquals(true, driver.calls[1].flush)
+
+        driver.speakingValue = false
+        now += 3_000L
+        assertEquals("Right.", voice.onTurn(SteeringCap.Right, 20f))
+        assertEquals(3, driver.calls.size)
     }
 
     @Test

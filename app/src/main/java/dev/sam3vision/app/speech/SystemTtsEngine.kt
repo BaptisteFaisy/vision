@@ -42,8 +42,10 @@ interface TtsDriver {
  * gratuite, hors-ligne, en anglais — là où [dev.sam3vision.app.VoiceAnnouncer]
  * parle ElevenLabs (clé, réseau, latence), un virage ne peut pas attendre.
  *
- * File sans chevauchement : un seul moteur, les phrases normales s'enchaînent
- * (`QUEUE_ADD`), les urgentes coupent (`QUEUE_FLUSH`). Le débit est borné par
+ * Dernier gagnant : un seul moteur, chaque phrase coupe la précédente
+ * (`QUEUE_FLUSH`, ordre user du 03/11) — aucune file, aucune vieille. Le
+ * mode file (`QUEUE_ADD`) reste au mécanisme ([TtsDriver.speak]) mais plus
+ * aucun appelant production ne l'emploie. Le débit est borné par
  * [Settings.clampTtsSpeed], comme la voix ElevenLabs.
  *
  * Sûr pour le cycle de vie : ne retient que le contexte applicatif (jamais une
@@ -152,10 +154,12 @@ class SystemTtsEngine(
 
 /**
  * Tampon borné des phrases prononcées avant l'init du moteur système :
- * [AndroidTtsDriver] y garde ([add]) puis y rejoue ([drain]) à l'arrivée de
- * `onInit` — sans lui, la première alerte (moteur pas encore prêt) serait
- * perdue. Pur et testé en JVM : le pilote Android n'y délègue que le
- * stockage (l'ordre et la borne), sous son verrou.
+ * [AndroidTtsDriver] y garde ([add]) puis n'en rejoue que la plus fraîche
+ * ([drain]) à l'arrivée de `onInit` — sans lui, la première alerte (moteur
+ * pas encore prêt) serait perdue ; avec un rejeu en ordre, des vieilles se
+ * diraient à la suite (ordre user du 03/11 : pas d'ancienne donnée). Pur et
+ * testé en JVM : le pilote Android n'y délègue que le stockage (l'ordre et
+ * la borne), sous son verrou.
  */
 class TtsInitBuffer(private val max: Int = PENDING_MAX) {
 
@@ -174,11 +178,11 @@ class TtsInitBuffer(private val max: Int = PENDING_MAX) {
         items.add(BufferedPhrase(text, flush, locale, rate, pitch))
     }
 
-    /** Rend le tampon dans l'ordre et le vide (rejoué à l'init). */
+    /** Rend la plus fraîche seule et vide le tampon (rejouée seule à l'init : pas de vieilles). */
     fun drain(): List<BufferedPhrase> {
-        val backlog = items.toList()
+        val fresh = items.lastOrNull()?.let { listOf(it) } ?: emptyList()
         items.clear()
-        return backlog
+        return fresh
     }
 
     /** Jette le tampon (coupe, fermeture). */
@@ -200,9 +204,10 @@ class TtsInitBuffer(private val max: Int = PENDING_MAX) {
  *
  * Le moteur met quelques centaines de millisecondes à s'initialiser : les
  * phrases prononcées avant sont gardées ([TtsInitBuffer], les plus vieilles
- * tombent, une urgente vide le tampon) puis parlées dans l'ordre à l'arrivée
- * de [onInit]. Échec d'init (`CHECK_VOICE_DATA` manquant…) = pilote condamné :
- * tout est jeté et [speak] refuse ensuite, sans lever.
+ * tombent, une urgente vide le tampon) puis seule la plus fraîche est
+ * parlée à l'arrivée de [onInit] (pas de vieilles à la suite, ordre 03/11).
+ * Échec d'init (`CHECK_VOICE_DATA` manquant…) = pilote condamné : tout est
+ * jeté et [speak] refuse ensuite, sans lever.
  *
  * Adaptateur fin, comme [dev.sam3vision.app.SpeechPlayer] : instanciable
  * uniquement sur Android, donc sans test JVM — le tampon ([TtsInitBuffer]),

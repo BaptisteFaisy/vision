@@ -30,8 +30,9 @@ import kotlin.coroutines.coroutineContext
  * de parole, fanion rendu) et se tait — sauf le niveau 0 (voiture en
  * mouvement : seul 0 coupe la parole du user). Sans clé ElevenLabs, silence.
  * Voix réseau en panne ([isNetworkVoiceDown] : clé, crédits, cadence,
- * timeout, réseau) : la phrase part au TTS système ([system], en file),
- * jamais jetée quand un moteur est câblé (`null` = jet comme avant).
+ * timeout, réseau) : la phrase part au TTS système ([system], en coupant
+ * la précédente — dernier gagnant), jamais jetée quand un moteur est câblé
+ * (`null` = jet comme avant).
  * Le stop ne se répète jamais. L'appelant sérialise les appels
  * (le porte-parole du bus tient un mutex) : dernier gagnant.
  *
@@ -89,15 +90,17 @@ class ProximityVoice(
     }
 
     /**
-     * Repli TTS système (hors-ligne) : [phrase] dite sans ElevenLabs, en file
-     * (`QUEUE_ADD`, jamais de chevauchement). `true` si confiée au moteur
-     * (mémorisée comme une parole normale) ; `false` si aucun moteur câblé ou
-     * refus (non mémorisée : le jet garde le motif `panne-reseau`).
+     * Repli TTS système (hors-ligne) : [phrase] dite sans ElevenLabs, en
+     * coupant la précédente (`QUEUE_FLUSH`, dernier gagnant — le bus est
+     * rendu aussitôt, une file rejouerait des périmées à la suite, ordre
+     * user du 03/11). `true` si confiée au moteur (mémorisée comme une
+     * parole normale) ; `false` si aucun moteur câblé ou refus (non
+     * mémorisée : le jet garde le motif `panne-reseau`).
      */
     private fun speakOffline(phrase: String, current: Settings): Boolean {
         val engine = system ?: return false
         val locale = SystemTtsEngine.localeOf(current.speechLanguage)
-        if (!engine.speak(phrase, false, locale, current.ttsSpeed)) return false
+        if (!engine.speak(phrase, true, locale, current.ttsSpeed)) return false
         markSpoken(phrase)
         SpeechLog.play("repli-système", phrase)
         SpeechLog.done(phrase)
