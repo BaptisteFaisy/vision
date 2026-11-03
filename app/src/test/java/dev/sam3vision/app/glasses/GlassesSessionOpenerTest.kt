@@ -1,5 +1,6 @@
 package dev.sam3vision.app.glasses
 
+import kotlinx.coroutines.test.runCurrent
 import kotlinx.coroutines.test.runTest
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertTrue
@@ -43,7 +44,9 @@ class GlassesSessionOpenerTest {
         assertEquals(MessageKind.INFO, harness.notes.last().kind)
         assertTrue(harness.notes.last().text, harness.notes.last().text.contains("reconnecting"))
         assertEquals(0, harness.starts)
-        testScheduler.advanceTimeBy(1_000L)
+        // Marge past la borne (la tâche à l'exact délai peut ne pas partir) + purge.
+        testScheduler.advanceTimeBy(1_500L)
+        runCurrent()
         assertEquals(1, harness.starts)
     }
 
