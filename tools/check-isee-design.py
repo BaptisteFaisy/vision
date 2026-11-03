@@ -83,9 +83,10 @@ PORTRAIT_NEEDS = (
     "PICTURE_H",
     "CAM_Y",
     "CAM_R",
-    "FADE",
+    "DIVIDER",
+    "DIVIDER_H_DP",
+    "DIVIDER_CORNER_DP",
     "portraitGeometry",
-    "pictureAlpha",
     "focusPull",
     "wordsSpoken",
 )

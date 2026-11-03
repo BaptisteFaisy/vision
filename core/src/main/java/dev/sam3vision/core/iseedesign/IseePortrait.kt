@@ -2,7 +2,7 @@ package dev.sam3vision.core.iseedesign
 
 /**
  * Le design « Portrait » de l'écran iSee (choisi sur la maquette web) : logique pure, testable
- * sur JVM. La rue occupe le haut de l'écran et se fond dans le blanc ; la boule de verre est
+ * sur JVM. La rue occupe le haut de l'écran et un trait clair l'en sépare ; la boule de verre est
  * posée sous l'image, le court passage en cours dessous. Couleurs « Amber » : le user en bleu,
  * iSee en ambre. Aucun pixel sur la boule : verre + liquide marbré seulement.
  */
@@ -40,8 +40,10 @@ object IseePortrait {
     const val CAM_Y = 0.555f
     const val CAM_R = 0.20f
 
-    /** La rue se fond dans le blanc sur ses 34 % du bas. */
-    const val FADE = 0.34f
+    /** Trait de séparation rue/blanc (demande user 2026-11-03) : gris clair, 4 dp, coins 10 dp. */
+    const val DIVIDER = 0xFFE2E8F0.toInt()
+    const val DIVIDER_H_DP = 4f
+    const val DIVIDER_CORNER_DP = 10f
 }
 
 /** Géométrie d'une image de l'écran, en pixels (y vers le bas). */
@@ -84,18 +86,6 @@ fun portraitGeometry(width: Float, height: Float, open: Float, speech: Float = 0
         pictureH = picture * k,
         textTop = y + r * 1.3f + width * 0.03f,
     )
-}
-
-/**
- * Opacité de la rue à la hauteur [y] (pixels) : pleine en haut, elle se fond dans le blanc sur
- * ses [IseePortrait.FADE] du bas (courbe douce), nulle sous la rue.
- */
-fun pictureAlpha(y: Float, pictureH: Float): Float {
-    if (pictureH <= 0f || y >= pictureH) return 0f
-    val fromBottom = (pictureH - y) / pictureH
-    val u = (fromBottom / IseePortrait.FADE).coerceIn(0f, 1f)
-    val s = u * u * (3f - 2f * u)
-    return s * s * (3f - 2f * s)
 }
 
 /**
