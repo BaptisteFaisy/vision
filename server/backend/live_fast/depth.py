@@ -174,7 +174,33 @@ def attach_medians(norm, entries, image_size):
     return entries
 
 
-def attach_frame_depth(ctx, image, entries: list, with_depth: bool, timers: dict):
+def shortlist_entries(entries: list, max_objects, extras=()) -> list:
+    """Sous-ensemble à mesurer : top ``max_objects`` au score + ``extras`` (rescapés).
+
+    ``finalize`` pur ne garde que le top : mesurer le reste (resize + médiane
+    par entrée, ~0,23 ms pièce) est du calcul jeté — ~20 ms à 100 entrées.
+    ``finalize_guarded`` (direct) y ajoute au plus un rescapé par famille
+    gardée, fourni par l'appelant (``feux_guard.family_bests``). Mêmes objets
+    (mesure en place, ordre de ``entries`` conservé) : la réponse est
+    identique, seules les médianes jetées disparaissent. ``max_objects=None`` :
+    tout (appelants historiques).
+    """
+    if max_objects is None:
+        return list(entries)
+    try:
+        cap = int(max_objects)
+    except (TypeError, ValueError):
+        return list(entries)
+    if cap <= 0:
+        return []
+    # Même tri que `finalize` (stable, décroissant) : le top est le même ensemble.
+    ranked = sorted(entries, key=lambda entry: entry["score"], reverse=True)
+    wanted = set(map(id, ranked[:cap])) | set(map(id, extras))
+    return [entry for entry in entries if id(entry) in wanted]
+
+
+def attach_frame_depth(ctx, image, entries: list, with_depth: bool, timers: dict,
+                       max_objects=None, rescue=None):
     """Étage profondeur de ``run_frame`` : médiane par entrée (verrou selon l'appelant).
 
     Sans ``with_depth``, sans modèle chargé, ou sans entrée (DETR n'a rien
@@ -182,6 +208,9 @@ def attach_frame_depth(ctx, image, entries: list, with_depth: bool, timers: dict
     forward (repli gracieux — le client bascule sur sa profondeur embarquée).
     Le poste ``depth_ms`` n'est émis que si le levier ``FAST_TIMING`` est vrai
     et qu'un forward a réellement eu lieu.
+    ``max_objects`` (+ ``rescue(entries)`` : rescapés de la garde anti-éviction)
+    borne la mesure aux survivants possibles (``shortlist_entries``) : réponse
+    identique, ~20 ms en moins à 100 entrées sur les frames depth (1 sur 8).
     Implémentation unique, partagée par les deux variantes du backend.
     """
     if not with_depth or ctx.get("depth_model") is None or not entries:
@@ -191,7 +220,9 @@ def attach_frame_depth(ctx, image, entries: list, with_depth: bool, timers: dict
     started = now()
     norm = depth_map_for(ctx["depth_model"], ctx.get("depth_processor"), image, ctx["device"])
     add_ms(timers, "depth_ms", elapsed_ms(started))
-    return attach_medians(norm, entries, image.size)
+    measured = shortlist_entries(entries, max_objects, rescue(entries) if rescue else ())
+    attach_medians(norm, measured, image.size)
+    return entries
 
 
 def new_depth_throttle() -> dict:

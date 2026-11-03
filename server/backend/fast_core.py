@@ -481,7 +481,7 @@ def run_frame(ctx, image, prompts: list[str], work_edge: int, max_objects: int, 
         vision = _vision(ctx, pixels, timers)
         entries = _collect(ctx, vision, prompts, concepts, work.size, image_size, batch,
                            max_objects, timers)
-        entries = attach_frame_depth(ctx, image, entries, with_depth, timers)
+        entries = attach_frame_depth(ctx, image, entries, with_depth, timers, max_objects)
     result = _payload(entries, image_size, max_objects, mask_encoding, timers,
                       mask_format=mask_format, mask_edge=mask_edge)
     return _decorate(ctx, result, edge, edge_ok, timers)

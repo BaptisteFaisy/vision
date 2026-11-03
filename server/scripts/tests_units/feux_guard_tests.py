@@ -391,6 +391,92 @@ def _stairs_walls_guard(guard, seg, check) -> None:
           str([item["label"] for item in tiny["objects"]]))
 
 
+def _rescue_entries():
+    """7 voitures + chien + 5 familles gardées bas score : garde active à max 6."""
+    import numpy as np
+
+    mask = np.zeros((8, 8), dtype=np.uint8)
+    mask[2:6, 2:6] = 1
+    box = [0.0, 0.0, 8.0, 8.0]
+    entries = [{"label": f"car{i}", "score": round(0.90 - i * 0.01, 4),
+                "box": list(box), "mask": mask} for i in range(7)]
+    entries.append({"label": "dog", "score": 0.5, "box": list(box), "mask": mask})
+    for label, score in [("feu piéton", 0.12), ("passage piéton", 0.11),
+                         ("bordure", 0.10), ("escalier", 0.08), ("mur", 0.07)]:
+        entries.append({"label": label, "score": score, "box": list(box), "mask": mask})
+    return entries
+
+
+def _family_bests(guard, seg, check) -> None:
+    """Rescapés : un par famille, premier ex æquo, survivants couverts."""
+    import depth as depth_mod
+
+    entries = _rescue_entries()
+    bests = guard.family_bests(entries)
+    check("garde: un rescapé par famille non vide",
+          sorted(entry["label"] for entry in bests)
+          == ["bordure", "escalier", "feu piéton", "mur", "passage piéton"],
+          str([entry["label"] for entry in bests]))
+    check("garde: sans famille → aucun rescapé",
+          guard.family_bests(entries[:8]) == [], "familles trouvées sans famille")
+    tie = [dict(entries[8], box=[0.0, 0.0, 1.0, 1.0]),
+           dict(entries[8], label="signal piéton", box=[0.0, 0.0, 2.0, 2.0])]
+    first = guard.family_bests(tie)
+    check("garde: ex æquo → le premier (tri stable)",
+          len(first) == 1 and first[0]["box"] == [0.0, 0.0, 1.0, 1.0],
+          str([entry.get("box") for entry in first]))
+    kept = guard.finalize_guarded(seg.finalize, entries, (16, 16), 6, "none")
+    short = depth_mod.shortlist_entries(entries, 6, guard.family_bests(entries))
+    pairs = {(entry["label"], entry["score"]) for entry in short}
+    check("garde: 6 survivants (pool + 5 rescapés)",
+          len(kept["objects"]) == 6, str(len(kept["objects"])))
+    check("garde: survivants couverts par top + rescapés",
+          all((item["label"], item["score"]) in pairs for item in kept["objects"]),
+          str([(item["label"], item["score"]) for item in kept["objects"]]))
+
+
+def _shortlist_wiring(check) -> None:
+    """run_frame déployé : 32 entrées, max 8 → 9 mesurées (top + feu)."""
+    import depth as depth_mod
+    import numpy as np
+
+    core = _live_fast_module("fast_core")
+    mask = np.zeros((32, 64), dtype=np.uint8)
+    mask[4:20, 8:40] = 1
+    box = [8.0, 4.0, 40.0, 20.0]
+    entries = [{"label": f"car{i}", "score": round(0.95 - i * 0.01, 4),
+                "box": list(box), "mask": mask} for i in range(30)]
+    entries.append({"label": "dog", "score": 0.5, "box": list(box), "mask": mask})
+    entries.append({"label": "feu piéton", "score": 0.05, "box": list(box), "mask": mask})
+    seen: dict = {}
+    ctx = {"edge_applied": 518, "depth_model": "m", "depth_processor": "p",
+           "device": "cpu"}
+    saved = (core._preprocess, core._vision, core._collect, depth_mod.depth_map_for)
+    try:
+        core._preprocess = lambda _c, _i, _w: (SimpleNamespace(size=(8, 8)), "px")
+        core._vision = lambda _c, _p, _t: "vision"
+
+        def collect(*_args):
+            seen["entries"] = [dict(entry) for entry in entries]
+            return seen["entries"]
+
+        core._collect = collect
+        depth_mod.depth_map_for = lambda *_a: np.linspace(
+            0, 1, 32 * 64, dtype=np.float32).reshape(32, 64)
+        result = core.run_frame(ctx, SimpleNamespace(size=(64, 32)), ["voiture"],
+                                512, 8, True, mask_encoding="none", with_depth=True)
+    finally:
+        core._preprocess, core._vision, core._collect = saved[0], saved[1], saved[2]
+        depth_mod.depth_map_for = saved[3]
+    measured = sum("depth" in entry for entry in seen["entries"])
+    check("garde: run_frame déployé mesure 9/32 (top + rescapé)",
+          measured == 9, str(measured))
+    check("garde: feu rescapé servi avec depth",
+          any(item["label"] == "feu piéton" and "depth" in item
+              for item in result["objects"]),
+          str([(item["label"], "depth" in item) for item in result["objects"]]))
+
+
 def test_feux_guard(_) -> None:
     """Garde feux : point d'entrée unique (un seul slot RUNNERS, harnais à 497 l)."""
     from test_units import check
@@ -405,5 +491,7 @@ def test_feux_guard(_) -> None:
     _guarded_truncated(guard, _live_fast_module("segmentation"), check)
     _stairs_walls_labels(guard, check)
     _stairs_walls_guard(guard, _live_fast_module("segmentation"), check)
+    _family_bests(guard, _live_fast_module("segmentation"), check)
     _payload_wiring(check)
+    _shortlist_wiring(check)
     _service_wiring(check)

@@ -388,6 +388,10 @@ RUNNERS = (
      depth_tests.test_ws_depth_throttle_mixed),
     ("profondeur : run_frame saute depth à 0 objet", "fast_core",
      depth_tests.test_run_frame_depth_skip_empty),
+    ("profondeur : shortlist des médianes (top + rescapés)", "depth",
+     depth_tests.test_depth_shortlist),
+    ("profondeur : shortlist câblée au run_frame", "fast_core",
+     depth_tests.test_depth_shortlist_frame),
     ("live_fast : passage (décision)", "passage", live_fast_tests.test_passage_decision),
     ("live_fast : passage (tolérance)", "passage", live_fast_tests.test_passage_tolerance),
     # Apport du 20:30 (poids embarqués + snapshot mémoire) préservé par la fusion.

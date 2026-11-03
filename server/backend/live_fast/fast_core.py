@@ -398,7 +398,7 @@ def run_frame(ctx, image, prompts: list[str], work_edge: int, max_objects: int, 
     permet à l'appelant d'ajouter ses propres postes (``decode_ms``) à la même carte.
     """
     from depth import attach_frame_depth
-    from feux_guard import routed_concept
+    from feux_guard import family_bests, routed_concept
 
     timers = {} if timers is None else timers
     # `use_edge` peut réécrire la grille RoPE du ViT (FAST_EDGE_RUNTIME=1) : hors verrou, ce
@@ -416,8 +416,10 @@ def run_frame(ctx, image, prompts: list[str], work_edge: int, max_objects: int, 
         entries = _collect(ctx, vision, prompts, concepts, work.size, image_size, batch,
                            max_objects, timers, inputs)
     # Profondeur (DA2) hors verrou : indépendante du DETR, ~22 ms de créneau rendus
-    # 1 frame sur 8 — poste ``depth_ms`` et médianes inchangés.
-    entries = attach_frame_depth(ctx, image, entries, with_depth, timers)
+    # 1 frame sur 8 — poste ``depth_ms`` et médianes inchangés. Seuls les
+    # survivants possibles sont mesurés (top + rescapés de la garde).
+    entries = attach_frame_depth(ctx, image, entries, with_depth, timers, max_objects,
+                                 family_bests)
     result = _payload(entries, image_size, max_objects, mask_encoding, timers,
                       mask_format=mask_format, mask_edge=mask_edge)
     return _decorate(ctx, result, edge, edge_ok, timers)
