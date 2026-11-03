@@ -176,6 +176,13 @@ internal fun needsCodecRebuild(
 ): Boolean = !hasCodec || width != codecW || height != codecH
 
 /**
+ * Faut-il rattacher le codec ? Oui si la surface n'est plus la même instance
+ * (recréée en plein direct) : sinon l'image gèle sans erreur. `Any?` (référentiel) :
+ * une `Surface` ne s'instancie pas sur JVM. Pur, testé en JVM.
+ */
+internal fun needsSurfaceRebind(bound: Any?, target: Any?): Boolean = bound !== target
+
+/**
  * Rend les frames des lunettes sur la `Surface` de l'accueil iSee : les configs
  * codec nourrissent le décodeur sans afficher, le bitmap décodable (JPEG, brut
  * ARGB_8888) est dessiné tel quel, sinon le H.265 part vers `MediaCodec` (zéro
@@ -194,6 +201,9 @@ class GlassesLiveDecoder(
     /** Volatile : posé par `release` (UI, sous verrou), relu par `render` (hors verrou). */
     @Volatile
     private var codec: MediaCodec? = null
+    /** Surface liée au codec : la vue la recrée parfois en plein direct. */
+    @Volatile
+    private var boundSurface: Surface? = null
     private var codecWidth = 0
     private var codecHeight = 0
     private var closed = false
@@ -376,8 +386,15 @@ class GlassesLiveDecoder(
     /** Décodeur H.265 paresseux : créé à la première frame, recréé si la taille change. */
     private fun ensureCodec(target: Surface, width: Int, height: Int): MediaCodec? {
         val current = codec
-        if (!needsCodecRebuild(current != null, codecWidth, codecHeight, width, height)) return current
-        dropCodecLocked()
+        if (!needsCodecRebuild(current != null, codecWidth, codecHeight, width, height) && current != null) {
+            // Taille inchangée, codec vivant : rattacher la surface si la vue l'a
+            // recréée ; s'il refuse, la recréation ci-dessous lie la surface neuve.
+            val sameSurface = !needsSurfaceRebind(boundSurface, target) || rebindSurface(current, target)
+            if (sameSurface) return current
+            dropCodecLocked()
+        } else {
+            dropCodecLocked()
+        }
         val effectiveCsd = csd ?: GlassesVideoLink.fallbackCsd
         if (effectiveCsd != null && !csdAnnounced) {
             csdAnnounced = true
@@ -393,6 +410,7 @@ class GlassesLiveDecoder(
             }
         }.getOrNull() ?: return null
         codec = created
+        boundSurface = target
         codecWidth = width
         codecHeight = height
         Log.i(TAG, "direct lunettes : décodeur H.265 ${width}×${height}")
@@ -400,10 +418,19 @@ class GlassesLiveDecoder(
         return created
     }
 
+    /** Rattache le codec vivant à la surface neuve ; `false` = recréer derrière. */
+    private fun rebindSurface(decoder: MediaCodec, target: Surface): Boolean =
+        runCatching {
+            decoder.setOutputSurface(target)
+            boundSurface = target
+            Log.i(TAG, "direct lunettes : surface rattachée sans recréer le codec")
+        }.isSuccess
+
     private fun dropCodecLocked() {
         runCatching { codec?.stop() }
         runCatching { codec?.release() }
         codec = null
+        boundSurface = null
         codecWidth = 0
         codecHeight = 0
     }
