@@ -1,6 +1,5 @@
 package dev.sam3vision.core.curb
 
-import dev.sam3vision.core.distance.KnownSizes
 import dev.sam3vision.core.distance.LensSpec
 import dev.sam3vision.core.live.GuidanceSide
 import dev.sam3vision.core.live.GuidanceWord
@@ -219,21 +218,9 @@ object SidewalkRail {
         return ((label.centerX - AXIS_MID) * 2f * depth * halfTangent).takeIf { it.isFinite() }
     }
 
-    /** Vrai si [label] désigne une bordure (casse, accents, pluriel neutralisés). */
-    private fun isCurb(label: String): Boolean {
-        val key = KnownSizes.canonical(label)
-        if (key.isEmpty()) return false
-        if (key in CURBS) return true
-        return key.endsWith("s") && key.length > 3 && key.dropLast(1) in CURBS
-    }
+    /** Vrai si [label] désigne une bordure (définition partagée [CurbConcepts]). */
+    private fun isCurb(label: String): Boolean = CurbConcepts.isCurbEdge(label)
 
     /** Axe marché : le milieu du champ, comme le couloir du guidage. */
     private const val AXIS_MID = 0.5f
-
-    /**
-     * Bordures (canoniques) : `curb` et ses variantes. Volontairement **pas**
-     * `sidewalk` : le masque de sol est coupé par le cadre, son bord n'est pas
-     * la bordure.
-     */
-    private val CURBS = setOf("curb", "kerb", "bordure", "bord", "curbstone")
 }

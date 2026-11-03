@@ -36,6 +36,13 @@ object CurbConcepts {
     private val GROUND = setOf("sidewalk", "pavement", "footpath", "trottoir")
 
     /**
+     * Bordures seules (canoniques) : `curb` et ses variantes. Volontairement
+     * **pas** `sidewalk` : le masque de sol est coupé par le cadre, son bord
+     * n'est pas la bordure (même liste que le rail trottoir).
+     */
+    private val CURB_EDGE = setOf("curb", "kerb", "bordure", "bord", "curbstone")
+
+    /**
      * Chemins et routes (FR/EN, canoniques : « allée » vaut « allee ») : le
      * guidage obstacles les ignore — on ne fait jamais esquiver à
      * l'utilisateur le chemin ou la route sur lesquels il marche (ordre user du
@@ -60,6 +67,13 @@ object CurbConcepts {
      * marche (`step`) restent des obstacles — elles se montent, pas se traversent.
      */
     fun isGround(label: String): Boolean = matches(label, GROUND)
+
+    /**
+     * Vrai si [label] désigne une bordure seule (pas le plan du trottoir) :
+     * casse, accents, pluriel simple neutralisés. Le rail trottoir et le
+     * filtre distances iSee partagent cette définition.
+     */
+    fun isCurbEdge(label: String): Boolean = matches(label, CURB_EDGE)
 
     /**
      * Vrai si [label] désigne un chemin ou une route : le guidage obstacles
