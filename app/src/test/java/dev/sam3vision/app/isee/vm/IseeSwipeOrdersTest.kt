@@ -64,6 +64,7 @@ class IseeSwipeOrdersTest {
         placeMode: PictoPlaceMode = PictoPlaceMode.DEDANS,
         language: SpeechLanguage = SpeechLanguage.En,
         active: Boolean = true,
+        logs: MutableList<String> = mutableListOf(),
     ) = IseeSwipeOrders(
         scope = this,
         runMode = { modes += it; true },
@@ -79,6 +80,7 @@ class IseeSwipeOrdersTest {
         hapticStart = { haptics += "start" },
         hapticEnd = { haptics += "end" },
         isActive = { active },
+        log = { logs += it },
         clock = { testScheduler.currentTime },
     )
 
@@ -291,5 +293,67 @@ class IseeSwipeOrdersTest {
         assertTrue("aucune destination", destinations.isEmpty())
         assertFalse("tenue rendue", state.holding)
         assertFalse("plus d'écoute", orders.asking())
+    }
+
+    @Test
+    fun `hors ecran, le refus destination est loggue`() = runTest {
+        val logs = mutableListOf<String>()
+        val orders = swipe(FakeListening(text = "gare de Lyon"), active = false, logs = logs)
+
+        orders.askDestination()
+
+        assertEquals(1, logs.size)
+        assertTrue("motif inactif", logs.single().contains("inactif"))
+    }
+
+    @Test
+    fun `« Quoi chercher ? » en cours, le refus destination est loggue`() = runTest {
+        val logs = mutableListOf<String>()
+        val orders = swipe(FakeListening(text = "mes clés"), logs = logs)
+
+        orders.askToFind()
+        orders.askDestination()
+
+        assertEquals(1, logs.size)
+        assertTrue("motif micro tenu", logs.single().contains("tient le micro"))
+        advanceUntilIdle()
+    }
+
+    @Test
+    fun `destination deja en cours, le refus est loggue`() = runTest {
+        val logs = mutableListOf<String>()
+        val orders = swipe(FakeListening(text = "gare de Lyon"), logs = logs)
+
+        orders.askDestination()
+        orders.askDestination()
+
+        assertEquals(1, logs.size)
+        assertTrue("motif déjà en cours", logs.single().contains("déjà en cours"))
+        orders.sendDestination()
+        advanceUntilIdle()
+    }
+
+    @Test
+    fun `micro indisponible, le refus destination est loggue`() = runTest {
+        val logs = mutableListOf<String>()
+        val orders = swipe(FakeListening(available = false), logs = logs)
+
+        orders.askDestination()
+        advanceUntilIdle()
+
+        assertEquals(1, logs.size)
+        assertTrue("motif micro", logs.single().contains("micro indisponible"))
+    }
+
+    @Test
+    fun `ouverture reussie, rien n'est loggue`() = runTest {
+        val logs = mutableListOf<String>()
+        val orders = swipe(FakeListening(text = "gare de Lyon"), logs = logs)
+
+        orders.askDestination()
+
+        assertTrue("aucun refus", logs.isEmpty())
+        orders.sendDestination()
+        advanceUntilIdle()
     }
 }
