@@ -58,6 +58,24 @@ class WsLiveContractTest {
     }
 
     @Test
+    fun `un handshake refuse donne le code HTTP et non une erreur generique`() = runBlocking {
+        var transport: ContractWsTransport? = null
+        transport = ContractWsTransport { _ ->
+            transport?.disconnect(WsHandshakeRefused(404, null))
+            emptyList()
+        }
+        val client = WsLiveClient(base, transport, 1_000, RecordingLiveClient(), binaryWs = false)
+
+        val result = client.live("QQ==", null, 640, 4)
+
+        NetContract.assertError(result, ApiError.Network::class.java, "handshake refusé")
+        assertEquals(
+            "WebSocket /live/ws : handshake refusé (HTTP 404)",
+            NetContract.errorOf(result).message,
+        )
+    }
+
+    @Test
     fun `le health du client WS traverse le vrai HTTP jusqu au serveur`() = runBlocking {
         NetContract.server(body = """{"ok":true,"model":"sam3.1","device":"cuda","gpu":"A100"}""").use { server ->
             val client = WsLiveClient(

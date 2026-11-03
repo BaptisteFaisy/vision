@@ -124,7 +124,7 @@ class LiveClientTest {
         // était tué, frame perdue et inférence facturée quand même). Le direct partage un
         // seul client pour toute l'app : DNS + TCP + TLS (71,3 ms) payés une seule fois.
         assertEquals(5L, LIVE_TIMEOUT_SECONDS)
-        assertEquals(3_000, liveHttpClient().connectTimeoutMillis)
+        assertEquals(10_000, liveHttpClient().connectTimeoutMillis)
         assertEquals(5_000, liveHttpClient().writeTimeoutMillis)
         assertEquals(60_000, liveHttpClient().readTimeoutMillis)
         assertEquals(0, liveHttpClient().callTimeoutMillis)

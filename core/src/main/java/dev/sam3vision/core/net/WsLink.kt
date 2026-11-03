@@ -230,10 +230,12 @@ class WsLinkPump(
 }
 
 /**
- * Fermetures serveur de `/live/ws` : typées comme en dictée temps réel ([MetaRealtimeClient]),
- * pour que l'écran dise le motif (idle, réponse trop grosse) au lieu d'un « réseau » générique.
+ * Fermetures et refus de handshake serveur de `/live/ws` : typés comme en dictée temps réel
+ * ([MetaRealtimeClient]), pour que l'écran dise le motif (idle, réponse trop grosse, refus
+ * HTTP) au lieu d'un « réseau » générique.
  */
 internal fun wsCloseError(error: Throwable): ApiError = when (error) {
+    is WsHandshakeRefused -> ApiError.Network("WebSocket /live/ws : handshake refusé (HTTP ${error.code})")
     is WsClosedAbnormally -> when (error.code) {
         1001 -> ApiError.Network("WebSocket /live/ws : idle 120 s (1001), la frame suivante rouvre")
         1011 -> ApiError.Network("WebSocket /live/ws : erreur interne serveur (1011)")

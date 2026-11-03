@@ -75,7 +75,9 @@ fun defaultHttpClient(timeoutSeconds: Long = DEFAULT_TIMEOUT_SECONDS): OkHttpCli
  * caméra tourne déjà et que la 1re frame part aussitôt.
  *
  * Délais réglés sur la réalité du direct :
- * - connect 3 s (un lien chaud qui ne répond pas en 3 s est mort) ;
+ * - connect 10 s (une poignée de mains TLS sur données mobiles lentes dépasse
+ *   couramment 3 s — montée radio, DNS, TCP ; à 3 s le direct ne se connectait
+ *   jamais hors Wi-Fi. Ordre user du 03/11 : tous réseaux) ;
  * - write 5 s (27 Ko de frame JPEG s'écrivent en quelques ms) ;
  * - read 60 s : le **réveil** du conteneur Modal est mesuré à 20-27 s ;
  * - callTimeout 0 : aucun plafond global. L'ancien plafond de 10 s tuait la 1re frame après
@@ -141,9 +143,10 @@ fun liveHttpClient(): OkHttpClient = liveSharedClient
  * **partage le pool de connexions et le dispatcher** de [liveHttpClient], donc le handshake
  * `wss://` bénéficie du DNS/TCP/TLS déjà payés par `/health` et les frames HTTP.
  *
- * Seul le délai de lecture est ajusté : le handshake d'un conteneur endormi attend le
- * démarrage, il ne doit pas être coupé à 10 s. Le budget de la **frame** reste celui de
- * [WsLiveClient] (`withTimeoutOrNull`) — le socket, lui, vit toute la session.
+ * Seul le délai de lecture est ajusté (≥ 60 s) : le handshake d'un conteneur endormi
+ * attend le démarrage, il ne doit pas être coupé au budget historique de 10 s. Le budget
+ * de la **frame** reste celui de [WsLiveClient] (`withTimeoutOrNull`) — le socket, lui,
+ * vit toute la session.
  */
 fun liveWsClient(timeoutSeconds: Long = LIVE_TIMEOUT_SECONDS): OkHttpClient =
     liveSharedClient.newBuilder()
@@ -161,7 +164,7 @@ fun museWsClient(): OkHttpClient =
         .readTimeout(0, TimeUnit.MILLISECONDS)
         .build()
 
-private const val LIVE_CONNECT_SECONDS = 3L
+private const val LIVE_CONNECT_SECONDS = 10L
 private const val LIVE_WRITE_SECONDS = 5L
 private const val LIVE_READ_SECONDS = 60L
 
