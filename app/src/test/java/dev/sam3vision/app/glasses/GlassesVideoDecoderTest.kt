@@ -156,7 +156,7 @@ class GlassesVideoDecoderTest {
         // poste au-delà du budget 250 ms. Une frame manquée est conflée.
         assertEquals(1_000L, GlassesVideoDecoder.INPUT_TIMEOUT_US)
         assertEquals(40L, GlassesVideoDecoder.OUTPUT_WAIT_MS)
-        assertEquals(15, GlassesVideoDecoder.OPERATING_RATE)
+        assertEquals(24, GlassesVideoDecoder.OPERATING_RATE)
     }
 
     /** Frame compressée 504×896 : dimensions de production (VideoQuality.MEDIUM). */

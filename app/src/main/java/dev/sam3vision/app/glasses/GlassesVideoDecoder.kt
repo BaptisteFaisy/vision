@@ -271,14 +271,14 @@ internal open class GlassesVideoDecoder(
 
         /**
          * Attente totale d'une image décodée après chaque entrée, en
-         * millisecondes : ~une demi-période image à 15 i/s (66,7 ms). L'ancien
+         * millisecondes : ~une période image à 24 i/s (41,7 ms). L'ancien
          * 300 ms était le seul poste au-delà du budget 250 ms — pire cas
          * 350 ms avec l'entrée ; désormais ~45 ms.
          */
         const val OUTPUT_WAIT_MS = 40L
 
         /** Cadence annoncée au décodeur (clé `operating-rate`), en images par seconde. */
-        const val OPERATING_RATE = 15
+        const val OPERATING_RATE = 24
 
         /** Créations ratées d'affilée avant l'abandon (effacé par [release]). */
         const val MAX_FAILURES = 3

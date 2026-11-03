@@ -281,18 +281,18 @@ object GlassesVideoLink {
     private const val SUMMARY_NS = 1_000_000_000L
 
     /**
-     * Une ligne détaillée [TimingsText.link] toutes les N frames : à 15 i/s,
+     * Une ligne détaillée [TimingsText.link] toutes les N frames : à 24 i/s,
      * ~3 par seconde — la jointure E2E (`parse_glasses_e2e.py`, N >= 100) en
      * manquait à 1/s (30 jointes/120 s en recette 15b). Le format ne bouge pas
      * ; formatage + I/O logcat restent échantillonnés, pas par frame.
      */
-    private const val LINK_LINE_EVERY = 5L
+    private const val LINK_LINE_EVERY = 8L
 
-    /** Poussées rejoinables par un rendu tardif (~1 s à 15 i/s), au-delà conflées. */
-    internal const val LINK_NOTE_WINDOW = 16
+    /** Poussées rejoinables par un rendu tardif (~1 s à 24 i/s), au-delà conflées. */
+    internal const val LINK_NOTE_WINDOW = 24
 
-    /** Rendus en attente de leur pixel (~0,5 s à 15 i/s), au-delà le plus vieux conflé. */
-    internal const val PENDING_WINDOW = 8
+    /** Rendus en attente de leur pixel (~0,5 s à 24 i/s), au-delà le plus vieux conflé. */
+    internal const val PENDING_WINDOW = 12
 
     private val clockOffset = GlassesClockOffset()
     private val linkStats = GlassesLinkStats()

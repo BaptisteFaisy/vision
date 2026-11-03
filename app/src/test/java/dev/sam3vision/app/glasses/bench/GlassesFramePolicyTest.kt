@@ -81,7 +81,7 @@ class GlassesFramePolicyTest {
     fun `le portrait des lunettes perd le haut et le bas`() {
         // 504x896 = VideoQuality.MEDIUM : 504 de large → 283 de haut, centré.
         assertEquals(CropRect(0, 306, 504, 283), cropTo16x9(504, 896))
-        // 720x1280 = VideoQuality.HIGH en production : 720 de large → 405 de haut, centré.
+        // 720x1280 = VideoQuality.HIGH (ex-production) : 720 de large → 405 de haut, centré.
         assertEquals(CropRect(0, 437, 720, 405), cropTo16x9(720, 1280))
     }
 
@@ -113,7 +113,7 @@ class GlassesFramePolicyTest {
 
     @Test
     fun `le portrait des lunettes garde les trois quarts de sa hauteur`() {
-        // 720x1280 = VideoQuality.HIGH en production : 720 de large → 960 de haut, centré.
+        // 720x1280 = VideoQuality.HIGH (ex-production) : 720 de large → 960 de haut, centré.
         assertEquals(CropRect(0, 160, 720, 960), cropTo4x3(720, 1280))
         // 504x896 = VideoQuality.MEDIUM : 504 de large → 672 de haut, centré.
         assertEquals(CropRect(0, 112, 504, 672), cropTo4x3(504, 896))

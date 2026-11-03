@@ -63,11 +63,11 @@ internal data class CropRect(val x: Int, val y: Int, val width: Int, val height:
 /**
  * Recadrage centré au format 16:9 paysage (hérité : voir [cropTo4x3]).
  *
- * Les lunettes livrent du portrait 9:16 (`VideoQuality.HIGH` = 720×1280 en production,
+ * Les lunettes livrent du portrait 9:16 (`VideoQuality.MEDIUM` = 504×896 en production,
  * imposé par le SDK Meta : `StreamConfiguration` n'expose ni dimensions ni
- * orientation). En production, le 16:9 ne garde que 720×405 : 68 % de la hauteur
+ * orientation). En production, le 16:9 ne garde que 504×283 : 68 % de la hauteur
  * coupée — le sol et l'horizon sont perdus. Ne plus utiliser : [cropTo4x3]
- * (720×960) garde trois quarts de la hauteur ; bascule à faire dans
+ * (504×672) garde trois quarts de la hauteur ; bascule à faire dans
  * `GlassesFrameConvert.cropAndScale` (hors propriété de ce correctif).
  *
  * @return `null` quand l'image est déjà au 16:9 exact (rien à couper), quand
@@ -82,8 +82,8 @@ internal fun cropTo16x9(width: Int, height: Int): CropRect? {
 /**
  * Recadrage centré au format 4:3, **dans l'orientation de la source** : un portrait
  * reste portrait (3:4), un paysage reste paysage (4:3) — le 16:9 paysage coupait 68 %
- * de la hauteur du portrait des lunettes (720×405), le 4:3 n'en coupe que 25 %
- * (720×960 : le sol et l'horizon survivent). L'API accepte tous les ratios et
+ * de la hauteur du portrait des lunettes (504×283), le 4:3 n'en coupe que 25 %
+ * (504×672 : le sol et l'horizon survivent). L'API accepte tous les ratios et
  * [scaledDimensions] borne déjà le grand côté : le recadrage ne sert qu'à alléger.
  *
  * @return `null` quand l'image est déjà au 4:3 exact de son orientation (rien à
