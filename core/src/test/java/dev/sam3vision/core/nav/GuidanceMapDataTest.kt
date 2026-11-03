@@ -39,7 +39,7 @@ class GuidanceMapDataTest {
     )
 
     @Test
-    fun `mapping complet trace shape position recalee camera ensemble`() {
+    fun `mapping complet trace shape position recalee camera suit`() {
         // Fix pile sur un sommet du tracé : écart nul, position = fix.
         val fix = NavFix(lat = 48.85655, lon = 2.3463, accM = 8f, atMs = 1_000L)
         val state = guidanceMapStateOf(route, fix, update)
@@ -57,31 +57,27 @@ class GuidanceMapDataTest {
         assertEquals("Arrived — Gare de Lyon", overlays.maneuvers[2].label)
         assertTrue(overlays.maneuvers.all { !it.upcoming })
 
-        // Caméra d'ensemble : le trajet entier tient dans le cadre (la
-        // position est sur le tracé, le cadre = bornes du tracé), zoom de
-        // cadrage (plus large que la rue), nord en haut.
-
+        // Caméra suit la position (zoom rue, nord en haut) : l'user
+        // reste au centre du cadre au lieu d'en sortir.
         val camera = state.camera!!
-        assertEquals((48.8606 + 48.8443) / 2.0, camera.target.lat, 1e-9)
-        assertEquals((2.3376 + 2.3730) / 2.0, camera.target.lon, 1e-9)
-        assertTrue(camera.zoom in 2.0..19.0)
-        assertTrue(camera.zoom < 16.0)
+        assertEquals(48.85655, camera.target.lat, 1e-9)
+        assertEquals(2.3463, camera.target.lon, 1e-9)
+        assertEquals(16.0, camera.zoom, 0.0)
         assertEquals(0f, camera.bearingDeg, 0f)
     }
 
     @Test
-    fun `camera cadre le trajet entier meme hors trace`() {
-        // Écarté à plus de 30 m : la position brute reste affichée, et le
-        // cadre englobe tracé + position (centre des bornes étendues).
+    fun `camera suit la position brute meme hors trace`() {
+        // Écarté à plus de 30 m : la position brute reste affichée, et la
+        // caméra la suit (zoom rue) au lieu de cadrer le trajet entier.
         val fix = NavFix(lat = 48.8700, lon = 2.3900, accM = 8f, atMs = 1_000L)
         val state = guidanceMapStateOf(route, fix, update)
         assertEquals(RoutePoint(48.8700, 2.3900), state.overlays.position)
         val camera = state.camera!!
-        assertEquals((48.8443 + 48.8700) / 2.0, camera.target.lat, 1e-9)
-        assertEquals((2.3376 + 2.3900) / 2.0, camera.target.lon, 1e-9)
+        assertEquals(48.8700, camera.target.lat, 1e-9)
+        assertEquals(2.3900, camera.target.lon, 1e-9)
+        assertEquals(16.0, camera.zoom, 0.0)
         assertEquals(0f, camera.bearingDeg, 0f)
-        assertTrue(camera.zoom in 2.0..19.0)
-        assertTrue(camera.zoom < 16.0)
     }
 
     @Test

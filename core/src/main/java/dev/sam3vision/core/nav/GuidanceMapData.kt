@@ -81,8 +81,8 @@ fun snappedPositionOf(fix: NavFix?, shape: List<RoutePoint>): RoutePoint? {
  * - position = [snappedPositionOf] (avec la précision du fix) ;
  * - traversées = manœuvres `crossing` finies ;
  * - une pastille par manœuvre finie, libellé [maneuverLabel] ;
- * - caméra : cadrage du trajet entier (tracé + position, [zoomFor]),
- *   sinon `null` (cadrage auto) ; cap 0 (nord en haut).
+ * - caméra : suit la position (zoom rue), sinon cadrage du tracé
+ *   ([zoomFor]), sinon `null` (cadrage auto) ; cap 0 (nord en haut).
  *
  * [update] est réservé : [GuidanceUpdate] ne porte aucun index de manœuvre
  * (ni instruction ciblée), donc `upcoming` vaut `false` partout — le moteur
@@ -125,14 +125,15 @@ private fun buildMapState(
 }
 
 /**
- * Caméra d'ensemble : le trajet entier tient dans le cadre (tracé +
- * position, même écartée), nord en haut. Sans point traçable : `null`
- * (cadrage auto). Cap 0 (nord en haut) dans tous les cas.
+ * Caméra de guidage : suit la position (zoom rue, nord en haut) dès
+ * qu'elle existe — sinon l'user sort du cadre sur les longs trajets
+ * (carte 160 dp, zoom du trajet entier). Sans position : cadrage du
+ * tracé ; sans point traçable : `null` (cadrage auto).
  */
 private fun cameraFor(points: List<RoutePoint>, position: RoutePoint?): MapCamera? {
-    val framed = if (position == null) points else points + position
-    val target = boundsCenter(framed) ?: return null
-    return MapCamera(target = target, zoom = zoomFor(framed), bearingDeg = 0f)
+    if (position != null) return MapCamera(target = position, zoom = ZOOM_STREET, bearingDeg = 0f)
+    val target = boundsCenter(points) ?: return null
+    return MapCamera(target = target, zoom = zoomFor(points), bearingDeg = 0f)
 }
 
 /** Centre du cadre englobant (miroir de la référence de [MapFit]). */
