@@ -32,6 +32,9 @@ CONCEPT_ALIASES = {
     "joggeur": "jogger",
     "joggeurs": "jogger",
     "foule": "crowd",
+    # Poussette : corps vulnérable suivi dehors (ordre user 03/11).
+    "poussette": "stroller",
+    "poussettes": "stroller",
     # Véhicules
     "voiture": "car",
     "voitures": "car",

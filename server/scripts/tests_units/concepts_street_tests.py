@@ -49,6 +49,11 @@ def test_concepts_street(concepts) -> None:
           concepts.model_concept("bateau") == "curb ramp")
     check("rue : bateau de trottoir -> curb ramp",
           concepts.model_concept("bateau de trottoir") == "curb ramp")
+    # Corps vulnérable suivi dehors (ordre user 03/11).
+    check("rue : poussette -> stroller",
+          concepts.model_concept("poussette") == "stroller")
+    check("rue : poussettes -> stroller",
+          concepts.model_concept("poussettes") == "stroller")
     # Sens « boat » préservé via la forme explicite (homonyme levé).
     check("rue : bateau à voile -> boat (sens préservé)",
           concepts.model_concept("bateau à voile") == "boat")
@@ -67,6 +72,7 @@ def test_concepts_street(concepts) -> None:
     check("rue : table déployée == racine",
           deployed.CONCEPT_ALIASES == concepts.CONCEPT_ALIASES,
           "divergence live_fast/concepts.py")
-    check("rue : déployé traduit pareil (bordure, bateau)",
+    check("rue : déployé traduit pareil (bordure, bateau, poussette)",
           deployed.model_concept("bordure") == "curb"
-          and deployed.model_concept("bateau") == "curb ramp")
+          and deployed.model_concept("bateau") == "curb ramp"
+          and deployed.model_concept("poussette") == "stroller")
