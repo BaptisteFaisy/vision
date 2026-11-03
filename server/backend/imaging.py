@@ -298,6 +298,19 @@ def _encode_varint(value: int) -> bytes:
             return bytes(out)
 
 
+# Table LEB128 des runs < 16384 (≤ 2 octets), construite une fois : l'encodeur
+# RLE (~250 runs par masque) ne fait que des lookups — les runs géants (fond
+# uni : quelques-uns par masque) gardent la boucle Python, dans l'ordre.
+_VARINT_TABLE = tuple(_encode_varint(n) for n in range(16384))
+
+
+def _encode_varints(lengths) -> bytes:
+    """Runs en LEB128, dans l'ordre : table < 16384, boucle pour les géants."""
+    table = _VARINT_TABLE
+    return b"".join(table[length] if length < 16384 else _encode_varint(length)
+                    for length in lengths)
+
+
 def encode_mask_rle_b64(mask, grid: tuple[int, int]) -> str:
     """Encode un masque en runs LEB128 sur ``grid`` (w, h), base64, sans perte.
 
@@ -307,13 +320,11 @@ def encode_mask_rle_b64(mask, grid: tuple[int, int]) -> str:
     (éventuellement nul), comme le décodeur Kotlin l'attend.
     """
     cells = (mask_to_uint8(mask, grid) > 0).reshape(-1)
-    changes = np.flatnonzero(np.diff(cells.astype(np.int8))).tolist()
-    bounds = [0] + [change + 1 for change in changes] + [cells.size]
-    lengths = [stop - start for start, stop in zip(bounds, bounds[1:])]
+    changes = np.flatnonzero(np.diff(cells.astype(np.int8)))
+    lengths = np.diff(np.concatenate(([0], changes + 1, [cells.size]))).tolist()
     if cells.size and cells[0]:
         lengths = [0] + lengths
-    runs = b"".join(_encode_varint(length) for length in lengths)
-    return base64.b64encode(runs).decode("ascii")
+    return base64.b64encode(_encode_varints(lengths)).decode("ascii")
 
 
 def decode_mask_rle_b64(payload: str, grid: tuple[int, int]) -> np.ndarray:
