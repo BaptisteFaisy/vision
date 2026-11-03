@@ -290,6 +290,9 @@ class WsLiveClient(
         if (!link.canAttempt()) return false
         val gen = socketGen + 1
         link.startConnecting()
+        // Posés AVANT l'appel : un `101` synchrone doit trouver son socket.
+        socketGen = gen
+        connected = true
         val opened = transport.open(
             webSocketUrl(baseUrl, LIVE_WS_PATH),
             { text -> onText(text) },
@@ -299,11 +302,10 @@ class WsLiveClient(
             { onSocketOpen(gen) },
         )
         if (!opened) {
+            connected = false
             link.onFailure()
             return false
         }
-        connected = true
-        socketGen = gen
         startPingLocked()
         return true
     }
@@ -365,10 +367,7 @@ class WsLiveClient(
         maxObjects: Int,
     ): ByteArray = frameMessageBinary(id, jpeg, prompts, workEdge, maxObjects, maskFormat, maskEdge, withDepth, masks)
 
-    /**
-     * Réponse du serveur (comme `POST /live`, ou `error`). JSON construit **une seule fois** :
-     * la garde `error` et la frame partagent le même objet.
-     */
+    /** Réponse serveur : JSON construit **une seule fois**, partagé par garde et frame. */
     private fun parseReply(raw: String): Result<LiveFrame> {
         val json = readJson(raw) ?: return Result.failure(ApiError.BadResponse(WS_UNREADABLE))
         return liveReplyOf(json)
