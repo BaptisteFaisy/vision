@@ -137,6 +137,44 @@ class GlassesBackgroundFramesTest {
     }
 
     @Test
+    fun `longueur-prefixe = decodeur direct, sonde bitmap sautee`() {
+        // Converti par `annexB` (tableau neuf) : `BitmapFactory` y échouerait
+        // à coup sûr après 1 à 3 ms — le pont saute la sonde, comme l'Annex B.
+        val decoder = FakeDecoder()
+
+        assertNull(sampler(decoder).bitmapOf(box(bytes = byteArrayOf(0, 0, 0, 4, 0x65, 0x41, 0x42, 0x43))))
+
+        assertEquals(0, bitmapAttempts)
+        assertEquals(1, decoder.decoded)
+    }
+
+    @Test
+    fun `image fixe non Annexe B = sonde d abord, decodeur ensuite`() {
+        // `FF D8…` : la magie JPEG vaut des milliards en big-endian, `annexB`
+        // repart tel quel — la sonde passe en premier, comme avant.
+        val decoder = FakeDecoder()
+
+        assertNull(
+            sampler(decoder).bitmapOf(
+                box(bytes = byteArrayOf(0xFF.toByte(), 0xD8.toByte(), 0xFF.toByte(), 0xE0.toByte(), 1, 2, 3, 4)),
+            ),
+        )
+
+        assertEquals(1, bitmapAttempts)
+        assertEquals(1, decoder.decoded)
+    }
+
+    @Test
+    fun `converti mais decodeur en echec = repli sonde tente`() {
+        val decoder = FakeDecoder(image = null)
+
+        assertNull(sampler(decoder).bitmapOf(box(bytes = byteArrayOf(0, 0, 0, 4, 0x65, 0x41, 0x42, 0x43))))
+
+        assertEquals(1, decoder.decoded)
+        assertEquals(1, bitmapAttempts)
+    }
+
+    @Test
     fun `echec du decodeur = null`() {
         val decoder = FakeDecoder(image = null)
 
