@@ -103,6 +103,12 @@ class VoiceNavEngineDriver(
     private val routeReaderBusy: () -> Boolean = { false },
     /** L'utilisateur parle (dictée en cours) : la voix ordinaire se tait. */
     private val userSpeaking: () -> Boolean = { false },
+    /**
+     * Observabilité du démarrage (une ligne par maillon manquant : origine,
+     * géocodage, URL, itinéraire, tracé, moteur). Injecté pour rester
+     * testable en JVM (vérifié sur appareil, comme le câblage).
+     */
+    private val log: (String) -> Unit = {},
 ) {
 
     private val app = appContext.applicationContext
@@ -138,34 +144,41 @@ class VoiceNavEngineDriver(
         // Origine lue tôt : elle trie les candidats du géocodage par proximité.
         val origin = try {
             originNow()
-        } catch (_: Exception) {
+        } catch (e: Exception) {
+            log("démarrage moteur : origine en échec (${e.javaClass.simpleName})")
             null
-        } ?: return false
+        } ?: return false.also { log("démarrage moteur : origine indisponible") }
         // Appels `suspend` (`runCatching` ne l'est pas) : try/catch directs.
         val place = try {
             geocode(destination, origin)
-        } catch (_: Exception) {
+        } catch (e: Exception) {
+            log("démarrage moteur : géocodage en échec (${e.javaClass.simpleName})")
             null
-        }?.getOrNull() ?: return false
+        }?.getOrNull() ?: return false.also { log("démarrage moteur : adresse introuvable") }
 
         // Client Valhalla sur l'URL des Réglages.
-        val base = runCatching { settings().routeBaseUrl.trim().trimEnd('/') }.getOrDefault("") ?: return false
-        if (base.isBlank()) return false
+        val base = runCatching { settings().routeBaseUrl.trim().trimEnd('/') }.getOrDefault("") ?: return false.also { log("démarrage moteur : URL itinéraire illisible") }
+        if (base.isBlank()) return false.also { log("démarrage moteur : URL itinéraire vide") }
         val trip = try {
             routeClient(base).route(origin, RoutePoint(place.latitude, place.longitude))
-        } catch (_: Exception) {
+        } catch (e: Exception) {
+            log("démarrage moteur : /route en échec (${e.javaClass.simpleName})")
             null
-        }?.getOrNull() ?: return false
-        val nav = trip.toNavRoute(place.label).getOrNull() ?: return false
+        }?.getOrNull() ?: return false.also { log("démarrage moteur : itinéraire indisponible") }
+        val nav = trip.toNavRoute(place.label).getOrNull() ?: return false.also { log("démarrage moteur : tracé invalide") }
         return guideLoaded(nav, RoutePoint(place.latitude, place.longitude), destination)
     }
 
     /** Itinéraire connu → tracker guidé + écoute GPS + voix (`false` = replié). */
     private fun guideLoaded(nav: NavRoute, dest: RoutePoint, destination: String): Boolean {
-        if (runCatching { tracker.guide(nav) }.getOrNull()?.isSuccess != true) return false
+        if (runCatching { tracker.guide(nav) }.getOrNull()?.isSuccess != true) {
+            log("démarrage moteur : route non guidable")
+            return false
+        }
         // Écoute GPS réellement démarrée : sinon aucun écran de guidage muet,
         // sinon repos + annonce (voir `VoiceNavTracker.start`).
         if (!runCatching { tracker.start() }.getOrDefault(false)) {
+            log("démarrage moteur : écoute GPS refusée")
             stop()
             return false
         }
