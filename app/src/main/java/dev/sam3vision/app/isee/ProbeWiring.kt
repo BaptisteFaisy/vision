@@ -7,6 +7,7 @@ import dev.sam3vision.app.glasses.GlassesVideoLink
 import dev.sam3vision.app.live.LensOrigin
 import dev.sam3vision.app.live.chooseLens
 import dev.sam3vision.app.speech.VoicePack
+import dev.sam3vision.app.traverse.traversePrompts
 import dev.sam3vision.core.curb.CurbWatcher
 import dev.sam3vision.core.curb.RailState
 import dev.sam3vision.core.curb.SidewalkRail
@@ -97,6 +98,21 @@ private fun rawClip(app: Application, fileName: String): ByteArray? = runCatchin
  * l'appelant a passé les défauts (`default`, `indoor`, vide) ; une liste
  * explicite (Traversée, « Follow », « mode find my X ») traverse inchangée.
  */
+
+/**
+ * Prompts d'une bascule Traversée côté sonde : à l'activation, la base passe
+ * par [traversePrompts] (véhicules en tête, poubelle/souvenirs/lampadaire
+ * écartés — ordre user 03/11, les mêmes 21 que le direct) ; à la coupure
+ * après traversée, retour à la liste du monde ([LivePrompts.forMode], comme
+ * le direct qui rend `default`) ; simple reconfiguration (réglages, lens) :
+ * base rejouée telle quelle. Pur, testé en JVM.
+ */
+internal fun crossingPrompts(base: List<String>, active: Boolean, wasActive: Boolean, outdoorMode: Boolean): List<String> = when {
+    active -> traversePrompts(base.ifEmpty { LivePrompts.default })
+    wasActive -> LivePrompts.forMode(outdoorMode)
+    else -> base.ifEmpty { LivePrompts.default }
+}
+
 internal fun LiveProbe.configureFrom(
     settings: Settings,
     prompts: List<String> = LivePrompts.default,

@@ -1,5 +1,6 @@
 package dev.sam3vision.app.isee
 
+import dev.sam3vision.app.traverse.traversePrompts
 import dev.sam3vision.core.crossing.CrossingAnnouncer
 import dev.sam3vision.core.crossing.CrossingCue
 import dev.sam3vision.core.crossing.CrossingState
@@ -7,6 +8,7 @@ import dev.sam3vision.core.crossing.NoLightGate
 import dev.sam3vision.core.distance.DistanceReading
 import dev.sam3vision.core.distance.LensSpec
 import dev.sam3vision.core.live.AntiRepeat
+import dev.sam3vision.core.live.LivePrompts
 import dev.sam3vision.core.speech.IseeClipsEn
 import dev.sam3vision.core.model.LiveFrame
 import dev.sam3vision.core.model.SegObject
@@ -86,15 +88,15 @@ class CrossingWiringTest {
     }
 
     @Test
-    fun `bascule traversee garde les memes prompts, memes masques`() = runTest {
+    fun `bascule traversee applique les 21 filtres puis rend le monde`() = runTest {
         val (probe, _) = probeHarness(this)
         val before = probe.state.value.conceptsSent
         probe.setCrossingActive(Settings.Default, true)
         assertTrue(probe.state.value.crossingActive)
-        assertEquals(before, probe.state.value.conceptsSent)
+        assertEquals(traversePrompts(before.ifEmpty { LivePrompts.default }), probe.state.value.conceptsSent)
         probe.setCrossingActive(Settings.Default, false)
         assertFalse(probe.state.value.crossingActive)
-        assertEquals(before, probe.state.value.conceptsSent)
+        assertEquals(LivePrompts.forMode(Settings.Default.outdoorMode), probe.state.value.conceptsSent)
     }
 
     @Test
@@ -461,5 +463,25 @@ class CrossingWiringTest {
             AntiRepeat.reset()
             CrossingLateralWatch.reset()
         }
+    }
+
+    @Test
+    fun `prompts traversee sonde egaux a ceux du direct, 21 filtres`() {
+        val prompts = crossingPrompts(LivePrompts.default, active = true, wasActive = false, outdoorMode = true)
+        assertEquals(traversePrompts(LivePrompts.default), prompts)
+        assertEquals(21, prompts.size)
+        assertEquals(listOf("car", "bus", "bicycle", "truck", "motorcycle"), prompts.take(5))
+        assertTrue(prompts.contains("dog") && prompts.contains("child"))
+    }
+
+    @Test
+    fun `prompts traversee idempotents, reconfig rejoue, coupure rend le monde`() {
+        val on = crossingPrompts(LivePrompts.default, true, false, true)
+        assertEquals(on, crossingPrompts(on, true, true, true))
+        val follow = listOf("wallet", "keys")
+        assertEquals(follow, crossingPrompts(follow, false, false, true))
+        assertEquals(LivePrompts.default, crossingPrompts(on, false, true, true))
+        assertEquals(LivePrompts.indoor, crossingPrompts(on, false, true, false))
+        assertEquals(on, crossingPrompts(emptyList(), true, false, true))
     }
 }
