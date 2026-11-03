@@ -12,8 +12,8 @@ Il **élit l'endpoint** appelé, il **n'allume aucune carte** (`SamRegion.kt:6-8
 
 | Région | App Modal | Conteneur | Preset d'endpoint (`SamRegion.kt`) |
 |---|---|---|---|
-| EU (défaut) | `sam3-eu-a100` | `region=eu`, `routing_region=eu-west` | `https://baptiste-faisy--sam3-eu-a100-sam3live-web.eu-west.modal.run` (ligne 21) |
-| US | `sam3-us-a100` | `region=us`, `routing_region=us-east` | `https://baptiste-faisy--sam3-us-a100-sam3live-web.us-east.modal.run` (ligne 26) |
+| EU (défaut) | `sam3-eu-a100` | `region=eu`, `routing_region=eu-west` | `https://gaiamelie--sam3-eu-a100-sam3live-web.eu-west.modal.run` (ligne 21) |
+| US | `sam3-us-a100` | `region=us`, `routing_region=us-east` | `https://gaiamelie--sam3-us-a100-sam3live-web.us-east.modal.run` (ligne 26) |
 
 ## Ordre de résolution — corrigé, et revérifié dans cet arbre
 
@@ -138,7 +138,7 @@ et tous agents confondus.
 
 ```bash
 ~/bin/sam3-gpu-us status     # lecture seule, ne réveille rien (exécuté le 2026-10-26 : app absente)
-curl -s https://baptiste-faisy--sam3-us-a100-sam3live-web.us-east.modal.run/health
+curl -s https://gaiamelie--sam3-us-a100-sam3live-web.us-east.modal.run/health
 # → {"ok":true,"gpu":"NVIDIA A100-…","region":"us",…}
 # ⚠️ ce curl RÉVEILLE la carte (facturation) : ne pas le lancer sans demande explicite ; non lancé ici.
 ```

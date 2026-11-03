@@ -111,10 +111,52 @@ class LiveClientTest {
     fun `health en code non 2xx donne une erreur typée`() {
         val down = TestHttpServer { TestHttpServer.Response(503, "{}") }
         try {
-            val failure = runBlocking { HttpLiveClient(down.baseUrl).health() }.exceptionOrNull()
+            val failure = runBlocking { HttpLiveClient(down.baseUrl, retryDelayMs = 0L).health() }.exceptionOrNull()
             assertTrue(failure is ApiError.Http && failure.code == 503)
         } finally {
             down.close()
+        }
+    }
+
+    @Test
+    fun `health rejoue une fois sur 503 puis reussit`() = runBlocking {
+        // Fenêtre de churn (boot, bascule) : le 1er essai prend le 503, le 2e passe.
+        var calls = 0
+        val flaky = TestHttpServer {
+            calls++
+            if (calls == 1) TestHttpServer.Response(503, """{"ok":false}""")
+            else TestHttpServer.Response(200, """{"ok":true,"model":"sam3.1","device":"cuda","gpu":"A100"}""")
+        }
+        try {
+            val health = HttpLiveClient(flaky.baseUrl, retryDelayMs = 0L).health().getOrThrow()
+            assertTrue(health.ok)
+            assertEquals(2, calls)
+        } finally {
+            flaky.close()
+        }
+    }
+
+    @Test
+    fun `health 503 persistant remonte Http 503 en deux essais`() {
+        val down = TestHttpServer { TestHttpServer.Response(503, "{}") }
+        try {
+            val failure = runBlocking { HttpLiveClient(down.baseUrl, retryDelayMs = 0L).health() }.exceptionOrNull()
+            assertTrue(failure is ApiError.Http && failure.code == 503)
+            assertEquals(2, down.requests.size)
+        } finally {
+            down.close()
+        }
+    }
+
+    @Test
+    fun `health 400 ne rejoue pas`() {
+        val bad = TestHttpServer { TestHttpServer.Response(400, "{}") }
+        try {
+            val failure = runBlocking { HttpLiveClient(bad.baseUrl, retryDelayMs = 0L).health() }.exceptionOrNull()
+            assertTrue(failure is ApiError.Http && failure.code == 400)
+            assertEquals(1, bad.requests.size)
+        } finally {
+            bad.close()
         }
     }
 

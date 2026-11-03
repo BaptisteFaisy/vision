@@ -4,7 +4,7 @@ import dev.sam3vision.core.live.TimingsText
 import java.util.Locale
 import dev.sam3vision.core.distance.DistanceReading
 import dev.sam3vision.core.distance.DistanceText
-import dev.sam3vision.core.net.ApiError
+import dev.sam3vision.core.net.isTransient
 
 /** Longueur maximale d'un endpoint affiché : au-delà, le milieu est coupé. */
 const val ENDPOINT_MAX_CHARS = 46
@@ -132,9 +132,14 @@ fun silenceNotice(ageMs: Long): String = "$SILENCE_PREFIX ${ageMs / 1_000} s —
  * - lien chaud qui répondait il y a une seconde : réponse lente, ce n'est pas un réveil ;
  * - aucune réponse encore ([ProbeLinkKind.Cold]/[ProbeLinkKind.Idle]) : conteneur Modal
  *   endormi (~30 s de réveil), la frame suivante réessaie d'elle-même.
+ *
+ * Tout échec transitoire ([isTransient] : délai, cadence, 5xx) prend ces lignes —
+ * un hoquet isolé ne flash plus « HTTP error 500… » à l'écran. Le reste remonte
+ * brut, dont « SAM GPU off — ask b to turn it on », qui demande une vraie
+ * action, pas un nouvel essai.
  */
 fun probeFailureText(error: Throwable, link: ProbeLinkState = ProbeLinkState()): String = when {
-    error !is ApiError.Timeout -> error.message ?: "SAM call failed"
+    !error.isTransient -> error.message ?: "SAM call failed"
     link.silent -> silenceNotice(link.lastAnswerAgeMs)
     link.kind == ProbeLinkKind.Warm -> "slow answer — retrying on the next frame"
     else -> "GPU waking up… (retrying on the next frame)"

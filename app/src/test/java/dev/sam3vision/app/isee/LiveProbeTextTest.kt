@@ -225,6 +225,24 @@ class LiveProbeTextTest {
     }
 
     @Test
+    fun `l'echec transitoire 500 dit reveil gpu au lieu du brut`() {
+        // Un hoquet isolé (boot, bascule, CUDA) ne flash plus « HTTP error 500… ».
+        assertEquals(
+            "GPU waking up… (retrying on the next frame)",
+            probeFailureText(ApiError.Http(500, "internal error: CUDA hoquet")),
+        )
+        assertEquals(
+            "GPU waking up… (retrying on the next frame)",
+            probeFailureText(ApiError.RateLimited()),
+        )
+        // Non transitoire : brut, et surtout pas avalé — il demande une vraie action.
+        assertEquals(
+            "SAM GPU off — ask b to turn it on",
+            probeFailureText(ApiError.BackendStopped()),
+        )
+    }
+
+    @Test
     fun `les modeles effectifs apparaissent dans le detail`() {
         val line = "llm : meta-models/muse-spark-open-1026 · live : meta-models/muse-spark-open-1026 (clé OK)"
         assertTrue(liveProbeDetails(LiveProbeState(modelsLine = line)).contains(line))

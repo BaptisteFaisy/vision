@@ -57,3 +57,15 @@ sealed class ApiError(message: String, cause: Throwable? = null) : Exception(mes
     /** Opération que ce client ne sait pas rendre (ex. question sans image) : rien à réessayer. */
     class NotSupported(message: String) : ApiError(message)
 }
+
+/**
+ * Échec qui mérite un nouvel essai : délai dépassé, cadence, ou panne côté
+ * fournisseur (5xx — conteneur en boot, bascule de déploiement, hoquet CUDA).
+ * Source unique : le LLM, le réveil GPU et les textes d'échec la partagent.
+ */
+val Throwable.isTransient: Boolean
+    get() = when (this) {
+        is ApiError.Timeout, is ApiError.RateLimited -> true
+        is ApiError.Http -> code >= 500
+        else -> false
+    }

@@ -22,7 +22,7 @@ python3 -m modal deploy server/backend/valhalla_cpu.py
 
 URL publique (stable) :
 
-`https://baptiste-faisy--valhalla-idf-cpu-valhallarouter-web.us-east.modal.run`
+`https://gaiamelie--valhalla-idf-cpu-valhallarouter-web.us-east.modal.run`
 
 ## Tuiles (upload unique)
 
@@ -38,8 +38,8 @@ modal volume put valhalla-idf-tiles <admin.sqlite> /admin.sqlite
 ## Vérification (depuis le poste, sans toucher au téléphone)
 
 ```bash
-curl -s https://baptiste-faisy--valhalla-idf-cpu-valhallarouter-web.us-east.modal.run/health
-curl -s -m 30 -X POST https://baptiste-faisy--valhalla-idf-cpu-valhallarouter-web.us-east.modal.run/route -d \
+curl -s https://gaiamelie--valhalla-idf-cpu-valhallarouter-web.us-east.modal.run/health
+curl -s -m 30 -X POST https://gaiamelie--valhalla-idf-cpu-valhallarouter-web.us-east.modal.run/route -d \
   '{"locations":[{"lat":48.8566,"lon":2.3522},{"lat":48.86,"lon":2.34}],"costing":"pedestrian"}'
 ```
 
