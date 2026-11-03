@@ -176,18 +176,11 @@ class GuidanceAnnouncer(
         lastDecision = decision
         lastSidewalk = sidewalk
         lastNudge = null
-        // Bordure à moins d'1 m : direction inverse, devant tout sauf le
-        // stop-contact. Niveau re-jugé ici (marge + mémoire) : hystérésis.
-        lastRailLevel = rail?.clearanceM?.let { SidewalkRail.levelOf(it, lastRailLevel) } ?: RailLevel.NONE
-        val railSide = rail?.side
-        if (lastRailLevel == RailLevel.SAFETY && railSide != null && !isContactStop(decision)) {
-            return safetyWord(atMs, railSide, labels, hfovDeg, range, language, ageMs)
-        }
-        // L'évitement passe DEVANT la décision de couloir : en foule le couloir
-        // est bouché presque en permanence, et c'est justement là que l'ordre
-        // doit venir de la piste (TTC, espace libre) et non du
-        // « côté le moins encombré » d'une frame. Un obstacle pile dans l'axe
-        // n'a pas de côté : le couloir parle alors seul.
+        safetySpeak(atMs, rail, decision, labels, hfovDeg, range, language, ageMs)?.let { return it }
+        // L'évitement passe DEVANT la décision de couloir : en foule le couloir est
+        // bouché presque en permanence, et c'est justement là que l'ordre doit venir
+        // de la piste (TTC, espace libre) et non du « côté le moins encombré » d'une
+        // frame. Un obstacle pile dans l'axe n'a pas de côté : le couloir parle seul.
         val cue = nudgeOf(atMs, labels, hfovDeg, ageMs, speedMps, space)
         if (cue != null) return nudgeWord(atMs, cue, language)
         if (decision.blocked) return blockedWord(atMs, decision, language)
@@ -262,33 +255,31 @@ class GuidanceAnnouncer(
         speak(atMs, directionKey(word.text(language)), word.text(language), repeatMs)
 
     /**
-     * Bordure à moins d'1 m (ordre user du 03/11) : **la direction inverse**,
-     * devant tout le reste. Sans direction sûre, « Stop. » : les deux côtés à
-     * moins d'1 m, ou une personne à moins d'1 m du côté où aller (le veto
-     * 1 m de [PeoplePath.clearsSide], comme le retour trottoir). Muet sur
-     * frame périmée, comme le rail.
+     * Sécurité bordure (< 1 m ⇒ inverse forcé), devant tout sauf le
+     * stop-contact. Le niveau est re-jugé ici (marge + mémoire) : l'hystérésis
+     * vit dans l'annonceur. `null` = pas de sécurité (ou frame périmée :
+     * une image de 1,5 s ne force pas une direction), la frame continue.
      */
-    private fun safetyWord(
+    private fun safetySpeak(
         atMs: Long,
-        railSide: GuidanceSide,
+        rail: RailState?,
+        decision: GuidanceDecision,
         labels: List<PlacedLabel>,
         hfovDeg: Float,
         range: Float,
         language: SpeechLanguage,
         ageMs: Long,
     ): String? {
-        if (Timing.isStale(ageMs)) return null
-        val away = SidewalkRail.awayFrom(railSide) ?: return null
-        val boxed = SidewalkRail.clearances(labels, hfovDeg)[away]?.let { it < SidewalkRail.SAFETY_M } == true
-        if (boxed || !PeoplePath.clearsSide(labels, away, range, hfovDeg)) {
-            return speak(atMs, "safety|stop", GuidanceWord.Stop.text(language), RAIL_REPEAT_MS, urgent = true)
+        lastRailLevel = rail?.clearanceM?.let { SidewalkRail.levelOf(it, lastRailLevel) } ?: RailLevel.NONE
+        val side = rail?.side
+        if (lastRailLevel != RailLevel.SAFETY || side == null || Timing.isStale(ageMs)) return null
+        if (decision.blocked && decision.contactStop) return null
+        return when (val cue = SidewalkRail.safetyCue(labels, side, hfovDeg, range)) {
+            RailCue.Stop -> speak(atMs, "safety|stop", GuidanceWord.Stop.text(language), RAIL_REPEAT_MS, urgent = true)
+            is RailCue.Direction -> speak(atMs, "safety|dir|" + cue.word.name, cue.word.text(language), RAIL_REPEAT_MS)
+            null -> null
         }
-        val word = GuidanceWord.fromSide(away)
-        return speak(atMs, "safety|dir|" + word.name, word.text(language), RAIL_REPEAT_MS)
     }
-
-    /** Stop au contact : le seul ordre que la sécurité bordure ne remplace pas. */
-    private fun isContactStop(decision: GuidanceDecision): Boolean = decision.blocked && decision.contactStop
 
     /**
      * Rail trottoir, **muet sur une frame périmée** : on ne dit pas « stop » sur

@@ -222,6 +222,33 @@ class SidewalkRailTest {
     }
 
     @Test
+    fun `safetyCue dit l oppose du bord sous 1 m`() {
+        assertEquals(
+            RailCue.Direction(GuidanceWord.Right),
+            SidewalkRail.safetyCue(listOf(bord(-0.9f)), GuidanceSide.Left, rangeMeters = 4f),
+        )
+        assertEquals(
+            RailCue.Direction(GuidanceWord.Left),
+            SidewalkRail.safetyCue(listOf(bord(0.8f)), GuidanceSide.Right, rangeMeters = 4f),
+        )
+    }
+
+    @Test
+    fun `safetyCue dit stop quand les deux cotes sont sous 1 m`() {
+        val labels = listOf(bord(-0.9f), bord(0.8f))
+
+        assertEquals(RailCue.Stop, SidewalkRail.safetyCue(labels, GuidanceSide.Left, rangeMeters = 4f))
+        assertEquals(RailCue.Stop, SidewalkRail.safetyCue(labels, GuidanceSide.Right, rangeMeters = 4f))
+    }
+
+    @Test
+    fun `safetyCue dit stop si une personne bloque le cote ou aller`() {
+        val labels = listOf(bord(-0.9f), PlacedLabel("person", 0.7f, 0.5f, 0.8f))
+
+        assertEquals(RailCue.Stop, SidewalkRail.safetyCue(labels, GuidanceSide.Left, rangeMeters = 4f))
+    }
+
+    @Test
     fun `fenetres de mesure trop pres et trop loin sont muettes`() {
         // 2 cm de l'axe : bruit de bordure sous le nez, pas une consigne.
         assertNull(SidewalkRail.of(listOf(bord(0.02f))).clearanceM)

@@ -4,6 +4,7 @@ import dev.sam3vision.core.distance.KnownSizes
 import dev.sam3vision.core.distance.LensSpec
 import dev.sam3vision.core.live.GuidanceSide
 import dev.sam3vision.core.live.GuidanceWord
+import dev.sam3vision.core.live.PeoplePath
 import dev.sam3vision.core.live.PlacedLabel
 import dev.sam3vision.core.speech.SpeechLanguage
 import kotlin.math.abs
@@ -181,6 +182,24 @@ object SidewalkRail {
         RailLevel.EDGE -> RailCue.Stop
         RailLevel.SAFETY, RailLevel.DRIFT ->
             awayFrom(state.side)?.let { RailCue.Direction(GuidanceWord.fromSide(it)) }
+    }
+
+    /**
+     * Consigne de sécurité (< 1 m ⇒ inverse forcé, ordre user du 03/11) :
+     * [RailCue.Direction] opposée au bord [side], [RailCue.Stop] si l'autre
+     * côté est aussi sous [SAFETY_M] ou si une personne est sous 1 m du côté
+     * où aller ([PeoplePath.clearsSide], comme le retour trottoir). Pure.
+     */
+    fun safetyCue(
+        labels: List<PlacedLabel>,
+        side: GuidanceSide,
+        hfovDeg: Float = LensSpec.DEFAULT_H_FOV_DEG,
+        rangeMeters: Float,
+    ): RailCue? {
+        val away = awayFrom(side) ?: return null
+        val boxed = clearances(labels, hfovDeg)[away]?.let { it < SAFETY_M } == true
+        if (boxed || !PeoplePath.clearsSide(labels, away, rangeMeters, hfovDeg)) return RailCue.Stop
+        return RailCue.Direction(GuidanceWord.fromSide(away))
     }
 
     /** Direction opposée au bord [side], `null` si le côté est inconnu. */
