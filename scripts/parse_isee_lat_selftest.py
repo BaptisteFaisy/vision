@@ -29,6 +29,8 @@ def selftest_frames():
         ("I ISEE_LAT: latency 348 · capt 22 · up 61 · srv 92 · rtt 153 · mask 37 · pixel 8",
          {"latency": 348, "capt": 22, "up": 61, "srv": 92, "rtt": 153,
           "mask": 37, "pixel": 8}),
+        ("I ISEE_LAT: latency 148 · capt 42 · pixel 8 · seq 12",
+         {"latency": 148, "capt": 42, "pixel": 8}),  # seq lunettes ignorée, verdict intact
         ("10-31 12:00:00.000 1 2 I ISEE_LAT: latency 12 · capt — · pixel 3",
          {"latency": 12, "pixel": 3}),
         ("I sam3vision: conversion: 5 ms", None),
