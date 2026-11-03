@@ -282,6 +282,7 @@ class WsLiveClientTest {
                 headers: Map<String, String>,
             ): Boolean {
                 opens += 1
+                onOpen() // socket qui marche (`101`), serveur muet : le cas FIX-16.
                 return true
             }
 
