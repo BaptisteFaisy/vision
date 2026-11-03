@@ -1,7 +1,10 @@
 package dev.sam3vision.app.glasses
 
+import com.meta.wearable.dat.camera.types.VideoFrame
+import java.nio.ByteBuffer
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertNull
+import org.junit.Assert.assertTrue
 import org.junit.Test
 
 /**
@@ -87,5 +90,58 @@ class GlassesVideoDecoderTest {
         assertEquals(1_000L, GlassesVideoDecoder.INPUT_TIMEOUT_US)
         assertEquals(40L, GlassesVideoDecoder.OUTPUT_WAIT_MS)
         assertEquals(15, GlassesVideoDecoder.OPERATING_RATE)
+    }
+
+    /** Frame compressée 504×896 : dimensions de production (VideoQuality.MEDIUM). */
+    private fun compressedFrame(
+        buffer: ByteBuffer = ByteBuffer.wrap(byteArrayOf(0, 0, 0, 1)),
+        width: Int = 504,
+        height: Int = 896,
+    ) = VideoFrame(buffer, width, height, 2_000L, true, false)
+
+    @Test
+    fun `sans codec decode rend null sans lever`() {
+        // Sur JVM il n'y a pas de MediaCodec : la création échoue, la frame est jetée.
+        assertNull(GlassesVideoDecoder().decode(compressedFrame()))
+    }
+
+    @Test
+    fun `trois creations ratees abandonnent, release repart de zero`() {
+        val journal = mutableListOf<String>()
+        val decoder = GlassesVideoDecoder(onLog = { journal += it })
+
+        repeat(3) { assertNull(decoder.decode(compressedFrame())) }
+        assertEquals(listOf("H.265 decoder given up after 3 failures"), journal)
+
+        // Abandonné : la 4e frame est jetée sans nouvel essai ni nouveau journal.
+        assertNull(decoder.decode(compressedFrame()))
+        assertEquals(1, journal.size)
+
+        // Libéré : l'abandon est effacé, le cycle de 3 recommence.
+        decoder.release()
+        repeat(3) { assertNull(decoder.decode(compressedFrame())) }
+        assertEquals(2, journal.size)
+    }
+
+    @Test
+    fun `dimensions nulles = jete sans essai ni compteur`() {
+        val journal = mutableListOf<String>()
+        val decoder = GlassesVideoDecoder(onLog = { journal += it })
+
+        repeat(3) { assertNull(decoder.decode(compressedFrame(width = 0, height = 0))) }
+
+        // Aucun essai de création : pas d'abandon après 3 frames dégénérées…
+        assertTrue(journal.isEmpty())
+        // …et le compteur est intact : 3 vraies frames l'abandonnent.
+        repeat(3) { assertNull(decoder.decode(compressedFrame())) }
+        assertEquals(1, journal.size)
+    }
+
+    @Test
+    fun `stashCsd range sans lever vide comme chargee`() {
+        val decoder = GlassesVideoDecoder()
+
+        decoder.stashCsd(compressedFrame(buffer = ByteBuffer.wrap(ByteArray(0))))
+        decoder.stashCsd(compressedFrame(buffer = ByteBuffer.wrap(byteArrayOf(1, 2, 3, 4))))
     }
 }
