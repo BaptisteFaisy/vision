@@ -3,6 +3,25 @@
 Le journal part du 2026-10-26 après 19 h : le commit de départ, puis une entrée par fait
 livré et ses preuves (tâche, fichiers, chiffres) dans l'arbre.
 
+## 2026-11-03 — iSee : wordmark retiré, caméra ×1,25 vers le bas (branche `isee-sans-wordmark-camera-plus`)
+
+- **Demande** : virer le « iSee » blanc en haut de l'écran iSee, et agrandir
+  la caméra de 25 % vers le bas (ordre user du 03/11/2026).
+- **Fait** :
+  - `app/isee/IseeSceneHeader.kt` : en-tête réduit à la pastille d'état en
+    haut à droite (`LISTENING`/`SPEAKING`/… inchangés, `chipLabel` testé) ;
+    wordmark supprimé, pastille toujours blanche sur la rue.
+  - `core/iseedesign/IseePortrait.kt` : `PICTURE_SPEAKING_H` 0,50 → 0,625
+    (la taille affichée, le pane fige `speech=1`), `PICTURE_GUIDING_H`
+    0,60 → 0,75, `PICTURE_H` 0,58 → 0,725 ; `PICTURE_IDLE_H` 0,64 inchangé
+    (hors prod, la boule et la phrase sortiraient au-delà).
+  - `IseePortraitTest` : valeur figée 0,725, marge phrase 14 % → 5 %
+    (grossissement assumé), guidage vérifié sous la rue (boule effacée).
+  - Docs : `docs/ISEE-DESIGN-PORTRAIT.md` §1 (pastille seule, 62,5 %/75 %),
+    commentaires `IseeScenePane`/`IseePortraitCamera`.
+- **Preuves** : `IseePortraitTest` 12/12, `IseeSceneTest` 17/17 (r630),
+  `assembleDebug` OK, `check-isee-design.py` OK, `check-kotlin-limits.py` OK.
+
 ## 2026-11-03 — iSee : swipe droit crée un picto, swipe gauche connecte les lunettes (branche `feat/swipe-right-picto`)
 
 - **Demande** : swipe vers la droite → mode picto, lunettes sur swipe gauche
