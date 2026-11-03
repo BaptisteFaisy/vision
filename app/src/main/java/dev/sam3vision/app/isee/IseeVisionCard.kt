@@ -92,7 +92,6 @@ internal fun BoxWithConstraintsScope.VisionCard(
             onToggle = { viewModel.modeChips.toggleCrossing() },
             onBounds = viewModel.modeChips.crossing::setBounds,
         )
-        LiveDebugPanel(probe, Modifier.align(Alignment.TopStart), dense = true)
         ProbeNoticeCard(snap)
     }
 }

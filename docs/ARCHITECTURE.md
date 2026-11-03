@@ -299,7 +299,7 @@ Choisir une région **n'allume aucune carte** : elle élit seulement l'URL appel
 | Client SAM | `core/…/net/HttpSamClient.kt` (photo), `core/…/net/WsLiveClient.kt` (direct), `core/…/net/WsTransport.kt` (transport), `core/…/net/LiveClientFactory.kt` (fabrique unique) |
 | Cycle de vie du GPU | `core/…/net/SamLifecycle.kt` (`/release`), `app/…/vm/AppDiagnostics.kt` (`releaseGpu`, `testSam`) |
 | Cadence et régulation | `core/…/live/LiveSession.kt`, `core/…/live/FrameGate.kt`, `core/…/live/PipelineGate.kt`, `core/…/live/LatestFrameSlot.kt` |
-| Sonde de la page caméra | `app/…/isee/LiveProbe.kt`, `LiveProbeState.kt`, `ProbeWiring.kt`, affichage `LiveProbeText.kt` + `LiveDebugPanel.kt` |
+| Sonde de la page caméra | `app/…/isee/LiveProbe.kt`, `LiveProbeState.kt`, `ProbeWiring.kt`, textes `LiveProbeText.kt` (panneau écran supprimé) |
 | Masques | `core/…/mask/MaskCore.kt` (pur : `M1`/bits, LUT, coloriage sans allocation), `core/…/mask/Masks.kt` (Bitmap), `app/…/live/LiveMaskDecoder.kt` |
 | Distances | `core/…/distance/DistanceEstimator.kt` (`DistanceMeter`), `KnownSizes.kt`, `LensSpec.kt`, `DistanceSmoother.kt`, `DistanceText.kt` |
 | Voix | `core/…/net/ElevenLabsTtsClient.kt`, `core/…/net/ElevenLabsSttClient.kt`, `core/…/net/MetaAsrClient.kt`, `core/…/net/FallbackSpeechClient.kt`, `app/…/SpeechPlayer.kt`, `app/…/VoiceAnnouncer.kt`, `app/…/SpeechClients.kt` |

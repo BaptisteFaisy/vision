@@ -136,7 +136,7 @@ data class LiveProbeState(
     /**
      * Chiffres mouvement V1 (fond contre boîte) de la dernière frame (`null` = pas
      * d'estimation publiée) : verdict, score de changement du fond et écart
-     * global-boîte, lus par le panneau debug ([liveProbeMotionLine]).
+     * global-boîte, formatés par [liveProbeMotionLine] (logs + tests).
      */
     val motion: MotionDebug? = null,
     /**
