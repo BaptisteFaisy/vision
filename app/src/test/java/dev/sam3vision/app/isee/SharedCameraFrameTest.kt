@@ -16,8 +16,11 @@ class SharedCameraFrameTest {
     @Test
     fun `la frame binaire est relue avec son numero, puis perime`() {
         SharedCameraFrame.clear()
-        val now = System.currentTimeMillis()
         SharedCameraFrame.offerBytes(byteArrayOf(1, 2, 3))
+        // Référence prise APRÈS l'offre : offerBytes horodate en interne avec
+        // System.currentTimeMillis() ; un `now` pris avant pouvait être antérieur
+        // d'1 ms et now+301 restait frais pile à 300 ms (flaky CI).
+        val now = System.currentTimeMillis()
         val frame = SharedCameraFrame.latestBytes(now, maxAgeMs = 300L)
         assertArrayEquals(byteArrayOf(1, 2, 3), frame?.jpeg)
         // Périmée : le direct s'arrête au lieu de boucler une image figée.
