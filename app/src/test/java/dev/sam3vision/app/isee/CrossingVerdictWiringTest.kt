@@ -231,11 +231,15 @@ class CrossingVerdictWiringTest {
     }
 
     @Test
-    fun `feu vu puis perdu - la preuve tombe et la phrase parle`() {
-        // Trous D3/D4 : un feu aperçu puis masqué laissait la porte muette à
-        // vie (`Absent` inatteignable) — plus aucune phrase, ni vibration, pour
-        // une personne aveugle. Après la borne de ré-armement (8 frames), le
-        // verdict parle, et la perte d'un feu vu ne vaut JAMAIS « Cross. ».
+    fun `feu vu puis perdu - attente breve puis absence reprouvee`() {
+        // 03/11/2026, ordre user : « pas de feu → traversez » — ce test
+        // remplace l'ancien contrat « un feu perdu ne vaut JAMAIS Cross »
+        // (verrou `sawBox` à vie, qui battait le ré-armement D3 de la porte
+        // et laissait « Don't cross. » pour toute la séance devant un passage
+        // sans feu). Nouveau contrat : perte brève (< 8 frames) = attente
+        // silencieuse (D1 court-terme : un rouge masqué ne devient pas un
+        // vert) ; perte durable (8 frames propres) = absence reprouvée, les
+        // voitures tranchent — ici aucune, donc « Cross. ».
         val script = LightScript()
         val posted = mutableListOf<CrossingPost>()
         val engine = scripted(script, posted)
@@ -245,12 +249,34 @@ class CrossingVerdictWiringTest {
         posted.clear()
         script.light = CrossingLight(null, CrossingState.Red)
         var out = engine.onFrame(frame(), emptyList(), "", 0L)
+        repeat(3) { out = engine.onFrame(frame(), emptyList(), "", (it + 1) * 200L) }
+        assertEquals("perte brève : on attend", CrossingVerdict.DontCross, out.verdict)
+        assertTrue("perte brève : silence borné, pas de contredit", posted.isEmpty())
+        repeat(8) { out = engine.onFrame(frame(), emptyList(), "", (it + 4) * 200L) }
+        assertEquals(CrossingVerdictLight.Absent, out.light)
+        assertEquals(CrossingVerdict.Cross, out.verdict)
+        assertEquals(listOf("Cross."), posted.map { it.text })
+    }
+
+    @Test
+    fun `un fragment parasite unique ne condamne pas le verdict a vie`() {
+        // 03/11/2026, ordre user : « pas de feu → traversez ». Un fragment SAM
+        // parasite (une seule frame avec boîte — `selectLightBoxes` n'a pas de
+        // plancher de score — classée rouge fail-closed) ne doit pas
+        // verrouiller « Don't cross. » pour toute la séance : après 8 frames
+        // propres, l'absence se reprouve (trou D3) et les voitures tranchent.
+        val script = LightScript()
+        val posted = mutableListOf<CrossingPost>()
+        val engine = scripted(script, posted)
+        script.light = CrossingLight(listOf(0.1f, 0.1f, 0.2f, 0.3f), CrossingState.Red)
+        val first = engine.onFrame(frame(), emptyList(), "", 0L)
+        assertEquals(CrossingVerdict.DontCross, first.verdict)
+        script.light = CrossingLight(null, CrossingState.Red)
+        var out = first
         repeat(11) { out = engine.onFrame(frame(), emptyList(), "", (it + 1) * 200L) }
-        assertFalse("un feu perdu ne redevient jamais vert", out.light == CrossingVerdictLight.Green)
-        assertEquals(CrossingVerdict.DontCross, out.verdict)
-        assertTrue("la phrase est prononcée après la borne", posted.isNotEmpty())
-        assertEquals("Don't cross.", posted.last().text)
-        assertTrue("plus de silence : ni « Cross. » ni traversée", posted.none { it.text == "Cross." })
+        assertEquals(CrossingVerdictLight.Absent, out.light)
+        assertEquals(CrossingVerdict.Cross, out.verdict)
+        assertEquals("Cross.", posted.last().text)
     }
 
     @Test
@@ -367,9 +393,11 @@ class CrossingVerdictWiringTest {
     }
 
     @Test
-    fun `a cadence nominale la borne 8 frames parle la premiere`() {
-        // 8 frames en 0,7 s (< 2 s) : le délai ne change rien — la borne frames
-        // parle à la 8e frame comme avant, et pas avant.
+    fun `a cadence nominale la 8e frame sans boite reprouve l'absence`() {
+        // 8 frames en 0,7 s (< 2 s) : le délai temps ne change rien — les 7
+        // premières frames sont muettes (perte brève = attente, D1
+        // court-terme) et la 8e reprouve l'absence (trou D3) : sans voiture,
+        // « Cross. » (03/11/2026, ordre user : « pas de feu → traversez »).
         val script = LightScript()
         val posted = mutableListOf<CrossingPost>()
         val engine = scripted(script, posted)
@@ -380,8 +408,9 @@ class CrossingVerdictWiringTest {
         script.light = CrossingLight(null, CrossingState.Red)
         repeat(7) { engine.onFrame(frame(), emptyList(), "", it * 100L) }
         assertTrue("silence avant la borne", posted.isEmpty())
-        engine.onFrame(frame(), emptyList(), "", 700L)
-        assertEquals(listOf("Don't cross."), posted.map { it.text })
+        val out = engine.onFrame(frame(), emptyList(), "", 700L)
+        assertEquals(CrossingVerdictLight.Absent, out.light)
+        assertEquals(listOf("Cross."), posted.map { it.text })
     }
 
     @Test

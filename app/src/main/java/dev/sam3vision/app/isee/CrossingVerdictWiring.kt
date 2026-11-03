@@ -1,5 +1,6 @@
 package dev.sam3vision.app.isee
 
+import dev.sam3vision.app.BuildConfig
 import dev.sam3vision.app.IseeHaptics
 import dev.sam3vision.core.crossing.CrossingLevels
 import dev.sam3vision.core.crossing.CrossingPost
@@ -94,9 +95,6 @@ class CrossingVerdictEngine(
     /** [atMs] de la première frame du silence sans preuve courant (`null` = preuve lue). */
     private var unprovenSinceMs: Long? = null
 
-    /** Une boîte de feu a-t-elle été vue depuis le dernier [reset] ? */
-    private var sawBox = false
-
     /**
      * Traite une frame à [atMs] : verdict, posts ordonnés publiés ([poster]),
      * overlay rouge-vert et front haptique. [readings] porte les distances
@@ -125,7 +123,6 @@ class CrossingVerdictEngine(
             sawAnyLightBox = read.box != null,
             bestState = if (read.box != null) read.state else null,
         )
-        if (read.box != null) sawBox = true
         val light = lightOf(read, evidence)
         val proven = light != CrossingVerdictLight.Unknown
         trackSilence(proven, atMs)
@@ -151,6 +148,7 @@ class CrossingVerdictEngine(
         // la phrase, jamais avant elle.
         val haptic = if (!silent && cue != null && felt != verdict) overlay else null
         if (!silent && cue != null) felt = verdict
+        verdictProbeLine(read.box != null, evidence, light, moving, carVeto, verdict, silent)
         return CrossingVerdictFrame(posts, verdict, light, moving, overlay, haptic, carVeto)
     }
 
@@ -202,16 +200,21 @@ class CrossingVerdictEngine(
     }
 
     /**
-     * Frame sans boîte : l'absence de la porte n'autorise la traversée
-     * (`CrossingVerdictLight.Absent`) que si **aucune** boîte n'a été vue dans
-     * cette traversée. Après un feu vu puis perdu, la porte rouvre bien
-     * l'absence (8 frames), mais sa perte n'est pas une preuve : un rouge
-     * masqué redeviendrait une autorisation de traverser (A9 §3 D1). Le verdict
-     * rend `Unknown`, donc « Don't cross. », et la phrase est prononcée dès que
-     * la porte conclut.
+     * Frame sans boîte : la porte tranche ([LightEvidenceGate]) —
+     * [Evidence.Absent] (4 frames sans boîte sans feu vu, ou 8 après un feu vu
+     * puis perdu : trou D3) vaut traversée sous conditions (les voitures
+     * tranchent), tout le reste vaut « Don't cross. ». Le moteur ne garde
+     * AUCUNE mémoire de boîte vue : la porte est la seule propriétaire de la
+     * politique vu-puis-perdu (03/11/2026, ordre user : un feu aperçu — ou un
+     * fragment SAM parasite, `selectLightBoxes` n'ayant pas de plancher de
+     * score — ne doit pas condamner le verdict à vie ; avant, le doublon
+     * `sawBox` du moteur battait le ré-armement D3 de la porte et le verdict
+     * restait « Don't cross. » pour toute la séance). Asymétrie sûre gardée :
+     * toute boîte qui revient reparle rouge en une frame, seul le passage au
+     * vert exige des frames propres.
      */
     private fun absentLight(evidence: Evidence): CrossingVerdictLight =
-        if (evidence == Evidence.Absent && !sawBox) CrossingVerdictLight.Absent else CrossingVerdictLight.Unknown
+        if (evidence == Evidence.Absent) CrossingVerdictLight.Absent else CrossingVerdictLight.Unknown
 
     /** Compte le silence et, à la borne, jette la preuve verte accumulée (déblocage borné). */
     private fun trackUnproven() {
@@ -265,7 +268,6 @@ class CrossingVerdictEngine(
         felt = null
         unprovenFrames = 0
         unprovenSinceMs = null
-        sawBox = false
     }
 }
 
@@ -298,4 +300,32 @@ internal fun overlayOf(verdict: CrossingVerdict): CrossingState = when (verdict)
 internal fun playVerdictHaptic(haptics: IseeHaptics, frame: CrossingVerdictFrame) {
     val felt = frame.haptic ?: return
     haptics.crossing(felt)
+}
+
+/** Étiquette des diagnostics du verdict (`logcat -s VoiceMute:*`, même canal que la sonde). */
+private const val TAG_MUTE = "VoiceMute"
+
+/** Dernière ligne verdict émise (une toutes les 2 s, debug seul). */
+private var lastVerdictProbeMs = 0L
+
+/**
+ * Une ligne toutes les 2 s : les entrées du verdict — distingue « pas de feu
+ * vu » (sans boîte, preuve `Absent`) de « feu vu puis perdu » (preuve
+ * `Unknown`, ré-armement en cours) et « voiture qui bloque » (`veto` ou
+ * `roule`). Debug seul, zéro effet sur la voix.
+ */
+private fun verdictProbeLine(
+    box: Boolean,
+    evidence: Evidence,
+    light: CrossingVerdictLight,
+    moving: Boolean,
+    veto: Boolean,
+    verdict: CrossingVerdict,
+    silent: Boolean,
+) {
+    if (!BuildConfig.DEBUG) return
+    val nowMs = System.currentTimeMillis()
+    if (nowMs - lastVerdictProbeMs < 2000L) return
+    lastVerdictProbeMs = nowMs
+    android.util.Log.d(TAG_MUTE, "verdict boite=$box preuve=$evidence feu=$light roule=$moving veto=$veto verdict=$verdict muet=$silent")
 }
