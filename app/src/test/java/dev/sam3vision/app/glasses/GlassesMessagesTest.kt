@@ -45,6 +45,7 @@ class GlassesMessagesTest {
         assertEquals(MessageKind.WARNING, GlassesMessages.noMockPress().kind)
         assertEquals(MessageKind.WARNING, GlassesMessages.videoUndecodable().kind)
         assertEquals(MessageKind.WARNING, GlassesMessages.frameRateFallback(60, 30).kind)
+        assertEquals(MessageKind.WARNING, GlassesMessages.mediumQualityFallback(0.195).kind)
         assertEquals(MessageKind.INFO, GlassesMessages.liveNotOnGlasses().kind)
         assertEquals(MessageKind.INFO, GlassesMessages.waitingForLink().kind)
         assertEquals(MessageKind.INFO, GlassesMessages.registrationStarted().kind)
@@ -60,6 +61,13 @@ class GlassesMessagesTest {
         val text = GlassesMessages.frameRateFallback(60, 30).text
         assertTrue(text, text.contains("60"))
         assertTrue(text, text.contains("30"))
+    }
+
+    @Test
+    fun `le repli qualite annonce le taux mesure`() {
+        val text = GlassesMessages.mediumQualityFallback(0.195).text
+        assertTrue(text, text.contains("medium"))
+        assertTrue(text, text.contains("19"))
     }
 
     @Test
