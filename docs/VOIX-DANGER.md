@@ -33,10 +33,10 @@ chat (9) et GPS (3, 11) en synthèse réseau.
 | 1 | Parole du user | Tait tout ; **seul 0 la coupe** | — (micro) |
 | 2 | Humains ≤ 15 m droit devant (plein axe ≤ 2 m) | **Mot d'évitement en continu** « Droite. »/« Gauche. », répété toutes les 300 ms (§ 36) | `guide_left`, `guide_right` |
 | 3 | Rappel GPS | Si silence depuis 15 s ou plus : répète la dernière consigne + distance restante | Synthèse réseau (GPS) |
-| 4 | Grillages + murs + barrières < 6 m | — | `fence`, `wall`, `barrier` |
+| 4 | Grillages + murs + barrières < 6 m | **Mot d'évitement en continu** « Droite. »/« Gauche. », répété toutes les 300 ms (§ 36) | `guide_left`, `guide_right` |
 | 5 | Bordures < 6 m | Montée / descente | `curb_up`, `curb_down` |
 | 6 | Escaliers | **Jalons 4 / 2 / 1 m** + **nombre de marches dit** | `stairs_up/down_4/2/1`, `n_1..12` + `stairs_steps` |
-| 7 | Poteau ≤ 15 m droit devant : **mot continu** (§ 36) ; mobilier vertical + divers < 6 m : doux confirmé | `guide_left`, `guide_right` (poteau) ; `pole`, `lamp`, `sign`, `animal`, `bin`, `keepsake` (divers) |
+| 7 | Poteaux + mobilier vertical + divers < 6 m (poteau ≤ 15 m droit devant) | **Mot d'évitement en continu** « Droite. »/« Gauche. », répété toutes les 300 ms (§ 36) | `guide_left`, `guide_right` |
 | 8 | Passages piétons < 6 m | Annonce (**« Crosswalk. »**, joué < 500 ms à vitesse de base, toutes les 2 s hors Traversée ; 1 fois par vue sinon) + alignement **au changement** + arrivée **1 fois** | `crosswalk`, `crosswalk_aligned`, `cross_arrived` |
 | 9 | Réponses du chat | **Attente + reprise depuis la coupure** (tranche interrompue rejouée) ; **seule file restante** | Synthèse réseau (chat) |
 | 10 | Trottoirs | **Absolu (§ 45)** : coupe tout, va au bout, seul le micro user passe devant ; **< 500 ms (§ 46)** : formes courtes lues en pastille 500 ms | `sidewalk_*_short` (nouveaux, `sidewalk_*` gardés pour le voicepack) |
@@ -96,13 +96,16 @@ une annonce avalée ne consomme pas son tour).
 | `human-soft` | 2 humains | 2 s |
 | `human-imminent` | 2 mot humain continu 0-15 m | **immédiat** (toujours autorisé) |
 | `pole-avoid` | 7 mot poteau continu 0-15 m | **immédiat** (toujours autorisé, § 36) |
+| `wall-avoid` | 4 mot mur continu | **immédiat** (toujours autorisé, § 36) |
+| `fence-avoid` | 4 mot clôture/barrière continu | **immédiat** (toujours autorisé, § 36) |
+| `misc-avoid` | 7 mot divers continu | **immédiat** (toujours autorisé, § 36) |
 | `gps-reminder` | 3 rappel | sans antirépétition (le 15 s est le déclencheur, pas une fenêtre) |
-| `fence` | 4 grillages/murs/barrières | 4 s |
+| `fence` | trou de grillage | 4 s (le doux dangers est supprimé, 03/11) |
 | `curb` | 5 bordures | 2 s |
 | `stairs` | 6 escaliers (annonce, jalons, montée) | 2 s |
 | `stairs-count` | 6 compte des marches | 1 s (§ 42, amende § 37) |
-| `pole` | 7 poteaux + mobilier vertical | 2 s |
-| `misc` | 7 divers (animal, poubelle, souvenirs) | 2 s |
+| `pole` | — (doux supprimé le 03/11) | 2 s (gardé pour compat de la table) |
+| `misc` | — (doux supprimé le 03/11) | 2 s (gardé pour compat de la table) |
 | `crosswalk-announce` | 8 annonce | **2 s** (« Crosswalk. » redit hors Traversée ; oubli explicite à la vue perdue) |
 | `crosswalk-align` | 8 alignement | **au changement** (l'appelant n'appelle que si ça change) |
 | `crosswalk-arrival` | 8 arrivée | **1 fois** |
@@ -212,34 +215,35 @@ Verrouillé alors par `HazardConceptsTest` et `HazardWatchTest`
 Recette téléphone : personne et poteau à 12-15 m droit devant → mot
 d'évitement en continu — **non mesuré**, exige un APK sur appareil réel.
 
-## 36. Position optimale en permanence : mot continu gens + poteaux, 300 ms (ordre user du 01/11)
+## 36. Position optimale en permanence : mot continu tous dangers, 300 ms (ordres user du 01/11, 02/11 murs, 03/11 tous)
 
-Le user refuse le dit-une-fois : tant qu'un gens ou un poteau est
-devant (0-15 m), iSee dit la position optimale en permanence. Nouveau
-contrat, qui amende le § 35 et la table v4 (§ 1, § 5) : proche comme
-loin, les deux disent le côté où aller, en boucle.
+Le user refuse le dit-une-fois : tant qu'un danger est devant, iSee
+dit la position optimale en permanence. Nouveau contrat, qui amende le
+§ 35 et la table v4 (§ 1, § 5) : proche comme loin, tous disent le
+côté où aller, en boucle — plus de doux « Attention … » depuis le
+03/11 (les obstacles s'esquivent, ils ne se nomment plus).
 
 - **mot continu** (`HazardWatcher.onContinuous`, dès la 1re frame — plus
   de confirmation, plus de cooldown, plus de ré-armement, plus de repli
-  `HazardAlt`) : personne (niveau 2, clé `human-imminent`) et poteau
-  (niveau 7, clé `pole-avoid`, sorte `POLE`) disent « Droite. » /
-  « Gauche. » (`HazardText.avoidWord`, côté opposé, droite par défaut),
-  répété toutes les 300 ms (`AVOID_REPEAT_MS`, immédiat au changement
-  de mot), urgent, en clip `guide_*` via `hazardWish` (tout mot urgent
-  part en clip, barrière et divers exclus car jamais urgents) ;
-- **aval v4 inchangé** : `AntiRepeat` laisse passer `human-imminent` et
-  `pole-avoid` (toujours autorisés), le bus arbitre par niveau (la
+  `HazardAlt`) : personne (niveau 2, clé `human-imminent`), poteau
+  (niveau 7, clé `pole-avoid`, sorte `POLE`), mur (niveau 4, clé
+  `wall-avoid`), clôture/barrière (niveau 4, clé `fence-avoid`) et
+  divers (niveau 7, clé `misc-avoid`) disent « Droite. » / « Gauche. »
+  (`HazardText.avoidWord`, côté opposé, droite par défaut), répété
+  toutes les 300 ms (`AVOID_REPEAT_MS`, immédiat au changement de mot),
+  urgent, en clip `guide_*` via `hazardWish` ;
+- **aval v4 inchangé** : `AntiRepeat` laisse passer les cinq clés
+  continues (toujours autorisées), le bus arbitre par niveau (la
   personne écrase le poteau, la voiture écrase tout) ; en traversée,
   seule la personne parle (niveau 101) ; dedans, seule la personne
   parle ; la parole du user coupe le mot ;
 - **inchangé** : seuils (15 m droit devant gens + poteaux, 10 m personne
-  hors couloir, 6 m le reste, plein axe ≤ 2 m), douce confirmée des
-  autres dangers (2 frames, 4 s grillages/murs/barrières, 2 s divers),
+  hors couloir, 6 m le reste, plein axe ≤ 2 m),
   repli haut-de-poteau (`isPole`).
 
-Verrouillé par `HazardWatchTest` (mot 1re frame gens + poteaux proche
-et loin, niveaux 2/7, clés, répétition 300 ms, immédiat au changement,
-sans cooldown ni ré-armement, barrière tue puis parlante au départ),
+Verrouillé par `HazardWatchTest` (mot 1re frame tous dangers proche
+et loin, niveaux 2/4/7, clés, répétition 300 ms, immédiat au changement,
+sans cooldown ni ré-armement, barrière tue puis esquive au départ),
 `HazardConceptsTest` (sorte `POLE`), `SeuilsDehorsV4Test` (humain 9 m
 et poteau en continu), `EchelleOverwriteTest` (personne et poteau
 postés niveau 2/7 en clip dès la 1re frame), `AntiRepeatTest` +
