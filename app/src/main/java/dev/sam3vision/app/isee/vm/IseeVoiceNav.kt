@@ -86,6 +86,7 @@ class IseeVoiceNav(
             stopRoute = stopRoute,
             onRouteCap = onRouteCap,
             userSpeaking = userSpeaking,
+            log = { android.util.Log.d(VoiceNavTracker.LOG_TAG, it) },
         )
     }
     private val driver: VoiceNavEngineDriver by driverLazy
