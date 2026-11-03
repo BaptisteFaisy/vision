@@ -229,16 +229,26 @@ class TraverseWiring(
 }
 
 /**
+ * Concepts écartés en traversée (ordre user 03/11) : poubelle, souvenirs et
+ * lampadaire ne servent pas à traverser ; les écarter tient la liste sous
+ * le plafond 22 et conserve chien et enfant.
+ */
+private val TRAVERSE_DROPPED = setOf("trash can", "souvenir shop", "street lamp")
+
+/**
  * Prompts du mode : le feu piéton devant, son poteau juste derrière (repli
  * haut-de-poteau quand SAM rate le boîtier), véhicules + base ensuite
  * (filtrée des wordings voiture : un Follow `feu tricolore` oublié ne doit
- * pas activer un veto fantôme en traversée, §10). Sans le concept feu,
- * aucun vert ne serait jamais lu. Pur, testé en JVM (l'activation autour
- * touche Android : TTS, cache, appareil seul).
+ * pas activer un veto fantôme en traversée, §10). Poubelle, souvenirs et
+ * lampadaire sont écartés ([TRAVERSE_DROPPED], ordre user 03/11) : la liste
+ * tient sous le plafond 22 et chien/enfant sont conservés. Sans le concept
+ * feu, aucun vert ne serait jamais lu. Pur, testé en JVM (l'activation
+ * autour touche Android : TTS, cache, appareil seul).
  */
 internal fun traversePrompts(prompts: List<String>): List<String> =
     TraversePipeline.promptsFor(
-        listOf(CrossingPrompts.LIGHT, "pole") + prompts.filterNot { CarLightVeto.isVetoPrompt(it) },
+        listOf(CrossingPrompts.LIGHT, "pole") +
+            prompts.filterNot { CarLightVeto.isVetoPrompt(it) || it in TRAVERSE_DROPPED },
     )
 
 /**

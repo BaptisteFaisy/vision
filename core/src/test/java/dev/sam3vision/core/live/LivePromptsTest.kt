@@ -101,8 +101,8 @@ class LivePromptsTest {
         // « vire bus, bicycle … » (01/11) avait sorti bus/bicycle/truck/motorcycle
         // du défaut (car gardée) ; bus restauré le 03/11 (ordre user).
         // `VehicleConcepts.promptsFor` met les cinq en tête quand la Traversée
-        // s'arme (car/bus dédupliqués, bicycle/truck/motorcycle ajoutés, queue
-        // dog/child coupée au plafond 22).
+        // s'arme (car/bus dédupliqués, bicycle/truck/motorcycle ajoutés ;
+        // poubelle, souvenirs, lampadaire écartés en amont : 21 envoyés).
         val crossing = VehicleConcepts.promptsFor(LivePrompts.default)
         (VehicleConcepts.PROMPTS).forEach { concept ->
             assertTrue(concept, concept in crossing)

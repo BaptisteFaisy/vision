@@ -48,8 +48,9 @@ object VehicleConcepts {
 
     /**
      * Prompts du mode traversée : véhicules d'abord, [base] ensuite, bornés à
-     * [LivePrompts.MAX] (22) : les cinq véhicules plus le début de la base —
-     * la queue (dog, child avec le défaut à 21) est coupée en traversée armée.
+     * [LivePrompts.MAX] (22). La base est filtrée en amont (poubelle,
+     * souvenirs, lampadaire écartés — ordre user 03/11) : 21 envoyés, chien
+     * et enfant conservés.
      */
     fun promptsFor(base: List<String> = emptyList()): List<String> =
         LivePrompts.normalize(PROMPTS + base)
