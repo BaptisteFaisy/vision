@@ -153,15 +153,18 @@ class WsLiveBinaryTest {
     }
 
     @Test
-    fun `un envoi binaire refuse donne Network sans repli`() = runBlocking {
+    fun `un envoi binaire refuse replie en POST live`() = runBlocking {
         val transport = ContractWsTransport().apply { sendResult = false }
-        val client = WsLiveClient(base, transport, 1_000, RecordingLiveClient(), binaryWs = true)
+        val http = RecordingLiveClient()
+        val client = WsLiveClient(base, transport, 1_000, http, binaryWs = true)
 
-        val result = client.live("SUVLFw==", null, 640, 4)
+        val frame = client.live("SUVLFw==", null, 640, 4).getOrThrow()
 
-        NetContract.assertError(result, ApiError.Network::class.java, "envoi binaire refusé")
+        assertEquals(512, frame.width)
         assertEquals(1, transport.sentBytes.size)
-        assertTrue("pas de repli quand le socket refuse", transport.sent.isEmpty())
+        assertTrue("pas de repli JSON quand le socket refuse : le POST prend le relais", transport.sent.isEmpty())
+        assertEquals("la frame est partie en POST", 1, http.liveCalls)
+        assertTrue("le repli colle", client.httpFallbackActive)
     }
 
     @Test

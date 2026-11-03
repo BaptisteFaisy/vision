@@ -60,8 +60,12 @@ class WsLiveClientHandshakeTest {
         fun fail(index: Int, error: Throwable = IOException("radio coupée")) = onCloseds[index](error)
     }
 
+    /**
+     * Client qui ne voit que le WS : HTTP en panne et re-sonde à chaque frame — les
+     * échecs WS restent des échecs, le backoff se prouve frame par frame comme avant.
+     */
     private fun clientFor(transport: HandshakeTransport, link: WsLink, timeoutMs: Long = 60_000L) =
-        WsLiveClient(base, transport, timeoutMs, RecordingLiveClient(), binaryWs = false, keepAlive = null, link = link)
+        WsLiveClient(base, transport, timeoutMs, failingHttpClient(), binaryWs = false, keepAlive = null, link = link, httpFallback = WsHttpFallback(probeEvery = 1))
 
     private suspend fun awaitOpens(transport: HandshakeTransport, n: Int) {
         withTimeout(2_000) { while (transport.opens < n) delay(5) }

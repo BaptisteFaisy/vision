@@ -219,22 +219,26 @@ class WsLiveClientTest {
             transport?.disconnect(IOException("coupure"))
             emptyList()
         }
-        val client = WsLiveClient(base, transport, 1_000, RecordingLiveClient(), binaryWs = false)
+        val http = failingHttpClient()
+        val client = WsLiveClient(base, transport, 1_000, http, binaryWs = false)
 
         val failure = client.live("QQ==", listOf("person"), 640, 4).exceptionOrNull()
 
         assertTrue("attendu Network, obtenu $failure", failure is ApiError.Network)
+        assertEquals("le repli POST a été tenté avant d'échouer", 1, http.liveCalls)
     }
 
     @Test
     fun `un socket qui ne s ouvre pas donne Network`() = runBlocking {
         val transport = ContractWsTransport().apply { openResult = false }
-        val client = WsLiveClient(base, transport, 1_000, RecordingLiveClient(), binaryWs = false)
+        val http = failingHttpClient()
+        val client = WsLiveClient(base, transport, 1_000, http, binaryWs = false)
 
         val failure = client.live("QQ==", listOf("person"), 640, 4).exceptionOrNull()
 
         assertTrue("attendu Network, obtenu $failure", failure is ApiError.Network)
         assertTrue(transport.sent.isEmpty())
+        assertEquals("le repli POST a été tenté avant d'échouer", 1, http.liveCalls)
     }
 
     @Test

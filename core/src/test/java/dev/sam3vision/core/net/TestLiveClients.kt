@@ -48,3 +48,11 @@ internal class RecordingLiveClient(
         closed = true
     }
 }
+
+/**
+ * Délégué HTTP en panne : le repli échoue et l'erreur réelle remonte — les tests du
+ * client WS prouvent ainsi le comportement « tout est tombé » sans réseau. Le compteur
+ * [RecordingLiveClient.liveCalls] prouve que le POST a bien été tenté.
+ */
+internal fun failingHttpClient(error: ApiError = ApiError.Network("POST /live : injoignable")): RecordingLiveClient =
+    RecordingLiveClient(frames = { Result.failure(error) })
