@@ -147,10 +147,13 @@ private fun BoxScope.SceneStatusBar(state: IseeUiState, viewModel: IseeViewModel
 }
 
 /**
- * Pont lunettes → sonde : nourri seulement quand le direct vit et qu'aucune photo n'est
- * figée à l'écran. Le guidage se lit sur `isGuidanceOverlay(navState)`, le signal que la
- * scène utilise déjà pour agrandir la rue, effacer la boule et poser la carte — donc le
- * même « mode route » que celui vu par l'utilisateur.
+ * Pont lunettes → sonde : nourri seulement quand le direct vit, qu'aucune photo n'est
+ * figée à l'écran et qu'un live est demandé — guidage ou Traversée ([glassesProbeFeed]).
+ * Le guidage se lit sur `isGuidanceOverlay(navState)`, le signal que la scène utilise déjà
+ * pour agrandir la rue, effacer la boule et poser la carte — donc le même « mode route »
+ * que celui vu par l'utilisateur. La Traversée est lue sur la tranche chiffres
+ * ([LiveProbe.collectRest]) : cette feuille légère recompose à l'écriture #2, mais le
+ * [GlassesProbeWiring] keyé sur le booléen ne redémarre qu'aux transitions.
  */
 @Composable
 private fun GlassesProbeLayer(
@@ -160,7 +163,15 @@ private fun GlassesProbeLayer(
     glassesStreaming: Boolean,
     guidance: Boolean,
 ) {
-    GlassesProbeWiring(probe, (glassesLive || glassesStreaming) && state.glassesPhoto == null, guidance)
+    val crossingActive = probe.collectRest().crossingActive
+    val feed = glassesProbeFeed(
+        glassesLive = glassesLive,
+        glassesStreaming = glassesStreaming,
+        photoDisplayed = state.glassesPhoto != null,
+        guidance = guidance,
+        crossingActive = crossingActive,
+    )
+    GlassesProbeWiring(probe, feed, guidance)
 }
 
 /**

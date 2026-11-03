@@ -18,10 +18,11 @@ import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 
 /**
- * Alimente la sonde SAM depuis la rue des lunettes : quand le direct vit et que la sonde
- * veut une frame, on décode la poussée du flux hors écran, on l'encode comme le téléphone
- * (JPEG redressé [ISEE_FRAME_EDGE]/[ISEE_FRAME_QUALITY], 320/q55 — pas le 480/q65 du
- * partage aidant) et on l'envoie. Guidage, distances et voix suivent alors le même
+ * Alimente la sonde SAM depuis la rue des lunettes : quand le direct vit, qu'un live est
+ * demandé ([glassesProbeFeed] : guidage ou Traversée, jamais la connexion seule) et que
+ * la sonde veut une frame, on décode la poussée du flux hors écran, on l'encode comme le
+ * téléphone (JPEG redressé [ISEE_FRAME_EDGE]/[ISEE_FRAME_QUALITY], 320/q55 — pas le 480/q65
+ * du partage aidant) et on l'envoie. Guidage, distances et voix suivent alors le même
  * chemin que le mode téléphone : parité par construction, sans toucher à
  * [Guidance][core.live.Guidance]. Le compteur de marches part aussi (même photo → Canny),
  * sinon la voix ne connaît jamais leur nombre.
@@ -169,6 +170,22 @@ private fun feedStairCounter(bitmap: Bitmap) {
  */
 internal fun stairFeedDue(lastMs: Long, nowMs: Long): Boolean =
     nowMs - lastMs >= STAIR_FEED_MS
+
+/**
+ * Porte du pont lunettes → sonde, pure et testée : le direct des lunettes ne part à SAM
+ * que sur demande explicite — guidage en cours ou mode Traversée — jamais dès la connexion
+ * (ordre user du 03/11 : fini les photos automatiques toutes les X secondes quand les
+ * lunettes sont portées). La photo lunettes figée coupe le pont : l'écran montre le figé,
+ * pas le flux. Le direct affiché, la photo manuelle et les questions vocales ne passent pas
+ * par ici et continuent sans live demandé.
+ */
+internal fun glassesProbeFeed(
+    glassesLive: Boolean,
+    glassesStreaming: Boolean,
+    photoDisplayed: Boolean,
+    guidance: Boolean,
+    crossingActive: Boolean,
+): Boolean = (glassesLive || glassesStreaming) && !photoDisplayed && (guidance || crossingActive)
 
 /** Fenêtre du Canny des marches côté lunettes : 1 s (le compteur tient 1,5 s). */
 internal const val STAIR_FEED_MS = 1_000L
