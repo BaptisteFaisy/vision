@@ -14,7 +14,7 @@ die()  { printf '\033[31mERREUR : %s\033[0m\n' "$*" >&2; exit 1; }
 
 # -------------------------------------------------------------------- Modal
 MODAL_BIN="${MODAL_BIN:-$HOME/.venv-modal/bin/modal}"
-MODAL_PROFILE="${MODAL_PROFILE:-baptiste-faisy}"
+MODAL_PROFILE="${MODAL_PROFILE:-gaiamelie}"
 SECRET_NAME="${SECRET_NAME:-sam3-llm}"
 APP_NAME="${APP_NAME:-sam3-vision}"
 BASE_URL_DEFAULT="${BASE_URL_DEFAULT:-https://openrouter.ai/api/v1}"
