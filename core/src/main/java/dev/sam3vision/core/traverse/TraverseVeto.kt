@@ -106,7 +106,8 @@ data class TraverseDecision(
  * qu'il approche
  * (croissance franche de boîte contre sa mémoire appariée, au-delà du tremblé
  * [AREA_JITTER_RATIO]) **ou** qu'il est proche (distance sténopé sous
- * [VETO_METERS]). L'approche se lit sur les boîtes seules — sans focale, elle
+ * [VETO_METERS], confirmée quand le score est faible : même instance proche à
+ * la frame précédente, anti-flicker [PROXIMITY_STRONG_SCORE]). L'approche se lit sur les boîtes seules — sans focale, elle
  * reste le seul critère ; la distance réutilise [KnownSizes] (déjà calibré
  * pour les sept véhicules) et [Pinhole]. Les vus se suivent par instance
  * (label + seau L/C/R, appariement IoU) : deux garées sous le même label ne
@@ -231,9 +232,23 @@ class TraverseVeto {
         val previous = matchOf(seen)?.area ?: fallbackArea(seen.key)
         val growing = previous != null && isGrowingBeyondJitter(previous, seen.box.area)
         val meters = distanceOf(seen.detection, focalPx)
-        val near = meters != null && meters < VETO_METERS
+        val near = meters != null && meters < VETO_METERS && nearConfirmed(seen)
         if (!growing && !near) return null
         return Blocking(seen.detection.label, meters)
+    }
+
+    /**
+     * Proximité confirmée : score franc (≥ [PROXIMITY_STRONG_SCORE]) ou même
+     * instance proche à la frame précédente (mémoire [previousSeen], IoU ≥
+     * [CONTINUITY_IOU_MIN]) — un flicker SAM (apparition isolée, score faible
+     * de nuit, fragments qui alternent) ne bloque pas ; une voiture vraiment
+     * proche confirme dès la 2e frame. La croissance franche (approche réelle)
+     * bloque, elle, sans confirmation.
+     */
+    private fun nearConfirmed(seen: Seen): Boolean {
+        if (seen.detection.score >= PROXIMITY_STRONG_SCORE) return true
+        val memories = previousSeen[seen.key] ?: return false
+        return memories.any { it.meters != null && it.meters < VETO_METERS && it.box.iou(seen.box) >= CONTINUITY_IOU_MIN }
     }
 
     /**
@@ -404,6 +419,9 @@ class TraverseVeto {
 
         /** Sous cette distance sténopé (m), un objet proche garde le guidage obstacles actif. */
         const val VETO_METERS = 15f
+
+        /** Score à partir duquel la proximité bloque dès la première frame ; en dessous, il faut la même instance proche à la frame précédente (anti-flicker nuit). */
+        const val PROXIMITY_STRONG_SCORE = 0.5f
 
         /** Un véhicule prouvé immobile sous cette distance sténopé (m) ne bloque plus : le vert seul décide (01/11). */
         const val STILL_EXEMPT_METERS = 15f
