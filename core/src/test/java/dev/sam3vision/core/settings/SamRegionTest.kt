@@ -73,6 +73,16 @@ class SamRegionTest {
     }
 
     @Test
+    fun `les presets sont pinces sur le workspace gaiamelie`() {
+        assertTrue(SamRegion.Eu.presetBaseUrl.startsWith("https://gaiamelie--"))
+        assertTrue(SamRegion.Eu.presetBaseUrl.contains("sam3-eu-a100"))
+        assertTrue(SamRegion.Eu.presetBaseUrl.contains("eu-west"))
+        assertTrue(SamRegion.Us.presetBaseUrl.startsWith("https://gaiamelie--"))
+        assertTrue(SamRegion.Us.presetBaseUrl.contains("sam3-us-a100"))
+        assertTrue(SamRegion.Us.presetBaseUrl.contains("us-east"))
+    }
+
+    @Test
     fun `le bail gpu tient en une ligne chiffree`() {
         assertTrue(SamRegion.GPU_LEASE_LINE.isNotBlank())
         assertTrue(SamRegion.GPU_LEASE_LINE.contains("25-38"))
