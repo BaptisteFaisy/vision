@@ -31,6 +31,9 @@ class SwipeHoldTrigger(
 
         /** Tenue terminée (relâchement, annulation, doigt supplémentaire). */
         fun onSwipeHoldEnd()
+
+        /** Attente abandonnée sur glissement repris (défaut : rien — l'app loggue). */
+        fun onSwipeHoldCancel() {}
     }
 
     enum class Phase { Idle, Pending, Holding }
