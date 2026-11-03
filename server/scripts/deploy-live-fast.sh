@@ -17,6 +17,7 @@
 #   FAST_BATCH_PROMPTS=1 les N concepts en un forward (le lot est actif)
 #   FAST_SNAPSHOT=1      snapshot mémoire (réveil 2-7 s au lieu de 25-38 s)
 #   FAST_MODEL_DIR=...   poids dans l'image (plus de re-téléchargement au réveil)
+#   DEPLOY_SHA          sha cuit dans l'image, exposé par /health (traçabilité)
 #   FAST_TIMING=1        timings_ms + Server-Timing (validation des < 10 s)
 #   FAST_PREPROCESS=fast pixel_values fusionnés torch (défaut hf : appel HF,
 #                        écart ±1 LSB, repli auto — levier CPU, FIX-14)
@@ -87,6 +88,7 @@ deploy_once() {
       FAST_ROUTING_REGION="$ROUTING" FAST_BATCH_PROMPTS=1 FAST_EDGE=512 \
       FAST_CUDA_GRAPH=1 FAST_DETR_GRAPH=1 FAST_POST_KEPT_ONLY=1 FAST_ATTN=sdpa FAST_SCALEDOWN=60 \
       FAST_SNAPSHOT=1 FAST_MODEL_DIR=/opt/models/sam3.1 FAST_TIMING=1 FAST_PREPROCESS=fast \
+      DEPLOY_SHA="$(git -C "$ROOT" rev-parse --short HEAD 2>/dev/null || echo unknown)" \
       "$MODAL" deploy backend/live_fast/live_app_fast.py "${profile_arg[@]}" )
 }
 
@@ -102,6 +104,7 @@ lev, app = h.get("levers") or {}, h.get("applied") or {}
 restored = h.get("restored")
 print("gpu    :", h.get("gpu"))
 print("model  :", h.get("model"))
+print("sha    :", h.get("sha") or "inconnu (image sans DEPLOY_SHA ?)")
 print("depth  :", h.get("depth") or "INDISPONIBLE (repli gracieux)")
 print("levers :", json.dumps(lev, ensure_ascii=False, sort_keys=True))
 print("applied:", json.dumps(app, ensure_ascii=False, sort_keys=True))
