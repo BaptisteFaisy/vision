@@ -223,6 +223,18 @@ def test_depth_default_every(_) -> None:
                 sys.modules[name] = module
 
 
+def test_depth_every_deploy(_module) -> None:
+    """``FAST_DEPTH_EVERY`` recuit dans l'env de l'image (réglable au deploy)."""
+    from test_units import check
+    from tests_units.weights_tests import _fresh_live_fast
+
+    app = _fresh_live_fast("live_app_fast")
+    check("depth : FAST_DEPTH_EVERY dans LEVER_NAMES",
+          "FAST_DEPTH_EVERY" in app.LEVER_NAMES, str(app.LEVER_NAMES))
+    check("depth : lever_env() transmet le levier",
+          "FAST_DEPTH_EVERY" in app.lever_env(), "absent de lever_env()")
+
+
 def _throttle_service():
     """Service déployé (``live_fast``) + son module, hors GPU (même purge que M1).
 
