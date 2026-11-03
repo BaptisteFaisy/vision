@@ -81,17 +81,24 @@ internal open class GlassesVideoDecoder(
     private var outColorFormat = 0
     private var formatWarned = false
 
-    /** La charge d'une frame de configuration brute : futur `csd-0`. */
+    /** La charge d'une frame de configuration brute : futur `csd-0`. Ne lève jamais. */
     open fun stashCsd(frame: VideoFrame) {
-        frame.payloadBytes()?.let { csd0 = it }
+        runCatching { frame.payloadBytes()?.let { csd0 = it } }
     }
 
     /** Décode une frame compressée ; `null` = jetée (cause journalisée). Ne lève jamais. */
     open fun decode(frame: VideoFrame): ArgbImage? {
-        if (broken || frame.width <= 0 || frame.height <= 0) return null
-        val active = ensureCodec(frame) ?: return null
-        if (!queueInput(active, frame)) return null
-        return pollOutput(active, frame)
+        try {
+            if (broken || frame.width <= 0 || frame.height <= 0) return null
+            val active = ensureCodec(frame) ?: return null
+            if (!queueInput(active, frame)) return null
+            return pollOutput(active, frame)
+        } catch (_: Throwable) {
+            // État inconnu (tampon SDK vérolé, erreur native…) : le codec est
+            // oublié pour repartir de zéro à la prochaine frame, la frame est jetée.
+            dropCodec()
+            return null
+        }
     }
 
     /** Libère le codec ; le prochain [decode] repart de zéro (abandon effacé). */
@@ -140,7 +147,8 @@ internal open class GlassesVideoDecoder(
 
     /** Présente [frame] au décodeur ; `false` = codec tombé, recréé au prochain appel. */
     private fun queueInput(active: MediaCodec, frame: VideoFrame): Boolean {
-        val payload = frame.payloadBytes() ?: return false
+        // Lecture du tampon SDK : un tampon vérolé jette la frame, pas le codec.
+        val payload = runCatching { frame.payloadBytes() }.getOrNull() ?: return false
         val index = runCatching { active.dequeueInputBuffer(INPUT_TIMEOUT_US) }.getOrDefault(-1)
         if (index < 0) return false
         val queued = runCatching {
