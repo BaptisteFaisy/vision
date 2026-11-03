@@ -359,6 +359,15 @@ class Sam3LiveService:
                                    if ctx.get("detr_graphs") else None),
                     "post": levers().get("post", "hf")}}
 
+    def _health_response(self):
+        """200 prêt, 503 en boot ou carte bloquée : « réessaie », pas « cassé »."""
+        from fastapi.responses import JSONResponse
+
+        body = self.health()
+        if body.get("ok"):
+            return body
+        return JSONResponse(status_code=503, content=body)
+
     @asynccontextmanager
     async def _lifespan(self, _api):
         """Charge le modèle avant la première requête (Baseten : uvicorn sans ``enter``)."""
@@ -436,11 +445,7 @@ class Sam3LiveService:
 
         @api.get("/health")
         async def health():
-            """200 prêt, 503 en boot ou carte bloquée : « réessaie », pas « cassé »."""
-            body = service.health()
-            if body.get("ok"):
-                return body
-            return JSONResponse(status_code=503, content=body)
+            return service._health_response()
 
         @api.post("/segment")
         async def segment(request: SegmentRequest):
