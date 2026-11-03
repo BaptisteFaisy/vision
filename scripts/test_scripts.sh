@@ -18,6 +18,7 @@ VERIFY_STREET="${HERE}/verify-street.sh"
 MESURE="${HERE}/mesure-distances.sh"
 SIM="${HERE}/isee-sim.sh"
 REPLAY="${HERE}/sim/route-replay.py"
+GUARD="${HERE}/lib/emu_guard.sh"
 SCRIPTS=("$BUILD" "$INSTALL" "$VERIFY" "$VERIFY_PORT" "$LATEST" "$VERIFY_NAV" "$VERIFY_STREET" "$MESURE" "$SIM")
 
 TMP="$(mktemp -d "${TMPDIR:-/tmp}/test-scripts.XXXXXX")" || exit 1
@@ -73,7 +74,7 @@ mkdir -p "${TMP}/homevide"
 
 # --- 1. syntaxe et hygiène de base ----------------------------------------
 echo "== 1. syntaxe, options, hygiène shell =="
-for f in "${SCRIPTS[@]}" "$LIB" "${HERE}/test_scripts.sh"; do
+for f in "${SCRIPTS[@]}" "$LIB" "$GUARD" "${HERE}/test_scripts.sh"; do
   run bash -n "$f"
   expect_status 0 "bash -n $(basename -- "$f")"
 done
@@ -184,24 +185,24 @@ expect_nonzero 'le fichier de cles ne sort jamais du script'
 
 # --- 6. garde-fous statiques ----------------------------------------------
 echo "== 6. garde-fous statiques =="
-run grep -nE '(^|[^[:alnum:]_])eval[[:space:]]' "${SCRIPTS[@]}" "$LIB"
+run grep -nE '(^|[^[:alnum:]_])eval[[:space:]]' "${SCRIPTS[@]}" "$LIB" "$GUARD"
 expect_nonzero 'aucun eval sur une donnée externe'
 
-run grep -nE '/tmp/[A-Za-z0-9._-]+' "${SCRIPTS[@]}" "$LIB"
+run grep -nE '/tmp/[A-Za-z0-9._-]+' "${SCRIPTS[@]}" "$LIB" "$GUARD"
 expect_nonzero 'aucun fichier temporaire à nom fixe dans /tmp'
 
-run grep -nE '/home/' "${SCRIPTS[@]}" "$LIB"
+run grep -nE '/home/' "${SCRIPTS[@]}" "$LIB" "$GUARD"
 expect_nonzero 'aucun chemin absolu de machine'
 
-run grep -nE '(cat|echo|tee|printf|head|tail)[^#]*local\.properties' "${SCRIPTS[@]}" "$LIB"
+run grep -nE '(cat|echo|tee|printf|head|tail)[^#]*local\.properties' "${SCRIPTS[@]}" "$LIB" "$GUARD"
 expect_nonzero 'local.properties jamais affiché'
 
 run grep -c 'rm -rf' "$LIB"
 expect_eq 1 'une seule suppression récursive, dans safe_rm_rf'
-run grep -n 'rm -rf' "${SCRIPTS[@]}"
+run grep -n 'rm -rf' "${SCRIPTS[@]}" "$GUARD"
 expect_nonzero 'aucun rm -rf brut dans les scripts'
 
-for f in "${SCRIPTS[@]}" "$LIB" "${HERE}/test_scripts.sh"; do
+for f in "${SCRIPTS[@]}" "$LIB" "$GUARD" "${HERE}/test_scripts.sh"; do
   lines="$(wc -l <"$f")"
   if (( lines < 500 )); then ok "$(basename -- "$f") < 500 lignes ($lines)"; else
     RC=$lines; OUT=""; ko "$(basename -- "$f") < 500 lignes ($lines)"
@@ -324,6 +325,49 @@ expect_nonzero 'isee-sim.sh refuse un APK absent en --no-build'
 expect_grep 'APK absent' 'isee-sim.sh nomme l APK manquant'
 run grep -q -- '--no-build' "$SIM"
 expect_status 0 'isee-sim.sh documente --no-build'
+
+# --- 10 bis. emu_guard.sh : segfault hôte ----------------------------------
+# qemu segfaulte (exit 139) par intermittence sur videofile: — le harnais doit
+# le dire (SEGFAULT HÔTE, pas un crash applicatif), verrouiller l'AVD contre
+# les doubles boots, et laisser choisir caméra et GPU. Aucun boot réel ici.
+echo "== 10 bis. emu_guard.sh : garde segfault hôte =="
+run bash -c '. "$1"; emu_gpu_flag swiftshader' _ "$GUARD"
+expect_status 0 'emu_gpu_flag accepte swiftshader'
+expect_grep 'swiftshader' 'emu_gpu_flag rend le mode demandé'
+run bash -c '. "$1"; emu_gpu_flag bidule' _ "$GUARD"
+expect_nonzero 'emu_gpu_flag refuse un GPU inconnu'
+expect_grep 'GPU inconnu' 'emu_gpu_flag nomme le GPU fautif'
+run bash -c '. "$1"; emu_camera_args none x' _ "$GUARD"
+expect_status 0 'emu_camera_args accepte none'
+expect_eq '' 'emu_camera_args none ne rend aucun argument'
+run bash -c '. "$1"; emu_camera_args bidule x' _ "$GUARD"
+expect_nonzero 'emu_camera_args refuse un mode inconnu'
+expect_grep 'caméra inconnue' 'emu_camera_args nomme le mode fautif'
+run bash -c '. "$1"; (exit 139) & emu_diagnose $! /dev/null démarrage' _ "$GUARD"
+expect_status 0 'emu_diagnose rend 0 après diagnostic'
+expect_grep 'SEGFAULT HÔTE' 'emu_diagnose dit SEGFAULT HÔTE sur exit 139'
+expect_grep 'pas un crash applicatif' 'emu_diagnose dédouane l application'
+run bash -c '. "$1"; (exit 1) & emu_diagnose $! /dev/null démarrage' _ "$GUARD"
+expect_grep 'émulateur arrêté' 'emu_diagnose dit arrêt simple sur exit 1'
+run bash -c '. "$1"; emu_probe_video /bin/true "$2"' _ "$GUARD" "${TMP}/faux.apk"
+expect_status 0 'emu_probe_video accepte quand ffmpeg réussit'
+run bash -c '. "$1"; emu_probe_video /bin/false "$2"' _ "$GUARD" "${TMP}/faux.apk"
+expect_nonzero 'emu_probe_video refuse quand ffmpeg échoue'
+env TMPDIR="$TMP" bash -c '. "$1"; emu_lock test-guard && sleep 3' _ "$GUARD" &
+holder=$!
+sleep 1
+run env TMPDIR="$TMP" bash -c '. "$1"; emu_lock test-guard' _ "$GUARD"
+expect_nonzero 'emu_lock refuse un AVD déjà verrouillé'
+expect_grep 'déjà en cours' 'emu_lock nomme le conflit de boot'
+wait "$holder" || :
+run env PATH="$PATH_BIN" APK="${TMP}/faux.apk" bash "$SIM" \
+  --video "${TMP}/fausse-balade.mp4" --camera bidule --no-build --seconds 5
+expect_nonzero 'isee-sim.sh refuse une --camera inconnue'
+expect_grep '\-\-camera' 'isee-sim.sh nomme --camera'
+run env PATH="$PATH_BIN" APK="${TMP}/faux.apk" bash "$SIM" \
+  --video "${TMP}/fausse-balade.mp4" --gpu bidule --no-build --seconds 5
+expect_nonzero 'isee-sim.sh refuse un --gpu inconnu'
+expect_grep '\-\-gpu' 'isee-sim.sh nomme --gpu'
 
 # --- 11. route-replay.py : trajets CSV et GPX -----------------------------
 echo "== 11. route-replay.py : lecture des trajets =="
