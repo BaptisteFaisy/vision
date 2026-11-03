@@ -1,5 +1,6 @@
 package dev.sam3vision.app.live
 
+import dev.sam3vision.core.keyframe.KeyframeConfig
 import dev.sam3vision.core.keyframe.KeyframeScheduler
 import dev.sam3vision.core.model.LiveFrame
 import dev.sam3vision.core.model.SegObject
@@ -29,7 +30,8 @@ class LiveAdaptiveTest {
 
     private val base = 65
     private var now = 1_000L
-    private fun scheduler() = KeyframeScheduler(clock = { now })
+    private fun scheduler(config: KeyframeConfig = KeyframeConfig()) =
+        KeyframeScheduler(config, clock = { now })
     /** Éteint : ces tests verrouillent chaque bras isolément (allumé par défaut, voir dessous). */
     private fun adaptive() = LiveAdaptive(baseQuality = base, scheduler = scheduler())
         .also { it.configure(uploadEnabled = false, keyframesEnabled = false) }
@@ -181,6 +183,29 @@ class LiveAdaptiveTest {
 
         assertEquals(3, adaptive.tier)
         assertEquals(LiveAdaptive.MIN_QUALITY, adaptive.jpegQuality)
+    }
+
+    @Test
+    fun `politique terrain par defaut, expire a 300 ms et tient 3 par seconde`() {
+        assertEquals(KeyframeConfig.Field, LiveAdaptive(baseQuality = base).scheduler.config)
+
+        val paced = LiveAdaptive(baseQuality = base, scheduler = scheduler(KeyframeConfig.Field))
+        paced.configure(uploadEnabled = false, keyframesEnabled = true)
+
+        assertTrue(paced.admit()) // STARTUP : première demande.
+        settled(paced, 120L, Result.success(frame(100f)))
+        now += 299L
+        assertFalse(paced.admit()) // masque encore frais (< 300 ms).
+        now += 1L
+        assertTrue(paced.admit()) // EXPIRED à 300 ms.
+        settled(paced, 120L, Result.success(frame(100f)))
+
+        // 3,3/s soutenus : le budget terrain (4/s) couvre chaque tick, sans hold.
+        repeat(6) {
+            now += 300L
+            assertTrue(paced.admit())
+            settled(paced, 120L, Result.success(frame(100f)))
+        }
     }
 
     @Test
