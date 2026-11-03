@@ -130,6 +130,39 @@ class UiLogicTest {
     }
 
     @Test
+    fun `le plan upright distingue identite reduction rotation et les deux`() {
+        // Déjà droite et sous le bord : rien à faire.
+        assertEquals(UprightOp.IDENTITY, uprightPlan(320, 240, 0, LIVE_EDGE).op)
+        // Droite mais trop grande : réduction seule.
+        val scale = uprightPlan(640, 480, 0, LIVE_EDGE)
+        assertEquals(UprightOp.SCALE, scale.op)
+        assertEquals(480 to 360, scale.targetWidth to scale.targetHeight)
+        // Quart de tour sous le bord : rotation seule, sans rééchantillonnage.
+        val rotate = uprightPlan(320, 240, 90, LIVE_EDGE)
+        assertEquals(UprightOp.ROTATE, rotate.op)
+        assertEquals(90, rotate.turn)
+        assertEquals(240 to 320, rotate.targetWidth to rotate.targetHeight)
+        // Quart de tour trop grand : rotation et réduction.
+        val both = uprightPlan(640, 480, 90, LIVE_EDGE)
+        assertEquals(UprightOp.ROTATE_SCALE, both.op)
+        assertEquals(360 to 480, both.targetWidth to both.targetHeight)
+    }
+
+    @Test
+    fun `le plan upright normalise l'angle avant de decider`() {
+        // -90° = 270° : mêmes dimensions, angle normalisé porté par le plan.
+        val neg = uprightPlan(640, 480, -90, LIVE_EDGE)
+        assertEquals(270, neg.turn)
+        assertEquals(UprightOp.ROTATE_SCALE, neg.op)
+        assertEquals(360 to 480, neg.targetWidth to neg.targetHeight)
+        // 180° ne change pas les dimensions, mais ce n'est pas l'identité.
+        assertEquals(UprightOp.ROTATE, uprightPlan(320, 240, 180, LIVE_EDGE).op)
+        val big = uprightPlan(640, 480, 180, LIVE_EDGE)
+        assertEquals(UprightOp.ROTATE_SCALE, big.op)
+        assertEquals(480 to 360, big.targetWidth to big.targetHeight)
+    }
+
+    @Test
     fun `les angles camera sont ramenes dans le cercle`() {
         assertEquals(270, normalizeDegrees(-90))
         assertEquals(0, normalizeDegrees(360))

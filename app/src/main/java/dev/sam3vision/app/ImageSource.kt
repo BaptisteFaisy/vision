@@ -105,23 +105,69 @@ fun targetSize(width: Int, height: Int, degrees: Int, edge: Int): Pair<Int, Int>
     return max(1, (rotatedWidth * ratio).toInt()) to max(1, (rotatedHeight * ratio).toInt())
 }
 
+/** Ce qu'[uprightScaled] doit faire : le cas décide du chemin le moins cher. */
+internal enum class UprightOp {
+    /** Rien à faire : l'image est déjà droite et sous le bord. */
+    IDENTITY,
+    /** Droite mais trop grande : simple réduction, sans matrice. */
+    SCALE,
+    /** À tourner mais sous le bord : rotation seule, sans rééchantillonnage. */
+    ROTATE,
+    /** À tourner et à réduire : matrice unique, comme avant. */
+    ROTATE_SCALE,
+}
+
+/**
+ * Décision pure d'[uprightScaled] : opération, angle normalisé et taille cible
+ * ([targetSize]). Testée en JVM (`UiLogicTest`), le `Bitmap` n'est créé qu'après.
+ */
+internal data class UprightPlan(val op: UprightOp, val turn: Int, val targetWidth: Int, val targetHeight: Int)
+
+internal fun uprightPlan(width: Int, height: Int, degrees: Int, edge: Int): UprightPlan {
+    val turn = normalizeDegrees(degrees)
+    val quarterTurn = isQuarterTurn(turn)
+    // Dimensions dans le repère déjà tourné : c'est là que l'échelle s'applique.
+    val turnedWidth = if (quarterTurn) height else width
+    val turnedHeight = if (quarterTurn) width else height
+    val (targetWidth, targetHeight) = targetSize(width, height, degrees, edge)
+    val scales = targetWidth != turnedWidth || targetHeight != turnedHeight
+    val op = when {
+        turn == 0 && !scales -> UprightOp.IDENTITY
+        turn == 0 -> UprightOp.SCALE
+        !scales -> UprightOp.ROTATE
+        else -> UprightOp.ROTATE_SCALE
+    }
+    return UprightPlan(op, turn, targetWidth, targetHeight)
+}
+
 /**
  * Redresse **et** réduit en une seule passe : rotation [degrees] et échelle au bord [edge]
  * dans la même matrice, donc un seul rééchantillonnage — là où `rotateBitmap` puis
  * `scaleToEdge` créaient deux bitmaps (≈ 2,7 ms et un alloc par frame économisés).
- * Renvoie [src] tel quel si rien ne change.
+ * Renvoie [src] tel quel si rien ne change ; une réduction seule passe par
+ * `createScaledBitmap` (sans matrice) et une rotation seule sans filtre
+ * (un quart de tour exact n'a rien à rééchantillonner).
  */
 fun uprightScaled(src: Bitmap, degrees: Int, edge: Int): Bitmap {
     if (src.width <= 0 || src.height <= 0) return src
-    val quarterTurn = isQuarterTurn(degrees)
-    // Dimensions dans le repère déjà tourné : c'est là que l'échelle s'applique.
-    val turnedWidth = if (quarterTurn) src.height else src.width
-    val turnedHeight = if (quarterTurn) src.width else src.height
-    val (targetWidth, targetHeight) = targetSize(src.width, src.height, degrees, edge)
-    if (normalizeDegrees(degrees) == 0 && targetWidth == turnedWidth && targetHeight == turnedHeight) return src
-    val matrix = Matrix().apply {
-        postRotate(normalizeDegrees(degrees).toFloat())
-        postScale(targetWidth.toFloat() / turnedWidth, targetHeight.toFloat() / turnedHeight)
+    val plan = uprightPlan(src.width, src.height, degrees, edge)
+    when (plan.op) {
+        UprightOp.IDENTITY -> return src
+        UprightOp.SCALE ->
+            return Bitmap.createScaledBitmap(src, plan.targetWidth, plan.targetHeight, true)
+        UprightOp.ROTATE -> {
+            val matrix = Matrix().apply { postRotate(plan.turn.toFloat()) }
+            return Bitmap.createBitmap(src, 0, 0, src.width, src.height, matrix, false)
+        }
+        UprightOp.ROTATE_SCALE -> {
+            val quarterTurn = isQuarterTurn(plan.turn)
+            val turnedWidth = if (quarterTurn) src.height else src.width
+            val turnedHeight = if (quarterTurn) src.width else src.height
+            val matrix = Matrix().apply {
+                postRotate(plan.turn.toFloat())
+                postScale(plan.targetWidth.toFloat() / turnedWidth, plan.targetHeight.toFloat() / turnedHeight)
+            }
+            return Bitmap.createBitmap(src, 0, 0, src.width, src.height, matrix, true)
+        }
     }
-    return Bitmap.createBitmap(src, 0, 0, src.width, src.height, matrix, true)
 }
