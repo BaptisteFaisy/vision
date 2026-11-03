@@ -83,6 +83,20 @@ class SettingsSeedTest {
         assertTrue("le preset ne doit pas figer l'Europe", seed.samBaseUrl.isEmpty())
     }
 
+    @Test
+    fun `un preset SAM retire est efface, pas appele a vie`() {
+        // Migration gaiamelie (03/11) : l'ancien preset baptiste-faisy persisté
+        // n'a jamais été un choix manuel — il ne doit pas figer l'endpoint.
+        val retire = Settings.Default.copy(
+            samBaseUrl = "https://baptiste-faisy--sam3-eu-a100-sam3live-web.eu-west.modal.run",
+        )
+        assertTrue("le preset retiré doit être reconnu", SamRegion.isPreset(retire.samBaseUrl))
+
+        val seed = seeded(retire, build)
+
+        assertTrue("le preset retiré ne doit pas figer l'ancien workspace", seed.samBaseUrl.isEmpty())
+    }
+
     /** App d'avant le 2026-10-27 : réglages d'usine InferHub + clé déjà saisie (ou héritée). */
     private val ancienne = Settings.Default.copy(
         llmBaseUrl = "https://api.inferhub.dev/v1",

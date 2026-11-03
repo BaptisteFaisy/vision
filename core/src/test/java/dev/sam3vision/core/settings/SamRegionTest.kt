@@ -88,4 +88,22 @@ class SamRegionTest {
         assertTrue(SamRegion.GPU_LEASE_LINE.contains("25-38"))
         assertTrue(SamRegion.GPU_LEASE_LINE.contains("2-7"))
     }
+
+    @Test
+    fun `les presets retires restent des presets, pas une saisie manuelle`() {
+        // Migration gaiamelie (03/11) : une URL baptiste-faisy persistée par une
+        // ancienne version n'a jamais été un choix — l'app ne doit pas appeler
+        // l'ancien workspace à vie.
+        assertTrue(SamRegion.isPreset("https://baptiste-faisy--sam3-eu-a100-sam3live-web.eu-west.modal.run"))
+        assertTrue(SamRegion.isPreset("  https://baptiste-faisy--sam3-us-a100-sam3live-web.us-east.modal.run/  "))
+    }
+
+    @Test
+    fun `un preset retire herite ne fige ni la region ni l endpoint`() {
+        val settings = Settings.Default.copy(
+            samRegion = SamRegion.Us,
+            samBaseUrl = "https://baptiste-faisy--sam3-eu-a100-sam3live-web.eu-west.modal.run",
+        )
+        assertEquals(SamRegion.Us.presetBaseUrl, settings.resolveSamEndpoint())
+    }
 }
