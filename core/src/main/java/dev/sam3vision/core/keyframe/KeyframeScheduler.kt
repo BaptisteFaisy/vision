@@ -16,7 +16,8 @@ import dev.sam3vision.core.live.FrameGate
  * Sûr entre threads (`@Synchronized`) : appelable depuis le thread caméra et le thread IO.
  */
 class KeyframeScheduler(
-    private val config: KeyframeConfig = KeyframeConfig(),
+    /** Exposée pour verrouiller la politique en test (référence ou terrain). */
+    internal val config: KeyframeConfig = KeyframeConfig(),
     private val clock: () -> Long = System::currentTimeMillis,
 ) {
 

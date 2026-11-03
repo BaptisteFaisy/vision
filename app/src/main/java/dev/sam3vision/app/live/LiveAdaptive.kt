@@ -1,6 +1,7 @@
 package dev.sam3vision.app.live
 
 import dev.sam3vision.core.keyframe.FrameSignal
+import dev.sam3vision.core.keyframe.KeyframeConfig
 import dev.sam3vision.core.keyframe.KeyframeDecision
 import dev.sam3vision.core.keyframe.KeyframeScheduler
 import dev.sam3vision.core.keyframe.KeyframeStats
@@ -19,10 +20,12 @@ import dev.sam3vision.core.model.LiveFrame
  * ne change.
  *
  * Q9 : [KeyframeScheduler] ne fait envoyer qu'une frame clé quand les masques en
- * service sont périmés (~2/s au lieu de ~5/s) ; entre deux keyframes, la propagation
- * locale (`boxPredictionEnabled`) comble l'intervalle — sans elle, les masques ont
- * jusqu'à 500 ms. Le signal est neutre (pas d'estimateur branché) plus la présence
- * d'objets de la dernière réponse : `STARTUP`/`EXPIRED`/`LOST` décident seuls.
+ * service sont périmés (~3/s) ; entre deux keyframes, la propagation locale
+ * (`boxPredictionEnabled`) comble l'intervalle — sans elle, les masques ont jusqu'à
+ * 300 ms. Le signal est neutre (pas d'estimateur branché) plus la présence d'objets
+ * de la dernière réponse : `STARTUP`/`EXPIRED`/`LOST` décident seuls. La politique
+ * est [KeyframeConfig.Field] (mesure v18 : serveur ~52 ms file vide), pas la
+ * référence L13 (500 ms) : mêmes garde-fous (un seul vol, rafale 2, repli, 12 s).
  *
  * Les deux sont **allumés par défaut** : [admit] ne laisse passer que les keyframes
  * et [jpegQuality] suit le palier courant. `configure` suit les Réglages (A/B
@@ -37,7 +40,8 @@ class LiveAdaptive(
     /** Qualité JPEG de la chaîne (65 le Direct 512 px, 55 iSee 320 px) : le palier 0. */
     private val baseQuality: Int,
     private val regulator: UploadRegulator = UploadRegulator(QualityTiers),
-    private val scheduler: KeyframeScheduler = KeyframeScheduler(),
+    /** Politique terrain par défaut ([KeyframeConfig.Field]) ; exposé pour les tests. */
+    internal val scheduler: KeyframeScheduler = KeyframeScheduler(KeyframeConfig.Field),
 ) {
 
     /** Poids montant adaptatif, allumé par défaut (Réglages, A/B runtime). */
