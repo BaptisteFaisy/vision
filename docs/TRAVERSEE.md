@@ -65,8 +65,10 @@ qui **précède** le verdict (plus petit nombre = plus forte priorité, donc
 
 ## 4. Détection en traversée
 
-- Liste unique normal/traversée (21 dehors, `docs/VOIX-DANGER.md` § 7) :
-  la bascule ne change plus les prompts. Le verdict lit le feu
+- Base unique normal/traversée (21 dehors, `docs/VOIX-DANGER.md` § 7) :
+  la traversée ajoute les véhicules en tête et écarte poubelle, souvenirs,
+  lampadaire (ordre user 03/11) — 21 envoyés, chien/enfant conservés.
+  Le verdict lit le feu
   (`pedestrian traffic light`) et les voitures (`car`) ; les niveaux 101
   et 102 lisent `person` et `curb`.
 - Couleur du feu : relue localement sur **chaque** frame caméra (le moteur

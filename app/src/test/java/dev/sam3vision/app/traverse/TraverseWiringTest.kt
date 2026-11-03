@@ -3,6 +3,7 @@ package dev.sam3vision.app.traverse
 import dev.sam3vision.app.isee.CrossingLight
 import dev.sam3vision.core.crossing.CrossingPrompts
 import dev.sam3vision.core.crossing.CrossingState
+import dev.sam3vision.core.live.LivePrompts
 import dev.sam3vision.core.model.LiveFrame
 import dev.sam3vision.core.model.SegObject
 import dev.sam3vision.core.settings.Settings
@@ -14,6 +15,7 @@ import dev.sam3vision.core.traverse.TraversePhase
 import dev.sam3vision.core.traverse.TraversePipeline
 import dev.sam3vision.core.traverse.TraversePlayer
 import dev.sam3vision.core.traverse.TraverseVoice
+import dev.sam3vision.core.traverse.VehicleConcepts
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.runBlocking
 import kotlin.coroutines.EmptyCoroutineContext
@@ -308,6 +310,19 @@ class TraverseWiringTest {
         assertTrue("dog" in prompts)
         assertFalse("feu tricolore" in prompts)
         assertFalse("traffic light" in prompts)
+    }
+
+    @Test
+    fun `prompts - poubelle souvenirs lampadaire ecartes, chien enfant gardes`() {
+        val prompts = traversePrompts(LivePrompts.default)
+
+        assertEquals(21, prompts.size)
+        assertEquals(VehicleConcepts.PROMPTS, prompts.take(5))
+        assertFalse("trash can" in prompts)
+        assertFalse("souvenir shop" in prompts)
+        assertFalse("street lamp" in prompts)
+        assertTrue("dog" in prompts)
+        assertTrue("child" in prompts)
     }
 
     @Test
