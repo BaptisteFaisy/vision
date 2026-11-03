@@ -51,6 +51,32 @@ class GlassesAudioPlanTest {
     }
 
     @Test
+    fun `sans besoin de voix mesure la camera reste seule meme video coupee`() {
+        // SILENT opportuniste : dictée au repos + enregistrement muet = 256 kbit/s à la vidéo.
+        assertEquals(listOf(GlassesAudioPlan.SILENT), GlassesAudioPlan.ladder(audioAllowed = true, videoActive = true, voiceNeeded = false))
+        assertEquals(listOf(GlassesAudioPlan.SILENT), GlassesAudioPlan.ladder(audioAllowed = true, videoActive = false, voiceNeeded = false))
+    }
+
+    @Test
+    fun `avec besoin de voix le plan est inchange`() {
+        assertEquals(
+            listOf(16_000, 0),
+            GlassesAudioPlan.ladder(audioAllowed = true, videoActive = true, voiceNeeded = true).map { it.hertz },
+        )
+        assertEquals(
+            listOf(16_000, 48_000, 0),
+            GlassesAudioPlan.ladder(audioAllowed = true, videoActive = false, voiceNeeded = true).map { it.hertz },
+        )
+    }
+
+    @Test
+    fun `le cout lien est celui du PCM 16 bits`() {
+        assertEquals(256_000, GlassesAudioPlan.linkBitsPerSecond(GlassesAudioPlan.PREFERRED))
+        assertEquals(768_000, GlassesAudioPlan.linkBitsPerSecond(GlassesAudioPlan.FALLBACK))
+        assertEquals(0, GlassesAudioPlan.linkBitsPerSecond(GlassesAudioPlan.SILENT))
+    }
+
+    @Test
     fun `la dictee ne prend le micro des lunettes que si tout est pret`() {
         assertTrue(GlassesAudioPlan.usable(connected = true, streaming = true, audioAllowed = true))
         assertFalse(GlassesAudioPlan.usable(connected = false, streaming = true, audioAllowed = true))

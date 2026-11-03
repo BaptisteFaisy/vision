@@ -21,6 +21,9 @@ object GlassesAudioPlan {
     /** Micro non autorisé côté app Meta AI : on garde la caméra seule, sans code mort. */
     val SILENT = AudioChoice(hertz = 0, channels = 0)
 
+    /** Le flux porte du PCM 16 bits : 16 bits par échantillon et par canal. */
+    private const val PCM_BITS_PER_SAMPLE = 16
+
     /**
      * Essais dans l'ordre, du meilleur au dernier recours. Caméra seule en dernier : un
      * codec audio refusé ne doit pas priver l'app de la caméra.
@@ -29,11 +32,23 @@ object GlassesAudioPlan {
      * est sauté : il doublait presque la charge du lien radio pour un micro que
      * la dictée rééchantillonne à 16 kHz de toute façon. Le 48 kHz reste réservé
      * aux modes sans vidéo (photo, dictée seule), où le lien ne porte que lui.
+     *
+     * [voiceNeeded] = la voix sert vraiment (dictée en cours ou enregistrement sonore),
+     * mesuré par l'appelant, jamais supposé. À `false`, caméra seule d'emblée : les
+     * 256 kbit/s du 16 kHz restent à la vidéo. Défaut `true` = voix joignable, comme avant.
      */
-    fun ladder(audioAllowed: Boolean, videoActive: Boolean): List<AudioChoice> =
+    fun ladder(audioAllowed: Boolean, videoActive: Boolean, voiceNeeded: Boolean = true): List<AudioChoice> =
         if (!audioAllowed) listOf(SILENT)
+        else if (!voiceNeeded) listOf(SILENT)
         else if (videoActive) listOf(PREFERRED, SILENT)
         else listOf(PREFERRED, FALLBACK, SILENT)
+
+    /**
+     * Coût d'un choix sur le lien radio, en bits/s : PCM 16 bits à [AudioChoice.hertz],
+     * 0 quand silencieux. Source unique du « 256k » pour l'arbitrage débit vidéo/audio.
+     */
+    fun linkBitsPerSecond(choice: AudioChoice): Int =
+        if (choice.silent) 0 else choice.hertz * PCM_BITS_PER_SAMPLE * choice.channels
 
     /**
      * La dictée ne prend le micro des lunettes que si le flux tourne **et** que le micro est
