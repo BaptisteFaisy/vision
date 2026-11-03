@@ -11,6 +11,7 @@ import dev.sam3vision.core.live.ScreenTimings
 import dev.sam3vision.app.ForegroundTracker
 import dev.sam3vision.app.GpuWake
 import dev.sam3vision.app.MASK_ALPHA
+import dev.sam3vision.app.ProbeWorkDispatcher
 import dev.sam3vision.app.maskColorAt
 import dev.sam3vision.app.TRANSPORT_WS
 import dev.sam3vision.core.distance.DistanceMeter
@@ -485,7 +486,11 @@ _state.update { it.cleared() }
     fun noteDrawn() {
         if (!chronology.noteDrawn()) return
         val snap = chronology.snapshot(_state.value.timings)
-        _state.update { current -> current.copy(timings = snap) }.also { LiveLatencyLog.frame(snap) }
+        _state.update { current -> current.copy(timings = snap) }.also {
+            // Journal hors main (fil sonde, ordonné) : le formatage + 2× Log.i
+            // ne bloquent plus le main — sous pression logd, Log.i attend.
+            scope.launch(ProbeWorkDispatcher) { LiveLatencyLog.frame(snap) }
+        }
     }
 
 }
