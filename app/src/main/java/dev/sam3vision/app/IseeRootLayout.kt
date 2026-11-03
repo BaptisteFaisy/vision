@@ -6,6 +6,7 @@ import android.graphics.RectF
 import android.os.Build
 import android.os.Handler
 import android.os.Looper
+import android.util.Log
 import android.view.MotionEvent
 import android.widget.FrameLayout
 import androidx.annotation.RequiresApi
@@ -123,6 +124,7 @@ class IseeRootLayout(context: Context) : FrameLayout(context) {
             override fun onSwipeHoldStart() {
                 swipeCapturing = true
                 brain.handOffToHold()
+                Log.d(TAG, "maintien GPS : micro destination ouvert")
                 onSwipeHoldStart?.invoke()
             }
 
@@ -130,6 +132,10 @@ class IseeRootLayout(context: Context) : FrameLayout(context) {
                 swipeCapturing = false
                 brain.holdReleased()
                 onSwipeHoldEnd?.invoke()
+            }
+
+            override fun onSwipeHoldCancel() {
+                Log.d(TAG, "maintien GPS annulé (glissement repris)")
             }
         },
     )
@@ -320,5 +326,8 @@ class IseeRootLayout(context: Context) : FrameLayout(context) {
     companion object {
         /** Bande latérale exclue du geste système (retour) : moindre que le plafond 200dp. */
         private const val EXCLUSION_SIDE_DP = 48f
+
+        /** Traces du maintien GPS (ouverture/annulation du micro destination). */
+        private const val TAG = "IseeSwipeHold"
     }
 }
