@@ -355,14 +355,16 @@ _state.update { it.cleared() }
      */
     fun wantsFrame(): Boolean {
         if (!foregroundGate.foreground) return false
-        publishLink() // silence : l'état dit « pas de réponse depuis N s », pas « GPU »
+        // Un seul « maintenant » par appel : le lien et la cadence jugent le même instant.
+        val nowMs = System.currentTimeMillis()
+        publishLink(nowMs) // silence : l'état dit « pas de réponse depuis N s », pas « GPU »
         val active = session ?: return false
         // Réserve pleine et fraîche : convertir serait du CPU jeté — refus
         // compté (jamais silencieux), la suivante est prioritaire. Périmée
         // (> 1 période caméra) : la réalimenter, la suivante part au drain.
         if (reserve.pending && !reserve.stale(clock(), STALE_RESERVE_MS)) { priorityArmed = true; noteSkipped(); return false }
         if (active.saturated || priorityArmed) return true
-        return cadence.isDue(System.currentTimeMillis())
+        return cadence.isDue(nowMs)
     }
 
     /**
