@@ -59,6 +59,22 @@ def deploy_sha() -> str:
     return os.environ.get("DEPLOY_SHA") or "unknown"
 
 
+async def _accept_ws(websocket) -> bool:
+    """Handshake gardé : un pair parti avant ``accept()`` rend 0 session, pas une trace.
+
+    La durée du handshake est loggée (sonde F3). Vrai si le socket est ouvert.
+    """
+    started = time.monotonic()
+    try:
+        await websocket.accept()
+    except Exception as exc:  # noqa: BLE001 — pair parti pendant le handshake
+        print(f"ws: accept impossible ({exc}), 0 session", flush=True)
+        return False
+    took_ms = (time.monotonic() - started) * 1000
+    print(f"ws: accept /live/ws en {took_ms:.0f} ms", flush=True)
+    return True
+
+
 class Sam3LiveService:
     """Modèle chargé une fois, leviers activables, verrou GPU unique.
 
@@ -465,19 +481,9 @@ class Sam3LiveService:
 
         @api.websocket("/live/ws")
         async def live_ws(websocket: WebSocket):
-            """Même pipeline que POST /live : un message texte JSON ou binaire (M1) par frame.
-
-            Handshake gardé : un pair parti avant ``accept()`` rend 0 session
-            (log seul), pas une trace — et sa durée est loggée (sonde F3).
-            """
-            started = time.monotonic()
-            try:
-                await websocket.accept()
-            except Exception as exc:  # noqa: BLE001 — pair parti pendant le handshake
-                print(f"ws: accept impossible ({exc}), 0 session", flush=True)
+            """Même pipeline que POST /live ; handshake via _accept_ws (0 session si refusé)."""
+            if not await _accept_ws(websocket):
                 return
-            took_ms = (time.monotonic() - started) * 1000
-            print(f"ws: accept /live/ws en {took_ms:.0f} ms", flush=True)
             await service._ws_loop(websocket)
 
         return api
