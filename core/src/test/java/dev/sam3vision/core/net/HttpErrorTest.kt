@@ -40,4 +40,27 @@ class HttpErrorTest {
         assertTrue(error.message!!.contains("409"))
         assertTrue(error.message!!.contains("try again"))
     }
+
+    @Test
+    fun `un corps d erreur geant est borne a 8 Ko`() {
+        val error = httpError(500, "x".repeat(100_000))
+
+        assertTrue("attendu Http, obtenu $error", error is ApiError.Http)
+        assertEquals(MAX_ERROR_BODY_CHARS, (error as ApiError.Http).body.length)
+    }
+
+    @Test
+    fun `un petit corps d erreur est garde tel quel`() {
+        val error = httpError(500, "boom")
+
+        assertTrue("attendu Http, obtenu $error", error is ApiError.Http)
+        assertEquals("boom", (error as ApiError.Http).body)
+    }
+
+    @Test
+    fun `le 404 modal reste detecte sur un corps geant`() {
+        val error = httpError(404, "modal-http: invalid function call\n" + "x".repeat(100_000))
+
+        assertTrue("attendu BackendStopped, obtenu $error", error is ApiError.BackendStopped)
+    }
 }
