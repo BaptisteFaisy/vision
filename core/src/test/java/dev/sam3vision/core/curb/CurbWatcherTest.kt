@@ -45,6 +45,22 @@ class CurbWatcherTest {
     }
 
     @Test
+    fun `bordure seule reconnue, trottoir et marche non`() {
+        assertTrue(CurbConcepts.isCurbEdge("curb"))
+        assertTrue(CurbConcepts.isCurbEdge("kerb"))
+        assertTrue(CurbConcepts.isCurbEdge("bordure"))
+        assertTrue(CurbConcepts.isCurbEdge("Bordures"))
+        assertTrue(CurbConcepts.isCurbEdge("bord"))
+        assertTrue(CurbConcepts.isCurbEdge("curbstone"))
+        assertFalse(CurbConcepts.isCurbEdge("sidewalk"))
+        assertFalse(CurbConcepts.isCurbEdge("trottoir"))
+        assertFalse(CurbConcepts.isCurbEdge("step"))
+        assertFalse(CurbConcepts.isCurbEdge("rebord"))
+        assertFalse(CurbConcepts.isCurbEdge("car"))
+        assertFalse(CurbConcepts.isCurbEdge("  "))
+    }
+
+    @Test
     fun `rebord et rampes reconnus, bateau et voilier non`() {
         assertTrue(CurbConcepts.isCurb("rebord"))
         assertFalse("bateau sorti v4", CurbConcepts.isCurb("curb ramp"))
