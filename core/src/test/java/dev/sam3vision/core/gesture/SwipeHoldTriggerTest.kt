@@ -100,6 +100,25 @@ class SwipeHoldTriggerTest {
     }
 
     @Test
+    fun `pas rapides post-armement survivent sous 48px`() {
+        trigger.arm(10f, 90f)
+        trigger.onMove(10f, 120f)
+        trigger.onMove(10f, 155f)
+        scheduler.elapse()
+        assertEquals(listOf("start"), recorder.events)
+        assertTrue(trigger.holding)
+    }
+
+    @Test
+    fun `bond extreme au-dela de 48px annule toujours`() {
+        trigger.arm(10f, 90f)
+        trigger.onMove(10f, 150f)
+        scheduler.elapse()
+        assertEquals(emptyList<String>(), recorder.events)
+        assertEquals(SwipeHoldTrigger.Phase.Idle, trigger.phase)
+    }
+
+    @Test
     fun `glissement repris signale l'annulation`() {
         val events = mutableListOf<String>()
         val watched = SwipeHoldTrigger(scheduler, object : SwipeHoldTrigger.Listener {
