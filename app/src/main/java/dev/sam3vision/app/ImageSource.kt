@@ -60,7 +60,9 @@ fun bitmapToJpegBase64(bitmap: Bitmap, quality: Int = JPEG_QUALITY): String =
 
 /** Bitmap → JPEG brut : le direct binaire n'a pas besoin du détour base64. */
 fun bitmapToJpeg(bitmap: Bitmap, quality: Int = JPEG_QUALITY): ByteArray {
-    val buffer = ByteArrayOutputStream()
+    // 16 Ko d'emblée : un 320/q55 y tient sans regrow (le défaut 32 o copiait
+    // ~2× la taille finale en regrows à chaque frame, des deux chemins).
+    val buffer = ByteArrayOutputStream(16 * 1024)
     bitmap.compress(Bitmap.CompressFormat.JPEG, quality, buffer)
     return buffer.toByteArray()
 }
