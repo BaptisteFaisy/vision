@@ -27,12 +27,16 @@ object IseePortrait {
     const val REST_Y = 0.40f
     const val REST_R = 0.335f
 
-    /** Caméra ouverte : plus haute au repos, compacte pendant la parole. */
-    const val PICTURE_H = 0.58f
+    /**
+     * Caméra ouverte ×1,25 (demande user 2026-11-03) : parole 62,5 %,
+     * guidage 75 %. Le repos (0,64) est hors prod — le pane fige speech=1 —
+     * et reste tel quel : plus haut, la boule et la phrase sortiraient.
+     */
+    const val PICTURE_H = 0.725f
     const val PICTURE_IDLE_H = 0.64f
-    const val PICTURE_SPEAKING_H = 0.50f
+    const val PICTURE_SPEAKING_H = 0.625f
     /** Guidage (carte en bas, boule effacée) : la rue grandit, la phrase garde sa place. */
-    const val PICTURE_GUIDING_H = 0.60f
+    const val PICTURE_GUIDING_H = 0.75f
     const val CAM_Y = 0.555f
     const val CAM_R = 0.20f
 

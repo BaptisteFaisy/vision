@@ -35,7 +35,8 @@ class IseePortraitTest {
             val spoken = portraitGeometry(w, h, 1f, 1f)
             assertEquals(h * IseePortrait.PICTURE_SPEAKING_H, spoken.pictureH, 0.01f)
             assertTrue(spoken.pictureH < h * IseePortrait.PICTURE_H)
-            assertTrue(spoken.textTop + h * 0.14f < h)
+            // Caméra ×1,25 (2026-11-03) : la phrase garde 5 % sous son haut.
+            assertTrue(spoken.textTop + h * 0.05f < h)
         }
     }
 
@@ -111,7 +112,7 @@ class IseePortraitTest {
     fun `la geometrie Portrait est figee`() {
         assertEquals(0.40f, IseePortrait.REST_Y, 0f)
         assertEquals(0.335f, IseePortrait.REST_R, 0f)
-        assertEquals(0.58f, IseePortrait.PICTURE_H, 0f)
+        assertEquals(0.725f, IseePortrait.PICTURE_H, 0f)
         assertEquals(0.555f, IseePortrait.CAM_Y, 0f)
         assertEquals(0.20f, IseePortrait.CAM_R, 0f)
         assertEquals(0.34f, IseePortrait.FADE, 0f)
@@ -123,7 +124,8 @@ class IseePortraitTest {
             val g = portraitGeometry(w, h, 1f, 1f, guiding = true)
             assertEquals(h * IseePortrait.PICTURE_GUIDING_H, g.pictureH, 0.01f)
             assertTrue(g.pictureH > h * IseePortrait.PICTURE_SPEAKING_H)
-            assertTrue(g.textTop < h)
+            // Boule effacée en guidage : la phrase est sous la rue, pas sous la boule.
+            assertTrue(g.pictureH + h * 0.05f < h)
         }
     }
 
