@@ -21,12 +21,18 @@ import kotlin.math.hypot
  * maintien. L'appui long normal ne peut pas coexister avec une attente
  * ici : il s'est déjà annulé au-delà de son slop quand le balayage est
  * confirmé (80 px >> 48 px).
+ *
+ * L'armement a lieu au pic de vitesse (swipe confirmé à 80 px) : pendant
+ * [ARM_GRACE_MS], les pas suivent l'ancre sans jugement — c'est la fin du
+ * swipe, pas un glissement repris. Le jugement ne porte que sur la fin de
+ * l'attente ; le relâchement reste jugé dès le premier pas ([UP_EARLY]).
  */
 class SwipeHoldTrigger(
     private val scheduler: LongPressTrigger.DelayScheduler,
     private val listener: Listener,
     private val holdMs: Long = LongPressTrigger.DEFAULT_LONG_PRESS_MS,
     private val slopPx: Float = HOLD_SLOP_PX,
+    private val nowMs: () -> Long = { System.nanoTime() / 1_000_000 },
 ) {
 
     /** Rappels d'état, émis sur le thread du scheduler (main thread dans l'app). */
@@ -81,6 +87,14 @@ class SwipeHoldTrigger(
          * ([CancelReason.UP_EARLY], GPS seul), pas besoin du 24 px.
          */
         const val HOLD_SLOP_PX = 48f
+
+        /**
+         * Grâce post-armement : le doigt file encore (fin de swipe à
+         * 4000-8000 px/s), ses pas suivent l'ancre sans JUMP. Sous le
+         * seuil de tenue (300 ms) : un vrai fling relâche avant
+         * ([UP_EARLY]), un glissement repris après se fait juger.
+         */
+        const val ARM_GRACE_MS = 200L
     }
 
     var phase: Phase = Phase.Idle
@@ -91,6 +105,7 @@ class SwipeHoldTrigger(
     private var cancelTimer: (() -> Unit)? = null
     private var holdX = 0f
     private var holdY = 0f
+    private var armedAtMs = 0L
 
     /**
      * Balayage vers le bas confirmé en ([x], [y]) : arme le maintien.
@@ -101,6 +116,7 @@ class SwipeHoldTrigger(
         resetSilent()
         holdX = x
         holdY = y
+        armedAtMs = nowMs()
         phase = Phase.Pending
         cancelTimer = scheduler.schedule(holdMs) {
             if (phase == Phase.Pending) {
@@ -111,12 +127,18 @@ class SwipeHoldTrigger(
     }
 
     /**
-     * Glissement : un bond franc au-delà du seuil abandonne l'attente
-     * ([CancelReason.JUMP_SLOP]) ; la dérive lente déplace l'ancre et
-     * garde le maintien — le doigt finit son slide en décélérant.
+     * Glissement : dans la grâce post-armement, tout pas suit l'ancre
+     * (fin du swipe) ; après, un bond franc au-delà du seuil abandonne
+     * l'attente ([CancelReason.JUMP_SLOP]), la dérive lente déplace
+     * l'ancre et garde le maintien.
      */
     fun onMove(x: Float, y: Float) {
         if (phase != Phase.Pending) return
+        if (nowMs() - armedAtMs < ARM_GRACE_MS) {
+            holdX = x
+            holdY = y
+            return
+        }
         if (hypot(x - holdX, y - holdY) > slopPx) {
             abandon(CancelReason.JUMP_SLOP)
         } else {
@@ -175,6 +197,7 @@ class SwipeHoldTrigger(
     private fun resetSilent() {
         cancelTimer?.invoke()
         cancelTimer = null
+        armedAtMs = 0L
         phase = Phase.Idle
     }
 
