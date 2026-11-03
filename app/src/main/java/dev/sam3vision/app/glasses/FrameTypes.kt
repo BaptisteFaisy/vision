@@ -204,15 +204,15 @@ internal class BufferScratch {
     private var bytes = ByteArray(0)
     private var ints = IntArray(0)
 
-    /** Tampon d'octets d'au moins [size] cases (repousse si trop court). */
+    /** Tampon d'octets d'au moins [size] cases (repousse amortie, ×2). */
     fun bytes(size: Int): ByteArray {
-        if (bytes.size < size) bytes = ByteArray(size)
+        if (bytes.size < size) bytes = ByteArray(maxOf(size, bytes.size * 2))
         return bytes
     }
 
-    /** Tampon d'entiers d'au moins [size] cases (repousse si trop court). */
+    /** Tampon d'entiers d'au moins [size] cases (repousse amortie, ×2). */
     fun ints(size: Int): IntArray {
-        if (ints.size < size) ints = IntArray(size)
+        if (ints.size < size) ints = IntArray(maxOf(size, ints.size * 2))
         return ints
     }
 }
