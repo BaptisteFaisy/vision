@@ -95,7 +95,6 @@ fun LiveScreen(
     /** `Settings.fireExposureCompensation` : coupé par défaut, borné (voir `LiveSensorControl`). */
     fireExposureCompensation: Boolean = false,
 ) {
-    // Barre de statut : cachée au niveau navigation (AppNav, iSee + direct).
     val context = LocalContext.current
     // Tranches scopées (voir LiveSlices) : l'étage caméra ne recompose pas sur la
     // voix, la mémoire ou la narration, ni les bandeaux sur les seuls masques.
