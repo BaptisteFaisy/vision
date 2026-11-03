@@ -97,9 +97,10 @@ data class LiveProbeState(
     /** Dernier état annoncé du feu (`null` = rien d'annoncé encore). */
     val crossing: dev.sam3vision.core.crossing.CrossingState? = null,
     /**
-     * Boîte normalisée du feu de la dernière frame (`x1,y1,x2,y2` en 0..1), pour
-     * poser l'état **sur la vidéo** ([CrossingOverlayLayer]). `null` = aucun feu
-     * dans le champ, ou mode coupé : rien à marquer.
+     * Boîte normalisée du feu de la dernière frame (`x1,y1,x2,y2` en 0..1).
+     * Gardée avec l'état publié (même système crossing) mais plus dessinée :
+     * le cadre rouge/vert sur la vidéo est retiré (ordre user du 03/11).
+     * `null` = aucun feu dans le champ, ou mode coupé.
      */
     val crossingBox: List<Float>? = null,
     /**

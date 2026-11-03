@@ -69,3 +69,11 @@ private const val SCAN_BANNER_MAX_LINES = 3
  * trop petite.
  */
 private const val SCAN_TOP_MARGIN_DP = 104f
+
+/** Texte des bandeaux (scan traversée) : lisible en marchant. */
+internal const val VERDICT_FONT_SP = 14f
+
+internal const val VERDICT_PAD_H_PX = 10f
+internal const val VERDICT_PAD_V_PX = 4f
+
+internal const val TAG_CORNER_DP = 6f
