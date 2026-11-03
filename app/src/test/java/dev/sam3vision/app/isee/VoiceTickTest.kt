@@ -124,13 +124,42 @@ class VoiceTickTest {
     @Test
     fun `tick ne re-propose pas l identique avant une seconde`() {
         val calls = mutableListOf<Long>()
-        VoiceTick.report(VoiceTick.SRC_FENCE, VoiceWish(4, "grillage", "test-voicetick-dedup"), 0L)
+        val wish = VoiceWish(4, "grillage", "test-voicetick-dedup")
+        VoiceTick.report(VoiceTick.SRC_FENCE, wish, 0L)
 
         assertTrue(VoiceTick.tick(0L, offer = { _, at -> calls += at; true }))
         assertFalse(VoiceTick.tick(700L, offer = { _, at -> calls += at; true }))
+        // Vœu consommé par le premier tick : re-rapporté, il reparle à 1 s tout rond.
+        VoiceTick.report(VoiceTick.SRC_FENCE, wish, 1_000L)
         assertTrue(VoiceTick.tick(1_000L, offer = { _, at -> calls += at; true }))
 
         assertEquals(listOf(0L, 1_000L), calls)
+    }
+
+    @Test
+    fun `tick re-rapporte avant une seconde tait puis reparle`() {
+        val calls = mutableListOf<Long>()
+        val wish = VoiceWish(4, "grillage", "test-voicetick-samems")
+        VoiceTick.report(VoiceTick.SRC_FENCE, wish, 0L)
+
+        assertTrue(VoiceTick.tick(0L, offer = { _, at -> calls += at; true }))
+        // Re-rapporté aussitôt : SAME_MS tait (refus, non consommé)...
+        VoiceTick.report(VoiceTick.SRC_FENCE, wish, 100L)
+        assertFalse(VoiceTick.tick(700L, offer = { _, at -> calls += at; true }))
+        // ...puis reparle à 1 s tout rond (entrée conservée car refusée).
+        assertTrue(VoiceTick.tick(1_000L, offer = { _, at -> calls += at; true }))
+
+        assertEquals(listOf(0L, 1_000L), calls)
+    }
+
+    @Test
+    fun `tick consomme le voeu servi`() {
+        VoiceTick.report(VoiceTick.SRC_FENCE, VoiceWish(4, "grillage", "test-voicetick-consomme"), 0L)
+
+        assertTrue(VoiceTick.tick(0L, offer = { _, _ -> true }))
+
+        // Encore frais (2 s) mais consommé : le battement ne redit pas.
+        assertNull(VoiceTick.pick(0L))
     }
 
     @Test
@@ -182,7 +211,7 @@ class VoiceTickTest {
             runCurrent()
             assertEquals(listOf(700L), calls)
 
-            // Battement suivant : même vœu dans la seconde → l'offre n'est pas rappelée.
+            // Battement suivant : vœu consommé → silence, l'offre n'est pas rappelée.
             advanceTimeBy(700)
             runCurrent()
             assertEquals(1, calls.size)

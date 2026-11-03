@@ -242,7 +242,11 @@ internal fun LiveProbe.observeFenceOpening(
             if (placeMode() != PictoPlaceMode.DEHORS) return@collect
             val readings = st.distanceLayer?.readings ?: return@collect
             val signal = FenceOpeningSignal.of(readings, st.width, st.height)
-            val cue = watcher.onSignal(signal, System.currentTimeMillis(), language()) ?: return@collect
+            val cue = watcher.onSignal(signal, System.currentTimeMillis(), language())
+            if (cue == null) {
+                VoiceTick.report(VoiceTick.SRC_FENCE, null, System.currentTimeMillis())
+                return@collect
+            }
             if (VoiceBus.stairsSpeaking() || VoiceBus.sidewalkSpeaking()) return@collect
             VoiceTick.report(
                 VoiceTick.SRC_FENCE,
@@ -400,7 +404,11 @@ internal fun LiveProbe.observeSidewalk(
             if (st.crossingActive) return@collect
             if (placeMode() != PictoPlaceMode.DEHORS) return@collect
             val position = this@observeSidewalk.voice.lastSidewalk
-            val cue = watcher.onPosition(position, System.currentTimeMillis(), language()) ?: return@collect
+            val cue = watcher.onPosition(position, System.currentTimeMillis(), language())
+            if (cue == null) {
+                VoiceTick.report(VoiceTick.SRC_SIDEWALK, null, System.currentTimeMillis())
+                return@collect
+            }
             VoiceTick.report(
                 VoiceTick.SRC_SIDEWALK,
                 VoiceWish(cue.level, cue.phrase, cue.antiRepeatKey),

@@ -220,6 +220,31 @@ class StairsUncuttableTest {
     }
 
     @Test
+    fun `un compte frais se dit, a 1 s il perime`() {
+        val now = longArrayOf(1_000L)
+        VoiceBus.clock = { now[0] }
+        VoiceBus.post(OutdoorLevel.STAIRS, "5 marches.")
+        VoiceBus.post(OutdoorLevel.STAIRS, "6 marches.")
+
+        // À 1 s tout rond : âge 1000, pas > 1000 — encore frais, il se dit.
+        now[0] = 2_000L
+        VoiceBus.onSpeechIdle()
+        assertEquals(2, speaker.said.size)
+
+        // Le reset rend la clock réelle : on la réinjecte (le speaker survit).
+        VoiceBus.reset()
+        now[0] = 1_000L
+        VoiceBus.clock = { now[0] }
+        VoiceBus.post(OutdoorLevel.STAIRS, "5 marches.")
+        VoiceBus.post(OutdoorLevel.STAIRS, "6 marches.")
+
+        // À 1 s + 1 ms : âge 1001 > 1000 — périmé, il ne se dit plus.
+        now[0] = 2_001L
+        VoiceBus.onSpeechIdle()
+        assertEquals(3, speaker.said.size)
+    }
+
+    @Test
     fun `une coupe abandonne le compte en attente`() {
         VoiceBus.post(OutdoorLevel.STAIRS, "5 marches.")
         VoiceBus.post(OutdoorLevel.STAIRS, "6 marches.")

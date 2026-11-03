@@ -94,7 +94,11 @@ private fun LiveProbe.announceStairs(
             "escaliers: n=$stairsCount ageMs=${StairCannyCount.countAgeMs()} m=$stairsMeters annonce=${cue?.phrase}",
         )
     }
-    cue ?: return
+    if (cue == null) {
+        // Signal perdu : le vœu est effacé aussitôt (pas de fantôme au battement, ordre 03/11).
+        VoiceTick.report(VoiceTick.SRC_STAIRS, null, System.currentTimeMillis())
+        return
+    }
     VoiceTick.report(VoiceTick.SRC_STAIRS, VoiceWish(cue.level, cue.phrase, cue.antiRepeatKey, clips = cue.clips), System.currentTimeMillis())
     if (AntiRepeat.allow(cue.antiRepeatKey, System.currentTimeMillis())) {
         VoiceBus.post(cue.level, cue.phrase, antiRepeatKey = cue.antiRepeatKey, clips = cue.clips)
@@ -167,7 +171,11 @@ internal fun LiveProbe.observeStairsCount(
             val st = state.value
             if (st.crossingActive) continue
             if (placeMode() != PictoPlaceMode.DEHORS) continue
-            if (!stairsFoundOf(st).detected) continue
+            if (!stairsFoundOf(st).detected) {
+                // Escalier perdu de vue : le compte fantôme est effacé (pas de « 5 marches » après coup).
+                VoiceTick.report(VoiceTick.SRC_STAIRS_COUNT, null, nowMs())
+                continue
+            }
             // Trottoir absolu (§ 45) : le compteur attend sa fin — devant
             // `onTick`, pour que la fenêtre de répétition ne tourne pas.
             if (VoiceBus.sidewalkSpeaking()) continue
