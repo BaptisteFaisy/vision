@@ -74,6 +74,31 @@ class SwipeHoldTriggerTest {
     }
 
     @Test
+    fun `derive lente apres swipe garde le maintien`() {
+        trigger.arm(10f, 90f)
+        trigger.onMove(10f, 105f)
+        trigger.onMove(10f, 120f)
+        trigger.onMove(10f, 132f)
+        scheduler.elapse()
+        assertEquals(listOf("start"), recorder.events)
+        assertTrue(trigger.holding)
+    }
+
+    @Test
+    fun `glissement repris signale l'annulation`() {
+        val events = mutableListOf<String>()
+        val watched = SwipeHoldTrigger(scheduler, object : SwipeHoldTrigger.Listener {
+            override fun onSwipeHoldStart() { events += "start" }
+            override fun onSwipeHoldEnd() { events += "end" }
+            override fun onSwipeHoldCancel() { events += "cancel" }
+        })
+        watched.arm(10f, 90f)
+        watched.onMove(10f, 200f)
+        scheduler.elapse()
+        assertEquals(listOf("cancel"), events)
+    }
+
+    @Test
     fun `petit tremblement tolere`() {
         trigger.arm(10f, 90f)
         trigger.onMove(12f, 92f)
