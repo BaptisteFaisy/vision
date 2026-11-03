@@ -44,7 +44,8 @@ data class LateralNudge(
  * - **rien ne bornait le côté conseillé à l'espace réel** : ordre à 1,38 m à
  *   gauche sur un trottoir de 1,8 m ;
  * - **88 changements de mot en 120 s** : le côté clignotait d'une frame à
- *   l'autre.
+ *   l'autre (plus corrigé depuis le 03/11 : pas de tenue, ordre user —
+ *   voir règle 4) ;
  *
  * ### Règles tenues ici
  * 1. **Jamais muet par ambiguïté** : deux côtés occupés ⇒ on conseille le côté
@@ -58,9 +59,10 @@ data class LateralNudge(
  *    que l'approche est confirmée ([CONFIRM_DECREASES] diminutions ou piste
  *    connue), au-delà seulement sous [CLOSE_METERS] (compatibilité) — un
  *    humain au mouvement inconnu parle lui dès [PERSON_CLOSE_METERS] ;
- * 4. **hystérésis** : un côté choisi est tenu au moins [MIN_HOLD_MS], on ne
- *    change que si l'autre côté offre [SWITCH_GAIN_M] de dégagement en plus ou
- *    si l'obstacle qui motivait la tenue a disparu ;
+ * 4. **pas de tenue** (ordre user du 03/11) : le côté conseillé suit la
+ *    frame — aucun buffer right/left, aucun seuil de bascule. Le clignotement
+ *    mesuré par l'audit (88 changements en 120 s) est accepté : la voix redit
+ *    la direction à sa cadence, elle ne fige plus un côté périmé ;
  * 5. **espace** : un côté sans marge ([FreeSpace.EDGE_MARGIN_M]) est marqué
  *    [LateralNudge.tight] — on ne renvoie jamais un côté qui n'existe pas sans
  *    le dire.
@@ -80,8 +82,8 @@ class LateralNudgeTracker {
         val person: Boolean,
     )
 
-    /** Choix de la frame : direction, dégagement offert, marge suffisante ? */
-    private class Decision(val side: SteeringCap, val room: Float, val tight: Boolean)
+    /** Choix de la frame : direction conseillée, marge suffisante ? */
+    private class Decision(val side: SteeringCap, val tight: Boolean)
 
     /** Mémoire d'un côté : dernière distance, confirmations, fermeture vue. */
     private class SideTrack {
@@ -123,10 +125,6 @@ class LateralNudgeTracker {
         SteeringCap.Right to SideTrack(),
     )
 
-    /** Côté tenu par l'hystérésis et instant du choix, `null` = aucune tenue. */
-    private var heldSide: SteeringCap? = null
-    private var heldSinceMs: Long = 0L
-
     /**
      * Consigne de la frame, `null` **uniquement** si aucun obstacle n'est à
      * portée (ou si l'approche n'est pas encore prouvée : voir règle 3).
@@ -151,24 +149,19 @@ class LateralNudgeTracker {
         val range = Timing.rangeFor(speedMps)
         val left = read(SteeringCap.Left, atMs, labels, hfovDeg, range)
         val right = read(SteeringCap.Right, atMs, labels, hfovDeg, range)
-        if (left == null && right == null) {
-            heldSide = null
-            return null
-        }
+        if (left == null && right == null) return null
         val gate = listOfNotNull(left, right)
             .filter { passes(it, ageMs) }
             .minByOrNull { it.meters }
             ?: return null
         val base = wantedSide(left, right, free, range)
-        val wanted = decisionFor(base, labels, free, hfovDeg, left, right, range)
-        return nudgeOf(resolve(atMs, wanted, labels, free, hfovDeg, left, right, range), gate, ageMs)
+        val wanted = decisionFor(base, labels, free, hfovDeg)
+        return nudgeOf(wanted, gate, ageMs)
     }
 
-    /** Oublie les deux côtés et la tenue (nouvelle séance, fin de traversée). */
+    /** Oublie les deux côtés (nouvelle séance, fin de traversée). */
     fun reset() {
         tracks.values.forEach { it.forget() }
-        heldSide = null
-        heldSinceMs = 0L
     }
 
     /**
@@ -227,7 +220,7 @@ class LateralNudgeTracker {
 
     /**
      * Décision pour un côté visé : le veto personne inverse le côté s'il est
-     * libre de personne, sinon il tient le côté visé en marquant la contrainte
+     * libre de personne, sinon il garde le côté visé en marquant la contrainte
      * ([Decision.tight]) — on ne fonce pas, on serre.
      */
     private fun decisionFor(
@@ -235,62 +228,11 @@ class LateralNudgeTracker {
         labels: List<PlacedLabel>,
         free: FreeSpace,
         hfovDeg: Float,
-        left: Reading?,
-        right: Reading?,
-        range: Float,
     ): Decision {
         val vetoed = personAhead(labels, side, hfovDeg)
         val chosen = if (vetoed && !personAhead(labels, opposite(side), hfovDeg)) opposite(side) else side
         val tight = vetoed || lacksRoom(free, chosen)
-        return Decision(chosen, clearance(chosen, left, right, range), tight)
-    }
-
-    /** Applique l'hystérésis : le côté tenu garde la main tant qu'il se justifie. */
-    private fun resolve(
-        atMs: Long,
-        wanted: Decision,
-        labels: List<PlacedLabel>,
-        free: FreeSpace,
-        hfovDeg: Float,
-        left: Reading?,
-        right: Reading?,
-        range: Float,
-    ): Decision {
-        val current = heldSide
-        if (current == null) {
-            hold(wanted.side, atMs)
-            return wanted
-        }
-        if (current == wanted.side) return wanted
-        if (releaseHold(atMs, current, wanted, left, right, free, range)) {
-            hold(wanted.side, atMs)
-            return wanted
-        }
-        return decisionFor(current, labels, free, hfovDeg, left, right, range)
-    }
-
-    /**
-     * Vrai si la tenue doit être levée : l'obstacle qui la motivait (de l'autre
-     * côté) a disparu — sinon il faut [MIN_HOLD_MS] écoulé **et**
-     * [SWITCH_GAIN_M] de dégagement mesuré en plus pour l'autre côté.
-     */
-    private fun releaseHold(
-        atMs: Long,
-        current: SteeringCap,
-        wanted: Decision,
-        left: Reading?,
-        right: Reading?,
-        free: FreeSpace,
-        range: Float,
-    ): Boolean {
-        if (readingAt(opposite(current), left, right) == null) return true
-        if (atMs - heldSinceMs < MIN_HOLD_MS) return false
-        return wanted.room - clearance(current, left, right, range) >= SWITCH_GAIN_M
-    }
-
-    private fun hold(side: SteeringCap, atMs: Long) {
-        heldSide = side
-        heldSinceMs = atMs
+        return Decision(chosen, tight)
     }
 
     /** Consigne finale : côté + marge, sur la distance **projetée** de la menace. */
@@ -429,14 +371,5 @@ class LateralNudgeTracker {
 
         /** Sans observation au-delà, la piste est périmée (miroir véhicules). */
         const val STALE_MS = 1000L
-
-        /**
-         * Tenue minimale d'un côté (ms) : l'audit a compté 88 changements de mot
-         * en 120 s — un côté conseillé ne clignote plus frame à frame.
-         */
-        const val MIN_HOLD_MS = 1_500L
-
-        /** Dégagement supplémentaire exigé pour changer de côté (m). */
-        const val SWITCH_GAIN_M = 0.35f
     }
 }

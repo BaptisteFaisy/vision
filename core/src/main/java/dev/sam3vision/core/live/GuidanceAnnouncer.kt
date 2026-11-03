@@ -170,7 +170,7 @@ class GuidanceAnnouncer(
         lastNudge = null
         // L'évitement passe DEVANT la décision de couloir : en foule le couloir
         // est bouché presque en permanence, et c'est justement là que l'ordre
-        // doit venir de la piste (TTC, hystérésis, espace libre) et non du
+        // doit venir de la piste (TTC, espace libre) et non du
         // « côté le moins encombré » d'une frame. Un obstacle pile dans l'axe
         // n'a pas de côté : le couloir parle alors seul.
         val cue = nudgeOf(atMs, labels, hfovDeg, ageMs, speedMps, space)

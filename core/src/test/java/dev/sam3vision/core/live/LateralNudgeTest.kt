@@ -15,7 +15,9 @@ import org.junit.Test
  * - **jamais muet par ambiguïté** : deux côtés occupés ⇒ le côté le plus large ;
  * - **veto personne** : on inverse le côté s'il est libre de personne, sinon on
  *   conseille le côté visé en marquant `tight` (« serrez », on ne fonce pas) ;
- * - **décision en secondes** (TTC projeté, âge, vitesse) et **hystérésis**.
+ * - **décision en secondes** (TTC projeté, âge, vitesse), **sans tenue** : le
+ *   côté conseillé suit la frame (ordre user du 03/11 — la tenue 1,5 s est
+ *   supprimée, plus de buffer right/left).
  */
 class LateralNudgeTest {
 
@@ -456,44 +458,34 @@ class LateralNudgeTest {
     }
 
     @Test
-    fun `le cote conseille est tenu 1,5 s`() {
+    fun `le cote conseille suit la frame sans tenue`() {
         val suivi = LateralNudgeTracker()
         assertEquals(SteeringCap.Left, suivi.onFrame(0L, listOf(mur(0.7f, 1.4f)))!!.side)
 
         // Deux côtés bouchés, l'espace dit droite (1 m) plus large que gauche (0,2 m).
         val deux = listOf(mur(0.3f, 1.0f), mur(0.7f, 1.6f))
-        val free = FreeSpace(0.2f, 1.0f)
-        assertEquals("à 250 ms, l'autre côté est plus large mais on tient", SteeringCap.Left, suivi.onFrame(250L, deux, free = free)!!.side)
-        assertEquals("à 1,4 s, toujours tenu", SteeringCap.Left, suivi.onFrame(1_400L, deux, free = free)!!.side)
+
+        assertEquals("à 250 ms, on bascule aussitôt", SteeringCap.Right, suivi.onFrame(250L, deux, free = FreeSpace(0.2f, 1.0f))!!.side)
     }
 
     @Test
-    fun `apres 1,5 s on bascule si le gain depasse 0,35 m`() {
+    fun `un petit gain fait changer des la frame suivante`() {
         val suivi = LateralNudgeTracker()
         suivi.onFrame(0L, listOf(mur(0.7f, 1.4f)))
 
-        val nudge = suivi.onFrame(1_500L, listOf(mur(0.3f, 1.0f), mur(0.7f, 2.0f)), free = FreeSpace(0.2f, 1.0f))
+        val nudge = suivi.onFrame(250L, listOf(mur(0.3f, 1.3f), mur(0.7f, 1.5f)), free = FreeSpace(0.8f, 1.0f))
 
-        assertEquals(SteeringCap.Right, nudge!!.side)
+        assertEquals("0,2 m de gain suffit, sans seuil", SteeringCap.Right, nudge!!.side)
     }
 
     @Test
-    fun `apres 1,5 s un gain trop faible ne fait pas changer`() {
+    fun `le cote re-bascule d une frame a l autre`() {
         val suivi = LateralNudgeTracker()
-        suivi.onFrame(0L, listOf(mur(0.7f, 1.4f)))
+        val droiteLarge = listOf(mur(0.3f, 1.0f), mur(0.7f, 1.6f))
+        val gaucheLarge = listOf(mur(0.3f, 1.6f), mur(0.7f, 1.0f))
 
-        val nudge = suivi.onFrame(1_600L, listOf(mur(0.3f, 1.3f), mur(0.7f, 1.5f)), free = FreeSpace(0.8f, 1.0f))
-
-        assertEquals("0,2 m de gain < 0,35 m", SteeringCap.Left, nudge!!.side)
-    }
-
-    @Test
-    fun `la tenue tombe si l obstacle qui la motive disparait`() {
-        val suivi = LateralNudgeTracker()
-        suivi.onFrame(0L, listOf(mur(0.7f, 1.4f)))
-
-        val nudge = suivi.onFrame(250L, listOf(mur(0.3f, 1.0f)))
-
-        assertEquals(SteeringCap.Right, nudge!!.side)
+        assertEquals(SteeringCap.Left, suivi.onFrame(0L, droiteLarge, free = FreeSpace(1.0f, 0.2f))!!.side)
+        assertEquals(SteeringCap.Right, suivi.onFrame(250L, gaucheLarge, free = FreeSpace(0.2f, 1.0f))!!.side)
+        assertEquals(SteeringCap.Left, suivi.onFrame(500L, droiteLarge, free = FreeSpace(1.0f, 0.2f))!!.side)
     }
 }
