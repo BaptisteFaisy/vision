@@ -2,12 +2,14 @@ package dev.sam3vision.app.isee
 
 import dev.sam3vision.app.BuildConfig
 import dev.sam3vision.core.curb.CurbCue
+import dev.sam3vision.core.curb.CurbEdge
 import dev.sam3vision.core.hazard.HazardCue
 import dev.sam3vision.core.hazard.HazardKind
 import dev.sam3vision.core.crossing.CrossingLevels
 import dev.sam3vision.core.live.AntiRepeat
 import dev.sam3vision.core.live.GuidanceWord
 import dev.sam3vision.core.speech.DynamicClipChain
+import dev.sam3vision.core.speech.IseeClipsEn
 
 /**
  * Échelle voix dehors SPEC v4 : 13 niveaux, le plus petit gagne —
@@ -121,6 +123,22 @@ internal fun curbWish(cue: CurbCue?, crossingActive: Boolean = false): VoiceWish
         if (crossingActive) CrossingLevels.CURB else OutdoorLevel.CURB,
         cue.phrase, AntiRepeat.KEY_CURB,
         clips = DynamicClipChain.curbChain(cue.edge, cue.phrase),
+    )
+}
+
+/**
+ * Vœu boucle « curb up » : niveau 5 dehors, clip [IseeClipsEn.CURB_UP]
+ * (« Curb up. », pack anglais — zéro réseau, départ immédiat), clé
+ * [AntiRepeat.KEY_CURB_UP] sans délai (la cadence vient du bus libre,
+ * pas de la table). L'appelant ne poste que bus non tenu par une
+ * bordure ([VoiceBus.curbSpeaking]) : la boucle ne se coupe jamais
+ * elle-même. Pur, testé en JVM.
+ */
+internal fun curbUpWish(): VoiceWish {
+    val text = IseeClipsEn.CURB_UP_TEXT
+    return VoiceWish(
+        OutdoorLevel.CURB, text, AntiRepeat.KEY_CURB_UP,
+        clips = DynamicClipChain.curbChain(CurbEdge.Up, text),
     )
 }
 

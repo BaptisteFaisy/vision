@@ -341,6 +341,9 @@ object VoiceBus {
      */
     @Synchronized
     fun stairsSpeaking(): Boolean = activeLevel == OutdoorLevel.STAIRS
+    /** Vrai quand une bordure parle (niveau 5) : la boucle « curb up » s'y tait en amont au lieu de se couper elle-même. */
+    @Synchronized
+    fun curbSpeaking(): Boolean = activeLevel == OutdoorLevel.CURB
 
     /** Vrai quand un trottoir parle (niveau 10 absolu, § 45) : producteurs et GPS attendent sa fin. */
     @Synchronized

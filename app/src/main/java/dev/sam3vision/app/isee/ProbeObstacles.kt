@@ -3,6 +3,7 @@ package dev.sam3vision.app.isee
 import dev.sam3vision.app.BuildConfig
 import dev.sam3vision.core.curb.CurbSignal
 import dev.sam3vision.core.curb.CurbTier
+import dev.sam3vision.core.curb.CurbUpLoop
 import dev.sam3vision.core.curb.CurbWatcher
 import dev.sam3vision.core.hazard.HazardKind
 import dev.sam3vision.core.hazard.HazardSignal
@@ -22,11 +23,13 @@ import kotlin.coroutines.EmptyCoroutineContext
 internal class ObstacleWatchers(
     val curb: CurbWatcher,
     val hazard: HazardWatcher,
+    val curbUp: CurbUpLoop = CurbUpLoop(),
 ) {
-    /** Oublie les deux guetteurs (nouvelle séance). */
+    /** Oublie les guetteurs (nouvelle séance). */
     fun reset() {
         curb.reset()
         hazard.reset()
+        curbUp.reset()
     }
 }
 
@@ -46,8 +49,9 @@ internal fun LiveProbe.observeObstacles(
     placeMode: () -> PictoPlaceMode = { PictoPlaceMode.DEHORS },
     /** Fil de la collecte (`ProbeWorkDispatcher` en prod : hors main, ordonné). */
     work: CoroutineContext = EmptyCoroutineContext,
+    curbUp: CurbUpLoop = CurbUpLoop(),
 ): ObstacleWatchers {
-    val watchers = ObstacleWatchers(curb, hazard)
+    val watchers = ObstacleWatchers(curb, hazard, curbUp)
     scope.launch(work) {
         state.collect { st ->
             obstacleFrame(st, language, watchers, placeMode)
@@ -60,9 +64,10 @@ internal fun LiveProbe.observeObstacles(
  * Une frame d'obstacles : les deux signaux relus dans l'état (lectures de
  * distance + dimensions, déjà publiées par frame), convertis en vœux
  * ([hazardWish], [curbWish] — mot d'évitement continu en clip immédiat,
- * humain niveau 2, poteau niveau 7), arbitrés ([decideFrame]) puis proposés
- * au bus ([offer]). `collect` séquentiel : une alerte confirmée ne
- * s'annule pas.
+ * humain niveau 2, poteau niveau 7 — et [curbUpWish] quand la boucle
+ * « curb up » est active, à la place du doux), arbitrés ([decideFrame])
+ * puis proposés au bus ([offer]). `collect` séquentiel : une alerte
+ * confirmée ne s'annule pas.
  */
 internal fun obstacleFrame(
     st: LiveProbeState,
@@ -89,12 +94,20 @@ internal fun obstacleFrame(
     // de toute façon, tour mangé ; ≤0,5 s). La bordure, elle, coupe le mot
     // (même jour, bordures : elle interrompt « droite » / « gauche »).
     val guidanceHolds = !indoor && VoiceBus.guidanceSpeaking()
+    // Boucle « curb up » (montée < 1 m, dehors, hors Traversée) : re-postée
+    // à chaque frame libre — jamais sur une bordure en cours (pas
+    // d'auto-coupe). Active, elle remplace le doux (la 102 de Traversée
+    // parle toujours).
+    val loopActive = watchers.curbUp.onSignal(curbSignal)
+    val loopWish =
+        if (loopActive && !indoor && !st.crossingActive && !VoiceBus.curbSpeaking()) curbUpWish() else null
     offer(
         decideFrame(
             listOf(
                 hazardWish(hazardCue, st.crossingActive)
                     ?.takeIf { (!indoor || (!st.crossingActive && hazardCue?.kind == HazardKind.PERSON)) && !guidanceHolds },
-                curbWish(curbCue, st.crossingActive).takeUnless { indoor },
+                curbWish(curbCue, st.crossingActive).takeUnless { indoor || (loopActive && !st.crossingActive) },
+                loopWish,
             ),
         ),
         nowMs,
