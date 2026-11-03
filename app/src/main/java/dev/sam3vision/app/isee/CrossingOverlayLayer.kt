@@ -20,7 +20,6 @@ import androidx.compose.ui.text.rememberTextMeasurer
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import dev.sam3vision.core.crossing.CrossingState
-import dev.sam3vision.core.traverse.TraversePhase
 
 /**
  * Le feu piéton **sur la vidéo**, au même endroit que les masques SAM : un cadre
@@ -44,10 +43,7 @@ internal fun CrossingOverlayLayer(
     frameWidth: Int,
     frameHeight: Int,
     modifier: Modifier = Modifier,
-    /** Phase prudente publiée (`null` = pas de verdict : aucun bandeau). */
-    phase: TraversePhase? = null,
 ) {
-    TraverseVerdictBanner(active, phase)
     val tag = crossingTag(active, state)
     if (tag.isEmpty()) return
     BoxWithConstraints(modifier.fillMaxSize()) {
@@ -81,47 +77,8 @@ internal fun CrossingOverlayLayer(
 }
 
 /**
- * Le verdict **sur la vidéo**, en haut et centré, sous la puce : « peut
- * traverser » (vert) ou « ne peut pas traverser » (rouge). Rien quand le mode
- * est coupé ou qu'aucune phase n'est publiée — le direct ne publiant pas de
- * phase, son overlay reste celui d'avant.
- */
-@Composable
-internal fun TraverseVerdictBanner(
-    active: Boolean,
-    phase: TraversePhase?,
-    modifier: Modifier = Modifier,
-) {
-    if (!active || phase == null) return
-    val tag = traverseTag(active, phase)
-    if (tag.isEmpty()) return
-    val accent = Color(traverseAccent(active, phase))
-    BoxWithConstraints(modifier.fillMaxSize()) {
-        val boxW = constraints.maxWidth.toFloat()
-        val boxH = constraints.maxHeight.toFloat()
-        val laid = rememberMeasuredTag(tag, VERDICT_FONT_SP, boxW, boxH)
-        val plate = verdictRect(
-            laid.size.width.toFloat() + VERDICT_PAD_H_PX * 2,
-            laid.size.height.toFloat() + VERDICT_PAD_V_PX * 2,
-            boxW,
-            boxH,
-            with(LocalDensity.current) { VERDICT_TOP_MARGIN_DP.dp.toPx() },
-        )
-        Canvas(Modifier.fillMaxSize()) {
-            drawRoundRect(
-                color = accent.copy(alpha = 0.92f),
-                topLeft = Offset(plate.left, plate.top),
-                size = Size(plate.width, plate.height),
-                cornerRadius = CornerRadius(TAG_CORNER_DP, TAG_CORNER_DP),
-            )
-            drawText(laid, topLeft = Offset(plate.left + VERDICT_PAD_H_PX, plate.top + VERDICT_PAD_V_PX))
-        }
-    }
-}
-
-/**
  * Étiquette blanche en gras, mesurée une fois par texte (pas à chaque
- * composition) : le feu et le verdict partagent la même mesure.
+ * composition).
  */
 @Composable
 private fun rememberMeasuredTag(
@@ -143,14 +100,11 @@ private fun rememberMeasuredTag(
 /** Épaisseur du cadre : lisible sur une scène claire comme sur une nuit. */
 private const val STROKE_DP = 2.5f
 
-/** Verdict plus grand que l'étiquette du feu : c'est lui qu'on lit en marchant. */
+/** Texte des bandeaux (scan traversée) : plus grand que l'étiquette du feu, lisible en marchant. */
 internal const val VERDICT_FONT_SP = 14f
 
 internal const val VERDICT_PAD_H_PX = 10f
 internal const val VERDICT_PAD_V_PX = 4f
-
-/** Décalage du bandeau sous la puce (~46 dp de puce + respiration). */
-private const val VERDICT_TOP_MARGIN_DP = 64f
 
 /** Taille de l'étiquette : petite, mais lisible sur une vidéo qui bouge. */
 private const val TAG_FONT_SP = 11f

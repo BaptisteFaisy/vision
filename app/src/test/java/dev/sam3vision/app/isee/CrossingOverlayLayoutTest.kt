@@ -1,7 +1,6 @@
 package dev.sam3vision.app.isee
 
 import dev.sam3vision.core.crossing.CrossingState
-import dev.sam3vision.core.traverse.TraversePhase
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertNotNull
 import org.junit.Assert.assertNull
@@ -141,24 +140,6 @@ class CrossingOverlayLayoutTest {
         assertEquals(300f, r.left, 0.001f)
         assertEquals(400f, r.right, 0.001f)
         assertEquals(366f, r.top, 0.001f)
-    }
-
-    @Test
-    fun `seul TRAVERSER autorise - le reste attend`() {
-        assertEquals("may cross", traverseTag(true, TraversePhase.TRAVERSER))
-        for (phase in listOf(TraversePhase.PRET, TraversePhase.ATTENDRE, TraversePhase.ALERTE, null)) {
-            assertEquals("may not cross", traverseTag(true, phase))
-        }
-        assertEquals("", traverseTag(false, TraversePhase.TRAVERSER))
-    }
-
-    @Test
-    fun `bandeau vert pour partir rouge pour attendre`() {
-        assertEquals(CROSSING_ACCENT_GREEN, traverseAccent(true, TraversePhase.TRAVERSER))
-        for (phase in listOf(TraversePhase.PRET, TraversePhase.ATTENDRE, TraversePhase.ALERTE, null)) {
-            assertEquals(CROSSING_ACCENT_RED, traverseAccent(true, phase))
-        }
-        assertEquals(CROSSING_ACCENT_OFF, traverseAccent(false, TraversePhase.TRAVERSER))
     }
 
     @Test

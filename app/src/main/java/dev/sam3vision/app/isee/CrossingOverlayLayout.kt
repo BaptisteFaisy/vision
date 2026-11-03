@@ -2,7 +2,6 @@ package dev.sam3vision.app.isee
 
 import dev.sam3vision.app.cropTransform
 import dev.sam3vision.core.crossing.CrossingState
-import dev.sam3vision.core.traverse.TraversePhase
 
 /**
  * Mise en place du **feu sur la vidéo** : le mode Traversée lit l'état du feu
@@ -57,33 +56,6 @@ fun crossingTag(active: Boolean, state: CrossingState?): String {
     return when (state) {
         CrossingState.Green -> "GREEN"
         CrossingState.Red, null -> "RED"
-    }
-}
-
-/**
- * Verdict de traversée posé sur la vidéo (vide = rien à écrire) : seul
- * [TraversePhase.TRAVERSER] (vert confirmé, maintenu, sans veto) autorise —
- * [TraversePhase.PRET] reste un « may not », prudent d'une frame.
- */
-fun traverseTag(active: Boolean, phase: TraversePhase?): String {
-    if (!active) return ""
-    return when (phase) {
-        TraversePhase.TRAVERSER -> "may cross"
-        TraversePhase.PRET, TraversePhase.ATTENDRE, TraversePhase.ALERTE, null ->
-            "may not cross"
-    }
-}
-
-/**
- * Couleur du bandeau verdict : vert pour partir, rouge pour attendre (mêmes
- * teintes que le cadre du feu) ; gris mode coupé.
- */
-fun traverseAccent(active: Boolean, phase: TraversePhase?): Int {
-    if (!active) return CROSSING_ACCENT_OFF
-    return when (phase) {
-        TraversePhase.TRAVERSER -> CROSSING_ACCENT_GREEN
-        TraversePhase.PRET, TraversePhase.ATTENDRE, TraversePhase.ALERTE, null ->
-            CROSSING_ACCENT_RED
     }
 }
 
@@ -173,12 +145,11 @@ fun tagRect(
 }
 
 /**
- * Rectangle du bandeau verdict : centré en haut de la vidéo, sous la puce
+ * Rectangle d'un bandeau centré en haut de la vidéo, sous la puce
  * ([topMarginPx], fourni en px depuis des dp à l'appel). En bas, le panneau
  * debug le recouvrait (constaté sur téléphone : toujours affiché, devant).
- * Le verdict ne dépend d'aucune boîte SAM — même sans feu cadré, « may not
- * cross » reste affiché tant que le mode est actif.
-
+ * Le bandeau ne dépend d'aucune boîte SAM — même sans feu cadré, le scan
+ * reste affiché tant que le mode est actif.
  */
 fun verdictRect(
     tagWidth: Float,
