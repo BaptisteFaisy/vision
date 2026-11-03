@@ -1,6 +1,7 @@
 package dev.sam3vision.core.live
 
 import dev.sam3vision.core.curb.RailCue
+import dev.sam3vision.core.curb.RailLevel
 import dev.sam3vision.core.curb.RailState
 import dev.sam3vision.core.curb.SidewalkPosition
 import dev.sam3vision.core.curb.SidewalkRail
@@ -45,6 +46,10 @@ import dev.sam3vision.core.speech.SpeechLanguage
  * ([Timing.isStale]) : on ne dit pas « serrez » sur une image de 1,5 s. Tant
  * qu'il dérive il possède la frame — un « Tout droit. » le contredirait — et se
  * redit toutes les [RAIL_REPEAT_MS] millisecondes, pas à chaque frame.
+ *
+ * **Sécurité bordure 1 m** (03/11) — devant tout sauf le stop-contact :
+ * bordure à moins d'1 m ⇒ direction inverse forcée, « Stop. » si les deux
+ * côtés sont à moins d'1 m ou si une personne bloque ([PeoplePath.clearsSide]).
  *
  * La machine anti-répétition est [AnnouncementGate], partagée avec les
  * annonces de positions : ici, tout mot saute le délai **et la stabilité** —
@@ -101,6 +106,9 @@ class GuidanceAnnouncer(
 
     /** Instant du dernier « Stop. » du rail : la direction opposée suit à la frame d'après. */
     private var stopSaidAtMs: Long? = null
+
+    /** Niveau du rail à la frame précédente : l'hystérésis de [SidewalkRail.levelOf]. */
+    private var lastRailLevel: RailLevel = RailLevel.NONE
 
     private val nudge = LateralNudgeTracker()
 
@@ -168,6 +176,13 @@ class GuidanceAnnouncer(
         lastDecision = decision
         lastSidewalk = sidewalk
         lastNudge = null
+        // Bordure à moins d'1 m : direction inverse, devant tout sauf le
+        // stop-contact. Niveau re-jugé ici (marge + mémoire) : hystérésis.
+        lastRailLevel = rail?.clearanceM?.let { SidewalkRail.levelOf(it, lastRailLevel) } ?: RailLevel.NONE
+        val railSide = rail?.side
+        if (lastRailLevel == RailLevel.SAFETY && railSide != null && !isContactStop(decision)) {
+            return safetyWord(atMs, railSide, labels, hfovDeg, range, language, ageMs)
+        }
         // L'évitement passe DEVANT la décision de couloir : en foule le couloir
         // est bouché presque en permanence, et c'est justement là que l'ordre
         // doit venir de la piste (TTC, espace libre) et non du
@@ -247,11 +262,34 @@ class GuidanceAnnouncer(
         speak(atMs, directionKey(word.text(language)), word.text(language), repeatMs)
 
     /**
-     * Ce que le rail a à dire : le niveau et sa phrase, `null` quand il se tait
-     * (aucun rail, niveau [RailLevel.NONE], ou côté de bordure inconnu —
-     * [SidewalkRail.phrase] ne devine pas une direction). `null` rend la main à
-     * la voie libre : sans consigne de bordure, le cap reste valable.
+     * Bordure à moins d'1 m (ordre user du 03/11) : **la direction inverse**,
+     * devant tout le reste. Sans direction sûre, « Stop. » : les deux côtés à
+     * moins d'1 m, ou une personne à moins d'1 m du côté où aller (le veto
+     * 1 m de [PeoplePath.clearsSide], comme le retour trottoir). Muet sur
+     * frame périmée, comme le rail.
      */
+    private fun safetyWord(
+        atMs: Long,
+        railSide: GuidanceSide,
+        labels: List<PlacedLabel>,
+        hfovDeg: Float,
+        range: Float,
+        language: SpeechLanguage,
+        ageMs: Long,
+    ): String? {
+        if (Timing.isStale(ageMs)) return null
+        val away = SidewalkRail.awayFrom(railSide) ?: return null
+        val boxed = SidewalkRail.clearances(labels, hfovDeg)[away]?.let { it < SidewalkRail.SAFETY_M } == true
+        if (boxed || !PeoplePath.clearsSide(labels, away, range, hfovDeg)) {
+            return speak(atMs, "safety|stop", GuidanceWord.Stop.text(language), RAIL_REPEAT_MS, urgent = true)
+        }
+        val word = GuidanceWord.fromSide(away)
+        return speak(atMs, "safety|dir|" + word.name, word.text(language), RAIL_REPEAT_MS)
+    }
+
+    /** Stop au contact : le seul ordre que la sécurité bordure ne remplace pas. */
+    private fun isContactStop(decision: GuidanceDecision): Boolean = decision.blocked && decision.contactStop
+
     /**
      * Rail trottoir, **muet sur une frame périmée** : on ne dit pas « stop » sur
      * une image de 1,5 s.
@@ -437,6 +475,7 @@ class GuidanceAnnouncer(
         lastDecision = null
         lastSidewalk = null
         lastNudge = null
+        lastRailLevel = RailLevel.NONE
         nudge.reset()
     }
 

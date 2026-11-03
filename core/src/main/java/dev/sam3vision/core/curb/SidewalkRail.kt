@@ -8,10 +8,13 @@ import dev.sam3vision.core.live.PlacedLabel
 import dev.sam3vision.core.speech.SpeechLanguage
 import kotlin.math.abs
 
-/** Niveau du rail trottoir : rien, on dérive, on est au bord. */
+/** Niveau du rail trottoir : rien, sécurité, dérive, bord. */
 enum class RailLevel {
     /** Bord mesuré, mais encore à distance : silence. */
     NONE,
+
+    /** Sous [SidewalkRail.SAFETY_M] : bord proche, direction inverse forcée. */
+    SAFETY,
 
     /** Sous [SidewalkRail.DRIFT_M] : on s'écarte, on le dit. */
     DRIFT,
@@ -61,14 +64,29 @@ sealed interface RailCue {
  * du trottoir réellement mesurable : le masque de sol, lui, est coupé par le
  * cadre de l'image et son bord n'est pas la bordure.
  *
- * Deux paliers, deux phrases :
- * - sous [DRIFT_M] (50 cm) : on s'écarte du trottoir, l'app dit de serrer de
- *   l'autre côté ;
+ * Trois paliers :
+ * - sous [SAFETY_M] (1 m) : bord proche, l'app dit **forcément** la
+ *   direction inverse (ordre user du 03/11) ;
+ * - sous [DRIFT_M] (50 cm) : on s'écarte du trottoir, l'app dit de serrer
+ *   de l'autre côté ;
  * - sous [EDGE_M] (30 cm) : on est sur le fil, l'app alerte.
  *
  * Pur et testé en JVM : aucune image, aucun Android, aucune horloge.
  */
 object SidewalkRail {
+
+    /**
+     * Marge sous laquelle la direction inverse est forcée (m) : à moins
+     * d'1 m d'une bordure, on ne marche plus vers elle (ordre user du 03/11).
+     */
+    const val SAFETY_M = 1.0f
+
+    /**
+     * Sortie du palier [SAFETY_M] (m) : l'hystérésis (miroir de
+     * `CurbWatcher.REARM_MARGIN_METERS`) retient la consigne jusqu'à 1,20 m,
+     * pour qu'une bordure qui tremble autour d'1 m ne fasse pas bégayer la voix.
+     */
+    const val SAFETY_EXIT_M = 1.2f
 
     /** Marge sous laquelle on signale la dérive (m). */
     const val DRIFT_M = 0.50f
@@ -94,10 +112,7 @@ object SidewalkRail {
         if (!halfTangent.isFinite() || halfTangent <= 0f) return RailState.none()
         var best: RailState = RailState.none()
         for (label in labels) {
-            if (!isCurb(label.label)) continue
-            val depth = label.meters?.takeIf { it.isFinite() && it > 0f } ?: continue
-            val lateral = (label.centerX - AXIS_MID) * 2f * depth * halfTangent
-            if (!lateral.isFinite()) continue
+            val lateral = curbLateral(label, halfTangent) ?: continue
             val clearance = abs(lateral)
             if (clearance < MIN_USEFUL_M || clearance > MAX_USEFUL_M) continue
             if (best.clearanceM != null && clearance >= best.clearanceM) continue
@@ -107,10 +122,43 @@ object SidewalkRail {
         return best
     }
 
-    /** Niveau d'alerte d'une marge (m). */
-    fun levelOf(clearanceM: Float): RailLevel = when {
+    /**
+     * Bordure mesurée la plus proche de chaque côté (m) : la règle de sécurité
+     * (< 1 m ⇒ direction inverse) doit savoir si l'autre côté est libre avant
+     * d'y envoyer l'utilisateur. Côtés sans bordure mesurée absents : l'inconnu
+     * n'est pas un bord. Pur, testé en JVM.
+     */
+    fun clearances(
+        labels: List<PlacedLabel>,
+        hfovDeg: Float = LensSpec.DEFAULT_H_FOV_DEG,
+    ): Map<GuidanceSide, Float> {
+        val halfTangent = LensSpec.halfTangent(hfovDeg)
+        if (!halfTangent.isFinite() || halfTangent <= 0f) return emptyMap()
+        var left = Float.POSITIVE_INFINITY
+        var right = Float.POSITIVE_INFINITY
+        for (label in labels) {
+            val lateral = curbLateral(label, halfTangent) ?: continue
+            val clearance = abs(lateral)
+            if (clearance < MIN_USEFUL_M || clearance > MAX_USEFUL_M) continue
+            if (lateral < 0f) left = minOf(left, clearance) else right = minOf(right, clearance)
+        }
+        return buildMap {
+            if (left.isFinite()) put(GuidanceSide.Left, left)
+            if (right.isFinite()) put(GuidanceSide.Right, right)
+        }
+    }
+
+    /**
+     * Niveau d'alerte d'une marge (m). [prev] est le niveau de la frame
+     * précédente : la sécurité tient jusqu'à [SAFETY_EXIT_M] (une bordure qui
+     * tremble autour d'1 m ne fait pas alterner les consignes), mais les
+     * paliers urgents ([EDGE_M], [DRIFT_M]) gagnent toujours.
+     */
+    fun levelOf(clearanceM: Float, prev: RailLevel = RailLevel.NONE): RailLevel = when {
         clearanceM <= EDGE_M -> RailLevel.EDGE
         clearanceM <= DRIFT_M -> RailLevel.DRIFT
+        clearanceM < SAFETY_M -> RailLevel.SAFETY
+        prev == RailLevel.SAFETY && clearanceM < SAFETY_EXIT_M -> RailLevel.SAFETY
         else -> RailLevel.NONE
     }
 
@@ -120,8 +168,8 @@ object SidewalkRail {
      * synthèse réseau (ordre user du 01/11 : « juste droite et gauche, et à
      * 30 cm c'est stop puis la direction opposée »).
      *
-     * - [RailLevel.DRIFT] : un mot seul, **l'opposé du bord** (bordure à gauche
-     *   ⇒ « Droite. »).
+     * - [RailLevel.SAFETY] et [RailLevel.DRIFT] : un mot seul, **l'opposé du
+     *   bord** (bordure à gauche ⇒ « Droite. »).
      * - [RailLevel.EDGE] : [RailCue.Stop] d'abord — on s'arrête — puis la
      *   direction opposée, que l'annonceur enchaîne à la frame suivante (le
      *   guidage ne prononce qu'un clip par frame, et « Stop. » doit couper la
@@ -131,7 +179,8 @@ object SidewalkRail {
     fun cue(state: RailState): RailCue? = when (state.level) {
         RailLevel.NONE -> null
         RailLevel.EDGE -> RailCue.Stop
-        RailLevel.DRIFT -> awayFrom(state.side)?.let { RailCue.Direction(GuidanceWord.fromSide(it)) }
+        RailLevel.SAFETY, RailLevel.DRIFT ->
+            awayFrom(state.side)?.let { RailCue.Direction(GuidanceWord.fromSide(it)) }
     }
 
     /** Direction opposée au bord [side], `null` si le côté est inconnu. */
@@ -139,6 +188,16 @@ object SidewalkRail {
         GuidanceSide.Left -> GuidanceSide.Right
         GuidanceSide.Right -> GuidanceSide.Left
         null -> null
+    }
+
+    /**
+     * Écart latéral signé d'une bordure (m, négatif à gauche), `null` si la
+     * mesure est inexploitable : pas une bordure, sans distance, ou non finie.
+     */
+    private fun curbLateral(label: PlacedLabel, halfTangent: Float): Float? {
+        if (!isCurb(label.label)) return null
+        val depth = label.meters?.takeIf { it.isFinite() && it > 0f } ?: return null
+        return ((label.centerX - AXIS_MID) * 2f * depth * halfTangent).takeIf { it.isFinite() }
     }
 
     /** Vrai si [label] désigne une bordure (casse, accents, pluriel neutralisés). */

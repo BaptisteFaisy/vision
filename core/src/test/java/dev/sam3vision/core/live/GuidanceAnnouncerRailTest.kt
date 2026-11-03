@@ -3,6 +3,7 @@ package dev.sam3vision.core.live
 import dev.sam3vision.core.curb.RailLevel
 import dev.sam3vision.core.curb.RailState
 import dev.sam3vision.core.curb.SidewalkRail
+import dev.sam3vision.core.distance.LensSpec
 import dev.sam3vision.core.speech.SpeechLanguage
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertNotNull
@@ -28,6 +29,16 @@ class GuidanceAnnouncerRailTest {
 
     /** Mur à droite, à [meters] : un humain parlerait dès la 1re frame (3 m, ordre user du 02/11). */
     private fun murDroite(meters: Float) = PlacedLabel("mur", 0.7f, 0.5f, meters)
+
+    /**
+     * Bordure placée pour que son écart latéral à l'axe vaille [lateralM]
+     * (négatif = à gauche), à la profondeur [depth] (miroir du helper de
+     * `SidewalkRailTest`, privé et non réutilisable).
+     */
+    private fun bord(lateralM: Float, depth: Float = 2f): PlacedLabel {
+        val halfWidth = 2f * depth * LensSpec.halfTangent(LensSpec.DEFAULT_H_FOV_DEG)
+        return PlacedLabel("curb", 0.5f + lateralM / halfWidth, 0.5f, depth)
+    }
 
     private fun dire(state: RailState, language: SpeechLanguage = SpeechLanguage.Fr): String? =
         GuidanceAnnouncer().onFrame(0L, libre, language, rail = state)
@@ -99,5 +110,84 @@ class GuidanceAnnouncerRailTest {
         assertEquals("Gauche.", announcer.onFrame(0L, libre, SpeechLanguage.Fr, rail = etat))
         announcer.reset()
         assertEquals("Gauche.", announcer.onFrame(200L, libre, SpeechLanguage.Fr, rail = etat))
+    }
+
+    @Test
+    fun `securite sous 1 m force la direction inverse devant le cap`() {
+        // Ordre user du 03/11 : bordure à gauche à 0,9 m + cap à gauche ⇒
+        // « Droite. » forcé — on ne marche plus vers la bordure.
+        val etat = RailState(GuidanceSide.Left, 0.9f, RailLevel.SAFETY)
+        assertEquals(
+            "Droite.",
+            GuidanceAnnouncer().onFrame(0L, libre, SpeechLanguage.Fr, cap = SteeringCap.Left, rail = etat),
+        )
+    }
+
+    @Test
+    fun `securite gagne sur le decalage lateral`() {
+        // Même mur qui approche que `decalage lateral gagne sur le rail`
+        // (qui dirait « Gauche. » à 500 ms) : la sécurité parle d'abord et
+        // possède la frame — le décalage ne passe jamais devant.
+        val announcer = GuidanceAnnouncer()
+        val etat = RailState(GuidanceSide.Left, 0.9f, RailLevel.SAFETY)
+        fun frame(atMs: Long, mur: Float) =
+            announcer.onFrame(atMs, listOf(murDroite(mur)), SpeechLanguage.Fr, rail = etat)
+        assertEquals("Droite.", frame(0L, 3.0f))
+        assertNull(announcer.lastNudge)
+        assertNull(frame(250L, 2.6f))
+        assertNull(frame(500L, 2.2f))
+        assertEquals("Droite.", frame(3_000L, 2.0f))
+    }
+
+    @Test
+    fun `deux bordures sous 1 m disent stop`() {
+        // Pas de direction sûre : bordures des deux côtés à moins d'1 m.
+        val labels = listOf(bord(-0.9f), bord(0.8f))
+        val etat = SidewalkRail.of(labels)
+        assertEquals(GuidanceSide.Right, etat.side)
+        assertEquals(RailLevel.SAFETY, etat.level)
+        assertEquals("Stop.", GuidanceAnnouncer().onFrame(0L, labels, SpeechLanguage.Fr, rail = etat))
+    }
+
+    @Test
+    fun `personne sous 1 m du cote ou aller dit stop`() {
+        // Bordure à gauche, mais personne à droite à 0,8 m : le veto 1 m
+        // (miroir du retour trottoir) refuse d'y envoyer l'utilisateur.
+        val labels = listOf(PlacedLabel("person", 0.7f, 0.5f, 0.8f))
+        val etat = RailState(GuidanceSide.Left, 0.9f, RailLevel.SAFETY)
+        assertEquals("Stop.", GuidanceAnnouncer().onFrame(0L, labels, SpeechLanguage.Fr, rail = etat))
+    }
+
+    @Test
+    fun `securite muette sur frame perimee`() {
+        val etat = RailState(GuidanceSide.Left, 0.9f, RailLevel.SAFETY)
+        assertNull(GuidanceAnnouncer().onFrame(0L, libre, SpeechLanguage.Fr, ageMs = 1_500L, rail = etat))
+    }
+
+    @Test
+    fun `securite tient jusqu a 1,20 m puis rend la main`() {
+        // Hystérésis : 0,9 m parle, 1,1 m tient encore (niveau mesuré NONE),
+        // 1,3 m sort — la voie libre reparle.
+        val announcer = GuidanceAnnouncer()
+        fun frame(atMs: Long, marge: Float, niveau: RailLevel) =
+            announcer.onFrame(atMs, libre, SpeechLanguage.Fr, rail = RailState(GuidanceSide.Left, marge, niveau))
+        assertEquals("Droite.", frame(0L, 0.9f, RailLevel.SAFETY))
+        assertEquals("Droite.", frame(3_000L, 1.1f, RailLevel.NONE))
+        assertEquals("Tout droit.", frame(6_000L, 1.3f, RailLevel.NONE))
+    }
+
+    @Test
+    fun `stop au contact garde sur la securite`() {
+        // Bordure au contact + personne au contact plein axe (colonne
+        // centrale : hors fenêtre du décalage) : le stop reste un stop.
+        val labels = listOf(
+            PlacedLabel("curb", 0.5f, 0.5f, 0.5f),
+            PlacedLabel("person", 0.5f, 0.5f, 0.5f),
+        )
+        val etat = RailState(GuidanceSide.Left, 0.9f, RailLevel.SAFETY)
+        assertEquals(
+            "obstacle, arrêtez-vous.",
+            GuidanceAnnouncer().onFrame(0L, labels, SpeechLanguage.Fr, rail = etat),
+        )
     }
 }

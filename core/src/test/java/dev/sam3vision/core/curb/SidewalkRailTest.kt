@@ -19,12 +19,11 @@ import org.junit.Test
  * quatre mètres devant soi, 85 cm de dérive passaient sans un mot (constat
  * utilisateur du 01/11 : « il peut passer à 80 cm du sidewalk »).
  *
- * [SidewalkRail] repasse tout en mètres sur la bordure, avec deux paliers :
- * [SidewalkRail.DRIFT_M] = 0,50 m (on s'écarte) et [SidewalkRail.EDGE_M] =
- * 0,30 m (on est sur le fil). La phrase de dérive est **l'opposé du bord**
- * (« Serrez à droite. » si la bordure est à gauche) ; la phrase de bord
- * (« Attention, bord du trottoir. ») ne nomme aucun côté : au contact, un
- * mauvais côté coûte plus qu'un silence.
+ * [SidewalkRail] repasse tout en mètres sur la bordure, avec trois paliers :
+ * [SidewalkRail.SAFETY_M] = 1 m (direction inverse forcée, ordre user du
+ * 03/11), [SidewalkRail.DRIFT_M] = 0,50 m (on s'écarte) et
+ * [SidewalkRail.EDGE_M] = 0,30 m (on est sur le fil, « Stop. » puis l'opposé).
+ * La consigne de sécurité et de dérive est **l'opposé du bord**.
  */
 class SidewalkRailTest {
 
@@ -77,8 +76,20 @@ class SidewalkRailTest {
     }
 
     @Test
-    fun `bordure a 0,8 m reste silencieuse`() {
+    fun `bordure a 0,8 m est en securite et dit l oppose`() {
+        // Ordre user du 03/11 : à moins d'1 m, la direction inverse — le
+        // silence historique sous 0,50 m ne vaut plus entre 0,50 et 1 m.
         val state = SidewalkRail.of(listOf(bord(-0.8f)))
+
+        assertEquals(GuidanceSide.Left, state.side)
+        assertEquals(0.8f, state.clearanceM!!, 0.01f)
+        assertEquals(RailLevel.SAFETY, state.level)
+        assertEquals(RailCue.Direction(GuidanceWord.Right), SidewalkRail.cue(state))
+    }
+
+    @Test
+    fun `bordure a 1,1 m reste silencieuse`() {
+        val state = SidewalkRail.of(listOf(bord(-1.1f)))
 
         assertEquals(RailLevel.NONE, state.level)
         assertNull(SidewalkRail.cue(state))
@@ -130,7 +141,8 @@ class SidewalkRailTest {
         assertEquals(RailLevel.EDGE, SidewalkRail.levelOf(0.30f))
         assertEquals(RailLevel.DRIFT, SidewalkRail.levelOf(0.31f))
         assertEquals(RailLevel.DRIFT, SidewalkRail.levelOf(0.50f))
-        assertEquals(RailLevel.NONE, SidewalkRail.levelOf(0.51f))
+        // Ordre user du 03/11 : au-delà de 50 cm, c'est la sécurité jusqu'à 1 m.
+        assertEquals(RailLevel.SAFETY, SidewalkRail.levelOf(0.51f))
     }
 
     @Test
@@ -158,11 +170,12 @@ class SidewalkRailTest {
     }
 
     @Test
-    fun `a 4 m le rail se tait a 80 cm et parle a 45 cm`() {
+    fun `a 4 m le rail dit l oppose a 80 cm et la derive a 45 cm`() {
         // Le chiffre de l'audit : l'ancienne bande d'image tolérait ±0,85 m à 4 m.
+        // Ordre user du 03/11 : 80 cm n'est plus silencieux, c'est la sécurité.
         val large = SidewalkRail.of(listOf(bord(0.80f, depth = 4f)))
-        assertEquals(RailLevel.NONE, large.level)
-        assertNull(SidewalkRail.cue(large))
+        assertEquals(RailLevel.SAFETY, large.level)
+        assertEquals(RailCue.Direction(GuidanceWord.Left), SidewalkRail.cue(large))
 
         val serre = SidewalkRail.of(listOf(bord(0.45f, depth = 4f)))
         assertEquals(RailLevel.DRIFT, serre.level)
@@ -177,6 +190,35 @@ class SidewalkRailTest {
         assertEquals(GuidanceSide.Left, state.side)
         assertEquals(0.42f, state.clearanceM!!, 0.01f)
         assertEquals(RailLevel.DRIFT, state.level)
+    }
+
+    @Test
+    fun `paliers de levelOf entree 1,00 et sortie 1,20 avec hysteresis`() {
+        // Entrée stricte : « moins d'1 m », 1,00 m pile ne déclenche pas.
+        assertEquals(RailLevel.SAFETY, SidewalkRail.levelOf(0.99f))
+        assertEquals(RailLevel.NONE, SidewalkRail.levelOf(1.00f))
+        assertEquals(RailLevel.NONE, SidewalkRail.levelOf(1.10f))
+        // Tenue : déjà en sécurité, on y reste jusqu'à 1,20 m.
+        assertEquals(RailLevel.SAFETY, SidewalkRail.levelOf(1.10f, RailLevel.SAFETY))
+        assertEquals(RailLevel.NONE, SidewalkRail.levelOf(1.20f, RailLevel.SAFETY))
+        // Les paliers urgents gagnent sur la sécurité tenue.
+        assertEquals(RailLevel.DRIFT, SidewalkRail.levelOf(0.40f, RailLevel.SAFETY))
+        assertEquals(RailLevel.EDGE, SidewalkRail.levelOf(0.20f, RailLevel.SAFETY))
+    }
+
+    @Test
+    fun `clearances rend la bordure la plus proche de chaque cote`() {
+        val both = SidewalkRail.clearances(listOf(bord(-0.9f), bord(-0.6f), bord(0.8f)))
+
+        assertEquals(0.6f, both[GuidanceSide.Left]!!, 0.01f)
+        assertEquals(0.8f, both[GuidanceSide.Right]!!, 0.01f)
+
+        // Côté sans bordure mesurée absent : l'inconnu n'est pas un bord.
+        val single = SidewalkRail.clearances(listOf(bord(-0.9f)))
+        assertEquals(1, single.size)
+        assertNull(single[GuidanceSide.Right])
+
+        assertTrue(SidewalkRail.clearances(emptyList()).isEmpty())
     }
 
     @Test
