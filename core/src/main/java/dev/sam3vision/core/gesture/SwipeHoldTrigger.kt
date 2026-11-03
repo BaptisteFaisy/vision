@@ -11,13 +11,15 @@ import kotlin.math.hypot
  * [Listener.onSwipeHoldEnd] (envoi). Mêmes seuils que l'appui long
  * ([LongPressTrigger]) : le maintien « se sent » pareil.
  *
- * Un bond franc (> slop entre deux MOVE) ou un relâchement avant le seuil
- * annulent : le bond signale [Listener.onSwipeHoldCancel], le relâchement
- * reste muet — un balayage vite relâché garde son seul effet GPS. La
- * dérive lente (le doigt finit son slide en décélérant) déplace l'ancre
- * et garde le maintien. L'appui long normal ne peut pas coexister avec
- * une attente ici : il s'est déjà annulé au-delà de son slop quand le
- * balayage est confirmé (80 px >> 24 px).
+ * Un bond franc (> slop entre deux MOVE), un relâchement avant le seuil,
+ * une annulation système, un doigt supplémentaire ou un [reset] externe
+ * abandonnent l'attente en signalant [Listener.onSwipeHoldAbandoned] avec
+ * son [CancelReason] — un balayage vite relâché garde son seul effet GPS,
+ * mais sa mort est observable en logcat et en test. La dérive lente (le
+ * doigt finit son slide en décélérant) déplace l'ancre et garde le
+ * maintien. L'appui long normal ne peut pas coexister avec une attente
+ * ici : il s'est déjà annulé au-delà de son slop quand le balayage est
+ * confirmé (80 px >> 24 px).
  */
 class SwipeHoldTrigger(
     private val scheduler: LongPressTrigger.DelayScheduler,
@@ -34,11 +36,43 @@ class SwipeHoldTrigger(
         /** Tenue terminée (relâchement, annulation, doigt supplémentaire). */
         fun onSwipeHoldEnd()
 
-        /** Attente abandonnée sur glissement repris (défaut : rien — l'app loggue). */
+        /**
+         * Attente abandonnée sans start, avec son motif : chaque mort du
+         * timer est observable (logcat) et testable. Par défaut, délègue à
+         * [onSwipeHoldCancel] pour les écouteurs historiques.
+         */
+        fun onSwipeHoldAbandoned(reason: CancelReason) = onSwipeHoldCancel()
+
+        /**
+         * Attente abandonnée (historique, sans motif — glissement repris).
+         * Gardé pour compatibilité ; préférer [onSwipeHoldAbandoned].
+         */
         fun onSwipeHoldCancel() {}
     }
 
+    /**
+     * Pourquoi une attente est morte sans start : chaque valeur est une
+     * sortie observable du chemin balayage vers le bas + maintien.
+     */
+    enum class CancelReason {
+        /** Bond franc au-delà du slop entre deux MOVE (glissement repris). */
+        JUMP_SLOP,
+        /** Doigt relevé avant le seuil (le balayage garde son effet GPS). */
+        UP_EARLY,
+        /** Annulation système (ACTION_CANCEL) avant le seuil. */
+        CANCEL_SYSTEM,
+        /** Second doigt posé pendant l'attente. */
+        SECOND_FINGER,
+        /** [reset] externe pendant l'attente (vue détachée, fond, gestes coupés). */
+        RESET_EXTERNAL,
+    }
+
     enum class Phase { Idle, Pending, Holding }
+
+    companion object {
+        /** Tag logcat commun du chemin maintien GPS (layout + ordres). */
+        const val LOG_TAG = "IseeSwipeHold"
+    }
 
     var phase: Phase = Phase.Idle
         private set
@@ -55,7 +89,7 @@ class SwipeHoldTrigger(
      */
     fun arm(x: Float, y: Float) {
         if (phase == Phase.Holding) return
-        reset()
+        resetSilent()
         holdX = x
         holdY = y
         phase = Phase.Pending
@@ -69,48 +103,74 @@ class SwipeHoldTrigger(
 
     /**
      * Glissement : un bond franc au-delà du seuil abandonne l'attente
-     * ([Listener.onSwipeHoldCancel]) ; la dérive lente déplace l'ancre et
+     * ([CancelReason.JUMP_SLOP]) ; la dérive lente déplace l'ancre et
      * garde le maintien — le doigt finit son slide en décélérant.
      */
     fun onMove(x: Float, y: Float) {
         if (phase != Phase.Pending) return
         if (hypot(x - holdX, y - holdY) > slopPx) {
-            reset()
-            listener.onSwipeHoldCancel()
+            abandon(CancelReason.JUMP_SLOP)
         } else {
             holdX = x
             holdY = y
         }
     }
 
-    /** Doigt supplémentaire : annule l'attente, ou clôt la tenue en cours. */
+    /** Doigt supplémentaire : abandonne l'attente, ou clôt la tenue en cours. */
     fun onPointerDown() {
         when (phase) {
-            Phase.Pending -> reset()
+            Phase.Pending -> abandon(CancelReason.SECOND_FINGER)
             Phase.Holding -> end()
             Phase.Idle -> Unit
         }
     }
 
-    /** Relâchement : clôt la tenue, ou annule une attente qui n'a pas abouti. */
+    /** Relâchement : clôt la tenue, ou abandonne l'attente ([CancelReason.UP_EARLY]). */
     fun onUp() {
-        if (phase == Phase.Holding) end() else reset()
+        when (phase) {
+            Phase.Holding -> end()
+            Phase.Pending -> abandon(CancelReason.UP_EARLY)
+            Phase.Idle -> Unit
+        }
     }
 
-    /** Annulation système : même traitement qu'un relâchement. */
-    fun onCancel() = onUp()
+    /**
+     * Annulation système : clôt la tenue, ou abandonne l'attente
+     * ([CancelReason.CANCEL_SYSTEM]) — distinguée du relâchement volontaire.
+     */
+    fun onCancel() {
+        when (phase) {
+            Phase.Holding -> end()
+            Phase.Pending -> abandon(CancelReason.CANCEL_SYSTEM)
+            Phase.Idle -> Unit
+        }
+    }
 
-    /** Remise à zéro inconditionnelle (vue détachée, arrêt de l'app). */
+    /**
+     * Remise à zéro inconditionnelle (vue détachée, arrêt de l'app) : une
+     * attente interrompue signale [CancelReason.RESET_EXTERNAL], sinon muet.
+     */
     fun reset() {
+        val wasPending = phase == Phase.Pending
+        resetSilent()
+        if (wasPending) listener.onSwipeHoldAbandoned(CancelReason.RESET_EXTERNAL)
+    }
+
+    /** Abandonne l'attente en signalant son motif (toujours depuis Pending). */
+    private fun abandon(reason: CancelReason) {
+        resetSilent()
+        listener.onSwipeHoldAbandoned(reason)
+    }
+
+    /** Coupe le timer et revient à Idle, sans rien signaler. */
+    private fun resetSilent() {
         cancelTimer?.invoke()
         cancelTimer = null
         phase = Phase.Idle
     }
 
     private fun end() {
-        cancelTimer?.invoke()
-        cancelTimer = null
-        phase = Phase.Idle
+        resetSilent()
         listener.onSwipeHoldEnd()
     }
 }
