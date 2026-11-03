@@ -45,6 +45,8 @@ import kotlinx.coroutines.flow.collect
 import kotlinx.coroutines.flow.distinctUntilChanged
 import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.launch
+import kotlin.coroutines.CoroutineContext
+import kotlin.coroutines.EmptyCoroutineContext
 
 /**
  * Câblage de la sonde SAM de la page caméra : réglages, voix, fin d'enregistrement.
@@ -214,9 +216,11 @@ internal fun LiveProbe.observeFenceOpening(
     scope: CoroutineScope,
     language: () -> SpeechLanguage,
     placeMode: () -> PictoPlaceMode = { PictoPlaceMode.DEHORS },
+    /** Fil de la collecte (`ProbeWorkDispatcher` en prod : hors main, ordonné). */
+    work: CoroutineContext = EmptyCoroutineContext,
 ): FenceOpeningWatcher {
     val watcher = FenceOpeningWatcher()
-    scope.launch {
+    scope.launch(work) {
         state.collect { st ->
             if (st.crossingActive) return@collect
             if (placeMode() != PictoPlaceMode.DEHORS) return@collect
@@ -371,9 +375,11 @@ internal fun LiveProbe.observeSidewalk(
     scope: CoroutineScope,
     language: () -> SpeechLanguage,
     placeMode: () -> PictoPlaceMode = { PictoPlaceMode.DEHORS },
+    /** Fil de la collecte (`ProbeWorkDispatcher` en prod : hors main, ordonné). */
+    work: CoroutineContext = EmptyCoroutineContext,
 ): SidewalkWatcher {
     val watcher = SidewalkWatcher()
-    scope.launch {
+    scope.launch(work) {
         state.collect { st ->
             if (st.crossingActive) return@collect
             if (placeMode() != PictoPlaceMode.DEHORS) return@collect
@@ -424,15 +430,17 @@ internal fun LiveProbe.observeHazards(
     scope: CoroutineScope,
     language: () -> SpeechLanguage,
     placeMode: () -> PictoPlaceMode = { PictoPlaceMode.DEHORS },
+    /** Fil des six guetteurs (`ProbeWorkDispatcher` en prod : hors main, ordonné). */
+    work: CoroutineContext = EmptyCoroutineContext,
 ): ProbeHazards {
-    val obstacles = observeObstacles(scope, language, placeMode = placeMode)
-    observeVoiceTick(scope, indoor = { placeMode() == PictoPlaceMode.DEDANS })
+    val obstacles = observeObstacles(scope, language, placeMode = placeMode, work = work)
+    observeVoiceTick(scope, indoor = { placeMode() == PictoPlaceMode.DEDANS }, work = work)
     return ProbeHazards(
         obstacles.curb,
-        observeStairs(scope, language, placeMode = placeMode),
-        observeStairsCount(scope, language, placeMode = placeMode),
+        observeStairs(scope, language, placeMode = placeMode, work = work),
+        observeStairsCount(scope, language, placeMode = placeMode, work = work),
         obstacles.hazard,
-        observeFenceOpening(scope, language, placeMode = placeMode),
-        observeSidewalk(scope, language, placeMode = placeMode),
+        observeFenceOpening(scope, language, placeMode = placeMode, work = work),
+        observeSidewalk(scope, language, placeMode = placeMode, work = work),
     )
 }
