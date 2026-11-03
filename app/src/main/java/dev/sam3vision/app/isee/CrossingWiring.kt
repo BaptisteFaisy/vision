@@ -164,10 +164,10 @@ internal data class CrossingPatch(
  * reste alors muette et ne marque aucun feu. Le veto ne voit un vert que
  * boîte à l'appui ([greenForDecision]) : sans feu en vue, attente — sauf
  * absence de feu confirmée ([noLightGate], `null` = voix feu seule, legacy),
- * où le feu se tait et la phrase vient de la branche sans-feu (véhicules
- * puis « Traversez. », ordre user du 31/10). [contradiction] vrai (deux feux
- * lus en désaccord, câblage 2 feux) : la phrase dédiée remplace, l'état
- * reste fail-safe (voir [crossingCueOf]).
+ * où le feu se tait et ce sont les véhicules qui tranchent : sans voiture
+ * en mouvement ni feu rouge, la phase dit « traversez » (ordre user du
+ * 03/11). [contradiction] vrai (deux feux lus en désaccord, câblage 2 feux) :
+ * la phrase dédiée remplace, l'état reste fail-safe (voir [crossingCueOf]).
  */
 internal fun crossingPatchOf(
     announcer: CrossingAnnouncer,
@@ -187,15 +187,16 @@ internal fun crossingPatchOf(
     val light = crossingLightOf(frame, jpegB64, onCrop)
     val detections = frame.objects.toDetections(frame.width, frame.height)
     val focalPx = lens.focalPx(frame.width, frame.height)
-    val decision = veto.update(light.greenForDecision, detections, focalPx, atMs, motion = motion)
-    if (noLightGate?.onFrame(light.box) == true) {
-        // Sans feu confirmé : le feu se tait (pas de « Rouge, attendez. »
-        // pour un feu absent), l'état publié reste rouge (aucun vert lu —
-        // pastille, bouton et vibrations inchangés). Le **veto trafic est
-        // conservé** : c'est lui qui empêche la voix de dire « Cross. » quand
-        // un bus arrive (A9 § 3 D7) ; le laisser à sa valeur par défaut
-        // (`false`) rouvrait exactement ce trou.
-        return CrossingPatch(null, CrossingState.Red, null, decision.state, noLight = true, veto = decision.veto)
+    // Absence lue AVANT le veto (miroir du direct) : sans feu confirmé,
+    // ce sont les véhicules qui tranchent.
+    val noLight = noLightGate?.onFrame(light.box) == true
+    val decision = veto.update(light.greenForDecision, detections, focalPx, atMs, motion = motion, noLight = noLight)
+    if (noLight) {
+        // Sans feu confirmé : le feu se tait, l'état suit la phase — vert à
+        // TRAVERSER, rouge sinon (PRET prudent, attente, alerte). Veto trafic
+        // conservé (A9 § 3 D7 : sinon « Cross. » avec un bus qui arrive).
+        val state = if (decision.state == TraversePhase.TRAVERSER) CrossingState.Green else CrossingState.Red
+        return CrossingPatch(null, state, null, decision.state, noLight = true, veto = decision.veto)
     }
     val vetoed = decision.crossingState()
     val cue = crossingCueOf(announcer.onFrame(atMs, vetoed, language), decision.state, language, contradiction)
