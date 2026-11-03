@@ -21,6 +21,25 @@ livré et ses preuves (tâche, fichiers, chiffres) dans l'arbre.
     commentaires `IseeScenePane`/`IseePortraitCamera`.
 - **Preuves** : `IseePortraitTest` 12/12, `IseeSceneTest` 17/17 (r630),
   `assembleDebug` OK, `check-isee-design.py` OK, `check-kotlin-limits.py` OK.
+## 2026-11-03 — iSee : trait clair à la place du nuage entre la rue et le blanc (branche `isee-separateur-cam`)
+
+- **Demande** : virer le nuage (fondu blanc) entre la caméra et le bloc blanc ;
+  pour la séparation, un trait arrondi (10 dp) aux seules extrémités (ordre user
+  du 03/11/2026).
+- **Fait** :
+  - `app/isee/IseePortraitCamera.kt` : `PictureFade` viré, `HeaderShade` garde
+    le seul ombrage haut de l'en-tête ; nouveau `CameraDivider` (marges 16 dp,
+    premier overlay sous les chips).
+  - `core/iseedesign/IseePortrait.kt` : `FADE`/`pictureAlpha` supprimés,
+    `DIVIDER` (`0xFFE2E8F0`), `DIVIDER_H_DP` (4), `DIVIDER_CORNER_DP` (10).
+  - Tests figés (`IseePortraitTest`), garde `tools/check-isee-design.py` et
+    `docs/ISEE-DESIGN-PORTRAIT.md` (§1, §3, §5) mis à jour.
+- **Preuves** : `:core` 3628/3628, `:app` 2354/2354, `assembleDebug` OK
+  (build-serveur r630) ; gardes `check-isee-design` + `check-kotlin-limits` OK ;
+  capture téléphone Redmi : bord net, trait gris capsule aux extrémités
+  arrondies (`/tmp/isee-shot-sep.png`, 23:14) ; master `be7106d9` réinstallé
+  après test. isee-sim inutilisable ce soir (qemu 37.2.12 segfault ×3 à
+  l'ouverture caméra, avec et sans `videofile`).
 
 ## 2026-11-03 — iSee : swipe droit crée un picto, swipe gauche connecte les lunettes (branche `feat/swipe-right-picto`)
 
