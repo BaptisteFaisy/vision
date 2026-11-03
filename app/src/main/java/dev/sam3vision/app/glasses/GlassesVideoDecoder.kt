@@ -245,11 +245,11 @@ internal open class GlassesVideoDecoder(
 
     internal companion object {
         /**
-         * Attente d'un buffer d'entrée libre, en microsecondes : 5 ms, comme le
-         * direct — un codec qui ne libère rien en 5 ms ne libérera rien non
-         * plus en 50, et la frame suivante est conflée à la place.
+         * Attente d'un buffer d'entrée libre, en microsecondes : 1 ms, comme le
+         * direct — un codec qui ne libère rien en 1 ms est affamé, et la frame
+         * suivante est conflée à la place.
          */
-        const val INPUT_TIMEOUT_US = 5_000L
+        const val INPUT_TIMEOUT_US = 1_000L
 
         /** Attente d'un buffer de sortie par tour, en microsecondes. */
         const val OUTPUT_TIMEOUT_US = 10_000L
