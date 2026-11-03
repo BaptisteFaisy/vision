@@ -34,9 +34,11 @@ data class VehicleStateCue(
  * Annonces d'état des véhicules moteurs (voiture, bus, camion, moto), miroir de `HazardWatcher` :
  * [confirmFrames] positifs consécutifs pour parler, puis silence pendant le cooldown de l'état.
  *
- * En mouvement = approche confirmée (tau < 3 s), traversée latérale à
- * taille stable ([VehicleApproach]) ou boîte croissante (miroir du veto) —
- * sauf veto fond (`MovingVerdict` accuse la caméra : doute/silence).
+ * En mouvement = approche confirmée (tau < 3 s attribué à l'instance),
+ * traversée latérale à taille stable ([VehicleApproach]) ou boîte croissante
+ * de la même instance (miroir du veto + continuité IoU : un saut de boîte
+ * vers une autre voiture n'est pas une croissance, biais garée) — sauf veto
+ * fond (`MovingVerdict` accuse la caméra : doute/silence).
  * À l'arrêt = boîte figée (dérive sous [STILL_SPEED], taille stable) et
  * seau-mètre stable, mesuré ou non (l'heure situe), partout, hors fond franc
  * (le suivi coupe l'arrêt). En stationnement = même immobilité mesurée
@@ -249,7 +251,18 @@ class VehicleStateWatcher(
         return movingPick(current, meters, tau, atMs, hushed, movingMeters, motion) ?: if (announceStopped) stoppedPick(current, meters, atMs, hushed, fondFranc, motion) else null
     }
 
-    /** Véhicule en mouvement : tau, traversée du champ ou croissance, en portée (ou non mesuré). */
+    /**
+     * Tau attribué à l'instance [candidate] (clé label+seau, pas label seul :
+     * le tau d'une voiture qui roule ne fait plus annoncer la garée d'à côté —
+     * biais garée) ; repli label si le verdict ne porte pas la clé (doute parle).
+     */
+    private fun isTauFor(tau: ApproachVerdict, candidate: String): Boolean {
+        if (!tau.approaching || !tau.tauFresh) return false
+        val key = tau.tauKey ?: return tau.label?.let(::vehicleKey) == labelPart(candidate)
+        return key == candidate
+    }
+
+    /** Véhicule en mouvement : tau attribué, traversée du champ ou croissance, en portée (ou non mesuré). */
     private fun movingPick(
         current: Map<String, Current>,
         meters: Map<String, Float>,
@@ -259,7 +272,6 @@ class VehicleStateWatcher(
         movingMeters: Float,
         motion: FrameMotion?,
     ): Pick? {
-        val tauKey = tau.label?.takeIf { tau.approaching }?.let(::vehicleKey)
         val moving = current.keys
             .mapNotNull { candidate ->
                 // Tait par instance (l'approche juge par instance) ou par
@@ -271,7 +283,7 @@ class VehicleStateWatcher(
                 // Fraîcheur : un tau/latéral porté par une piste morte (objet sorti,
                 // coupe de scène) ne s'impute pas à la garée présente — le veto
                 // garde le maintien stale (fail-safe), la voix exige le frais.
-                val tauHit = tauKey != null && tauKey == labelPart(candidate) && tau.tauFresh
+                val tauHit = isTauFor(tau, candidate)
                 // Attribution : un latéral ne s'impute qu'à la candidate qui glisse
                 // elle-même — sinon une piste qui churn entre voitures voisines
                 // fait annoncer la garée d'à côté (faux « Stop », Times Square).
@@ -279,20 +291,25 @@ class VehicleStateWatcher(
                     prev != null && !still(prev, seen, atMs, motion)
                 // Tronqué au cadre (entrée/sortie de champ) : la croissance est
                 // un artefact de (dé)clip, pas une approche (doctrine onEdge).
-                val growth = prev != null && !prev.edge && !seen.edge && isVehicleGrowth(prev.area, prev.atMs, prev.closeness, // FUSION P1+2.
+                // Continuité exigée : une boîte qui saute d'une voiture à
+                // l'autre (churn SAM, IoU < seuil) ne « croît » pas — c'est
+                // une autre voiture, pas un mouvement (biais garée).
+                val growth = prev != null && boxIou(prev.box, seen.box) >= CONTINUITY_IOU_MIN &&
+                    !prev.edge && !seen.edge && isVehicleGrowth(prev.area, prev.atMs, prev.closeness, // FUSION P1+2.
                     seen.area, seen.closeness, atMs, approach.lastGlobal) &&
                     !followingCamera(prev, seen, atMs, motion)
                 val strong = tauHit || lateralHit
-                if ((strong || growth) && inMovingRange(metersFor(meters, candidate), movingMeters)) candidate to strong else null
+                if ((strong || growth) && inMovingRange(metersFor(meters, candidate), movingMeters)) candidate to (strong to tauHit) else null
             }.toMap()
         val key = moving.keys.minByOrNull { metersFor(meters, it) ?: Float.MAX_VALUE }
             ?: return null
         val seen = current.getValue(key)
         val name = VehicleStateText.nameOf(seen.label) ?: return null
         val measured = metersFor(meters, key)
-        val urgent = tau.approaching && tauKey == labelPart(key) && measured != null && measured <= NEAR_MOVING_METERS &&
+        val (strong, tauHit) = moving.getValue(key)
+        val urgent = tauHit && measured != null && measured <= NEAR_MOVING_METERS &&
             seen.cx != null && seen.cx in CENTER_LO..CENTER_HI
-        return Pick(State.MOVING, name, measured, seen.cx, urgent, moving.size, moving.getValue(key))
+        return Pick(State.MOVING, name, measured, seen.cx, urgent, moving.size, strong)
     }
 
     /** Véhicule à l'arrêt : boîte figée (dérive, taille) et seau stable, mesuré ou non, partout. */
@@ -383,6 +400,13 @@ class VehicleStateWatcher(
             candidates.getOrPut(VehicleApproach.instanceKeyOf(detection.label, seen.cx ?: 0.5f)) { mutableListOf() } += box to seen
         }
         return candidates.mapValues { (key, boxes) -> pickStable(boxes, previous[key]?.box) }
+    }
+
+    /** Recouvrement de deux boîtes proto (0 si illisible) : la croissance exige la même instance. */
+    private fun boxIou(a: List<Float>, b: List<Float>): Float {
+        val first = Box.fromProto(a) ?: return 0f
+        val second = Box.fromProto(b) ?: return 0f
+        return first.iou(second)
     }
 
     /** Même instance qu'avant si elle se recouvre (IoU), sinon surface max : pas de téléportation entre deux voitures. */

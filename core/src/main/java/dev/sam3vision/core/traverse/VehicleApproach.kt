@@ -33,6 +33,8 @@ data class ApproachVerdict(
     val tauFresh: Boolean = true,
     /** Même partage pour le latéral (piste nourrie ou non). */
     val lateralFresh: Boolean = true,
+    /** Clé d'instance ([instanceKeyOf]) porteuse du tau (`null` sans approche) : la voix attribue le tau à sa voiture, pas au label. */
+    val tauKey: String? = null,
 )
 
 /**
@@ -295,26 +297,29 @@ class VehicleApproach {
         val approach = approachOf(frameWidth, frameHeight, radialMpsByKey, atMs)
         val lateral = lateralOf(frameWidth, frameHeight, atMs)
         return ApproachVerdict(
-            approach.first, approach.second, approach.third,
+            approach.approaching, approach.ttc, approach.label,
             lateral.first, lateral.second, lateralTtcOf(frameWidth, frameHeight),
-            tauFresh = approach.fourth, lateralFresh = lateral.third,
+            tauFresh = approach.fresh, lateralFresh = lateral.third,
+            tauKey = approach.key,
         )
     }
 
-/** Quadruplet local (verdict + fraîcheur) : Kotlin n'a pas de Quadruple std. */
-private data class Quadruple<A, B, C, D>(val first: A, val second: B, val third: C, val fourth: D)
+/** Approche retenue : verdict + fraîcheur + clé d'instance porteuse. */
+private data class ApproachPick(val approaching: Boolean, val ttc: Float?, val label: String?, val fresh: Boolean, val key: String?)
 
     /**
      * Rapprochement franc : plus petit tau sous [TTC_SECONDS], ou radiale
      * Kalman franche ([radialMpsByKey]) sans tau — la distance confirme,
      * jamais elle ne supprime.
      */
-    private fun approachOf(frameWidth: Int, frameHeight: Int, radialMpsByKey: Map<String, Float>?, atMs: Long): Quadruple<Boolean, Float?, String?, Boolean> {
+    private fun approachOf(frameWidth: Int, frameHeight: Int, radialMpsByKey: Map<String, Float>?, atMs: Long): ApproachPick {
         var bestLabel: String? = null
         var bestTtc = Float.MAX_VALUE
         var bestFresh = true
+        var bestKey: String? = null
         var radialLabel: String? = null
         var radialBest = Float.MAX_VALUE
+        var radialKey: String? = null
         for ((id, track) in tracks) {
             if (!track.motion.velocityReliable) continue
             if (lastVerdicts[id]?.verdict == Verdict.CAMERA_MOVED) continue
@@ -328,6 +333,7 @@ private data class Quadruple<A, B, C, D>(val first: A, val second: B, val third:
                 if (radial < radialBest) {
                     radialBest = radial
                     radialLabel = track.label
+                    radialKey = instanceKeyOf(track.label, track.motion.anchorBox.centerX / frameWidth)
                 }
             }
             if (!tauEligible(track, frameWidth, width, lastGlobal, lastGlobalDtMs)) continue
@@ -336,11 +342,12 @@ private data class Quadruple<A, B, C, D>(val first: A, val second: B, val third:
                 bestTtc = tau
                 bestLabel = track.label
                 bestFresh = track.lastSeenMs == atMs
+                bestKey = instanceKeyOf(track.label, track.motion.anchorBox.centerX / frameWidth)
             }
         }
-        if (bestLabel != null && bestTtc < TTC_SECONDS) return Quadruple(true, bestTtc, bestLabel, bestFresh)
-        if (radialLabel != null) return Quadruple(true, null, radialLabel, true)
-        return Quadruple(false, null, null, true)
+        if (bestLabel != null && bestTtc < TTC_SECONDS) return ApproachPick(true, bestTtc, bestLabel, bestFresh, bestKey)
+        if (radialLabel != null) return ApproachPick(true, null, radialLabel, true, radialKey)
+        return ApproachPick(false, null, null, true, null)
     }
 
     /**

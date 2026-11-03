@@ -104,15 +104,17 @@ class CrossingVerdictWiringTest {
         val green = CrossingLight(listOf(0.1f, 0.1f, 0.2f, 0.3f), CrossingState.Green)
         val engine = engine(green)
         engine.warm(2)
+        // Approche continue (IoU ≥ 0,3 entre frames) : un saut de boîte vers
+        // une autre voiture n'est pas une croissance (biais garée, churn SAM).
         val first = engine.onFrame(frame(car(box = listOf(100f, 100f, 200f, 200f))), emptyList(), "", 0L)
         assertEquals(CrossingVerdict.Cross, first.verdict)
         val second = engine.onFrame(
-            frame(car(box = listOf(50f, 50f, 300f, 300f))), emptyList(), "", 200L,
+            frame(car(box = listOf(90f, 90f, 210f, 210f))), emptyList(), "", 200L,
         )
         assertFalse("croissance isolée : brut faux (run-2)", second.carMoving)
         assertEquals(CrossingVerdict.Cross, second.verdict)
         val third = engine.onFrame(
-            frame(car(box = listOf(40f, 40f, 320f, 320f))), emptyList(), "", 400L,
+            frame(car(box = listOf(80f, 80f, 220f, 220f))), emptyList(), "", 400L,
         )
         assertTrue("croissance répétée : brut vrai", third.carMoving)
         assertEquals(CrossingVerdict.Cross, third.verdict)
