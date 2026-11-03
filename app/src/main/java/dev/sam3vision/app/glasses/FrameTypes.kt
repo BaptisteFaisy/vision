@@ -116,7 +116,7 @@ object YuvConverter {
         return true
     }
 
-    /** Conversion d'un pixel sur quatre, sans allocation dans la boucle. */
+    /** Conversion d'un pixel sur quatre : additions seules dans la boucle interne. */
     private fun fillArgbHalf(data: ByteArray, layout: Yuv420Layout, out: IntArray, halfW: Int, halfH: Int) {
         val yStride = layout.yRowStride
         val uvStride = layout.uvRowStride
@@ -127,19 +127,28 @@ object YuvConverter {
         for (row in 0 until halfH) {
             // Pixel de sortie (row, col) = pixel source (2·row, 2·col) : le
             // chroma du couple (2·row, 2·col) est exactement (row, col).
-            val yBase = (row * 2) * yStride
-            val uvBase = row * uvStride
-            for (col in 0 until halfW) {
-                val y = data[yBase + col * 2].toInt() and 0xFF
-                val ci = uvBase + col * uvStep
-                val u = (data[uOffset + ci].toInt() and 0xFF) - 128
-                val v = (data[vOffset + ci].toInt() and 0xFF) - 128
+            // Index incrémentaux (`yi`, `ci`) : plus de multiplication par pixel.
+            var yi = (row * 2) * yStride
+            val uRow = uOffset + row * uvStride
+            val vRow = vOffset + row * uvStride
+            var ci = 0
+            repeat(halfW) {
+                val y = data[yi].toInt() and 0xFF
+                val u = (data[uRow + ci].toInt() and 0xFF) - 128
+                val v = (data[vRow + ci].toInt() and 0xFF) - 128
                 out[o++] = argb(y, u, v)
+                yi += 2
+                ci += uvStep
             }
         }
     }
 
-    /** Conversion pixel par pixel, sans allocation dans la boucle. */
+    /**
+     * Conversion pixel par pixel, sans allocation ni division dans la boucle :
+     * deux pixels par cellule de chroma (une seule lecture U/V par paire),
+     * index incrémental — la colonne impaire d'une largeur impaire prend seule
+     * sa cellule, comme avant.
+     */
     private fun fillArgb(data: ByteArray, layout: Yuv420Layout, out: IntArray) {
         val width = layout.width
         val height = layout.height
@@ -151,13 +160,16 @@ object YuvConverter {
         var o = 0
         for (row in 0 until height) {
             val yBase = row * yStride
-            val uvBase = (row / 2) * uvStride
-            for (col in 0 until width) {
-                val y = data[yBase + col].toInt() and 0xFF
-                val ci = uvBase + (col / 2) * uvStep
-                val u = (data[uOffset + ci].toInt() and 0xFF) - 128
-                val v = (data[vOffset + ci].toInt() and 0xFF) - 128
-                out[o++] = argb(y, u, v)
+            val uRow = uOffset + (row / 2) * uvStride
+            val vRow = vOffset + (row / 2) * uvStride
+            var ci = 0
+            for (pair in 0 until (width + 1) / 2) {
+                val col = pair * 2
+                val u = (data[uRow + ci].toInt() and 0xFF) - 128
+                val v = (data[vRow + ci].toInt() and 0xFF) - 128
+                out[o++] = argb(data[yBase + col].toInt() and 0xFF, u, v)
+                if (col + 1 < width) out[o++] = argb(data[yBase + col + 1].toInt() and 0xFF, u, v)
+                ci += uvStep
             }
         }
     }
