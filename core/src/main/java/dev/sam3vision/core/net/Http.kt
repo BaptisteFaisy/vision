@@ -5,8 +5,10 @@ import java.io.InterruptedIOException
 import java.net.InetAddress
 import java.net.Socket
 import java.net.SocketTimeoutException
+import java.net.UnknownHostException
 import java.util.concurrent.TimeUnit
 import javax.net.SocketFactory
+import javax.net.ssl.SSLException
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
@@ -25,6 +27,9 @@ internal const val USER_AGENT = "sam3-vision-android/1.0"
 
 /** Nom exact de l'en-tête posé par [request] sur toutes les requêtes sortantes. */
 private const val USER_AGENT_HEADER = "User-Agent"
+
+/** Échec TLS (certificat, date du téléphone, proxy) : dit tel quel, actionnable. */
+internal const val TLS_FAILED = "TLS handshake failed — check date, network, or proxy"
 
 internal val JSON_MEDIA = "application/json; charset=utf-8".toMediaType()
 
@@ -342,6 +347,10 @@ internal fun Throwable.toApiError(): ApiError = when (this) {
     is ApiError -> this
     is SocketTimeoutException -> ApiError.Timeout()
     is InterruptedIOException -> ApiError.Timeout()
+    // TLS (certificat, date, proxy) et DNS (faute de frappe d'endpoint) : dits tels
+    // quels, pas noyés dans le « network » générique — l'écran les montre bruts.
+    is SSLException -> ApiError.Network(TLS_FAILED, cause = this)
+    is UnknownHostException -> ApiError.Network("unknown host — check the endpoint in Settings", cause = this)
     is IOException -> ApiError.Network(cause = this)
     else -> ApiError.Network(message = message ?: "backend unreachable", cause = this)
 }

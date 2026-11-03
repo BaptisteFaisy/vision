@@ -282,6 +282,20 @@ internal fun LiveProbe.markWarming() {
     publishLink(force = true)
 }
 
+/**
+ * Nouvel essai manuel (bouton « Réessayer » de la notice) : le lien repart de zéro
+ * et rouvre aussitôt, le réveil est relancé, et l'erreur affichée s'efface — la
+ * frame suivante la reposera si la panne dure. Sans session (direct arrêté), rien.
+ */
+fun LiveProbe.retryNow(): Boolean {
+    val single = session ?: return false
+    val ok = single.retryNow()
+    fireWake(_state.value.endpoint)
+    _state.update { it.copy(error = null) }
+    publishLink(force = true)
+    return ok
+}
+
 /** Durée d'affichage du « Back online » : assez pour être lu, trop court pour rester. */
 internal const val BACK_LINE_MS = 3_000L
 

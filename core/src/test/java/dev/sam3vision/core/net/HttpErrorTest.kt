@@ -1,6 +1,10 @@
 package dev.sam3vision.core.net
 
+import java.net.UnknownHostException
+import javax.net.ssl.SSLHandshakeException
 import org.junit.Assert.assertEquals
+import org.junit.Assert.assertFalse
+import org.junit.Assert.assertSame
 import org.junit.Assert.assertTrue
 import org.junit.Test
 
@@ -55,6 +59,26 @@ class HttpErrorTest {
 
         assertTrue("attendu Http, obtenu $error", error is ApiError.Http)
         assertEquals("boom", (error as ApiError.Http).body)
+    }
+
+    @Test
+    fun `un echec TLS parle de TLS, pas de reseau generique`() {
+        val cause = SSLHandshakeException("certificate verify failed")
+        val error = cause.toApiError()
+
+        assertTrue("attendu Network, obtenu $error", error is ApiError.Network)
+        assertEquals(TLS_FAILED, error.message)
+        assertSame(cause, error.cause)
+        assertFalse("un TLS cassé ne guérit pas en réessayant seul", error.isTransient)
+    }
+
+    @Test
+    fun `un hote inconnu renvoie vers les reglages`() {
+        val error = UnknownHostException("gaiamelie--sam3-eu-a100-sam3live-web.eu-west.modal.runx").toApiError()
+
+        assertTrue("attendu Network, obtenu $error", error is ApiError.Network)
+        assertTrue(error.message!!.contains("Settings"))
+        assertFalse(error.isTransient)
     }
 
     @Test
