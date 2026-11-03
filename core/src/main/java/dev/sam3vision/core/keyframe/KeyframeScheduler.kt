@@ -17,7 +17,7 @@ import dev.sam3vision.core.live.FrameGate
  */
 class KeyframeScheduler(
     /** Exposée pour verrouiller la politique en test (référence ou terrain). */
-    internal val config: KeyframeConfig = KeyframeConfig(),
+    val config: KeyframeConfig = KeyframeConfig(),
     private val clock: () -> Long = System::currentTimeMillis,
 ) {
 
