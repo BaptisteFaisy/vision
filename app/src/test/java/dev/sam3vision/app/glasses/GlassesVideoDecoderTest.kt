@@ -2,7 +2,9 @@ package dev.sam3vision.app.glasses
 
 import com.meta.wearable.dat.camera.types.VideoFrame
 import java.nio.ByteBuffer
+import org.junit.Assert.assertArrayEquals
 import org.junit.Assert.assertEquals
+import org.junit.Assert.assertFalse
 import org.junit.Assert.assertNull
 import org.junit.Assert.assertTrue
 import org.junit.Test
@@ -66,10 +68,75 @@ class GlassesVideoDecoderTest {
     }
 
     @Test
-    fun `une tranche plus haute que l image est jetee pas devinee`() {
-        // Yuv420Layout ne porte pas de hauteur de tranche : recaler le chroma
-        // à l'aveugle décalerait l'image d'un nombre inconnu de lignes.
-        assertNull(decoderOutputLayout(504, 896, 512, 912, COLOR_FORMAT_YUV420_PLANAR))
+    fun `une tranche plus courte que l image est incomprehensible`() {
+        assertNull(decoderOutputLayout(504, 896, 512, 800, COLOR_FORMAT_YUV420_PLANAR))
+    }
+
+    @Test
+    fun `une tranche alignee est portee pas jetee`() {
+        // 512x912 = alignement 16 courant du MediaCodec pour 504x896 : le
+        // chroma suit à 256x456, le padding est ignoré à la conversion.
+        assertEquals(
+            Yuv420Layout(504, 896, 512, 256, 1, 912),
+            decoderOutputLayout(504, 896, 512, 912, COLOR_FORMAT_YUV420_PLANAR),
+        )
+        assertEquals(
+            Yuv420Layout(504, 896, 512, 512, 2, 912),
+            decoderOutputLayout(504, 896, 512, 912, COLOR_FORMAT_YUV420_SEMIPLANAR),
+        )
+    }
+
+    @Test
+    fun `des cles manquantes retombent en serre`() {
+        // `MediaFormat` sans `stride` ni `slice-height` (0) : on suppose le
+        // buffer serré au lieu de jeter toutes les frames.
+        assertEquals(
+            Yuv420Layout(504, 896, 504, 252, 1, 896),
+            decoderOutputLayout(504, 896, 0, 0, COLOR_FORMAT_YUV420_PLANAR),
+        )
+        assertEquals(
+            Yuv420Layout(504, 896, 504, 504, 2, 896),
+            decoderOutputLayout(504, 896, 0, 0, COLOR_FORMAT_YUV420_SEMIPLANAR),
+        )
+        // Partiel : la clé présente est gardée, la manquante retombe en serré.
+        assertEquals(
+            Yuv420Layout(504, 896, 504, 252, 1, 912),
+            decoderOutputLayout(504, 896, 0, 912, COLOR_FORMAT_YUV420_PLANAR),
+        )
+        assertEquals(
+            Yuv420Layout(504, 896, 512, 256, 1, 896),
+            decoderOutputLayout(504, 896, 512, 0, COLOR_FORMAT_YUV420_PLANAR),
+        )
+    }
+
+    @Test
+    fun `la tranche paddee compte ses lignes de remplissage`() {
+        val layout = Yuv420Layout(504, 896, 512, 256, 1, 912)
+        // Y : 512x912, chroma : 2 plans de 256x456.
+        assertEquals(512 * 912 + 2 * 256 * 456, layout.requiredBytes())
+        assertEquals(512 * 912, layout.uOffset)
+    }
+
+    @Test
+    fun `la tranche paddee se convertit comme la serree`() {
+        // Même zone utile (Y=200, neutre U=V=128), padding à 0 : les deux
+        // conversions doivent réussir et rendre les mêmes pixels.
+        val tight = Yuv420Layout(4, 4, 4, 2, 1)
+        val padded = Yuv420Layout(4, 4, 8, 4, 1, 6)
+        val tightOut = IntArray(16)
+        val paddedOut = IntArray(16)
+        assertTrue(YuvConverter.yuv420ToArgb(fillUseful(tight), tight, tightOut))
+        assertTrue(YuvConverter.yuv420ToArgb(fillUseful(padded), padded, paddedOut))
+        assertArrayEquals(tightOut, paddedOut)
+        val halfOut = IntArray(4)
+        assertTrue(YuvConverter.yuv420ToArgbHalf(fillUseful(padded), padded, halfOut))
+    }
+
+    @Test
+    fun `une tranche trop courte ne se convertit pas`() {
+        val layout = Yuv420Layout(4, 4, 4, 2, 1, 2)
+        assertFalse(YuvConverter.yuv420ToArgb(ByteArray(64), layout, IntArray(16)))
+        assertFalse(YuvConverter.yuv420ToArgbHalf(ByteArray(64), layout, IntArray(4)))
     }
 
     @Test
@@ -143,5 +210,22 @@ class GlassesVideoDecoderTest {
 
         decoder.stashCsd(compressedFrame(buffer = ByteBuffer.wrap(ByteArray(0))))
         decoder.stashCsd(compressedFrame(buffer = ByteBuffer.wrap(byteArrayOf(1, 2, 3, 4))))
+    }
+
+    /** Buffer à la taille de [layout], zone utile grise, padding à 0. */
+    private fun fillUseful(layout: Yuv420Layout): ByteArray {
+        val data = ByteArray(layout.requiredBytes())
+        for (row in 0 until layout.height) {
+            for (col in 0 until layout.width) {
+                data[row * layout.yRowStride + col] = 200.toByte()
+            }
+        }
+        for (row in 0 until layout.chromaHeight) {
+            for (col in 0 until layout.chromaWidth) {
+                data[layout.uOffset + row * layout.uvRowStride + col] = 128.toByte()
+                data[layout.vOffset + row * layout.uvRowStride + col] = 128.toByte()
+            }
+        }
+        return data
     }
 }

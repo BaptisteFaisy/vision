@@ -35,8 +35,11 @@ data class JpegFrame(
  * - `uvPixelStride = 1` → I420 **planaire** : plan U puis plan V séparés ;
  * - `uvPixelStride = 2` → NV12 **semi-planaire** : U et V entrelacés, U en premier.
  *
- * L'offset du plan U est déduit : les [height] lignes du plan Y occupent
- * `yRowStride * height` octets, le chroma suit immédiatement.
+ * L'offset du plan U est déduit : les [ySliceHeight] lignes du plan Y occupent
+ * `yRowStride * ySliceHeight` octets, le chroma suit immédiatement. La tranche
+ * vaut [height] quand le producteur ne padde pas (défaut) ; un décodeur
+ * `MediaCodec` l'aligne souvent au-dessus (ex. 912 pour 896), et seules les
+ * [height] premières lignes sont converties.
  */
 data class Yuv420Layout(
     val width: Int,
@@ -44,6 +47,7 @@ data class Yuv420Layout(
     val yRowStride: Int,
     val uvRowStride: Int,
     val uvPixelStride: Int = 1,
+    val ySliceHeight: Int = height,
 ) {
     /** Largeur du plan de chroma (un échantillon pour deux pixels). */
     val chromaWidth: Int get() = (width + 1) / 2
@@ -51,19 +55,22 @@ data class Yuv420Layout(
     /** Hauteur du plan de chroma. */
     val chromaHeight: Int get() = (height + 1) / 2
 
-    /** Le plan U commence juste après les lignes du plan Y. */
-    val uOffset: Int get() = yRowStride * height
+    /** Lignes de chroma stockées, padding de tranche compris. */
+    val chromaSliceHeight: Int get() = (ySliceHeight + 1) / 2
+
+    /** Le plan U commence juste après les lignes (paddées) du plan Y. */
+    val uOffset: Int get() = yRowStride * ySliceHeight
 
     /** Plan V : plan séparé (planaire) ou octet voisin de U (entrelacé). */
     val vOffset: Int
-        get() = if (uvPixelStride >= 2) uOffset + 1 else uOffset + uvRowStride * chromaHeight
+        get() = if (uvPixelStride >= 2) uOffset + 1 else uOffset + uvRowStride * chromaSliceHeight
 
     /**
-     * Taille minimale du buffer, padding de fin de ligne compris (les strides
-     * sont uniformes : la dernière ligne est donc aussi paddée).
+     * Taille minimale du buffer, paddings de ligne et de tranche compris (les
+     * strides sont uniformes : la dernière ligne est donc aussi paddée).
      */
     fun requiredBytes(): Int {
-        val chroma = uvRowStride * chromaHeight
+        val chroma = uvRowStride * chromaSliceHeight
         return uOffset + if (uvPixelStride >= 2) chroma else 2 * chroma
     }
 }
@@ -80,15 +87,15 @@ object YuvConverter {
      * @param data buffer contigu : plan Y puis plan(s) de chroma, selon [layout].
      * @param layout disposition (dimensions + strides) du buffer.
      * @param out tableau de destination, au moins `width * height` cases.
-     * @return false si l'entrée est incohérente (dimensions nulles, strides trop
-     *   courts, buffer trop petit, tableau de sortie trop court) ; dans ce cas
-     *   [out] reste inchangé.
+     * @return false si l'entrée est incohérente (dimensions nulles, strides ou
+     *   tranche trop courts, buffer trop petit, tableau de sortie trop court) ;
+     *   dans ce cas [out] reste inchangé.
      */
     fun yuv420ToArgb(data: ByteArray, layout: Yuv420Layout, out: IntArray): Boolean {
         val width = layout.width
         val height = layout.height
         if (width <= 0 || height <= 0) return false
-        if (layout.yRowStride < width) return false
+        if (layout.yRowStride < width || layout.ySliceHeight < height) return false
         if (layout.uvPixelStride < 1) return false
         if (out.size < width * height) return false
         if (layout.requiredBytes() > data.size) return false
@@ -107,7 +114,7 @@ object YuvConverter {
         val width = layout.width
         val height = layout.height
         if (width <= 0 || height <= 0) return false
-        if (layout.yRowStride < width) return false
+        if (layout.yRowStride < width || layout.ySliceHeight < height) return false
         if (layout.uvPixelStride < 1) return false
         val (halfW, halfH) = halfDimensions(width, height)
         if (out.size < halfW * halfH) return false

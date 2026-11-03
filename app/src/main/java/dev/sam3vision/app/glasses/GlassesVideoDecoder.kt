@@ -26,9 +26,13 @@ internal fun chromaStepFor(colorFormat: Int): Int? = when (colorFormat) {
 }
 
 /**
- * Disposition du YUV sorti du décodeur, `null` si elle n'est pas exprimable
- * ([Yuv420Layout] ne porte pas de hauteur de tranche : une tranche plus haute
- * que l'image est jetée, pas devinée).
+ * Disposition du YUV sorti du décodeur, `null` si elle n'est pas exprimable.
+ *
+ * Tolérante aux clés manquantes (`0` = serré : pas = largeur, tranche =
+ * hauteur) et aux tranches paddées (`slice-height` aligné au-dessus de
+ * l'image, porté par [Yuv420Layout.ySliceHeight]). Seuls les pas et tranches
+ * réellement trop courts (sous la dimension utile, hors `0` = clé manquante)
+ * et les formats de chroma inconnus jettent la frame.
  */
 internal fun decoderOutputLayout(
     width: Int,
@@ -37,10 +41,13 @@ internal fun decoderOutputLayout(
     sliceHeight: Int,
     colorFormat: Int,
 ): Yuv420Layout? {
-    if (width <= 0 || height <= 0 || stride < width || sliceHeight != height) return null
+    if (width <= 0 || height <= 0) return null
+    if ((stride != 0 && stride < width) || (sliceHeight != 0 && sliceHeight < height)) return null
     val step = chromaStepFor(colorFormat) ?: return null
-    val uvStride = if (step >= 2) stride else (stride / 2).coerceAtLeast((width + 1) / 2)
-    return Yuv420Layout(width, height, stride, uvStride, step)
+    val yStride = if (stride >= width) stride else width
+    val ySlice = if (sliceHeight >= height) sliceHeight else height
+    val uvStride = if (step >= 2) yStride else (yStride / 2).coerceAtLeast((width + 1) / 2)
+    return Yuv420Layout(width, height, yStride, uvStride, step, ySlice)
 }
 
 /**
