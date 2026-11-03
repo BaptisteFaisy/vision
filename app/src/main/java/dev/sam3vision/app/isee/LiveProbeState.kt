@@ -121,6 +121,13 @@ data class LiveProbeState(
      * ([CrosswalkScanBanner]). Publiées avec la phrase, dans la même écriture.
      */
     val scanLines: CrosswalkScanLines? = null,
+    /**
+     * Sur le passage piéton (Traversée + arrivée annoncée + proximité prouvée,
+     * sortie retardée 4 frames + 4 s) : le verdict changé coupe à 99, les
+     * occupants du passage parlent à 100, le verdict maintenu recule à 101 et
+     * le guidage latéral se tait. Faux hors Traversée. DEHORS gardé côté voix.
+     */
+    val onCrosswalk: Boolean = false,
     /** Le conteneur Modal est en train de démarrer (30-50 s au premier appel). */
     val warming: Boolean = false,
     /**
