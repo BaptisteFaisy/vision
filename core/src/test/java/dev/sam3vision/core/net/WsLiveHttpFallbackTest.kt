@@ -257,9 +257,8 @@ class WsLiveHttpFallbackTest {
 
         policy.onWsFailed()
         assertTrue(policy.active)
-        assertFalse(policy.routeWs())
-        assertFalse(policy.routeWs())
-        assertTrue("3e frame HTTP : re-sonde", policy.routeWs())
+        assertFalse("la déclencheuse compte : 2e HTTP", policy.routeWs())
+        assertTrue("3e frame : re-sonde", policy.routeWs())
 
         policy.onWsServed()
         assertFalse(policy.active)
