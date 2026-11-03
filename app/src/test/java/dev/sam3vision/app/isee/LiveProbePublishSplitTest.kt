@@ -84,6 +84,17 @@ class LiveProbePublishSplitTest {
         assertEquals(2, probe.state.value.pixelSeq)
     }
 
+    @Test
+    fun `ecriture 2 recopie onCrosswalk`() = runTest {
+        val probe = probe(this)
+        val active = LiveSession(NeverClient(), clock = { ns })
+        val rest = ProbeRest(emptyList(), emptyList(), emptyList(), null, null, onCrosswalk = true)
+
+        probe.publishRest(active, frame(), rest)
+
+        assertEquals(true, probe.state.value.onCrosswalk)
+    }
+
     private fun probe(scope: TestScope) = LiveProbe(
         scope = scope,
         clock = { ns },
