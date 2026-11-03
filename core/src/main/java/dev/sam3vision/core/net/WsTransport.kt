@@ -46,6 +46,14 @@ interface WsTransport {
 class WsClosedAbnormally(val code: Int, reason: String) :
     java.io.IOException("WebSocket fermé ($code)${if (reason.isBlank()) "" else " : $reason"}")
 
+/**
+ * Handshake refusé par le serveur (HTTP ≠ 101 : 404 route absente, 426 upgrade
+ * requis, 301/302 redirection non suivie…) : le code est préservé pour le
+ * diagnostic, au lieu d'une erreur générique sans motif.
+ */
+class WsHandshakeRefused(val code: Int, cause: Throwable?) :
+    java.io.IOException("WebSocket handshake refusé (HTTP $code)", cause)
+
 /** Chemin du WebSocket du direct, à côté de `POST /live`. */
 internal const val LIVE_WS_PATH = "/live/ws"
 
@@ -133,7 +141,13 @@ class OkHttpWsTransport(client: OkHttpClient) : WsTransport {
         /** Trame binaire descendante : ignorée (recette Muse : jamais du texte). */
         override fun onMessage(webSocket: WebSocket, bytes: ByteString) = Unit
 
-        override fun onFailure(webSocket: WebSocket, t: Throwable, response: Response?) = onClosed(t)
+        /**
+         * Échec : handshake refusé (HTTP ≠ 101, réponse présente) ⇒ le code est
+         * préservé pour le diagnostic ; sinon (coupure en vol, DNS, TCP, TLS)
+         * l'erreur remonte telle quelle.
+         */
+        override fun onFailure(webSocket: WebSocket, t: Throwable, response: Response?) =
+            onClosed(if (response != null && response.code != 101) WsHandshakeRefused(response.code, t) else t)
 
         /**
          * Fermeture propre (1000, fin de session normale) : `null`, comme
