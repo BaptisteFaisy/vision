@@ -73,15 +73,27 @@ class ProximityVoiceFallbackTest {
     )
 
     @Test
-    fun `panne timeout, phrase dite au systeme en file`() = runTest {
+    fun `panne timeout, phrase dite au systeme en coupant`() = runTest {
         val rig = Rig()
 
         assertTrue(rig.voice().speak("Turn left in 20 meters.", level = OutdoorLevel.GPS_EVENT))
 
         assertEquals(listOf("Turn left in 20 meters."), rig.attempts)
         assertEquals(listOf("Turn left in 20 meters."), rig.driver.heard)
-        assertEquals(listOf(false), rig.driver.flushed)
+        assertEquals(listOf(true), rig.driver.flushed)
         assertEquals(listOf("Turn left in 20 meters."), rig.spoken)
+    }
+
+    @Test
+    fun `repli en chaine, chaque phrase coupe la precedente`() = runTest {
+        val rig = Rig()
+        val voice = rig.voice()
+
+        assertTrue(voice.speak("Turn left in 20 meters.", level = OutdoorLevel.GPS_EVENT))
+        assertTrue(voice.speak("Turn right in 10 meters.", level = OutdoorLevel.GPS_EVENT))
+
+        assertEquals(listOf("Turn left in 20 meters.", "Turn right in 10 meters."), rig.driver.heard)
+        assertEquals(listOf(true, true), rig.driver.flushed)
     }
 
     @Test

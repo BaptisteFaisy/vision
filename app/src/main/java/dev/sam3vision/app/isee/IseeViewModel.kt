@@ -315,6 +315,7 @@ class IseeViewModel(app: Application) : AndroidViewModel(app) {
         dictation.discard()
         player.release()
         voiceNav.shutdown()
+        systemTts.close()
         probe.stopLocal()
         pitch.stop()
         super.onCleared()
@@ -347,15 +348,17 @@ class IseeViewModel(app: Application) : AndroidViewModel(app) {
     fun onGlassesListening() = silenceForGlasses()
     fun onGlassesHeard(text: String, pcm: ByteArray) = glassesInbox.heard(text, pcm)
 
-    /** iSee se tait (réponse en vol + lecture + guidage) : la voix du user a priorité. */
+    /** iSee se tait (réponse en vol + lecture + guidage + repli système) : la voix du user a priorité. */
     private fun silenceForGlasses() {
         answers.cancelInFlight()
         cutSpeech()
         voiceNav.stopVoice()
+        systemTts.stop()
     }
 
-    /** Coupe la lecture en cours et rend l'état parlant et le bus : la parole du user passe devant. */
+    /** Coupe la lecture en cours (lecteur + repli système) et rend l'état parlant et le bus : la parole du user passe devant. */
     private fun cutSpeech() {
+        systemTts.stop()
         if (!playerIdle()) {
             player.stop()
             VoiceBus.onSpeechIdle(cut = true)

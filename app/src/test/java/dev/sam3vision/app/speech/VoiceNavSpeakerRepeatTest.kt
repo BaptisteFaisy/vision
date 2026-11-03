@@ -37,7 +37,7 @@ class VoiceNavSpeakerRepeatTest {
 
         assertEquals("Turn left.", phrase)
         assertEquals(1, driver.calls.size)
-        assertEquals(FakeSpeakerDriver.Call("Turn left.", false, Locale.FRENCH, Settings.Default.ttsSpeed), driver.calls[0])
+        assertEquals(FakeSpeakerDriver.Call("Turn left.", true, Locale.FRENCH, Settings.Default.ttsSpeed), driver.calls[0])
     }
 
     @Test

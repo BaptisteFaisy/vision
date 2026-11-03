@@ -130,14 +130,14 @@ class SystemTtsEngineTest {
     }
 
     @Test
-    fun `tampon rejoue a l init dans l ordre puis vide`() {
+    fun `tampon rejoue la derniere seule puis vide`() {
         val buffer = TtsInitBuffer()
         buffer.add("Un.", flush = false, Locale.FRENCH, 1f)
         buffer.add("Deux.", flush = false, Locale.FRENCH, 1f)
 
         val replayed = buffer.drain()
 
-        assertEquals(listOf("Un.", "Deux."), replayed.map { it.text })
+        assertEquals(listOf("Deux."), replayed.map { it.text })
         assertEquals(0, buffer.size)
         assertTrue(buffer.drain().isEmpty())
 
@@ -147,13 +147,13 @@ class SystemTtsEngineTest {
     }
 
     @Test
-    fun `urgente vide le tampon, debordement jette les vieilles`() {
+    fun `urgente vide le tampon, drain ne rend que la fraiche`() {
         val buffer = TtsInitBuffer(max = 2)
         buffer.add("Un.", flush = false, Locale.FRENCH, 1f)
         buffer.add("Deux.", flush = false, Locale.FRENCH, 1f)
         buffer.add("Trois.", flush = false, Locale.FRENCH, 1f)
 
-        assertEquals(listOf("Deux.", "Trois."), buffer.drain().map { it.text })
+        assertEquals(listOf("Trois."), buffer.drain().map { it.text })
 
         buffer.add("Quatre.", flush = false, Locale.FRENCH, 1f)
         buffer.add("Stop.", flush = true, Locale.FRENCH, 1f)
