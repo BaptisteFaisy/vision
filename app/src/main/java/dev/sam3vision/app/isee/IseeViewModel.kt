@@ -231,7 +231,7 @@ class IseeViewModel(app: Application) : AndroidViewModel(app) {
     ))
     private val glassesInbox = IseeGlassesInbox(viewModelScope, shots, { _state.value }, ::update, ::silenceForGlasses, ::answerHeard, cameraOps::stopVideo, probe::stop, { cameraOps.startVideo(); syncProbe() })
     /** Balayages bas/droite : fonction GPS et « Quoi chercher ? » (voir [IseeSwipeOrders]). */
-    private val swipe = IseeSwipeOrders(viewModelScope, modes::run, voiceNav::runOrder, dictation, { mic.preview().speaking }, { settings }, { _state.value.placeMode }, { navSpeaker.speakClipAndWait(it) }, ::update, voiceNav::goTo, ::silenceForGlasses, haptics::holdStart, haptics::holdEnd)
+    private val swipe = IseeSwipeOrders(viewModelScope, modes::run, voiceNav::runOrder, dictation, { mic.preview().speaking }, { settings }, { _state.value.placeMode }, { navSpeaker.speakClipAndWait(it) }, ::update, voiceNav::goTo, { silenceForGlasses(); clipPlayer.stop() }, haptics::holdStart, haptics::holdEnd, { active })
     private val holdTalk = IseeHoldTalk(viewModelScope, { active }, ::silenceForGlasses, shots, { _state.value }, ::update, haptics, dictation, liveDictation, streamDictation, { settings }, cameraOps, ::transcribeAndAnswer, glassesInbox::onTap, { _state.value.placeMode }, modes::applyPlace, System::currentTimeMillis, swipe::asking)
     private val glassesOrder = IseeGlassesOrder({ navSpeaker.speakNavigation(it) }, ::update, { glassesSession })
 
@@ -248,7 +248,7 @@ class IseeViewModel(app: Application) : AndroidViewModel(app) {
     var active: Boolean = false
         set(value) {
             field = value
-            if (!value) gestures.onHoldCancel()
+            if (!value) { gestures.onHoldCancel(); gestures.onSwipeHoldCancel() }
         }
 
     /** Caméra de la fenêtre flottante, câblée par le composable à l'attachement. */

@@ -63,6 +63,7 @@ class IseeSwipeOrdersTest {
         listening: FindListening,
         placeMode: PictoPlaceMode = PictoPlaceMode.DEDANS,
         language: SpeechLanguage = SpeechLanguage.En,
+        active: Boolean = true,
     ) = IseeSwipeOrders(
         scope = this,
         runMode = { modes += it; true },
@@ -77,6 +78,7 @@ class IseeSwipeOrdersTest {
         silence = { silences++ },
         hapticStart = { haptics += "start" },
         hapticEnd = { haptics += "end" },
+        isActive = { active },
         clock = { testScheduler.currentTime },
     )
 
@@ -162,6 +164,7 @@ class IseeSwipeOrdersTest {
         assertEquals("micro ouvert une fois", 1, listening.starts)
         assertEquals("voix coupée", 1, silences)
         assertEquals(listOf("start"), haptics)
+        assertTrue("tenue posée", state.holding)
         assertTrue("écoute tenue", orders.asking())
         assertEquals("aucun clip de question", emptyList<String>(), spokenClips)
         assertTrue("aucun ordre GPS rejoué", gpsOrders.isEmpty())
@@ -181,7 +184,23 @@ class IseeSwipeOrdersTest {
         assertEquals("transcrit une fois", 1, listening.finishes)
         assertEquals(listOf("gare de Lyon"), destinations)
         assertEquals(listOf("start", "end"), haptics)
+        assertFalse("tenue rendue", state.holding)
         assertFalse("plus d'écoute", orders.asking())
+    }
+
+    @Test
+    fun `hors ecran, le maintien n'ouvre rien`() = runTest {
+        val listening = FakeListening(text = "gare de Lyon")
+        val orders = swipe(listening, active = false)
+
+        orders.askDestination()
+        advanceUntilIdle()
+
+        assertEquals("micro intact", 0, listening.starts)
+        assertEquals("voix intacte", 0, silences)
+        assertTrue("aucune haptique", haptics.isEmpty())
+        assertFalse("pas de tenue", state.holding)
+        assertFalse("pas d'écoute", orders.asking())
     }
 
     @Test
@@ -221,6 +240,9 @@ class IseeSwipeOrdersTest {
         advanceUntilIdle()
 
         assertEquals(IseeStatusText.MIC_UNAVAILABLE, state.status)
+        assertEquals("voix intacte", 0, silences)
+        assertTrue("aucune haptique", haptics.isEmpty())
+        assertFalse("pas de tenue", state.holding)
         assertTrue("aucune destination", destinations.isEmpty())
         assertFalse("plus d'écoute", orders.asking())
     }
@@ -267,6 +289,7 @@ class IseeSwipeOrdersTest {
         assertEquals("l'enregistrement est jeté", 1, listening.discards)
         assertEquals("rien de transcrit", 0, listening.finishes)
         assertTrue("aucune destination", destinations.isEmpty())
+        assertFalse("tenue rendue", state.holding)
         assertFalse("plus d'écoute", orders.asking())
     }
 }
