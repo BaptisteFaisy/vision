@@ -43,18 +43,31 @@ internal class GlassesBackgroundFrames(
             runCatching { decoder.stashCsd(frame.asSdkFrame()) }
             return null
         }
-        // Comme le direct : un bitstream déjà en Annex B y échoue à coup sûr
-        // après 1 à 3 ms — on ne sonde que ce qui peut être une image.
-        if (shouldProbeBitmap(frame)) runCatching { tryBitmap(frame) }.getOrNull()?.let { return it }
-        if (!frame.compressed) return null
+        if (!frame.compressed) return probe(frame)
+        // `annexB` d'abord : il ne convertit (tableau neuf) que ce qui se
+        // parcourt en unités NAL longueur-préfixées — une image fixe (JPEG,
+        // PNG…) y échoue dès la première longueur (sa magie vaut des
+        // milliards en big-endian) et repart telle quelle vers la sonde.
+        // Le converti saute la sonde : `BitmapFactory` y échouerait à coup
+        // sûr après 1 à 3 ms de copie + JNI, comme l'Annex B déjà sauté.
         val access = annexB(frame.bytes)
+        if (access === frame.bytes && shouldProbeBitmap(frame)) probe(frame)?.let { return it }
         val sdk = VideoFrame(
             ByteBuffer.wrap(access), frame.width, frame.height,
             frame.presentationTimeUs, true, frame.codecConfig,
         )
-        val argb = runCatching { decoder.decode(sdk) }.getOrNull() ?: return null
-        return runCatching { argbToBitmap(argb) }.getOrNull()
+        val argb = runCatching { decoder.decode(sdk) }.getOrNull()
+        if (argb != null) return runCatching { argbToBitmap(argb) }.getOrNull()
+        // Repli : une image fixe qui se parcourrait en NAL (théorique — seul
+        // un conteneur à boîtes type HEIF le peut) a sauté la sonde ; on la
+        // tente après l'échec du décodeur, le rendu reste identique.
+        if (access !== frame.bytes && shouldProbeBitmap(frame)) return probe(frame)
+        return null
     }
+
+    /** Sonde bitmap (JPEG ou brut ARGB) : un flux cassé rend `null`, sans lever. */
+    private fun probe(frame: GlassesFrame): Bitmap? =
+        runCatching { tryBitmap(frame) }.getOrNull()
 
     /** Libère le décodeur (fin de composition) : le prochain appel repart de zéro. */
     fun release() = decoder.release()
