@@ -31,4 +31,17 @@ class GlassesLiveDecoderLatencyTest {
         assertTrue(needsCodecRebuild(false, 0, 0, 504, 896))
         assertTrue(needsCodecRebuild(false, 504, 896, 504, 896))
     }
+
+    @Test
+    fun `la meme surface ne rattache rien`() {
+        val surface = Any()
+        assertFalse(needsSurfaceRebind(surface, surface))
+        assertFalse(needsSurfaceRebind(null, null))
+    }
+
+    @Test
+    fun `une surface neuve ou perdue rattache le codec`() {
+        assertTrue(needsSurfaceRebind(Any(), Any()))
+        assertTrue(needsSurfaceRebind(null, Any()))
+    }
 }
