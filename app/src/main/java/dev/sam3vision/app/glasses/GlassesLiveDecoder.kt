@@ -338,8 +338,7 @@ class GlassesLiveDecoder(
                 Log.i(TAG, "direct lunettes : NAL ${fresh.sorted()} (entrée $inputFed)")
             }
         }
-        decoder.queueInputBuffer(index, 0, access.size, maxOf(0L, frame.presentationTimeUs), 0)
-        return drain(decoder)
+        return queueInputGuarded(decoder, index, access.size, frame.presentationTimeUs, ::dropCodecLocked) && drain(decoder)
     }
 
     /** Rend un buffer d'entrée inutilisé (vide) : sans ça l'index est perdu à jamais. */
@@ -357,10 +356,13 @@ class GlassesLiveDecoder(
         val info = MediaCodec.BufferInfo()
         var rendered = false
         while (true) {
-            val index = decoder.dequeueOutputBuffer(info, if (rendered) 0L else OUTPUT_WAIT_US)
+            // Panne contenue au vidage : une image déjà rendue reste un succès, et
+            // l'erreur transitoire garde le codec (le jeter = 100 à 500 ms de gel).
+            val index = dequeueOutputGuarded(decoder, info, if (rendered) 0L else OUTPUT_WAIT_US, ::dropCodecLocked)
+                ?: return countRender(rendered)
             when {
                 index >= 0 -> {
-                    decoder.releaseOutputBuffer(index, true)
+                    if (!releaseOutputGuarded(decoder, index, ::dropCodecLocked)) return countRender(rendered)
                     rendered = true
                     drained += 1
                     if (drained == 1L) Log.i(TAG, "direct lunettes : 1re sortie codec")
