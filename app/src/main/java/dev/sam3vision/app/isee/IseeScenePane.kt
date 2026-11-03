@@ -16,6 +16,7 @@ import androidx.compose.foundation.layout.navigationBars
 import androidx.compose.foundation.layout.padding
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.SideEffect
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
@@ -99,18 +100,25 @@ private fun BoxWithConstraintsScope.PortraitScene(
     val showGlasses = rememberGlassesFeed(layers, open)
     val navState by viewModel.voiceNavState.collectAsState()
     val density = LocalDensity.current
+    // Un seul calcul par compose : le guidage est lu quatre fois plus bas.
+    val guidance = isGuidanceOverlay(navState)
+    val bottom = navInsetDp()
     // Rue à la taille parole (50 %) ; en guidage, la carte prend le bas,
     // la boule s'efface et la rue grandit (60 %), sans respirer.
-    val geo = with(density) { portraitGeometry(width.toPx(), (height - navInsetDp()).toPx(), open, 1f, isGuidanceOverlay(navState)) }
+    // Mémorisée : seul `open` et le guidage la changent, pas les recomposes
+    // voisins (parole, sonde, navigation).
+    val geo = remember(density, width, height, open, guidance) {
+        with(density) { portraitGeometry(width.toPx(), (height - bottom).toPx(), open, 1f, guidance) }
+    }
     with(density) { PortraitCamera(state, glue, probe, viewModel, open, geo.pictureH.toDp(), showGlasses, layers.glassesGhost) }
-    GlassesProbeLayer(state, viewModel.probe, glassesLive, glassesStreaming, isGuidanceOverlay(navState))
+    GlassesProbeLayer(state, viewModel.probe, glassesLive, glassesStreaming, guidance)
     Header(view.scene, onPicture = open > 0.5f, modifier = Modifier.fillMaxWidth())
     // navState est collecté plus haut : la taille de la rue en dépend.
     SceneGuidanceLayer(viewModel) {
         SceneOrbLayer(state, view, geo, open, position, navState)
     }
-    BottomScrim()
-    SceneStatusBar(state, viewModel, isGuidanceOverlay(navState))
+    BottomScrim(bottom)
+    SceneStatusBar(state, viewModel, guidance, bottom)
     // Génération picto : le bloc fin semi-transparent survit à la rue
     // (génération lancée, vidéo coupée), jamais dehors.
     if (state.placeMode.pictoEnabled && state.picto.phase == PictoPhase.Generating) PictoGeneratingCard()
@@ -127,14 +135,15 @@ private fun BoxWithConstraintsScope.PortraitScene(
  * l'on marche, donc celui où des masques figés font croire que tout va bien.
  */
 @Composable
-private fun BoxScope.SceneStatusBar(state: IseeUiState, viewModel: IseeViewModel, guidance: Boolean) {
+private fun BoxScope.SceneStatusBar(state: IseeUiState, viewModel: IseeViewModel, guidance: Boolean, bottom: Dp) {
+    // La sonde écrit deux fois par frame : ce corps se réexécute à chaque
+    // tick, mais le modificateur stable laisse la feuille intacte quand
+    // le texte ne change pas (l'expiration du « Back online » est gardée :
+    // la ligne est toujours recalculée sur l'état frais).
     val outage = outageLineOf(viewModel.probe.state.collectAsState().value)
     if (guidance && outage == null) return
-    SceneBottomBar(
-        state,
-        outage,
-        Modifier.align(Alignment.BottomCenter).padding(bottom = navInsetDp() + 10.dp),
-    )
+    val bar = remember(bottom) { Modifier.align(Alignment.BottomCenter).padding(bottom = bottom + 10.dp) }
+    SceneBottomBar(state, outage, bar)
 }
 
 /**
@@ -258,18 +267,23 @@ internal fun orbLookOf(scene: IseeScene, time: Float, open: Float): OrbLook {
     return OrbLook(time = time, you = you, see = see, amp = amp, level = level)
 }
 
+/** Demi-largeur, demi-hauteur, opacité : le contact se resserre vers le centre. */
+private val SHADOW_LOBES = listOf(
+    Triple(0.94f, 0.18f, 0.09f),
+    Triple(0.66f, 0.085f, 0.14f),
+    Triple(0.34f, 0.032f, 0.18f),
+)
+
+// Statiques : les reconstruire à chaque frame de la boule alloue pour rien.
+private val SHADOW_INK = Color(IseePortrait.INK)
+private val CROWN_SEE = Color(IseePortrait.SEE)
+
 /** Pénombre diffuse, ombre portée et cœur de contact, fondus sur le sol blanc. */
 private fun androidx.compose.ui.graphics.drawscope.DrawScope.drawOrbShadow(c: Offset, r: Float, k: Float) {
     if (k <= 0.01f) return
-    // Demi-largeur, demi-hauteur, opacité : le contact se resserre vers le centre.
-    val lobes = listOf(
-        Triple(0.94f, 0.18f, 0.09f),
-        Triple(0.66f, 0.085f, 0.14f),
-        Triple(0.34f, 0.032f, 0.18f),
-    )
     val center = Offset(c.x + r * 0.045f, c.y + r * 1.13f)
-    val ink = Color(IseePortrait.INK)
-    lobes.forEach { (width, height, opacity) ->
+    val ink = SHADOW_INK
+    SHADOW_LOBES.forEach { (width, height, opacity) ->
         // Comprimer le dégradé lui-même évite le bord dur d'un disque rogné en ovale.
         withTransform({
             translate(center.x, center.y)
@@ -296,7 +310,7 @@ private fun androidx.compose.ui.graphics.drawscope.DrawScope.drawOrbShadow(c: Of
 /** La couronne de 120 barres fines qui monte du verre avec la voix d'iSee. */
 private fun androidx.compose.ui.graphics.drawscope.DrawScope.drawVoiceCrown(c: Offset, r: Float, t: Float, k: Float, amp: Float) {
     val n = 120
-    val see = Color(IseePortrait.SEE)
+    val see = CROWN_SEE
     for (i in 0 until n) {
         val a = i / n.toFloat() * 2f * Math.PI.toFloat()
         val e = 0.5f + 0.28f * kotlin.math.sin(a * 3 + t * 2.1f) + 0.18f * kotlin.math.sin(a * 7 - t * 3.3f + 1.3f) +
@@ -317,8 +331,8 @@ private fun androidx.compose.ui.graphics.drawscope.DrawScope.drawVoiceCrown(c: O
 
 /** Bandeau blanc derrière les boutons système du bas. */
 @Composable
-private fun BoxWithConstraintsScope.BottomScrim() {
-    Box(Modifier.align(Alignment.BottomCenter).fillMaxWidth().padding(bottom = 0.dp).background(Color.White).padding(bottom = navInsetDp()))
+private fun BoxWithConstraintsScope.BottomScrim(bottom: Dp) {
+    Box(Modifier.align(Alignment.BottomCenter).fillMaxWidth().background(Color.White).padding(bottom = bottom))
 }
 
 /** Le crochet de navigation (raccourci : l'inset de navigation du téléphone). */
@@ -333,6 +347,8 @@ internal fun navInsetDp(): Dp = WindowInsets.navigationBars.asPaddingValues().ca
 private fun rememberGlassesFeed(layers: IseeSceneLayers, open: Float): Boolean {
     var lastGlasses by remember { mutableStateOf(false) }
     val showGlasses = showGlassesFeed(layers.glassesFeed, layers.glassesGhost, layers.cameraCard, open, lastGlasses)
-    lastGlasses = showGlasses
+    // Écrit après application : écrire pendant la composition planifie un
+    // recompose immédiat à chaque bascule (double passe pour rien).
+    SideEffect { lastGlasses = showGlasses }
     return showGlasses
 }
