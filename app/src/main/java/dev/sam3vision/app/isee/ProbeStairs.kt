@@ -13,6 +13,8 @@ import dev.sam3vision.core.stairs.StairWatcher
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
+import kotlin.coroutines.CoroutineContext
+import kotlin.coroutines.EmptyCoroutineContext
 
 /**
  * Guetteur escaliers de la sonde, miroir du trottoir : l'escalier nommé par
@@ -43,11 +45,13 @@ internal fun LiveProbe.observeStairs(
     scope: CoroutineScope,
     language: () -> SpeechLanguage,
     placeMode: () -> PictoPlaceMode = { PictoPlaceMode.DEHORS },
+    /** Fil de la collecte (`ProbeWorkDispatcher` en prod : hors main, ordonné). */
+    work: CoroutineContext = EmptyCoroutineContext,
 ): StairWatcher {
     // Deux frames suffisent côté voix (le flux Canny d'affichage garde trois) :
     // un escalier nommé deux fois de suite n'est plus un clignotement.
     val watcher = StairWatcher(confirmFrames = 2)
-    scope.launch {
+    scope.launch(work) {
         state.collect { st ->
             if (stairsAnnounceMuted(st, placeMode)) return@collect
             // Lectures d'abord (sens + heure par la boîte), libellés bruts en
@@ -144,9 +148,11 @@ internal fun LiveProbe.observeStairsCount(
     tickMs: Long = StairCountVoice.COUNT_MS,
     nowMs: () -> Long = { System.currentTimeMillis() },
     placeMode: () -> PictoPlaceMode = { PictoPlaceMode.DEHORS },
+    /** Fil du battement (`ProbeWorkDispatcher` en prod : hors main, ordonné). */
+    work: CoroutineContext = EmptyCoroutineContext,
 ): StairCountVoice {
     val counter = StairCountVoice()
-    scope.launch {
+    scope.launch(work) {
         while (true) {
             delay(tickMs)
             val st = state.value

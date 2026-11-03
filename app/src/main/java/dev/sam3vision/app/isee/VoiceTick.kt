@@ -5,6 +5,8 @@ import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
+import kotlin.coroutines.CoroutineContext
+import kotlin.coroutines.EmptyCoroutineContext
 
 /**
  * Battement vocal (ordre user du 01/11 : la voix parle toutes les 700 ms) :
@@ -167,7 +169,9 @@ internal fun LiveProbe.observeVoiceTick(
     nowMs: () -> Long = { System.currentTimeMillis() },
     offer: (VoiceWish?, Long) -> Boolean = ::offer,
     indoor: () -> Boolean = { false },
-): Job = voiceTickJob(scope, { state.value.crossingActive }, tickMs, nowMs, offer, indoor)
+    /** Fil du battement (`ProbeWorkDispatcher` en prod : hors main, ordonné). */
+    work: CoroutineContext = EmptyCoroutineContext,
+): Job = voiceTickJob(scope, { state.value.crossingActive }, tickMs, nowMs, offer, indoor, work)
 
 /**
  * Boucle du battement, hors sonde : toutes les [tickMs], propose le vœu
@@ -182,7 +186,9 @@ internal fun voiceTickJob(
     nowMs: () -> Long = { System.currentTimeMillis() },
     offer: (VoiceWish?, Long) -> Boolean = ::offer,
     indoor: () -> Boolean = { false },
-): Job = scope.launch {
+    /** Fil du battement (`ProbeWorkDispatcher` en prod : hors main, ordonné). */
+    work: CoroutineContext = EmptyCoroutineContext,
+): Job = scope.launch(work) {
     while (true) {
         delay(tickMs)
         if (crossingActive()) continue

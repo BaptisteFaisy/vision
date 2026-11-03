@@ -11,6 +11,8 @@ import dev.sam3vision.core.picto.PictoPlaceMode
 import dev.sam3vision.core.speech.SpeechLanguage
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.launch
+import kotlin.coroutines.CoroutineContext
+import kotlin.coroutines.EmptyCoroutineContext
 
 /**
  * Les deux guetteurs obstacles (bordure + mobilier) : les véhicules ne
@@ -42,9 +44,11 @@ internal fun LiveProbe.observeObstacles(
     curb: CurbWatcher = CurbWatcher(),
     hazard: HazardWatcher = HazardWatcher(),
     placeMode: () -> PictoPlaceMode = { PictoPlaceMode.DEHORS },
+    /** Fil de la collecte (`ProbeWorkDispatcher` en prod : hors main, ordonné). */
+    work: CoroutineContext = EmptyCoroutineContext,
 ): ObstacleWatchers {
     val watchers = ObstacleWatchers(curb, hazard)
-    scope.launch {
+    scope.launch(work) {
         state.collect { st ->
             obstacleFrame(st, language, watchers, placeMode)
         }

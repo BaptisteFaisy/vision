@@ -4,6 +4,7 @@ import android.app.Application
 import androidx.lifecycle.AndroidViewModel
 import androidx.lifecycle.viewModelScope
 import dev.sam3vision.app.IseeHaptics
+import dev.sam3vision.app.ProbeWorkDispatcher
 import dev.sam3vision.app.glasses.GlassesSessionControl
 import dev.sam3vision.app.isIntroDisablePhrase
 import dev.sam3vision.app.media.CacheCleanerManager
@@ -290,7 +291,9 @@ class IseeViewModel(app: Application) : AndroidViewModel(app) {
         probe.observeGlassesLive(viewModelScope, { settings }, { camera?.lensSpec }, { pitch.stop() }, { pitch.start() }, lensFeeds::mire)
         probe.observeHeadPose(viewModelScope)
         probe.observeDetour(viewModelScope, voiceNav::onProbeDetour)
-        hazards = probe.observeHazards(viewModelScope, { settings.speechLanguage }, placeMode = { _state.value.placeMode })
+        // Guetteurs hors main (fil sonde mono-thread, ordonné) : leurs signaux +
+        // lignes debug ne retardent plus la composition ni le tampon PIXEL.
+        hazards = probe.observeHazards(viewModelScope, { settings.speechLanguage }, placeMode = { _state.value.placeMode }, work = ProbeWorkDispatcher)
         probe.link.guidanceActive = { voiceNavState.value is VoiceNavUiState.Guiding }
         probe.observeIndoorDoors(
             viewModelScope,
