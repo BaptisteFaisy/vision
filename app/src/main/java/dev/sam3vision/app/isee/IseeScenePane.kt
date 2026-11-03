@@ -103,8 +103,8 @@ private fun BoxWithConstraintsScope.PortraitScene(
     // Un seul calcul par compose : le guidage est lu quatre fois plus bas.
     val guidance = isGuidanceOverlay(navState)
     val bottom = navInsetDp()
-    // Rue à la taille parole (50 %) ; en guidage, la carte prend le bas,
-    // la boule s'efface et la rue grandit (60 %), sans respirer.
+    // Rue à la taille parole (62,5 %) ; en guidage, la carte prend le bas,
+    // la boule s'efface et la rue grandit (75 %), sans respirer.
     // Mémorisée : seul `open` et le guidage la changent, pas les recomposes
     // voisins (parole, sonde, navigation).
     val geo = remember(density, width, height, open, guidance) {
