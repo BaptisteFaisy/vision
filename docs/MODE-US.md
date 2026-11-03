@@ -12,8 +12,8 @@ Il **élit l'endpoint** appelé, il **n'allume aucune carte** (`SamRegion.kt:6-8
 
 | Région | App Modal | Conteneur | Preset d'endpoint (`SamRegion.kt`) |
 |---|---|---|---|
-| EU (défaut) | `sam3-eu-a100` | `region=eu`, `routing_region=eu-west` | `https://gaiamelie--sam3-eu-a100-sam3live-web.eu-west.modal.run` (ligne 21) |
-| US | `sam3-us-a100` | `region=us`, `routing_region=us-east` | `https://gaiamelie--sam3-us-a100-sam3live-web.us-east.modal.run` (ligne 26) |
+| EU (défaut) | `sam3-eu-a100` | `region=eu`, `routing_region=eu-west` | `https://gaiamelie--sam3-eu-a100-sam3live-web.eu-west.modal.run` (ligne 22) |
+| US | `sam3-us-a100` | `region=us`, `routing_region=us-east` | `https://gaiamelie--sam3-us-a100-sam3live-web.us-east.modal.run` (ligne 27) |
 
 ## Ordre de résolution — corrigé, et revérifié dans cet arbre
 
@@ -167,7 +167,7 @@ mode US sert quand l'Europe est à sec ou indisponible, **pas** pour gagner en l
   les routes ; l'app le traduit en `BackendStopped` (« GPU SAM éteint — demande à b de l'allumer »)
   — `core/…/net/Errors.kt:35-37`, mapping `Http.kt:198-204`. Un 404 sans ce corps tombe dans
   `ApiError.Http(404, …)` (`Http.kt:203`).
-- Le preset suppose le profil Modal `baptiste-faisy`. Un autre profil ⇒ mettre l'URL dans
+- Le preset suppose le profil Modal `gaiamelie`. Un autre profil ⇒ mettre l'URL dans
   « Base URL SAM 3.1 » (elle gagne sur tout le reste).
 - Une URL du build (`sam.base.url` / `sam.us.base.url`) gagne sur le preset : voir le premier
   piège de ce document.
