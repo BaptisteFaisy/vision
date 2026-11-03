@@ -220,7 +220,7 @@ class SwipeHoldTriggerTest {
     }
 
     @Test
-    fun `compatibilite : l'ancien onSwipeHoldCancel recoit aussi UP_EARLY`() {
+    fun `compatibilite - l'ancien onSwipeHoldCancel recoit aussi UP_EARLY`() {
         val events = mutableListOf<String>()
         val legacy = SwipeHoldTrigger(scheduler, object : SwipeHoldTrigger.Listener {
             override fun onSwipeHoldStart() { events += "start" }
