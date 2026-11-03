@@ -53,7 +53,7 @@ jobs:
           set -euo pipefail
           # URL déterministe : https://<workspace>--<app>-<classe>-<methode>.<region>.modal.run
           # (vérifiée à la main le 2026-10-28 ; en cas de renommage cette fumée casse).
-          BASE="https://baptiste-faisy--valhalla-idf-cpu-valhallarouter-web.us-east.modal.run"
+          BASE="https://gaiamelie--valhalla-idf-cpu-valhallarouter-web.us-east.modal.run"
           echo "BASE=$BASE"
           timeout 240 bash -c "until curl -sf -m 10 $BASE/health; do sleep 5; done"
           curl -sf -m 30 -X POST "$BASE/route" \

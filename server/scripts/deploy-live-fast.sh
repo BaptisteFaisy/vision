@@ -38,7 +38,7 @@ set -uo pipefail
 
 ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 MODAL="${MODAL_BIN:-modal}"
-URL="${LIVE_HEALTH_URL:-https://baptiste-faisy--sam3-eu-a100-sam3live-web.eu-west.modal.run/health}"
+URL="${LIVE_HEALTH_URL:-https://gaiamelie--sam3-eu-a100-sam3live-web.eu-west.modal.run/health}"
 WARM_URL="${URL%/health}warm"  # réveil explicite, sans inférence (voir `/warm`)
 
 APP_NAME="${LIVE_APP_NAME:-sam3-eu-a100}"
@@ -49,7 +49,7 @@ ROUTING="${FAST_ROUTING_REGION:-eu-west}"
 # `${VAR-default}` et non `${VAR:-default}` : en CI la variable est définie **vide**
 # exprès (pas de ~/.modal.toml), et `:-` y remettrait le profil local → erreur
 # « No such option: -profile » (vu le 26/10 sur le runner GitHub).
-PROFILE="${MODAL_PROFILE-baptiste-faisy}"
+PROFILE="${MODAL_PROFILE-gaiamelie}"
 profile_arg=()
 [ -n "$PROFILE" ] && profile_arg=(--profile "$PROFILE")
 
