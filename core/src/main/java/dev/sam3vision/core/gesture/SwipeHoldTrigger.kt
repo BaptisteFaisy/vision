@@ -11,10 +11,12 @@ import kotlin.math.hypot
  * [Listener.onSwipeHoldEnd] (envoi). Mêmes seuils que l'appui long
  * ([LongPressTrigger]) : le maintien « se sent » pareil.
  *
- * Un glissement repris ou un relâchement avant le seuil annulent sans rien
- * déclencher : un vrai balayage (GPS activé au franchissement) n'ouvre
- * jamais le micro. L'appui long normal ne peut pas coexister avec une
- * attente ici : il s'est déjà annulé au-delà de son slop quand le
+ * Un bond franc (> slop entre deux MOVE) ou un relâchement avant le seuil
+ * annulent : le bond signale [Listener.onSwipeHoldCancel], le relâchement
+ * reste muet — un balayage vite relâché garde son seul effet GPS. La
+ * dérive lente (le doigt finit son slide en décélérant) déplace l'ancre
+ * et garde le maintien. L'appui long normal ne peut pas coexister avec
+ * une attente ici : il s'est déjà annulé au-delà de son slop quand le
  * balayage est confirmé (80 px >> 24 px).
  */
 class SwipeHoldTrigger(
@@ -65,9 +67,20 @@ class SwipeHoldTrigger(
         }
     }
 
-    /** Glissement : au-delà du seuil pendant l'attente, le maintien est abandonné. */
+    /**
+     * Glissement : un bond franc au-delà du seuil abandonne l'attente
+     * ([Listener.onSwipeHoldCancel]) ; la dérive lente déplace l'ancre et
+     * garde le maintien — le doigt finit son slide en décélérant.
+     */
     fun onMove(x: Float, y: Float) {
-        if (phase == Phase.Pending && hypot(x - holdX, y - holdY) > slopPx) reset()
+        if (phase != Phase.Pending) return
+        if (hypot(x - holdX, y - holdY) > slopPx) {
+            reset()
+            listener.onSwipeHoldCancel()
+        } else {
+            holdX = x
+            holdY = y
+        }
     }
 
     /** Doigt supplémentaire : annule l'attente, ou clôt la tenue en cours. */
