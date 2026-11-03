@@ -83,3 +83,23 @@ def test_concepts_poussette(concepts) -> None:
     deployed = _fresh_live_fast_concepts()
     check("rue : déployé traduit pareil (poussette)",
           deployed.model_concept("poussette") == "stroller")
+
+
+def test_concepts_cache(concepts) -> None:
+    """Mémoïsation : fonction pure, hits après warm, résultats inchangés."""
+    from test_units import check
+
+    concepts.model_concept.cache_clear()
+    before = concepts.model_concept.cache_info()
+    check("concepts: mêmes traductions via le cache",
+          concepts.model_concept("bordure") == "curb"
+          and concepts.model_concept("une Barrière") == "barrier"
+          and concepts.model_concept("souvenir shop") == "souvenir shop")
+    for _ in range(10):
+        concepts.model_concept("bordure")
+        concepts.model_concept("une Barrière")
+    after = concepts.model_concept.cache_info()
+    check("concepts: hits après warm (3 miss, 20 hits)",
+          after.misses - before.misses == 3 and after.hits - before.hits == 20,
+          str(after))
+    check("concepts: cache borné", after.maxsize == 1024, str(after))
