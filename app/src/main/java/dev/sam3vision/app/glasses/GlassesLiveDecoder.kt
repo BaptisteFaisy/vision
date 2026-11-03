@@ -9,7 +9,6 @@ import android.os.SystemClock
 import android.util.Log
 import android.view.Surface
 import dev.sam3vision.core.distance.CropGeometry
-import java.io.ByteArrayOutputStream
 import java.nio.ByteBuffer
 
 /**
@@ -56,16 +55,11 @@ internal fun resetAnnexBMemo() {
 }
 
 /**
- * Remet un accès H.265 en Annex B si ses unités sont longueur-préfixées (style hvcC,
- * 4 octets big-endian) : `MediaCodec` veut des start codes, pas des longueurs, et reste
- * muet sinon — sans erreur. Détection par essai : start code présent, longueur
- * incohérente ou reste inexpliqué, et les octets repartent tels quels.
- *
- * Détection mémorisée : le format est stable par session, donc un flux détecté
- * Annex B repart tel quel sans nouveau balayage (15 poussées/s × 2 chemins) ;
- * un flux longueur-préfixé garde le chemin complet (chaque accès se convertit,
- * les octets changent à chaque frame). Testé en JVM (`GlassesAnnexBTest`,
- * mémo réinitialisé entre cas).
+ * Remet un accès H.265 en Annex B si ses unités sont longueur-préfixées (hvcC) :
+ * `MediaCodec` veut des start codes et reste muet sinon, sans erreur. Détection
+ * par essai (start code présent, longueur incohérente ou reste inexpliqué → tel quel),
+ * mémorisée : l'Annex B avéré repart sans balayage, le longueur-préfixé garde le
+ * chemin complet. Testé en JVM (`GlassesAnnexBTest`, mémo réinitialisé entre cas).
  */
 fun annexB(bytes: ByteArray): ByteArray {
     if (annexBStable == true) return bytes
@@ -73,24 +67,39 @@ fun annexB(bytes: ByteArray): ByteArray {
         if (bytes.size >= 8) annexBStable = true
         return bytes
     }
-    val out = ByteArrayOutputStream(bytes.size + 16)
+    // Deux passes, tableau à taille exacte : l'ancien `ByteArrayOutputStream`
+    // recopiait l'accès entier (fin + croissances) — 1 à 3 copies par accès.
+    var units = 0
     var pos = 0
     while (pos + 4 <= bytes.size) {
-        val length = ((bytes[pos].toInt() and 0xFF) shl 24) or
-            ((bytes[pos + 1].toInt() and 0xFF) shl 16) or
-            ((bytes[pos + 2].toInt() and 0xFF) shl 8) or
-            (bytes[pos + 3].toInt() and 0xFF)
+        val length = u32be(bytes, pos)
         if (length <= 0 || pos + 4 + length > bytes.size) return bytes
-        out.write(ANNEX_B_START)
-        out.write(bytes, pos + 4, length)
+        units += 1
         pos += 4 + length
     }
     if (pos != bytes.size) return bytes
+    val out = ByteArray(bytes.size + units * ANNEX_B_START.size)
+    var read = 0
+    var written = 0
+    while (read < pos) {
+        val length = u32be(bytes, read)
+        ANNEX_B_START.copyInto(out, written)
+        bytes.copyInto(out, written + ANNEX_B_START.size, read + 4, read + 4 + length)
+        read += 4 + length
+        written += ANNEX_B_START.size + length
+    }
     // Longueur-préfixé avéré : le chemin complet reste la règle (jamais de
     // raccourci vers `return bytes`, qui laisserait passer du hvcC brut).
     annexBStable = false
-    return out.toByteArray()
+    return out
 }
+
+/** Entier non signé big-endian à [pos] (longueur d'unité hvcC). */
+private fun u32be(bytes: ByteArray, pos: Int): Int =
+    ((bytes[pos].toInt() and 0xFF) shl 24) or
+        ((bytes[pos + 1].toInt() and 0xFF) shl 16) or
+        ((bytes[pos + 2].toInt() and 0xFF) shl 8) or
+        (bytes[pos + 3].toInt() and 0xFF)
 
 /** Vrai si les octets commencent par un start code Annex B (long ou court). */
 internal fun startsWithAnnexB(bytes: ByteArray): Boolean {
