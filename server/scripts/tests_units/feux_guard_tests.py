@@ -252,6 +252,36 @@ def _curb(guard, seg, check) -> None:
     labels = [item["label"] for item in kept2["objects"]]
     check("passage: garde réserve aussi le zébrures évincées",
           "zebra" in labels and "bordure" in labels, str(labels))
+    _sidewalk_guard(guard, seg, check)
+
+
+def _sidewalk_guard(guard, seg, check) -> None:
+    """Plan piéton : réserve du bucket bordure faute de bordure (+0 slot)."""
+    import numpy as np
+
+    for label in ["sidewalk", "Sidewalk", "trottoir", "Trottoir", "pavement", "footpath"]:
+        check(f"trottoir: plan reconnu ({label})",
+              guard.is_ground_label(label), label)
+    for label in ["curb", "road", "route", "chemin", "person", "", None]:
+        check(f"trottoir: pas un plan ({label!r})",
+              not guard.is_ground_label(label), repr(label))
+    mask = np.zeros((8, 8), dtype=np.uint8)
+    mask[2:6, 2:6] = 1
+    walk = [{"label": f"car{index}", "score": 0.9 - 0.05 * index,
+             "box": [0.0, 0.0, 8.0, 8.0], "mask": mask} for index in range(5)]
+    walk.append({"label": "trottoir", "score": 0.12,
+                 "box": [1.0, 1.0, 4.0, 4.0], "mask": mask})
+    saved = guard.finalize_guarded(seg.finalize, walk, (16, 16), 3, "none")
+    check("trottoir: garde réserve la dernière place faute de bordure",
+          [item["label"] for item in saved["objects"]] == ["car0", "car1", "trottoir"],
+          str([item["label"] for item in saved["objects"]]))
+    both2 = [dict(item) for item in walk]
+    both2.append({"label": "bordure", "score": 0.11,
+                  "box": [1.0, 1.0, 4.0, 4.0], "mask": mask})
+    first = guard.finalize_guarded(seg.finalize, both2, (16, 16), 3, "none")
+    check("trottoir: bordure d'abord dans le bucket",
+          [item["label"] for item in first["objects"]] == ["car0", "car1", "bordure"],
+          str([item["label"] for item in first["objects"]]))
 
 
 def _crowd(guard, seg, check) -> None:

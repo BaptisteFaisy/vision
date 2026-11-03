@@ -87,9 +87,9 @@ internal class ProbeRotationState {
      * d'une frame) rejoue la précédente au lieu d'effacer voix et overlay ;
      * deux vides de suite passent (scène vraiment vide). Les échecs
      * (`null`) passent avant ([accumulated]) : le chemin erreur garde déjà
-     * les derniers masques. La frame rejouée est la même instance
-     * (`elapsedMs`, `truncated` périmés d'une frame). Sans horloge : le
-     * compteur seul décide. Remis à zéro par [reset].
+     * les derniers masques. La frame rejouée est une copie : objets gardés,
+     * `elapsedMs` et `truncated` frais (sinon le diagnostic lirait périmé).
+     * Sans horloge : le compteur seul décide. Remis à zéro par [reset].
      */
     fun holdLastGood(raw: LiveFrame): LiveFrame {
         if (raw.objects.isNotEmpty()) {
@@ -100,7 +100,7 @@ internal class ProbeRotationState {
         val held = lastGood
         if (held != null && misses < 1) {
             misses += 1
-            return held
+            return held.copy(elapsedMs = raw.elapsedMs, truncated = raw.truncated)
         }
         lastGood = null
         misses = 0

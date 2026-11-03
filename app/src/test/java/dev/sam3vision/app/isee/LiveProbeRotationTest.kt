@@ -107,6 +107,19 @@ class LiveProbeRotationTest {
     }
 
     @Test
+    fun `filet rejoue objets gardes, truncated frais`() {
+        val rotation = ProbeRotationState()
+        val good = frame("person").copy(elapsedMs = 100L, truncated = listOf("vieux"))
+        val empty = frame().copy(elapsedMs = 200L, truncated = listOf("neuf"))
+
+        assertEquals(listOf("vieux"), rotation.holdLastGood(good).truncated)
+        val held = rotation.holdLastGood(empty)
+        assertEquals(listOf("person"), held.objects.map { it.label })
+        assertEquals(listOf("neuf"), held.truncated)
+        assertEquals(200L, held.elapsedMs)
+    }
+
+    @Test
     fun `reset vide le filet 1-manque`() = runTest {
         val (probe, fake) = harness(this, enableRotation = null)
         send(probe, fake, "A", 8_000_000L, frame("person", "car"))

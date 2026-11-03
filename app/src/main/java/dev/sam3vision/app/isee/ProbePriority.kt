@@ -126,7 +126,9 @@ internal fun curbWish(cue: CurbCue?, crossingActive: Boolean = false): VoiceWish
 
 /**
  * Propose un vœu au bus : tu par l'antirépétition ([AntiRepeat]) ou écrasé
- * par le bus ([VoiceBus]) = `false` (jeté, jamais redit) ; sinon posté.
+ * par le bus ([VoiceBus]) = `false` (jeté, tour rendu, rejoué à la frame
+ * suivante) ; sinon posté. Le verdict du bus fait foi : un `true`
+ * aveugle marquerait servie une phrase jamais dite ([VoiceTick]).
  * Sous un compte (§ 42), escaliers et trottoir passent (le trottoir coupe
  * le compte, § 45) ; sous un trottoir (§ 45), seuls les trottoirs passent —
  * les autres attendent sans consommer leur tour.
@@ -144,6 +146,5 @@ internal fun offer(wish: VoiceWish?, nowMs: Long = System.currentTimeMillis()): 
     val allowed = AntiRepeat.allow(wish.key, nowMs)
     if (BuildConfig.DEBUG) android.util.Log.d(TAG_MUTE, "offre level=${wish.level} cle=${wish.key} admis=$allowed texte=[${wish.text}]")
     if (!allowed) return false
-    VoiceBus.post(wish.level, wish.text, wish.clipId, wish.clips, antiRepeatKey = wish.key)
-    return true
+    return VoiceBus.post(wish.level, wish.text, wish.clipId, wish.clips, antiRepeatKey = wish.key)
 }
