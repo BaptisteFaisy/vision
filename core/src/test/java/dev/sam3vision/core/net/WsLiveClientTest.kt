@@ -6,6 +6,7 @@ import java.util.concurrent.TimeUnit
 import java.util.concurrent.atomic.AtomicInteger
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.async
+import kotlinx.coroutines.delay
 import kotlinx.coroutines.runBlocking
 import kotlinx.coroutines.withTimeout
 import org.json.JSONObject
@@ -467,5 +468,21 @@ class WsLiveClientTest {
         assertEquals(-1, leadingId("""{"objects":[{"id":5}]}"""))      // id niché : pas le nôtre
         assertEquals(-1, leadingId("""{"id":null}"""))
         assertEquals(-1, leadingId("pas du json"))
+    }
+
+    @Test
+    fun `le timeout d une frame reveille ses soeurs en vol`() = runBlocking {
+        val transport = ContractWsTransport() // silence : sans réveil, la sœur attendrait son budget
+        val client = WsLiveClient(base, transport, timeoutMs = 400, http = RecordingLiveClient(), binaryWs = false)
+        val first = async { client.live("QQ==", null, 640, 4) }
+        delay(250) // la sœur part à 250 : son budget seul l'emmènerait à 650
+        val sibling = async { client.live("QQ==", null, 640, 4) }
+        assertTrue(first.await().exceptionOrNull() is ApiError.Timeout) // t ≈ 400
+        withTimeout(150) { sibling.join() } // réveillée par le timeout, pas par le sien
+        val siblingError = sibling.await().exceptionOrNull()
+        assertTrue("sœur réveillée en Timeout, obtenu $siblingError", siblingError is ApiError.Timeout)
+        val cancels = transport.sent.filter { "\"cancel\"" in it }.map { JSONObject(it).getInt("id") }
+        assertEquals("un seul cancel, celui de la frame expirée", listOf(1), cancels)
+        client.close()
     }
 }
