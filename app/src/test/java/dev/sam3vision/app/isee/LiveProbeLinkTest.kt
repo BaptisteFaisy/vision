@@ -2,6 +2,8 @@ package dev.sam3vision.app.isee
 
 import dev.sam3vision.app.live.LiveLatencyLog
 import dev.sam3vision.core.net.ApiError
+import kotlinx.coroutines.test.advanceUntilIdle
+import kotlinx.coroutines.test.runTest
 import org.junit.After
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
@@ -156,6 +158,37 @@ class LiveProbeLinkTest {
         assertTrue("la première passe", LiveLatencyLog.failure(ApiError.Timeout(), 1, 5_000))
         assertFalse("la deuxième est écrasée", LiveLatencyLog.failure(ApiError.Timeout(), 2, 5_400))
         assertTrue("la seconde suivante passe", LiveLatencyLog.failure(ApiError.Timeout(), 3, 6_000))
+    }
+
+    @Test
+    fun `retryNow relance le lien et efface l_erreur`() = runTest {
+        val (probe, fake) = probeHarness(this)
+        advanceUntilIdle()
+        val closedBefore = fake.closed
+        val healthBefore = fake.healthCalls
+        probe.noteFailure(ApiError.Timeout())
+        assertNotNull(probe.state.value.error)
+
+        probe.retryNow()
+        advanceUntilIdle()
+
+        assertNull("l'erreur affichée s'efface", probe.state.value.error)
+        assertEquals("le lien repart de zéro", closedBefore + 1, fake.closed)
+        assertEquals("le réveil repart", healthBefore + 1, fake.healthCalls)
+    }
+
+    @Test
+    fun `retryNow sans session ne fait rien`() = runTest {
+        val (probe, fake) = probeHarness(this)
+        advanceUntilIdle()
+        probe.configure("") // direct arrêté : plus de session
+        advanceUntilIdle()
+        val healthBefore = fake.healthCalls
+
+        assertFalse(probe.retryNow())
+        advanceUntilIdle()
+
+        assertEquals("aucun réveil sans session", healthBefore, fake.healthCalls)
     }
 
     private companion object {

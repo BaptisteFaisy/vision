@@ -312,12 +312,14 @@ class WsLiveClient(
 
     /**
      * Porte d'entrée d'une frame (sous [lock]), calculée **avant** tout enregistrement :
+     * endpoint inutilisable ⇒ refus local actionnable (Réglages), sans handshake ;
      * hors ligne ⇒ refus local (ni DNS, ni TCP, ni handshake) ; interface changée ⇒ socket
      * mort-né jeté ici, mais **la frame courante repart** sur la nouvelle interface (une
      * bascule Wi-Fi → 4G ne doit pas coûter une frame : elle coûte un handshake) ;
      * backoff en cours ⇒ refus immédiat, sans consommer d'ouverture.
      */
     private fun admitLocked(): ApiError? {
+        endpointRefusal("endpoint direct", baseUrl, LIVE_WS_PATH)?.let { return it }
         if (!net.available) {
             link.onOffline()
             return discardSocketLocked(WS_OFFLINE)
@@ -493,6 +495,3 @@ class WsLiveClient(
     }
 
 }
-
-/** Annulation one-way (FIX-8) : le serveur annule l'inférence abandonnée, sans répondre. */
-internal fun cancelMessage(id: Int): String = "{\"id\":$id,\"cancel\":true}"

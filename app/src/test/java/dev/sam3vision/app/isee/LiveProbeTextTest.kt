@@ -248,4 +248,13 @@ class LiveProbeTextTest {
         assertTrue(liveProbeDetails(LiveProbeState(modelsLine = line)).contains(line))
         assertTrue(liveProbeDetails(LiveProbeState()).none { it.startsWith("llm :") })
     }
+
+    @Test
+    fun `le bouton reessayer n_apparait que sur erreur affichee`() {
+        assertFalse(probeRetryVisible(LiveProbeState()))
+        assertFalse(probeRetryVisible(LiveProbeState(warming = true, timeoutSec = 60)))
+        assertFalse(probeRetryVisible(LiveProbeState(frames = 3)))
+        assertTrue(probeRetryVisible(LiveProbeState(error = "GPU waking up… (retrying on the next frame)")))
+        assertTrue(probeRetryVisible(LiveProbeState(error = "SAM GPU off — ask b to turn it on")))
+    }
 }

@@ -146,6 +146,13 @@ fun probeFailureText(error: Throwable, link: ProbeLinkState = ProbeLinkState()):
 }
 
 /**
+ * Le bouton « Réessayer » : visible dès qu'une erreur est affichée dans la notice.
+ * Le direct réessaie déjà seul à chaque frame ; le bouton force l'échéance (lien
+ * remis à neuf + réveil relancé, voir [LiveProbe.retryNow]) au lieu d'attendre.
+ */
+fun probeRetryVisible(state: LiveProbeState): Boolean = state.error != null
+
+/**
  * Ligne de diagnostic du lien : « link: warm · 0.3 s · fails 0 · reprises 1 ». Fonction
  * pure (aucun Android) : le panneau la montre, la voix peut la lire.
  */

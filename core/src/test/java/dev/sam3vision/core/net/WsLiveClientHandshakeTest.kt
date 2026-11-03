@@ -158,4 +158,19 @@ class WsLiveClientHandshakeTest {
         assertEquals(2, transport.closes)
         client.close()
     }
+
+    @Test
+    fun `un endpoint inutilisable refuse sans handshake`() = runBlocking {
+        val transport = HandshakeTransport()
+        val bad = WsLiveClient(
+            "pas-une-url", transport, 60_000L, RecordingLiveClient(),
+            binaryWs = false, keepAlive = null,
+        )
+
+        val error = bad.live("QQ==", listOf("person"), 640, 4).exceptionOrNull()
+
+        assertTrue("attendu Network, obtenu $error", error is ApiError.Network)
+        assertTrue((error as ApiError.Network).message!!.contains("Settings"))
+        assertEquals("aucun handshake dans le vide", 0, transport.opens)
+    }
 }

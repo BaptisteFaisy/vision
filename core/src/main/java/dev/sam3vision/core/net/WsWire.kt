@@ -30,3 +30,6 @@ internal const val ERROR_MARK = "\"error\""
 
 /** Fermeture idle serveur (120 s sans message applicatif) : reprise sans backoff (§9). */
 internal const val IDLE_CLOSE_CODE = 1001
+
+/** Annulation one-way (FIX-8) : le serveur annule l'inférence abandonnée, sans répondre. */
+internal fun cancelMessage(id: Int): String = "{\"id\":$id,\"cancel\":true}"

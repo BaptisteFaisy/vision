@@ -14,6 +14,7 @@ import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.BoxScope
 import androidx.compose.foundation.layout.BoxWithConstraintsScope
+import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.offset
 import androidx.compose.foundation.layout.padding
@@ -23,6 +24,7 @@ import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.Text
+import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.LaunchedEffect
@@ -92,7 +94,7 @@ internal fun BoxWithConstraintsScope.VisionCard(
             onToggle = { viewModel.modeChips.toggleCrossing() },
             onBounds = viewModel.modeChips.crossing::setBounds,
         )
-        ProbeNoticeCard(snap)
+        ProbeNoticeCard(snap, onRetry = { probe.retryNow() })
     }
 }
 
@@ -128,23 +130,31 @@ internal const val PIXEL_VEIL_MS = 1_100
 /** Notice scopée : ne recompose que quand frames/erreur/réveil bougent, jamais sur les pixels. */
 @Composable
 internal fun BoxScope.ProbeNoticeScoped(probe: LiveProbe) {
-    ProbeNoticeCard(probe.collectNotice())
+    ProbeNoticeCard(probe.collectNotice(), onRetry = { probe.retryNow() })
 }
 
 /** Notice courte en centre de carte quand aucun masque n'est là (réveil GPU, etc). */
 @Composable
-internal fun BoxScope.ProbeNoticeCard(probe: LiveProbeState) {
-    liveProbeNotice(probe)?.let { notice ->
+internal fun BoxScope.ProbeNoticeCard(probe: LiveProbeState, onRetry: () -> Unit = {}) {
+    val notice = liveProbeNotice(probe) ?: return
+    Column(
+        modifier = Modifier
+            .align(Alignment.Center)
+            .background(Color(0xCC1A1F26), RoundedCornerShape(10.dp))
+            .padding(horizontal = 10.dp, vertical = 8.dp),
+        horizontalAlignment = Alignment.CenterHorizontally,
+    ) {
         Text(
             notice,
             color = Color.White,
             fontSize = 12.sp,
             textAlign = TextAlign.Center,
-            modifier = Modifier
-                .align(Alignment.Center)
-                .background(Color(0xCC1A1F26), RoundedCornerShape(10.dp))
-                .padding(horizontal = 10.dp, vertical = 8.dp),
         )
+        if (probeRetryVisible(probe)) {
+            TextButton(onClick = onRetry) {
+                Text("Retry", color = Color.White, fontSize = 12.sp)
+            }
+        }
     }
 }
 

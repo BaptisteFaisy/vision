@@ -168,6 +168,16 @@ class LiveSession(
     fun preconnect(): Boolean = client.preconnect()
 
     /**
+     * Nouvel essai manuel (bouton « Réessayer ») : le lien repart de zéro (`close`
+     * remet le backoff à zéro) puis rouvre aussitôt — sans socket (client HTTP),
+     * `close` est sans effet et `preconnect` rend `false`, sans erreur.
+     */
+    fun retryNow(): Boolean {
+        client.close()
+        return client.preconnect()
+    }
+
+    /**
      * Bascule chaud (FIX-18) : le délai froid (60 s) retombe au délai normal, sans rouvrir.
      * Sans socket (client HTTP), sans effet — comme [socketOpen] qui rend `false`.
      */
