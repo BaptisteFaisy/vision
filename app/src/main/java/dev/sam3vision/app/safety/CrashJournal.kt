@@ -37,6 +37,11 @@ private val STAMP = ThreadLocal.withInitial {
  */
 internal object JournalLine {
 
+    /** Ligne d'un événement sans exception (refus système, bascule) : mêmes champs, `type=event`. */
+    fun event(millis: Long, thread: String, origin: String, detail: String): String =
+        "${stampOf(millis)} thread=${field(thread)} origin=${field(origin)} " +
+            "type=event msg=[${redactSecrets(detail)}] frames=[]"
+
     /** Ligne complète d'un incident ([millis] = horodatage, [thread] = fil fautif). */
     fun of(millis: Long, thread: String, origin: String, error: Throwable): String {
         val frames = framesOf(error)
