@@ -35,7 +35,7 @@ import kotlinx.coroutines.withContext
  * Piloté par les poussées du flux (conflaté : la plus fraîche gagne), jamais sondé :
  * l'ancien sondage ajoutait jusqu'à 500 ms à chaque envoi. [LiveProbe.wantsFrame] reste
  * le garde de cadence ; en guidage, [GuidanceGate] plafonne en plus à une frame toutes les
- * [GUIDANCE_FRAME_MS] (une image de rue toutes les 0,4 s suffit à suivre une marche
+ * [GUIDANCE_FRAME_MS] (une image de rue toutes les 0,15 s suffit à suivre une marche
  * d'itinéraire, et le serveur respire pendant que la voix parle).
  *
  * Téléphone en veille : la poussée est décodée hors écran ([GlassesBackgroundFrames]) et
@@ -77,11 +77,12 @@ internal fun GlassesProbeWiring(probe: LiveProbe, glassesFeed: Boolean, guidance
  * Porte de cadence du guidage : au plus une frame toutes les [GUIDANCE_FRAME_MS].
  * Hors guidage elle laisse tout passer — c'est alors [LiveProbe.wantsFrame] seul qui
  * décide. État minimal (un `Long`), aucune allocation par frame.
+ * `internal` pour les tests : la fenêtre y est pinnée en JVM.
  */
-private class GuidanceGate {
+internal class GuidanceGate {
     private var lastAtMs = 0L
 
-    /** La frame peut-elle partir maintenant ? Oui hors guidage, ou créneau de 400 ms échu. */
+    /** La frame peut-elle partir maintenant ? Oui hors guidage, ou créneau de 150 ms échu. */
     fun admits(guidance: Boolean, nowMs: Long): Boolean {
         if (!guidance) return true
         // Horloge monotone : un recalage d'heure ne peut pas bloquer la porte.
@@ -211,10 +212,12 @@ private fun countBridgeSplit(decodeMs: Long, encMs: Long) {
 }
 
 /**
- * Cadence de guidage : une frame toutes les 400 ms (~2,5 fps). En guidage, la rue bouge
- * lentement (on regarde une direction, pas une scène) et la cadence de course de
- * [LiveProbe.wantsFrame] ne servait qu'à noyer le réseau pendant que la voix parle.
+ * Cadence de guidage : une frame toutes les 150 ms (~6,7 fps, ordre user du 03/11 : sous
+ * les 200 ms). En guidage, la rue bouge lentement (on regarde une direction, pas une
+ * scène) et la cadence de course de [LiveProbe.wantsFrame] ne servait qu'à noyer le réseau
+ * pendant que la voix parle — 150 ms garde un plafond sans affamer le suivi.
+ * `internal` pour les tests : l'exigence « sous 200 ms » y est pinnée en JVM.
  */
-private const val GUIDANCE_FRAME_MS = 400L
+internal const val GUIDANCE_FRAME_MS = 150L
 
 private const val TAG = "GlassesBridge"
