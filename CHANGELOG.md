@@ -16,6 +16,33 @@ livré et ses preuves (tâche, fichiers, chiffres) dans l'arbre.
 - **Preuves** : `CurbWatcherTest` 27/27, package `core.curb` + `SeuilsDehorsV4Test` +
   `DeadConceptsRemovedTest` 133/133, `ObstacleCurbVoiceTest` (:app) 9/9,
   build-serveur r630 ; échec authentique 2/27 avant correctif.
+## 2026-11-03 — iSee Traversée : « pas de feu → traversez » (branche `traversee-sans-feu`)
+
+- **Demande** : le verdict disait « Don't cross. » devant un passage sans feu ni
+  voiture en mouvement ; ordre user : sans feu confirmé + sans voiture en
+  mouvement → « Cross. » (répété toutes les 2 s, prioritaire), avec le guidage
+  latéral sur le passage.
+- **Cause** : le moteur du verdict gardait `sawBox` (une boîte vue = jamais
+  `Absent`) alors que la porte (`LightEvidenceGate`, trou D3) rouvre l'absence
+  après 8 frames propres — un fragment SAM parasite (`selectLightBoxes` sans
+  plancher de score) ou un feu dépassé verrouillait « Don't cross. » pour
+  toute la séance.
+- **Fait** :
+  - `app/isee/CrossingVerdictWiring.kt` : suppression du verrou moteur, la
+    porte tranche seule (perte brève = attente silencieuse, perte durable =
+    absence reprouvée ; toute boîte qui revient reparle en une frame, veto
+    trafic inchangé) + ligne verdict debug toutes les 2 s
+    (`logcat -s VoiceMute:*`).
+  - Tests : nouveau `un fragment parasite unique ne condamne pas le verdict a
+    vie` (rouge 1 frame → « Cross. » après 8 propres) ; contrat mis à jour
+    (`feu vu puis perdu - attente breve puis absence reprouvee`,
+    `a cadence nominale la 8e frame sans boite reprouve l'absence`).
+- **Vérifié sans changement** : répétition 2 s (`CrossingVerdictAnnouncer`),
+  priorité verdict 100 > latéral 101 sur le bus, guidage latéral sur passage
+  proche en traversée.
+- **Limite connue** : une voiture garée proche peut encore vetoter (proximité
+  `< 15 m`, `TraverseVeto`) même immobile — la ligne verdict permet de le voir
+  sur le terrain avant tout assouplissement.
 
 ## 2026-11-02 — iSee Traversée : une garée ne dit plus « Don't cross. » sur gigue 1-frame (branche `fix/traverser-garee-vs-circulation`)
 
