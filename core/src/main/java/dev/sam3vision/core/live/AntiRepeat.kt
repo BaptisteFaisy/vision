@@ -18,15 +18,17 @@ package dev.sam3vision.core.live
  * - `human-imminent` = immédiat hors table (niveau 2, mot continu : dit toujours) ;
  * - `pole-avoid` = immédiat hors table (niveau 7, mot continu : dit toujours) ;
  * - `gps-reminder` = sans antirépétition (niveau 3, rappel aux 15 s de silence) ;
- * - `fence` = 4 s (niveau 4, grillages + murs + barrières < 6 m) ;
+ * - `fence` = 4 s (trou de grillage — le doux dangers est supprimé, ordre user du 03/11) ;
+ * - `fence-avoid` = immédiat hors table (niveau 4, mot continu clôture/barrière) ;
+ * - `misc-avoid` = immédiat hors table (niveau 7, mot continu divers) ;
  * - `curb` = 2 s (niveau 5, bordures < 6 m) ;
  * - `curb-up` = immédiat hors table (niveau 5, boucle montée < 1 m) ;
  * - `stairs` = 2 s (niveau 6, escaliers : annonce, montée ; jalons :
  *   `stairs:<palier>`, même durée, mémoire par palier) ;
  * - `stairs-count` = 1 s (niveau 6, compte des marches — ordre user du
  *   02/11, VOIX-DANGER § 42) ;
- * - `pole` = 2 s (niveau 7, poteaux + mobilier vertical < 6 m) ;
- * - `misc` = 2 s (niveau 7, divers : animal, poubelle, souvenirs < 6 m) ;
+ * - `pole` = 2 s (doux supprimé le 03/11, gardé pour compat de la table) ;
+ * - `misc` = 2 s (doux supprimé le 03/11, gardé pour compat de la table) ;
  * - `crosswalk-announce` = 2 s (niveau 8, annonce du passage — le
  *   « Devant » se répète toutes les 2 s hors Traversée, ordre user du
  *   02/11 ; les autres directions restent 1 fois par vue côté guetteur) ;
@@ -121,6 +123,18 @@ object AntiRepeat {
      */
     const val KEY_WALL_AVOID = "wall-avoid"
 
+    /**
+     * Niveau 4 : mot continu clôture/barrière (< 6 m dans le couloir) — hors
+     * table, toujours autorisé (ordre user du 03/11 : esquive, plus de doux).
+     */
+    const val KEY_FENCE_AVOID = "fence-avoid"
+
+    /**
+     * Niveau 7 : mot continu divers (mobilier, animal, poubelle… < 6 m dans
+     * le couloir) — hors table, toujours autorisé (ordre user du 03/11).
+     */
+    const val KEY_MISC_AVOID = "misc-avoid"
+
     /** Niveau 7 : divers (animal, poubelle, souvenirs) < 6 m — 2 s. */
     const val KEY_MISC = "misc"
 
@@ -208,7 +222,8 @@ object AntiRepeat {
         KEY_CROSSWALK_ANNOUNCE -> 2_000L
         KEY_CROSSWALK_ARRIVAL -> ONCE_MS
         // Mots continus, rappel GPS, alignement, perte : sans délai (toujours autorisés).
-        KEY_HUMAN_IMMINENT, KEY_POLE_AVOID, KEY_WALL_AVOID, KEY_GPS_REMINDER, KEY_CROSSWALK_ALIGN, KEY_CROSSWALK_LOST, KEY_CURB_UP -> 0L
+        KEY_HUMAN_IMMINENT, KEY_POLE_AVOID, KEY_WALL_AVOID, KEY_FENCE_AVOID, KEY_MISC_AVOID,
+        KEY_GPS_REMINDER, KEY_CROSSWALK_ALIGN, KEY_CROSSWALK_LOST, KEY_CURB_UP -> 0L
         // Clés inconnues : sans antirépétition (jamais bloquantes).
         else -> 0L
     }

@@ -68,16 +68,15 @@ class ProbeHazardsTest {
     }
 
     @Test
-    fun `reset oublie l'alerte mobilier`() {
+    fun `reset re-arme le mot mobilier`() {
         val dangers = dangers()
         val signal = HazardSignal(detected = true, meters = 0.8f, label = "barrier")
-        dangers.hazard.onSignal(signal, 3_000L, SpeechLanguage.Fr)
-        dangers.hazard.onSignal(signal, 3_000L, SpeechLanguage.Fr)
-        assertEquals(3_000L, dangers.hazard.lastAlertMs)
+        assertEquals("Droite.", dangers.hazard.onSignal(signal, 3_000L, SpeechLanguage.Fr)!!.phrase)
+        assertNull(dangers.hazard.onSignal(signal, 3_100L, SpeechLanguage.Fr))
 
         dangers.reset()
 
-        assertNull(dangers.hazard.lastAlertMs)
+        assertEquals("Droite.", dangers.hazard.onSignal(signal, 3_100L, SpeechLanguage.Fr)!!.phrase)
     }
 
     @Test

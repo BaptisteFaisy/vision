@@ -117,11 +117,12 @@ class SeuilsDehorsV4Test {
         for (label in listOf("fence", "grillage", "barrier")) {
             val watcher = HazardWatcher()
             val signal = HazardSignal(detected = true, meters = 5.5f, label = label, centerX = 0.5f)
-            watcher.onSignal(signal, 1_000L, En)
-            val cue = watcher.onSignal(signal, 1_100L, En)
+            val cue = watcher.onSignal(signal, 1_000L, En)
             assertNotNull("label $label", cue)
-            assertEquals("label $label", 4, cue!!.level)
-            assertEquals("label $label", "fence", cue.antiRepeatKey)
+            assertEquals("label $label", "Right.", cue!!.phrase)
+            assertEquals("label $label", 4, cue.level)
+            assertEquals("label $label", "fence-avoid", cue.antiRepeatKey)
+            assertTrue("label $label", cue.urgent)
         }
         // Murs (ordre user du 02/11) : jamais nommés, mot d'évitement continu niveau 4.
         for (label in listOf("wall", "mur")) {
@@ -136,8 +137,7 @@ class SeuilsDehorsV4Test {
         }
         val watcher = HazardWatcher()
         val barrier = HazardSignal(detected = true, meters = 5.5f, label = "barrier", centerX = 0.5f)
-        watcher.onSignal(barrier, 1_000L, En)
-        assertEquals("Attention, barrier.", watcher.onSignal(barrier, 1_100L, En)!!.phrase)
+        assertEquals("Right.", watcher.onSignal(barrier, 1_000L, En)!!.phrase)
     }
 
     @Test
@@ -225,9 +225,9 @@ class SeuilsDehorsV4Test {
         assertEquals(7, HazardConcepts.levelOf("trash can"))
         assertEquals(7, HazardConcepts.levelOf("souvenir shop"))
         assertEquals(7, HazardConcepts.levelOf("trampoline"))
-        assertEquals("human-soft", HazardConcepts.antiRepeatKey("person"))
-        assertEquals("fence", HazardConcepts.antiRepeatKey("barrier"))
-        assertEquals("pole", HazardConcepts.antiRepeatKey("pole"))
+        assertEquals("human-imminent", HazardWatcher.KEY_HUMAN_IMMINENT)
+        assertEquals("fence-avoid", HazardWatcher.KEY_FENCE_AVOID)
+        assertEquals("misc-avoid", HazardWatcher.KEY_MISC_AVOID)
     }
 
     // Bordures — niveau 5.
@@ -439,8 +439,10 @@ class SeuilsDehorsV4Test {
         assertEquals(7, HazardWatcher.LEVEL_POLE)
         assertEquals("human-soft", HazardWatcher.KEY_HUMAN_SOFT)
         assertEquals("human-imminent", HazardWatcher.KEY_HUMAN_IMMINENT)
-        assertEquals("fence", HazardWatcher.KEY_FENCE)
-        assertEquals("pole", HazardWatcher.KEY_POLE)
+        assertEquals("pole-avoid", HazardWatcher.KEY_POLE_AVOID)
+        assertEquals("wall-avoid", HazardWatcher.KEY_WALL_AVOID)
+        assertEquals("fence-avoid", HazardWatcher.KEY_FENCE_AVOID)
+        assertEquals("misc-avoid", HazardWatcher.KEY_MISC_AVOID)
         assertEquals(5, CurbWatcher.LEVEL)
         assertEquals("curb", CurbWatcher.KEY_CURB)
         assertEquals(6, StairWatcher.LEVEL)

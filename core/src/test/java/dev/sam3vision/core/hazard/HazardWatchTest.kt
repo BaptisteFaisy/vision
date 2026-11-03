@@ -9,7 +9,7 @@ import org.junit.Assert.assertNull
 import org.junit.Assert.assertTrue
 import org.junit.Test
 
-/** Mot d'évitement continu (gens, poteaux) + douce confirmée (reste) ; le reste muet. */
+/** Mot d'évitement continu pour tous les dangers (esquive Right/Left) ; le reste muet. */
 class HazardWatchTest {
 
     private fun reading(label: String, meters: Float, box: List<Float>) =
@@ -30,13 +30,17 @@ class HazardWatchTest {
     }
 
     @Test
-    fun `l'annonce douce ne dit plus l'heure`() {
+    fun `barriere = mot d'evitement des la 1re frame, urgent`() {
         val watcher = HazardWatcher()
         val signal = HazardSignal(detected = true, meters = 0.8f, label = "barrier", centerX = 0.8f)
-        watcher.onSignal(signal, 1_000L, SpeechLanguage.Fr)
-        val cue = watcher.onSignal(signal, 2_000L, SpeechLanguage.Fr)
+        val cue = watcher.onSignal(signal, 1_000L, SpeechLanguage.Fr)
 
-        assertEquals("Attention à la barrière.", cue!!.phrase)
+        assertEquals("Gauche.", cue!!.phrase)
+        assertTrue(cue.urgent)
+        assertEquals(HazardKind.BARRIER, cue.kind)
+        assertEquals(4, cue.level)
+        assertEquals("fence-avoid", cue.antiRepeatKey)
+        assertEquals(0.8f, cue.meters!!, 0.001f)
     }
 
     @Test
@@ -272,15 +276,18 @@ class HazardWatchTest {
     }
 
     @Test
-    fun `deux positifs parlent, un isole non`() {
+    fun `mot continu de barriere repete a 300 ms, immediat au changement`() {
         val watcher = HazardWatcher()
         val signal = HazardSignal(detected = true, meters = 0.8f, label = "barrier")
 
-        assertNull(watcher.onSignal(signal, 1_000L, SpeechLanguage.Fr))
-        val cue = watcher.onSignal(signal, 2_000L, SpeechLanguage.Fr)
+        assertEquals("Droite.", watcher.onSignal(signal, 1_000L, SpeechLanguage.Fr)!!.phrase)
+        assertNull(watcher.onSignal(signal, 1_299L, SpeechLanguage.Fr))
+        val cue = watcher.onSignal(signal, 1_300L, SpeechLanguage.Fr)
 
-        assertEquals("Attention à la barrière.", cue!!.phrase)
+        assertEquals("Droite.", cue!!.phrase)
         assertEquals(0.8f, cue.meters!!, 0.001f)
+        val moved = HazardSignal(detected = true, meters = 0.8f, label = "barrier", centerX = 0.8f)
+        assertEquals("Gauche.", watcher.onSignal(moved, 1_350L, SpeechLanguage.Fr)!!.phrase)
     }
 
     @Test
@@ -293,17 +300,14 @@ class HazardWatchTest {
     }
 
     @Test
-    fun `cooldown tait la repetition`() {
+    fun `barriere presente = mot repete sans cooldown ni rearmement`() {
         val watcher = HazardWatcher()
         val signal = HazardSignal(detected = true, meters = 0.8f, label = "barrier")
-        watcher.onSignal(signal, 1_000L, SpeechLanguage.Fr)
-        watcher.onSignal(signal, 2_000L, SpeechLanguage.Fr)
 
-        watcher.onSignal(signal, 3_000L, SpeechLanguage.Fr)
-        assertNull(watcher.onSignal(signal, 4_000L, SpeechLanguage.Fr))
-        val cue = watcher.onSignal(signal, 13_000L, SpeechLanguage.Fr)
-
-        assertEquals("Attention à la barrière.", cue!!.phrase)
+        assertEquals("Droite.", watcher.onSignal(signal, 1_000L, SpeechLanguage.Fr)!!.phrase)
+        assertEquals("Droite.", watcher.onSignal(signal, 1_300L, SpeechLanguage.Fr)!!.phrase)
+        assertEquals("Droite.", watcher.onSignal(signal, 4_000L, SpeechLanguage.Fr)!!.phrase)
+        assertEquals("Droite.", watcher.onSignal(signal, 13_000L, SpeechLanguage.Fr)!!.phrase)
     }
 
     @Test
@@ -340,7 +344,7 @@ class HazardWatchTest {
     }
 
     @Test
-    fun `barriere tait tant que la personne parle, parle a son depart`() {
+    fun `barriere tait tant que la personne parle, esquive des son depart`() {
         val watcher = HazardWatcher()
         val both = HazardSignal.of(
             listOf(danger("person", 3.5f), danger("barrier", 0.8f)),
@@ -354,36 +358,40 @@ class HazardWatchTest {
         }
 
         val alone = HazardSignal.of(listOf(danger("barrier", 0.8f)), 512, 1138)
-        assertNull(watcher.onSignal(alone, 13_000L, SpeechLanguage.Fr))
-        val barrier = watcher.onSignal(alone, 14_000L, SpeechLanguage.Fr)
+        val barrier = watcher.onSignal(alone, 13_000L, SpeechLanguage.Fr)
 
-        assertEquals("Attention à la barrière.", barrier!!.phrase)
+        assertEquals("Droite.", barrier!!.phrase)
         assertEquals(HazardKind.BARRIER, barrier.kind)
+        assertEquals("fence-avoid", barrier.antiRepeatKey)
     }
 
     @Test
-    fun `douce confirmee en 2 frames meme en alternance`() {
+    fun `tout danger parle des la 1re frame, sans confirmation`() {
         val watcher = HazardWatcher()
         val barrier = HazardSignal(detected = true, meters = 0.8f, label = "barrier")
         val cat = HazardSignal(detected = true, meters = 1.2f, label = "chat")
 
-        assertNull(watcher.onSignal(barrier, 1_000L, SpeechLanguage.Fr))
+        assertEquals("Droite.", watcher.onSignal(barrier, 1_000L, SpeechLanguage.Fr)!!.phrase)
         val cue = watcher.onSignal(cat, 2_000L, SpeechLanguage.Fr)
 
-        assertEquals("Attention au chat.", cue!!.phrase)
+        assertEquals("Droite.", cue!!.phrase)
+        assertTrue(cue.urgent)
+        assertEquals(HazardKind.OTHER, cue.kind)
+        assertEquals("misc-avoid", cue.antiRepeatKey)
     }
 
     @Test
-    fun `mot continu ne consomme pas le cooldown doux`() {
+    fun `personne puis barriere = mots continus enchaines`() {
         val watcher = HazardWatcher()
         val person = HazardSignal(detected = true, meters = 12f, label = "person")
         val barrier = HazardSignal(detected = true, meters = 0.8f, label = "barrier")
 
         assertEquals("Droite.", watcher.onSignal(person, 1_000L, SpeechLanguage.Fr)!!.phrase)
-        assertNull(watcher.onSignal(barrier, 2_000L, SpeechLanguage.Fr))
-        val cue = watcher.onSignal(barrier, 3_000L, SpeechLanguage.Fr)
+        val cue = watcher.onSignal(barrier, 2_000L, SpeechLanguage.Fr)
 
-        assertEquals("Attention à la barrière.", cue!!.phrase)
+        assertEquals("Droite.", cue!!.phrase)
+        assertTrue(cue.urgent)
+        assertEquals(HazardKind.BARRIER, cue.kind)
     }
 
     @Test
@@ -471,14 +479,17 @@ class HazardWatchTest {
     }
 
     @Test
-    fun `sorte renseignee - divers sans alerte`() {
+    fun `divers = mot continu des la 1re frame, sans alerte`() {
         val watcher = HazardWatcher()
         val signal = HazardSignal(detected = true, meters = 0.8f, label = "poubelle")
 
-        watcher.onSignal(signal, 1_000L, SpeechLanguage.Fr)
-        val cue = watcher.onSignal(signal, 2_000L, SpeechLanguage.Fr)
+        val cue = watcher.onSignal(signal, 1_000L, SpeechLanguage.Fr)
 
-        assertEquals(HazardKind.OTHER, cue!!.kind)
+        assertEquals("Droite.", cue!!.phrase)
+        assertTrue(cue.urgent)
+        assertEquals(HazardKind.OTHER, cue.kind)
+        assertEquals(7, cue.level)
+        assertEquals("misc-avoid", cue.antiRepeatKey)
         assertNull(cue.safetyPhrase)
     }
 }
