@@ -126,7 +126,8 @@ internal class IseeGlassesInbox(
      * accompagnée), sans quitter la page courante — posée même depuis un autre
      * écran, elle attend le retour sur iSee. Doublon (même fichier) ignoré,
      * photo suivante remplace la précédente ([acceptGlassesPhoto]), épinglée
-     * en contexte, caméra coupée.
+     * en contexte, caméra coupée. Appui court ([takesPhoto]) : le LLM la décrit
+     * aussitôt, sans attendre un tap — ASK/LIVE ne portent jamais de photo.
      */
     fun onPhoto(file: File, action: CaptureAction) {
         if (!acceptGlassesPhoto(snapshot().glassesPhoto, file)) return
@@ -135,6 +136,7 @@ internal class IseeGlassesInbox(
         shots.setPinnedContext(file)
         if (snapshot().recordingVideo) stopVideo()
         stopProbe()
+        if (action.takesPhoto) describePhoto()
     }
 
     /** La photo part (tap, suivante), son contexte avec elle ; `false` = aucune. */
