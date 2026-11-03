@@ -155,6 +155,26 @@ class LiveStateTest {
     }
 
     @Test
+    fun `libelle de transport dit le cellulaire impose en lunettes`() {
+        assertEquals(
+            "WebSocket (cell)",
+            transportLabel(trackerEnabled = false, wsConnected = true, cellular = true),
+        )
+        assertEquals(
+            "WebSocket",
+            transportLabel(trackerEnabled = false, wsConnected = true, cellular = false),
+        )
+        assertEquals(
+            "WebSocket down",
+            transportLabel(trackerEnabled = false, wsConnected = false, cellular = true),
+        )
+        assertEquals(
+            "Tracker",
+            transportLabel(trackerEnabled = true, wsConnected = true, cellular = true),
+        )
+    }
+
+    @Test
     fun `le porteur est conserve au plus une fois par seconde`() {
         assertTrue(shouldKeepFrame(nowMs = 1_000L, lastKeepAtMs = 0L))
         assertFalse(shouldKeepFrame(nowMs = 1_500L, lastKeepAtMs = 1_000L))
