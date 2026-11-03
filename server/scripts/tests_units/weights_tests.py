@@ -213,6 +213,14 @@ def test_deploy_script(_module) -> None:
           'print("boot   :"' in script, "absent du contrôle")
     check("déploiement : 500/injoignable = retry transparent",
           "fenêtre de mort" in script, "absent du script")
+    check("déploiement : DEPLOY_SHA calculé et passé à l'image",
+          "DEPLOY_SHA" in script and "rev-parse --short HEAD" in script,
+          "absent du script")
+    check("déploiement : le contrôle affiche le sha servi",
+          'print("sha    :", h.get("sha")' in script, "absent du contrôle")
+    app = _fresh_live_fast("live_app_fast")
+    check("déploiement : lever_env() transmet DEPLOY_SHA",
+          "DEPLOY_SHA" in app.lever_env(), "absent de lever_env()")
 
 
 def test_no_cudagraph_typo(_module) -> None:

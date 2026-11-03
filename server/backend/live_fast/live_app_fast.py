@@ -108,6 +108,8 @@ def lever_env() -> dict:
     values["BACKEND_PLATFORM"] = "modal"
     values["FAST_MODEL_DIR"] = MODEL_DIR
     values["FAST_DEPTH_MODEL_DIR"] = DEPTH_MODEL_DIR
+    # Traçabilité : le sha déployé, exposé par /health (deploy_sha()).
+    values["DEPLOY_SHA"] = os.environ.get("DEPLOY_SHA", "")
     # Boot offline : zéro appel réseau pendant les imports (poids déjà locaux).
     values["HF_HUB_OFFLINE"] = "1"
     values["TRANSFORMERS_OFFLINE"] = "1"
