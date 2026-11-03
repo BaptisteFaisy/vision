@@ -183,8 +183,10 @@ class VoiceNavTracker(
         val manager = locations ?: return
         val gps = runCatching { manager.getLastKnownLocation(LocationManager.GPS_PROVIDER) }.getOrNull()
         val net = runCatching { manager.getLastKnownLocation(LocationManager.NETWORK_PROVIDER) }.getOrNull()
+        val nowMs = System.currentTimeMillis()
+        log("amorce bruts : gps=${describeFixForLog(gps?.toNavFix(), nowMs)} net=${describeFixForLog(net?.toNavFix(), nowMs)}")
         seedFixOf(gps?.toNavFix(), net?.toNavFix())?.let { lastFix = it }
-        log("amorce lastKnown : ${describeFixForLog(lastFix, System.currentTimeMillis())}")
+        log("amorce lastKnown : ${describeFixForLog(lastFix, nowMs)}")
     }
 
     private inner class FixListener : LocationListener {
