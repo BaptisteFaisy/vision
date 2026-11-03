@@ -102,8 +102,9 @@ internal fun liveClientWith(
     baseUrl,
     transport = transportFor(timeoutSeconds * 1000),
     timeoutMs = timeoutSeconds * 1000,
-    // `/health` et repli POST /live : il utilise les clients partagés par défaut.
-    http = HttpLiveClient(baseUrl),
+    // `/health` et repli POST /live : mêmes knobs que le WS (une frame repliée
+    // demande les mêmes masques et la même profondeur), clients partagés par défaut.
+    http = HttpLiveClient(baseUrl, marks = marks, maskFormat = maskFormat, maskEdge = maskEdge, masks = masks, withDepth = withDepth),
     marks = marks,
     maskFormat = maskFormat,
     maskEdge = maskEdge,
