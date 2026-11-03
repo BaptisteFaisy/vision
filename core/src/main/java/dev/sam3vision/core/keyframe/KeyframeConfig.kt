@@ -67,4 +67,16 @@ data class KeyframeConfig(
     /** Durée du repli après [failures] échecs consécutifs (la dernière durée est répétée). */
     fun backoffAfterFailures(failures: Int): Long =
         backoffMs[(failures - 1).coerceIn(0, backoffMs.size - 1)]
+
+    companion object {
+        /**
+         * Politique terrain du direct et de la sonde (vague latence w3, mesure v18) :
+         * le backend répond en ~52 ms file vide (`queue 0`, `rtt` p90 126 ms) pour
+         * ~12 offres/s — le plafond de référence (500 ms, ~2/s) laisse du débit utile
+         * sur la table. 300 ms (~3,3/s) tient dans le budget porté à 4/s ; la rafale
+         * (2), le découvert unique (≤ 7/s en pointe, jamais du spam), le délai
+         * minimal (200 ms), le repli et le timeout 12 s sont ceux de la référence.
+         */
+        val Field: KeyframeConfig = KeyframeConfig(maxAgeMs = 300L, budgetRatePerSec = 4f)
+    }
 }
