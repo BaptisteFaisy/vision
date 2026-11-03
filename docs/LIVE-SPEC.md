@@ -34,47 +34,31 @@ qu'elles entourent le direct (réveil, photo, vidéo, extinction).
 - Un socket apparemment vivant mais silencieux (conteneur arrêté, redéployé) est fermé au
   premier dépassement de délai, et la frame suivante rouvre le handshake :
   `WsLiveClient.kt:158-176`.
-- **Aucun repli HTTP pour les frames.** L'UI n'a que deux libellés, « WebSocket » et
-  « WebSocket KO » (`app/src/main/java/dev/sam3vision/app/LiveMessages.kt:20-24`), et le
-  démarrage du direct ne fait plus que `LiveMaskTransport.clientFor(base, marks = chronology)`
-  (`app/src/main/java/dev/sam3vision/app/LiveViewModel.kt:200`, via `LiveMaskTransport.kt:38-39`).
+- **Repli HTTP quand le socket tombe.** La frame que le WebSocket ne peut pas servir
+  (ouverture impossible, envoi refusé, fermeture en vol) part en `POST /live` via le
+  délégué HTTP (`WsLiveClient.kt`, `serve()`) : repli **collant** (aucun handshake mort
+  par frame), re-sonde WS toutes les 10 frames HTTP, retour au socket dès qu'il sert
+  (`core/src/main/java/dev/sam3vision/core/net/WsHttpFallback.kt`). Pas de repli sur
+  délai (serveur lent : pas de double inférence), endpoint inutilisable, hors-ligne
+  connu, backoff en cours ni après `close`. L'UI a trois libellés, « WebSocket »,
+  « HTTP » et « WebSocket down » (`app/src/main/java/dev/sam3vision/app/LiveMessages.kt`).
 
-### `POST /live` : écrit, jamais appelé pour une frame
+### `POST /live` : le repli des frames, aux mêmes knobs que le WS
 
 Le corps du message WebSocket est **exactement** le corps de `POST /live` plus l'`id`
-(`WsLiveClient.kt:109-122`, `core/src/main/java/dev/sam3vision/core/net/Json.kt:298-318`,
-verrouillé par `core/src/test/java/dev/sam3vision/core/live/LiveWireGuardTest.kt:51-70`).
-La route HTTP subsiste dans `HttpLiveClient.live()` (`HttpLiveClient.kt:53-61`), mais :
+(`core/src/main/java/dev/sam3vision/core/net/Json.kt`,
+verrouillé par `core/src/test/java/dev/sam3vision/core/live/LiveWireGuardTest.kt`) —
+c'est ce qui rend le repli transparent : même corps, mêmes knobs (`mask_format`,
+`mask_edge`, `with_depth`, `mask_encoding`), même réponse moins l'`id`.
 
-- la fabrique de production ne rend que le client WebSocket, et ne garde le client HTTP que
-  pour `/health` (`core/src/main/java/dev/sam3vision/core/net/LiveClientFactory.kt:19-39`) ;
-- les appelants de production passent tous par `LiveMaskTransport.clientFor` :
-  `LiveViewModel.kt:200` (Direct) et `LiveProbe.kt:64-65,178` (iSee) ;
-- `POST /live` n'est plus exercé que par les tests JVM (`LiveContractTest.kt:22`).
-
-Preuve par recherche — `git grep -n "POST /live"` dans cet arbre (27/10/2026) ne renvoie que
-des commentaires, de la documentation et des tests ; **aucun site d'appel** :
-
-```
-AGENTS.md:99,102        « n'est plus appelé », HTTP gardé pour les tests JVM
-NOTES.md:113,116        « n'est plus appelé en production », POST pour les tests JVM
-README.md:37,44         « ne passe plus par POST /live », tests JVM uniquement
-app/…/isee/IseeCameraPane.kt:35 mesure d'une époque où il servait
-core/…/Json.kt:184,204,289        commentaires de forme de corps
-core/…/LiveClientFactory.kt:6     « a abandonné POST /live pour les frames »
-core/…/WsLiveClient.kt:109,122    commentaires du contrat WS
-core/…/WsTransport.kt:34          commentaire du chemin
-core/…/predict/ObjectAssociator.kt:7  commentaire
-core/src/test/…/LiveContractTest.kt:12      test JVM de la route
-core/src/test/…/WsLiveContractTest.kt:93    test JVM du barème d'erreurs
-core/src/test/…/LiveWireGuardTest.kt:51     test JVM de la forme du corps
-docs/ARCHITECTURE.md:174, docs/ELEVENLABS-TTS.md:167,
-docs/OPTIMISATIONS.md:92   documentation
-```
-
-Le seul code qui appelle réellement `POST /live` est `HttpLiveClient.live()`, lui-même atteint
-par les tests JVM seulement. Le libellé « le POST a été retiré » est explicite dans
-`LiveMessages.kt:24`.
+- la fabrique de production rend le client WebSocket, dont le délégué HTTP sert
+  `/health` **et** le repli des frames
+  (`core/src/main/java/dev/sam3vision/core/net/LiveClientFactory.kt`) ;
+- les appelants de production passent tous par `LiveMaskTransport.clientFor`
+  (Direct et sonde iSee) ;
+- le repli est prouvé sans réseau par
+  `core/src/test/java/dev/sam3vision/core/net/WsLiveHttpFallbackTest.kt`
+  (déclencheurs, re-sonde, retour WS, knobs portés, non-déclencheurs, vrai POST).
 
 ## 2. Une frame = un message JSON, corrélé par `id`
 

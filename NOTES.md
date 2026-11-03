@@ -112,12 +112,12 @@ lancé sur cette machine pour ce comptage.
   écrans** (Direct et page caméra iSee) : point d'entrée unique, pas un `new` dispersé. Elle
   construit un `WsLiveClient` dont le transport est un `OkHttpWsTransport` sur
   `ws(s)://…/live/ws` (`core/net/WsTransport.kt:35`).
-- **`POST /live` n'est plus appelé en production.** Le seul appel de `LiveClient.live(…)` sur
-  le chemin exécuté est `LiveSession.kt:138`, et le client vient toujours de `liveClient()` →
+- **`POST /live` est le repli des frames.** Le seul appel de `LiveClient.live(…)` sur
+  le chemin exécuté est `LiveSession`, et le client vient toujours de `liveClient()` →
   WebSocket (l'autre, `LivePipeline.kt:75`, est dans du code sans appelant — voir § Écrit mais
-  pas appelé). `HttpLiveClient` reste dans la fabrique pour **`/health` seulement**
-  (`LiveClientFactory.kt:47`, `WsLiveClient.kt:98`) ; son `POST /live` (`HttpLiveClient.kt:75`)
-  ne sert qu'aux tests JVM (`core/src/test/…/LiveClientTest.kt`). Ne pas le reprendre pour des frames.
+  pas appelé). Quand le socket ne peut pas servir, la frame part en `POST /live` via le
+  délégué `HttpLiveClient` (repli collant + re-sonde WS, mêmes knobs) ; `HttpLiveClient`
+  sert aussi `/health`. Contrat : `docs/LIVE-SPEC.md` §1.
 - **Corrélation par `id`, une file par `id`** (`core/net/WsLiveClient.kt`) : le serveur peut
   répondre dans le désordre, un message dont l'`id` n'est pas en vol est ignoré ; l'attente est
   enregistrée **avant** l'ouverture du socket, sinon un refus de connexion laisse la frame

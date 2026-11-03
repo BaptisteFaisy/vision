@@ -191,10 +191,10 @@ des Réglages, d'un preset de région (`core/settings/SamRegion.kt:22,27`) ou de
 
 Précisions qui comptent :
 
-- **`POST /live` n'est plus le chemin des frames.** `liveClient()` (`core/net/LiveClientFactory.kt`)
-  ne construit qu'un `WsLiveClient` ; le `HttpLiveClient` qu'il lui passe en délégué ne sert
-  qu'à `health()` (`WsLiveClient.kt:197`). `HttpLiveClient.live` n'est donc appelé que par les
-  tests.
+- **`POST /live` est le repli des frames.** `liveClient()` (`core/net/LiveClientFactory.kt`)
+  construit un `WsLiveClient` ; le `HttpLiveClient` qu'il lui passe en délégué sert à
+  `health()` et au repli des frames quand le socket tombe (repli collant + re-sonde WS,
+  `core/net/WsHttpFallback.kt`, contrat `docs/LIVE-SPEC.md` §1).
 - **`GET /health` n'est appelé que par le bouton « Tester SAM »** (`app/vm/AppDiagnostics.kt:56`)
   et par la délégation ci-dessus. Aucune sonde périodique.
 - **Le tracker est câblé dans `:app`** : l'écran Direct construit `HttpTrackClient` +
