@@ -4,7 +4,12 @@ import dev.sam3vision.core.model.LiveFrame
 import dev.sam3vision.core.model.LiveHealth
 import dev.sam3vision.core.model.ObjectLimits
 import dev.sam3vision.core.net.ApiError
+import dev.sam3vision.core.net.ContractWsTransport
+import dev.sam3vision.core.net.LIVE_TIMEOUT_SECONDS
 import dev.sam3vision.core.net.LiveClient
+import dev.sam3vision.core.net.NetContract
+import dev.sam3vision.core.net.RecordingLiveClient
+import dev.sam3vision.core.net.WsLiveClient
 import kotlinx.coroutines.runBlocking
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
@@ -330,5 +335,44 @@ class LiveSessionTest {
         val session = LiveSession(FakeLiveClient(), cadence = Cadence.Fast)
         session.stats.record(161L)
         assertEquals(0L, session.intervalMsAdaptive())
+    }
+
+    @Test
+    fun `reset rouvre les creneaux refermes par le regulateur`() {
+        val session = LiveSession(FakeLiveClient(), cadence = Cadence.Fast)
+        (1..3).forEach { _ -> session.stats.record(344L) }
+        session.regulate()
+        assertEquals(1, session.slots)
+        session.reset()
+        assertEquals("nouvelle séance : les deux créneaux sont rendus", 2, session.slots)
+        assertFalse(session.saturated)
+    }
+
+    @Test
+    fun `reset garde un seul creneau en direct`() {
+        val session = LiveSession(FakeLiveClient())
+        session.reset()
+        assertEquals("le Direct garde une frame en vol max", 1, session.slots)
+    }
+
+    @Test
+    fun `reset re-arme la bascule froid-chaud pour la seance suivante`() = runBlocking {
+        val transport = ContractWsTransport { json -> listOf(NetContract.frameReply(json.getInt("id"))) }
+        val client = WsLiveClient(
+            "https://sam.example",
+            transport,
+            60_000,
+            RecordingLiveClient(),
+            binaryWs = false,
+        )
+        val session = LiveSession(client)
+        session.runFrame("QQ==")
+        assertEquals(LIVE_TIMEOUT_SECONDS * 1_000, client.currentTimeoutMs)
+        // Séance suivante repartie froide (budget ré-armé côté écran) : le premier
+        // succès doit resserrer à nouveau, pas rester collé à 60 s.
+        client.useTimeoutMs(60_000)
+        session.reset()
+        session.runFrame("QQ==")
+        assertEquals(LIVE_TIMEOUT_SECONDS * 1_000, client.currentTimeoutMs)
     }
 }
