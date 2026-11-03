@@ -87,6 +87,8 @@ def test_depth_math(depth) -> None:
     check("profondeur: 0..1, proche > loin",
           norm.min() >= 0.0 and norm.max() <= 1.0 and norm[0, 0] > norm[3, 3],
           f"{norm.min()} {norm.max()}")
+    check("profondeur: normalisation exacte (min→0, max→1)",
+          norm[0, 0] == 1.0 and norm[3, 3] == 0.0, f"{norm[0, 0]} {norm[3, 3]}")
     check("profondeur: carte plate → neutre 0.5",
           bool((depth.normalize_disparity(np.full((2, 2), 5.0)) == 0.5).all()))
     check("profondeur: médiane de boîte",
