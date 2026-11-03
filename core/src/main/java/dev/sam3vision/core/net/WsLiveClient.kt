@@ -11,10 +11,10 @@ import org.json.JSONObject
 
 /**
  * Direct par WebSocket : une trame par frame sur `/live/ws` (binaire M1 par défaut, JSON
- * en repli). La réponse porte le **même `id`**, corrélée par **file par `id`** — le serveur
- * peut répondre dans le désordre. Mesuré côté Modal : 50,3 ms en WebSocket contre 81,4 ms
- * en POST, soit ~31 ms gagnés par frame ; un `id` inconnu est ignoré, et le health est
- * délégué au client HTTP [http] (aucun `/health` dupliqué).
+ * puis POST /live en replis). La réponse porte le **même `id`**, corrélée par **file par
+ * `id`** — le serveur peut répondre dans le désordre. Mesuré côté Modal : 50,3 ms en
+ * WebSocket contre 81,4 ms en POST, soit ~31 ms gagnés par frame ; un `id` inconnu est
+ * ignoré, et le health est délégué au client HTTP [http] (aucun `/health` dupliqué).
  *
  * Une coupure est un **état**, pas une frame perdue : [link] porte l'état observable
  * ([linkState]), le compteur de tentatives et le backoff plafonné ; [net] dit quand le
@@ -53,6 +53,8 @@ class WsLiveClient(
     private val net: NetworkState = NetworkState.Always,
     /** Machine du lien (état, backoff, silence) : injectée pour piloter l'horloge en test. */
     private val link: WsLink = WsLink(),
+    /** Repli HTTP collant + re-sonde WS (injecté : les tests règlent la sonde). */
+    private val httpFallback: WsHttpFallback = WsHttpFallback(),
 ) : LiveClient {
 
     private val lock = Any()
@@ -77,12 +79,6 @@ class WsLiveClient(
     /** Le transport initial a déjà été annoncé à [onBinaryChange] (une fois par session). */
     private var legNoted = false
 
-    /** Une frame en vol : son réveil, et si elle est partie en binaire (repli JSON). */
-    private class PendingFrame(val reply: CompletableDeferred<String>, val binary: Boolean)
-
-    /** Signal interne : `id: -1` reçu — la frame binaire en vol repart en JSON. */
-    private object FallbackToJson : Exception("WS binaire refusé (id -1) : repli JSON")
-
     override suspend fun live(
         jpegB64: String,
         prompts: List<String>?,
@@ -96,15 +92,15 @@ class WsLiveClient(
         if (binary) {
             val jpeg = base64Bytes(jpegB64)
                 ?: return Result.failure(ApiError.BadResponse(WS_BAD_IMAGE))
-            val bytes = binaryFrame(id, jpeg, prompts, workEdge, maxObjects)
+            val bytes = binaryFrame(id, jpeg, prompts, workEdge, maxObjects, maskFormat, maskEdge, withDepth, masks)
             sender = { transport.sendBytes(bytes) }
         } else {
-            val message = frameMessage(id, jpegB64, prompts, workEdge, maxObjects)
+            val message = frameMessage(id, jpegB64, prompts, workEdge, maxObjects, maskFormat, maskEdge, withDepth, masks)
             sender = { transport.send(message) }
         }
         val jsonSender: () -> Boolean =
-            { transport.send(frameMessage(id, jpegB64, prompts, workEdge, maxObjects)) }
-        return roundTrip(id, binary, sender, jsonSender)
+            { transport.send(frameMessage(id, jpegB64, prompts, workEdge, maxObjects, maskFormat, maskEdge, withDepth, masks)) }
+        return serve({ http.live(jpegB64, prompts, workEdge, maxObjects) }) { roundTrip(id, binary, sender, jsonSender) }
     }
 
     /** JPEG brut : trame M1 **sans base64**, envoyée d'un `sendBytes` avant l'attente. */
@@ -119,16 +115,16 @@ class WsLiveClient(
         val binary = synchronized(lock) { sendLegLocked() }
         val sender: () -> Boolean
         if (binary) {
-            val bytes = binaryFrame(id, jpeg, prompts, workEdge, maxObjects)
+            val bytes = binaryFrame(id, jpeg, prompts, workEdge, maxObjects, maskFormat, maskEdge, withDepth, masks)
             sender = { transport.sendBytes(bytes) }
         } else {
-            val message = frameMessage(id, base64Text(jpeg), prompts, workEdge, maxObjects)
+            val message = frameMessage(id, base64Text(jpeg), prompts, workEdge, maxObjects, maskFormat, maskEdge, withDepth, masks)
             sender = { transport.send(message) }
         }
         // Encodage paresseux : le repli JSON n'a lieu que sur `id: -1`, jamais avant.
         val jsonSender: () -> Boolean =
-            { transport.send(frameMessage(id, base64Text(jpeg), prompts, workEdge, maxObjects)) }
-        return roundTrip(id, binary, sender, jsonSender)
+            { transport.send(frameMessage(id, base64Text(jpeg), prompts, workEdge, maxObjects, maskFormat, maskEdge, withDepth, masks)) }
+        return serve({ http.liveBytes(jpeg, prompts, workEdge, maxObjects) }) { roundTrip(id, binary, sender, jsonSender) }
     }
 
     /** Un aller-retour avec repli : [jsonSender] rejoue en JSON quand le serveur répond `id: -1`. */
@@ -138,9 +134,27 @@ class WsLiveClient(
         sender: () -> Boolean,
         jsonSender: () -> Boolean,
     ): Result<LiveFrame> = try {
-        exchange(id, binary, sender).then { text -> parseReply(text) }
+        exchange(id, binary, sender).then { text -> parseReply(text, readJson) }
     } catch (e: FallbackToJson) {
-        exchange(id, binary = false, jsonSender).then { text -> parseReply(text) }
+        exchange(id, binary = false, jsonSender).then { text -> parseReply(text, readJson) }
+    }
+
+    /** Route d'une frame : POST direct si le repli colle, sinon WS avec repli en POST. */
+    private suspend fun serve(httpCall: suspend () -> Result<LiveFrame>, wsCall: suspend () -> Result<LiveFrame>): Result<LiveFrame> {
+        if (!synchronized(lock) { httpFallback.routeWs() }) {
+            synchronized(lock) { if (!net.available) return Result.failure(ApiError.Network(WS_OFFLINE)) }
+            return httpCall()
+        }
+        return try {
+            wsCall().onSuccess { synchronized(lock) { httpFallback.onWsServed() } }
+        } catch (e: FallbackToHttp) {
+            // Hors ligne : le POST échouerait pareil — échec local, mais le repli colle.
+            synchronized(lock) {
+                httpFallback.onWsFailed()
+                if (!net.available) return Result.failure(ApiError.Network(WS_OFFLINE))
+            }
+            httpCall()
+        }
     }
 
     /** Un aller-retour sur le socket ; lève [FallbackToJson] sur `id: -1` (rejoué en texte). */
@@ -158,7 +172,8 @@ class WsLiveClient(
                 false
             }
         }
-        if (!opened) return Result.failure(ApiError.Network(WS_UNREACHABLE))
+        // Ouverture impossible : la frame part en POST, sans attendre le WS.
+        if (!opened) throw FallbackToHttp
         // Génération servie par cette frame : si le socket est refermé puis rouvert pendant
         // son attente, son propre délai ne tuera pas le socket neuf.
         val gen = synchronized(lock) { socketGen }
@@ -167,7 +182,8 @@ class WsLiveClient(
         if (!sender()) {
             synchronized(lock) { pending.remove(id) }
             invalidate(WS_SEND_REFUSED)
-            return Result.failure(ApiError.Network(WS_SEND_REFUSED))
+            // Envoi refusé : socket mort, la frame part en POST.
+            throw FallbackToHttp
         }
         // La frame prouve que le socket vit : le prochain ping recule d'un intervalle.
         keepAlive?.markActive()
@@ -180,6 +196,9 @@ class WsLiveClient(
 
     /** Vrai tant que le socket est ouvert — l'UI s'en sert pour dire « WebSocket » ou « KO ». */
     val isConnected: Boolean get() = synchronized(lock) { connected }
+
+    /** Vrai quand les frames partent en POST /live — l'UI dit « HTTP » au lieu de « KO ». */
+    val httpFallbackActive: Boolean get() = synchronized(lock) { httpFallback.active }
 
     /**
      * État du lien, **observable** : `Open` = socket vivant, `Degraded` = coupure connue et
@@ -250,8 +269,9 @@ class WsLiveClient(
             connected = false
             socketGen++
             stopPingLocked()
-            // État remis à zéro : ni « reconnexion » fantôme, ni backoff après fermeture.
+            // État remis à zéro : ni « reconnexion » fantôme, ni backoff, ni repli HTTP après fermeture.
             link.reset()
+            httpFallback.reset()
         }
         transport.close()
         failPending(ApiError.Network(WS_CLOSED))
@@ -352,30 +372,6 @@ class WsLiveClient(
         waiting.forEach { it.reply.completeExceptionally(error) }
     }
 
-    /** Message de requête : le corps de `POST /live` (mêmes knobs) plus l'`id` de corrélation. */
-    private fun frameMessage(
-        id: Int,
-        jpegB64: String,
-        prompts: List<String>?,
-        workEdge: Int,
-        maxObjects: Int,
-    ): String = liveFrameJson(jpegB64, prompts, workEdge, maxObjects, id, maskFormat, maskEdge, withDepth, masks)
-
-    /** Trame M1 : les knobs du client appliqués à [frameMessageBinary]. */
-    private fun binaryFrame(
-        id: Int,
-        jpeg: ByteArray,
-        prompts: List<String>?,
-        workEdge: Int,
-        maxObjects: Int,
-    ): ByteArray = frameMessageBinary(id, jpeg, prompts, workEdge, maxObjects, maskFormat, maskEdge, withDepth, masks)
-
-    /** Réponse serveur : JSON construit **une seule fois**, partagé par garde et frame. */
-    private fun parseReply(raw: String): Result<LiveFrame> {
-        val json = readJson(raw) ?: return Result.failure(ApiError.BadResponse(WS_UNREADABLE))
-        return liveReplyOf(json)
-    }
-
     /** Message entrant (thread lecteur) : seule la requête portant cet `id` est réveillée. */
     private fun onText(text: String) {
         val id = readId(text)
@@ -471,6 +467,8 @@ class WsLiveClient(
                 Result.success(raw)
             }
         } catch (e: ApiError) {
+            // Socket tombé en vol : la frame repart en POST — sauf session fermée et sauf délai.
+            if (e is ApiError.Network && synchronized(lock) { link.current } != WsLinkState.Closed) throw FallbackToHttp
             Result.failure(e)
         }
     }
