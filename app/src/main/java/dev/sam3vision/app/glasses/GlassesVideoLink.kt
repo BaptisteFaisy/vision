@@ -269,6 +269,9 @@ object GlassesVideoLink {
         val decodeEndNs: Long,
     )
 
+    /** Mesure figée à la poussée ([linkSeq] sans configs, [linkUs] radio), relue au rendu. */
+    private data class LinkNote(val linkSeq: Long, val linkUs: Long)
+
     private val timingLock = Any()
 
     /** Nanosecondes par microseconde (tous les étages du lien sont en µs). */
@@ -284,21 +287,40 @@ object GlassesVideoLink {
      * ; formatage + I/O logcat restent échantillonnés, pas par frame.
      */
     private const val LINK_LINE_EVERY = 5L
+
+    /** Poussées rejoinables par un rendu tardif (~1 s à 15 i/s), au-delà conflées. */
+    internal const val LINK_NOTE_WINDOW = 16
+
+    /** Rendus en attente de leur pixel (~0,5 s à 15 i/s), au-delà le plus vieux conflé. */
+    internal const val PENDING_WINDOW = 8
+
     private val clockOffset = GlassesClockOffset()
     private val linkStats = GlassesLinkStats()
-    private var awaitingNote = false
-    private var lastLinkSeq = -1L
-    private var lastLinkUs = -1L
-    private var pending: PendingLink? = null
+
+    /** Notes du lien par `seq` poussé, en ordre de poussée (borné : [LINK_NOTE_WINDOW]). */
+    private val linkNotes = LinkedHashMap<Long, LinkNote>()
+
+    /** Compteur du lien : une poussée décodable = +1 (configs et dégénérées exclues). */
+    private var linkSeq = 0L
+
+    /** Plus grand `linkSeq` compté (rendu ou évincé) : borne basse des écarts, sans double. */
+    private var accountedLinkSeq = 0L
+
+    /** Rendus datés en attente de leur pixel, dans l'ordre (borné : [PENDING_WINDOW]). */
+    private val pendings: ArrayDeque<PendingLink> = ArrayDeque()
+
+    /** Conflations côté pixel (file pleine), pour partager [LinkDrop.CONFLATED]. */
+    private var conflatedPixel = 0L
+
     private var lastSummaryNs = 0L
 
     /** Frames mesurées depuis la remise à zéro : cadence la ligne détaillée. */
     private var linkLineTicks = 0L
 
     /**
-     * Arrivée d'une poussée : alimente le décalage pts ↔ téléphone (B1) et compte
-     * les abandons d'amont. Une poussée décodable qui en écrase une autre jamais
-     * rendue est une conflation, pas une mesure manquante.
+     * Arrivée d'une poussée : décalage pts ↔ téléphone (B1), note du lien figée,
+     * abandons d'amont. La conflation se compte au rendu ([noteRendered]), pas ici :
+     * pousser pendant un décodage ne perd rien, seul l'écart de `seq` tranche.
      */
     private fun noteArrivalLocked(frame: GlassesFrame, pushedSeq: Long) {
         if (frame.codecConfig) {
@@ -309,10 +331,16 @@ object GlassesVideoLink {
             linkStats.drop(LinkDrop.DIMENSIONS)
             return
         }
-        if (awaitingNote) linkStats.drop(LinkDrop.CONFLATED)
-        awaitingNote = true
-        lastLinkSeq = pushedSeq
-        lastLinkUs = observeLinkUs(frame)
+        linkSeq += 1
+        linkNotes[pushedSeq] = LinkNote(linkSeq, observeLinkUs(frame))
+        while (linkNotes.size > LINK_NOTE_WINDOW) {
+            val oldest = linkNotes.entries.first()
+            linkNotes.remove(oldest.key)
+            if (oldest.value.linkSeq > accountedLinkSeq) {
+                accountedLinkSeq = oldest.value.linkSeq
+                linkStats.drop(LinkDrop.CONFLATED)
+            }
+        }
     }
 
     /** Retard variable radio (µs) d'une frame datée, `-1` si elle ne l'est pas (mock, banc). */
@@ -323,39 +351,43 @@ object GlassesVideoLink {
     }
 
     /**
-     * Une frame vient d'être rendue, bornes du rendu à l'appui ([decodeStartNs],
-     * [decodeEndNs] monotones) : allume le direct comme [markRendered], puis arme
-     * le pixel. Un rendu précédent jamais affiché est conflé (l'afficheur ne
-     * montre que la dernière image). Une frame non datée (mock, banc) allume le
-     * direct sans mesure : jamais de chiffre inventé.
+     * Frame rendue ([decodeStartNs]/[decodeEndNs] monotones) : direct allumé, poussées
+     * sautées conflées (l'écart de `linkSeq`, ni plus ni moins), rendu filé vers son
+     * pixel. `seq` inconnu (boîte d'avant `clear`) : lien relu sans écart ; frame non
+     * datée (mock, banc) : direct sans mesure, jamais de chiffre inventé.
      */
     fun noteRendered(seq: Long, frame: GlassesFrame, decodeStartNs: Long, decodeEndNs: Long) {
         markRendered(seq)
         synchronized(timingLock) {
-            awaitingNote = false
-            pending?.let { linkStats.drop(LinkDrop.CONFLATED) }
-            pending = null
-            val linkUs = if (seq == lastLinkSeq) lastLinkUs else observeLinkUs(frame)
+            val linkUs = linkNotes.remove(seq)?.let { note ->
+                repeat((note.linkSeq - accountedLinkSeq - 1L).coerceAtLeast(0L).toInt()) {
+                    linkStats.drop(LinkDrop.CONFLATED)
+                }
+                if (note.linkSeq > accountedLinkSeq) accountedLinkSeq = note.linkSeq
+                note.linkUs
+            } ?: observeLinkUs(frame)
             if (linkUs < 0L || decodeEndNs < decodeStartNs) return
             val decodeUs = (decodeEndNs - decodeStartNs + NS_PER_US / 2L) / NS_PER_US
-            pending = PendingLink(seq, linkUs, decodeUs, decodeEndNs)
+            while (pendings.size >= PENDING_WINDOW) {
+                pendings.removeFirst()
+                conflatedPixel += 1
+                linkStats.drop(LinkDrop.CONFLATED)
+            }
+            pendings.addLast(PendingLink(seq, linkUs, decodeUs, decodeEndNs))
         }
     }
 
     /**
-     * Pixel affiché (`onSurfaceTextureUpdated`) : ferme la frame en attente —
-     * `aff` = pixel − sortie décodeur — et journalise sous [LINK_TAG] la ligne
-     * détaillée ([TimingsText.link]) une frame sur [LINK_LINE_EVERY] plus le
-     * résumé à 1 Hz au plus ([GlassesLinkStats.line]), qui porte la mesure.
-     * [atNs] = 0 = maintenant (même idiome que `ScreenTimings.beginFrame`) ;
-     * sans rendu en attente, ne fait rien.
+     * Pixel affiché : ferme le plus vieux rendu en attente (`aff` = pixel − sortie
+     * décodeur), journalise la détaillée 1/[LINK_LINE_EVERY] et le résumé à 1 Hz.
+     * [atNs] = 0 = maintenant ; sans attente, ou pixel antérieur au rendu, rien.
      */
     fun markPixel(atNs: Long = 0L) {
         val nowNs = if (atNs > 0L) atNs else SystemClock.elapsedRealtimeNanos()
         synchronized(timingLock) {
-            val done = pending ?: return
-            pending = null
+            val done = pendings.firstOrNull() ?: return
             if (nowNs < done.decodeEndNs) return
+            pendings.removeFirst()
             val displayUs = (nowNs - done.decodeEndNs + NS_PER_US / 2L) / NS_PER_US
             linkStats.record(done.linkUs, done.decodeUs, displayUs)
             // La ligne par frame ne servait qu'au parseur : une sur N suffit, et
@@ -369,6 +401,7 @@ object GlassesVideoLink {
             if (nowNs - lastSummaryNs >= SUMMARY_NS) {
                 lastSummaryNs = nowNs
                 Log.i(LINK_TAG, linkStats.line())
+                Log.i(LINK_TAG, linkDropLineLocked())
             }
         }
     }
@@ -384,6 +417,22 @@ object GlassesVideoLink {
     /** Abandons par cause, dans l'ordre de [LinkDrop]. */
     fun linkDrops(): List<Long> = synchronized(timingLock) { linkStats.dropCounts() }
 
+    /**
+     * Abandons par cause, `attente` = avant rendu, `pixel` = avant affichage
+     * (`throttle`/`encode` vivent dans la pompe, pas ici). Pour recette et tests.
+     */
+    fun linkDropLine(): String = synchronized(timingLock) { linkDropLineLocked() }
+
+    private fun linkDropLineLocked(): String {
+        val drops = linkStats.dropCounts()
+        val conflated = drops[LinkDrop.CONFLATED.ordinal]
+        return "GlassesLink drops conflated=$conflated" +
+            " (attente=${conflated - conflatedPixel} pixel=$conflatedPixel)" +
+            " config=${drops[LinkDrop.CODEC_CONFIG.ordinal]}" +
+            " dim=${drops[LinkDrop.DIMENSIONS.ordinal]}" +
+            " decode=${drops[LinkDrop.DECODE_FAIL.ordinal]}"
+    }
+
     /** Frames mesurées jusqu'au pixel (les abandons ne comptent pas). */
     val linkSamples: Long get() = synchronized(timingLock) { linkStats.samples }
 
@@ -391,10 +440,11 @@ object GlassesVideoLink {
     private fun resetLinkLocked() {
         clockOffset.reset()
         linkStats.reset()
-        awaitingNote = false
-        lastLinkSeq = -1L
-        lastLinkUs = -1L
-        pending = null
+        linkNotes.clear()
+        linkSeq = 0L
+        accountedLinkSeq = 0L
+        pendings.clear()
+        conflatedPixel = 0L
         lastSummaryNs = 0L
         // Nouvelle session : la première frame rendue redonne une ligne détaillée.
         linkLineTicks = 0L

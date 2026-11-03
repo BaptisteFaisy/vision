@@ -137,12 +137,17 @@ class GlassesVideoLinkTest {
     }
 
     @Test
-    fun `deux poussees sans rendu confluent la premiere`() {
+    fun `la poussee sautee se compte au rendu qui la suit`() {
         GlassesVideoLink.push(dated(arrivedAtNs = 1_000_000_000L))
-        GlassesVideoLink.push(dated(arrivedAtNs = 1_066_000_000L))
-        val drops = GlassesVideoLink.linkDrops()
-        assertEquals(1L, drops[LinkDrop.CONFLATED.ordinal])
-        assertEquals(0L, GlassesVideoLink.linkSamples)
+        val second = dated(arrivedAtNs = 1_066_000_000L)
+        GlassesVideoLink.push(second)
+        // Pousser pendant l'attente ne perd rien : l'écart de seq tranche au rendu.
+        assertEquals(0L, GlassesVideoLink.linkDrops()[LinkDrop.CONFLATED.ordinal])
+        val seq = GlassesVideoLink.frames.value?.seq ?: 0L
+        GlassesVideoLink.noteRendered(seq, second, 1_076_000_000L, 1_084_000_000L)
+        assertEquals(1L, GlassesVideoLink.linkDrops()[LinkDrop.CONFLATED.ordinal])
+        GlassesVideoLink.markPixel(atNs = 1_092_000_000L)
+        assertEquals(1L, GlassesVideoLink.linkSamples)
     }
 
     @Test
@@ -163,7 +168,7 @@ class GlassesVideoLinkTest {
     }
 
     @Test
-    fun `un rendu sans pixel est confle par le rendu suivant`() {
+    fun `deux rendus avant leurs pixels mesurent deux frames`() {
         val first = dated(arrivedAtNs = 1_000_000_000L)
         GlassesVideoLink.push(first)
         val seq = GlassesVideoLink.frames.value?.seq ?: 0L
@@ -172,11 +177,13 @@ class GlassesVideoLinkTest {
         GlassesVideoLink.push(second)
         val seq2 = GlassesVideoLink.frames.value?.seq ?: 0L
         GlassesVideoLink.noteRendered(seq2, second, 1_076_000_000L, 1_084_000_000L)
-        // Le premier rendu n'a jamais atteint le pixel : conflé à l'affichage.
-        assertEquals(1L, GlassesVideoLink.linkDrops()[LinkDrop.CONFLATED.ordinal])
+        // Le premier rendu garde son pixel : file d'attente, pas conflation.
+        assertEquals(0L, GlassesVideoLink.linkDrops()[LinkDrop.CONFLATED.ordinal])
         assertEquals(0L, GlassesVideoLink.linkSamples)
         GlassesVideoLink.markPixel(atNs = 1_092_000_000L)
         assertEquals(1L, GlassesVideoLink.linkSamples)
+        GlassesVideoLink.markPixel(atNs = 1_100_000_000L)
+        assertEquals(2L, GlassesVideoLink.linkSamples)
     }
 
     @Test
@@ -202,6 +209,65 @@ class GlassesVideoLinkTest {
         assertEquals(0L, GlassesVideoLink.linkSamples)
         assertEquals(0L, GlassesVideoLink.linkDrops().sum())
         assertTrue(GlassesVideoLink.linkLine().endsWith("drops 0+0"))
+        assertEquals(
+            "GlassesLink drops conflated=0 (attente=0 pixel=0) config=0 dim=0 decode=0",
+            GlassesVideoLink.linkDropLine(),
+        )
+    }
+
+    @Test
+    fun `la file pixel pleine conflue le plus vieux rendu`() {
+        repeat(GlassesVideoLink.PENDING_WINDOW + 1) { i ->
+            val base = 1_000_000_000L + i * 66_000_000L
+            val frame = dated(arrivedAtNs = base)
+            GlassesVideoLink.push(frame)
+            val seq = GlassesVideoLink.frames.value?.seq ?: 0L
+            GlassesVideoLink.noteRendered(seq, frame, base + 10_000_000L, base + 18_000_000L)
+        }
+        assertEquals(1L, GlassesVideoLink.linkDrops()[LinkDrop.CONFLATED.ordinal])
+        assertEquals(
+            "GlassesLink drops conflated=1 (attente=0 pixel=1) config=0 dim=0 decode=0",
+            GlassesVideoLink.linkDropLine(),
+        )
+    }
+
+    @Test
+    fun `dix sept poussees un rendu seize conflations sans double`() {
+        repeat(GlassesVideoLink.LINK_NOTE_WINDOW + 1) { i ->
+            GlassesVideoLink.push(dated(arrivedAtNs = 1_000_000_000L + i * 66_000_000L))
+        }
+        val seq = GlassesVideoLink.frames.value?.seq ?: 0L
+        GlassesVideoLink.noteRendered(seq, dated(arrivedAtNs = 2_000_000_000L), 2_010_000_000L, 2_018_000_000L)
+        // 1 évincée + 15 sautées : ni oubli, ni double compte.
+        assertEquals(16L, GlassesVideoLink.linkDrops()[LinkDrop.CONFLATED.ordinal])
+        GlassesVideoLink.markPixel(atNs = 2_026_000_000L)
+        assertEquals(1L, GlassesVideoLink.linkSamples)
+    }
+
+    @Test
+    fun `le rendu tardif garde le lien de sa poussee`() {
+        val late = dated(arrivedAtNs = 2_000_000_000L)
+        GlassesVideoLink.push(late)
+        val seq = GlassesVideoLink.frames.value?.seq ?: 0L
+        // Une frame plus précoce rabaisse le minimum APRÈS la poussée.
+        GlassesVideoLink.push(dated(arrivedAtNs = 1_000_000_000L))
+        // Lien 0 (figé à la poussée), pas 1 s (relu après) : dec 8 ms, aff 8 ms.
+        GlassesVideoLink.noteRendered(seq, late, 2_010_000_000L, 2_018_000_000L)
+        GlassesVideoLink.markPixel(atNs = 2_026_000_000L)
+        assertEquals(1L, GlassesVideoLink.linkSamples)
+        assertEquals(
+            "GlassesLink e2e p50/p95/p99 16000/16000/16000 us (lien p95 0 us) drops 1+0",
+            GlassesVideoLink.linkLine(),
+        )
+    }
+
+    @Test
+    fun `un seq inconnu mesure sans ecart`() {
+        val frame = dated(arrivedAtNs = 1_000_000_000L)
+        GlassesVideoLink.noteRendered(999_999L, frame, 1_010_000_000L, 1_018_000_000L)
+        GlassesVideoLink.markPixel(atNs = 1_026_000_000L)
+        assertEquals(1L, GlassesVideoLink.linkSamples)
+        assertEquals(0L, GlassesVideoLink.linkDrops().sum())
     }
 
     private fun frame(bytes: ByteArray = byteArrayOf(1, 2, 3)) =
