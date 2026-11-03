@@ -59,6 +59,34 @@ class GlassesTalkTest {
     }
 
     @Test
+    fun `l ecoute silencieuse se termine sans transcription ni envoi`() {
+        // Non-régression : bouton heurté ou délai sans parole = ni STT ni LLM.
+        val talk = talk(mic = fakeMic(silent = true), transcript = "bonjour")
+        talk.press()
+
+        assertEquals(TalkPress.SENDING, talk.press())
+        assertFalse(talk.listening)
+        assertFalse(talk.busy)
+        assertTrue(heard.isEmpty())
+        assertEquals(null, lastSpeech)
+        assertEquals(listOf(GlassesTalkCue.LISTENING), cues)
+        assertEquals(listOf(true, false), listeningStates)
+        assertTrue(notes.isEmpty())
+    }
+
+    @Test
+    fun `la transcription fantome est jetee sans envoi`() {
+        val talk = talk(mic = fakeMic(), transcript = "Merci d'avoir regardé cette vidéo !")
+        talk.press()
+
+        assertEquals(TalkPress.SENDING, talk.press())
+        assertFalse(talk.listening)
+        assertTrue(heard.isEmpty())
+        assertEquals(1, lastSpeech?.calls)
+        assertEquals(listOf(true, false), listeningStates)
+    }
+
+    @Test
     fun `l ecoute ne prend pas de photo, ni a l ouverture ni a l envoi`() {
         val talk = talk(mic = fakeMic(), transcript = "où sont les toilettes")
         talk.press()
@@ -178,13 +206,15 @@ class GlassesTalkTest {
         assertEquals(1, notes.size)
     }
 
+    private var lastSpeech: FakeSpeech? = null
+
     private fun talk(
         mic: FakeMic?,
         transcript: String = "bonjour",
     ) = GlassesTalk(
         scope = scope,
         audio = { mic },
-        engine = { FakeSpeech(transcript) },
+        engine = { FakeSpeech(transcript).also { lastSpeech = it } },
         settings = { Settings("", "", "", "") },
         beep = cues::add,
         onListening = listeningStates::add,
@@ -193,14 +223,15 @@ class GlassesTalkTest {
         listenMs = LONG_LISTEN_MS,
     )
 
-    private fun fakeMic(starts: Boolean = true) = FakeMic(starts)
+    private fun fakeMic(starts: Boolean = true, silent: Boolean = false) = FakeMic(starts, silent)
 
-    private class FakeMic(private val starts: Boolean) : PcmSource {
+    private class FakeMic(private val starts: Boolean, private val silent: Boolean) : PcmSource {
         var aborted = false
 
         override fun start(): Boolean = starts
 
-        override fun stopAndCollect(): ByteArray = ByteArray(PCM_BYTES)
+        override fun stopAndCollect(): ByteArray =
+            if (silent) ByteArray(PCM_BYTES) else ByteArray(PCM_BYTES) { if (it % 2 == 1) 3.toByte() else 0.toByte() }
 
         override fun abort() {
             aborted = true
@@ -208,7 +239,12 @@ class GlassesTalkTest {
     }
 
     private class FakeSpeech(private val transcript: String) : SpeechClient {
-        override suspend fun transcribe(wav: ByteArray): Result<String> = Result.success(transcript)
+        var calls = 0
+
+        override suspend fun transcribe(wav: ByteArray): Result<String> {
+            calls += 1
+            return Result.success(transcript)
+        }
     }
 
     private companion object {

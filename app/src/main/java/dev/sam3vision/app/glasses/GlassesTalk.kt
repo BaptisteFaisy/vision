@@ -139,28 +139,39 @@ class GlassesTalk(
         phase = GlassesTalkPhase.SENDING
         timeout?.cancel()
         timeout = null
-        beep(GlassesTalkCue.SENT)
         val active = mic
         mic = null
         scope.launch {
-            val outcome = transcribe(active)
+            val pcm = active?.stopAndCollect() ?: ByteArray(0)
+            // Écoute vide (bouton heurté, délai sans parole) : fin silencieuse,
+            // ni transcription ni appel LLM — le plus fréquent des envois parasites.
+            if (!GlassesSpeechGate.hasSpeech(pcm)) {
+                endQuietly()
+                return@launch
+            }
+            beep(GlassesTalkCue.SENT)
+            val outcome = transcribePcm(pcm)
             phase = GlassesTalkPhase.IDLE
             outcome
-                .onSuccess { onHeard(it.text, it.pcm) }
+                .onSuccess { if (!GlassesSpeechGate.isJunkTranscript(it)) onHeard(it, pcm) }
                 .onFailure { onNote(GlassesMessages.talkFailed(it.message ?: "dictation impossible")) }
             onListening(false)
         }
     }
 
-    /** Micro coupé puis transcrit par le moteur de dictée de l'app. */
-    private suspend fun transcribe(active: PcmSource?): Result<GlassesTalkHeard> {
-        if (active == null) return Result.failure(IllegalStateException("glasses mic lost"))
-        val pcm = active.stopAndCollect()
+    /** Fin d'écoute sans envoi : micro déjà rendu, juste refermer proprement. */
+    private fun endQuietly() {
+        phase = GlassesTalkPhase.IDLE
+        onListening(false)
+    }
+
+    /** PCM déjà collecté, transcrit par le moteur de dictée de l'app. */
+    private suspend fun transcribePcm(pcm: ByteArray): Result<String> {
         val client = engine(settings())
             ?: return Result.failure(
                 IllegalStateException("no dictation engine: Meta or ElevenLabs key (Settings)"),
             )
-        return DictationUseCase(client).invoke(pcm).map { text -> GlassesTalkHeard(text, pcm) }
+        return DictationUseCase(client).invoke(pcm)
     }
 
     private companion object {
