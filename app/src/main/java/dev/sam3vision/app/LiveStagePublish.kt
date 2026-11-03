@@ -1,11 +1,13 @@
 package dev.sam3vision.app
 
+import androidx.lifecycle.viewModelScope
 import dev.sam3vision.app.live.LiveLatencyLog
 import dev.sam3vision.core.live.FrameTimings
 import dev.sam3vision.core.model.LiveFrame
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.update
+import kotlinx.coroutines.launch
 
 /**
  * Publication des instantanés de chronologie : à part (même motif que
@@ -37,7 +39,8 @@ internal fun LiveViewModel.publishStages(frame: LiveFrame?) {
 internal fun LiveViewModel.publishDrawnStages() {
     val snapshot = chronology.snapshot(_state.value.timings)
     pixel.publish(snapshot)
-    LiveLatencyLog.frame(snapshot)
+    // Journal hors main (fil sonde, ordonné) : même motif que la sonde iSee.
+    viewModelScope.launch(ProbeWorkDispatcher) { LiveLatencyLog.frame(snapshot) }
 }
 
 /** Boîtes prédites de la frame caméra, posées si la couche a changé. */
