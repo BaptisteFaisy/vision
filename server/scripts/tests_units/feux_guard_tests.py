@@ -143,6 +143,20 @@ def _finalize(guard, seg, check) -> None:
           str(rle)[:160])
 
 
+def _guarded_truncated(guard, seg, check) -> None:
+    """Garde active : `truncated` = labels non fusionnés, ordre de score."""
+    kept = guard.finalize_guarded(seg.finalize, _entries(), (16, 16), 3, "none")
+    check("garde: évincés listés quand la garde sauve",
+          kept["truncated"] == ["car2", "car3", "car4"], str(kept.get("truncated")))
+    strong = _entries()
+    strong[-1]["score"] = 0.95
+    same = guard.finalize_guarded(seg.finalize, strong, (16, 16), 3, "none")
+    check("garde: tri pur garde aussi la liste",
+          same["truncated"] == ["car2", "car3", "car4"], str(same.get("truncated")))
+    one = guard.finalize_guarded(seg.finalize, _entries(), (16, 16), 6, "none")
+    check("garde: rien d'évincé → vide", one["truncated"] == [], str(one.get("truncated")))
+
+
 def _payload_wiring(check) -> None:
     """``_payload`` déployé garde le feu ; ``run_frame`` route les concepts."""
     core = _live_fast_module("fast_core")
@@ -151,6 +165,8 @@ def _payload_wiring(check) -> None:
     check("feux: _payload déployé garde le feu",
           [item["label"] for item in result["objects"]] == ["car0", "car1", "feu piéton"],
           str(result)[:160])
+    check("feux: _payload déployé liste les évincés",
+          result["truncated"] == ["car2", "car3", "car4"], str(result.get("truncated")))
     check("feux: _payload mesure masks_ms", "masks_ms" in timers, str(sorted(timers)))
     seen: dict = {}
     saved = (core._preprocess, core._vision, core._collect)
@@ -276,11 +292,11 @@ def _crowd(guard, seg, check) -> None:
 
 
 def _stairs_walls_labels(guard, check) -> None:
-    """Familles escalier (11 formes + sens) et mur (miroir VeilPolicy)."""
+    """Familles escalier (14 formes + sens) et mur (miroir VeilPolicy)."""
     for label in ["stairs", "Stairs", "stair", "staircase", "Staircases",
-                  "steps", "upstairs", "downstairs", "escalier", "Escaliers",
-                  "un escalier", "marche", "marches", "marche d'escalier",
-                  "stairs going up", "escalier descendant"]:
+                  "stairway", "stairwell", "steps", "upstairs", "downstairs",
+                  "escalier", "Escaliers", "un escalier", "marche", "marches",
+                  "marche d'escalier", "stairs going up", "escalier descendant"]:
         check(f"escaliers: label volée reconnu ({label})",
               guard.is_stairs_label(label), label)
     # « step » EN reconnu aussi : la table confond « marche » et « step »
@@ -356,6 +372,7 @@ def test_feux_guard(_) -> None:
     _finalize(guard, _live_fast_module("segmentation"), check)
     _curb(guard, _live_fast_module("segmentation"), check)
     _crowd(guard, _live_fast_module("segmentation"), check)
+    _guarded_truncated(guard, _live_fast_module("segmentation"), check)
     _stairs_walls_labels(guard, check)
     _stairs_walls_guard(guard, _live_fast_module("segmentation"), check)
     _payload_wiring(check)

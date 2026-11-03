@@ -20,9 +20,15 @@ enum class StairDirection { Up, Down, Unknown }
  */
 object StairConcepts {
 
-    /** Formes canoniques du mot « escalier » (voir [KnownSizes.canonical]). */
+    /**
+     * Formes canoniques du mot « escalier » (voir [KnownSizes.canonical]).
+     * « step » singulier inclus : le backend renvoie ce label (suivi
+     * « marche »/« step ») et la bordure le revendique déjà — ici comme
+     * « steps », le contexte d'appel (géométrie, guetteur) lève l'ambiguïté.
+     */
     private val STAIRS = setOf(
-        "stair", "stairs", "staircase", "staircases", "steps", "upstairs", "downstairs",
+        "stair", "stairs", "staircase", "staircases", "stairway", "stairwell",
+        "step", "steps", "upstairs", "downstairs",
         "escalier", "escaliers", "marche", "marches",
     )
 

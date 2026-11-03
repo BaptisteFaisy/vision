@@ -27,6 +27,9 @@ internal class ProbeTestClient(private val journal: MutableList<String>) : LiveC
     /** Concepts envoyés par `live`, dans l'ordre : la preuve de la rotation. */
     val sentPrompts = mutableListOf<List<String>?>()
 
+    /** Plafonds `max_objects` envoyés par `live`, dans l'ordre. */
+    val sentMaxObjects = mutableListOf<Int>()
+
     /** Sessions fermées (`stop`, `configure`) : le socket rendu, la carte peut s'éteindre. */
     var closed = 0
         private set
@@ -47,6 +50,7 @@ internal class ProbeTestClient(private val journal: MutableList<String>) : LiveC
             waiting[jpegB64] = slot
             sent += 1
             sentPrompts += prompts
+            sentMaxObjects += maxObjects
             journal += "envoi $jpegB64 (frames=${publishedFrames()})"
         }
         return slot.await()

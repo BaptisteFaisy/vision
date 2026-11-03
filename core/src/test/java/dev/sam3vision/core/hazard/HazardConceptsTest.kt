@@ -192,6 +192,35 @@ class HazardConceptsTest {
     }
 
     @Test
+    fun `libelles composes reconnus au premier mot connu`() {
+        assertEquals("pole", HazardConcepts.nameOf("metal pole")!!.en)
+        assertEquals("au poteau", HazardConcepts.nameOf("metal pole")!!.fr)
+        assertEquals("barrier", HazardConcepts.nameOf("concrete barrier")!!.en)
+        assertEquals("fence", HazardConcepts.nameOf("wooden fences")!!.en)
+        assertTrue(HazardConcepts.isPole("metal pole"))
+        assertTrue(HazardConcepts.isBarrier("concrete barrier"))
+    }
+
+    @Test
+    fun `mot a mot jamais personne - feu pieton intact`() {
+        assertNull(HazardConcepts.nameOf("pedestrian traffic light"))
+        assertFalse(HazardConcepts.isPerson("pedestrian traffic light"))
+        assertEquals(HazardKind.OTHER, HazardConcepts.kindOf("pedestrian traffic light"))
+        assertNull(HazardConcepts.nameOf("baby person"))
+        assertNull(HazardConcepts.nameOf("lamp post"))
+    }
+
+    @Test
+    fun `siege auto n est pas un enfant, tete fr en premier mot`() {
+        assertNull(HazardConcepts.nameOf("child seat"))
+        assertFalse(HazardConcepts.isPerson("child seat"))
+        assertEquals(HazardKind.OTHER, HazardConcepts.kindOf("child seat"))
+        assertEquals("sign", HazardConcepts.nameOf("sign language")!!.en)
+        assertEquals("pole", HazardConcepts.nameOf("poteau métallique")!!.en)
+        assertEquals("wall", HazardConcepts.nameOf("mur de soutènement")!!.en)
+    }
+
+    @Test
     fun `murs reconnus FR EN pluriel`() {
         assertTrue(HazardConcepts.isWall("wall"))
         assertTrue(HazardConcepts.isWall("mur"))

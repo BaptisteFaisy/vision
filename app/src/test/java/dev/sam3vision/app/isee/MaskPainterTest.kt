@@ -2,6 +2,7 @@ package dev.sam3vision.app.isee
 
 import dev.sam3vision.core.mask.DecodeSplit
 import dev.sam3vision.core.model.LiveFrame
+import dev.sam3vision.core.model.MASK_ENCODING_NONE
 import dev.sam3vision.core.model.MASK_ENCODING_RLE
 import dev.sam3vision.core.model.SegObject
 import org.junit.Assert.assertEquals
@@ -63,6 +64,29 @@ class MaskPainterTest {
         assertEquals(5L, painter.lastDecode.totalMs)
         assertEquals(before.b64Ms, painter.lastDecode.b64Ms)
         assertEquals(before.imgMs, painter.lastDecode.imgMs)
+    }
+
+    @Test
+    fun `masque illisible saute avec sa raison`() {
+        val painter = MaskPainter({ 0xFFFF0000.toInt() }, 128)
+        val none = SegObject(
+            label = "stairs", score = 0.5f, box = listOf(0f, 0f, 8f, 6f),
+            maskPngB64 = "", maskEncoding = MASK_ENCODING_NONE,
+        )
+        val mixed = frame.copy(objects = listOf(rleObject, none))
+
+        painter.overlays(mixed)
+
+        assertEquals(listOf(SkippedMask("stairs", MASK_ENCODING_NONE, 0)), painter.lastSkipped)
+        assertEquals("stairs(none,0c)", skippedSummary(painter.lastSkipped))
+    }
+
+    @Test
+    fun `resume borne a six sautes`() {
+        val skipped = List(7) { SkippedMask("a$it", "rle", it) }
+
+        assertEquals("a0(rle,0c),a1(rle,1c),a2(rle,2c),a3(rle,3c),a4(rle,4c),a5(rle,5c)", skippedSummary(skipped))
+        assertEquals("", skippedSummary(emptyList()))
     }
 
     @Test

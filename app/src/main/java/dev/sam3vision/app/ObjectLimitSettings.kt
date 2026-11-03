@@ -16,7 +16,8 @@ import dev.sam3vision.core.settings.Settings
 
 /**
  * "On-screen objects" section: cap shared by Direct and photo
- * ([ObjectLimits.MIN_ON_SCREEN] to [ObjectLimits.MAX_ON_SCREEN]).
+ * ([ObjectLimits.MIN_ON_SCREEN] to [ObjectLimits.MAX_ON_SCREEN]) — the
+ * iSee probe always requests the server max and shows every mask.
  * Two big − / + buttons instead of a slider: easy to aim and read by finger.
  */
 @Composable
@@ -24,7 +25,7 @@ fun ObjectsSettings(draft: Settings, onChange: (Settings) -> Unit) {
     val current = draft.objectsOnScreen
     Column(Modifier.fillMaxWidth(), verticalArrangement = Arrangement.spacedBy(8.dp)) {
         Text(
-            "On-screen objects",
+            "On-screen objects (Direct, photo)",
             color = SettingsLight.text,
             fontSize = 13.sp,
             fontWeight = FontWeight.SemiBold,

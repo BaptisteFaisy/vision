@@ -453,6 +453,7 @@ private fun liveFrameOf(json: JSONObject): LiveFrame {
         passage = passageOf(json),
         maskEncoding = encoding,
         timingsMs = timingsMsOf(json),
+        truncated = json.strings("truncated"),
     )
 }
 

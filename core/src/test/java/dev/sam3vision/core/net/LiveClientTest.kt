@@ -198,7 +198,20 @@ class LiveClientTest {
 
         assertEquals("png", frame.maskEncoding)
         assertTrue(frame.timingsMs.isEmpty())
+        assertTrue(frame.truncated.isEmpty())
         assertEquals(512L, frame.elapsedMs)
+    }
+
+    @Test
+    fun `live lit les labels evinces du top global`() = runBlocking {
+        liveBody = """
+            {"width":64,"height":40,"elapsed_ms":9,"mask_encoding":"none",
+             "truncated":["stairs","sidewalk",""],
+             "objects":[{"label":"person","score":0.9,"box":[1,1,2,2],"mask_b64":""}]}
+        """.trimIndent()
+        val frame = HttpLiveClient(server.baseUrl).live("QQ==", null, 640, 12).getOrThrow()
+
+        assertEquals(listOf("stairs", "sidewalk"), frame.truncated)
     }
 
     @Test

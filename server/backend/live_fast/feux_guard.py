@@ -97,13 +97,15 @@ CROSSWALK_ROUTED = {
 STAIRS_CONCEPTS = frozenset({"stairs", "stair", "staircase"})
 
 # Variantes brutes reconnues pour la réserve (tri serveur seul). Miroir de
-# ``StairConcepts.STAIRS`` côté client : les 11 formes (EN + FR).
+# ``StairConcepts.STAIRS`` côté client : les 14 formes (EN + FR).
 # « step » recouvre le « step » EN (bordure) autant que la « marche » FR
 # (la table les confond en « step ») : chevauchement assumé — le bucket
 # curb passe d'abord (cf. ``_split_guarded``), la réserve reste d'une
 # place par famille réellement manquante.
 STAIRS_ROUTED = {
     "staircases": "staircase",
+    "stairway": "stairs",
+    "stairwell": "stairs",
     "steps": "stairs",
     "step": "stairs",
     "upstairs": "stairs",
@@ -173,11 +175,12 @@ def _stairs_word(word: str) -> bool:
 def is_stairs_label(label: object) -> bool:
     """Vrai si [label] désigne un escalier (FR/EN, casse/accents tolérés).
 
-    Miroir de ``StairConcepts`` côté client : les 11 formes (« stair(s) »,
-    « staircase(s) », « steps », « upstairs », « downstairs », « escalier(s) »,
-    « marche(s) ») via la table ``concepts`` + ``STAIRS_ROUTED`` — et, comme
-    le client, mot à mot : « stairs going up » et « escalier descendant »
-    (le sens vient des mots du libellé) restent gardés.
+    Miroir de ``StairConcepts`` côté client : les 14 formes (« stair(s) »,
+    « staircase(s) », « stairway », « stairwell », « step(s) », « upstairs »,
+    « downstairs », « escalier(s) », « marche(s) ») via la table ``concepts``
+    + ``STAIRS_ROUTED`` — et, comme le client, mot à mot : « stairs going
+    up » et « escalier descendant » (le sens vient des mots du libellé)
+    restent gardés.
     """
     if not isinstance(label, str) or not label.strip():
         return False
@@ -262,6 +265,10 @@ def finalize_guarded(finalize, entries: list[dict], image_size, max_objects: int
     familles manquantes effaçait un feu pourtant premier au score (0,99) dès
     qu'un passage à 0,10 prenait sa place réservée — la garde évinçait
     précisément ce qu'elle protège (reel audit foule 01/11).
+
+    ``truncated`` (comme ``finalize``) liste les labels non fusionnés, ordre
+    de score : sans lui le client lirait « rien de coupé » exactement quand
+    la garde sauve des familles.
     """
     others, feu, walk, curb, stairs, walls = _split_guarded(entries)
     families = ((feu, is_feu_label), (walk, is_crosswalk_label), (curb, is_curb_label),
@@ -284,4 +291,21 @@ def finalize_guarded(finalize, entries: list[dict], image_size, max_objects: int
         merged.extend(part["objects"])
     merged = sorted(merged, key=lambda item: item["score"], reverse=True)
     return {"width": kept["width"], "height": kept["height"],
-            "mask_encoding": kept["mask_encoding"], "objects": merged}
+            "mask_encoding": kept["mask_encoding"],
+            "truncated": _dropped_labels(entries, merged), "objects": merged}
+
+
+def _dropped_labels(entries: list[dict], merged: list[dict]) -> list[str]:
+    """Labels de ``entries`` absents de ``merged`` (ordre de score) : ``truncated``."""
+    seen: dict[tuple[str, float], int] = {}
+    for item in merged:
+        slot = (item["label"], item["score"])
+        seen[slot] = seen.get(slot, 0) + 1
+    dropped = []
+    for item in sorted(entries, key=lambda entry: entry["score"], reverse=True):
+        slot = (item["label"], item["score"])
+        if seen.get(slot, 0):
+            seen[slot] -= 1
+        else:
+            dropped.append(item["label"])
+    return dropped
