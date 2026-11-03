@@ -3,6 +3,7 @@ package dev.sam3vision.core.live
 import android.os.SystemClock
 import dev.sam3vision.core.model.LiveFrame
 import dev.sam3vision.core.model.ObjectLimits
+import dev.sam3vision.core.net.LIVE_TIMEOUT_SECONDS
 import dev.sam3vision.core.net.LiveClient
 import dev.sam3vision.core.net.WsLiveClient
 import java.util.concurrent.atomic.AtomicInteger
@@ -116,6 +117,14 @@ class LiveSession(
      * deux fois par seconde pour une liste qui ne change jamais en séance.
      */
     private val normalizedPrompts: List<String> by lazy { LivePrompts.normalize(prompts) }
+
+    /**
+     * Chauffe de la séance : le premier succès prouve le conteneur chaud et fait
+     * retomber le délai froid au délai normal ([LIVE_TIMEOUT_SECONDS]) — une fois.
+     * Les écrans partent en délai froid, la session resserre seule (la bascule
+     * vocale de la sonde reste maîtresse de l'annonce, le resserrage est commun).
+     */
+    private val warmup = LiveWarmup()
 
     /** Une frame est-elle en train d'être traitée ? */
     override val inFlight: Boolean get() = gate.inFlight
@@ -239,6 +248,8 @@ class LiveSession(
             val result = send()
             // Échec : le handshake de reprise part en fond (FIX-16), recouvert par l'inter-frame.
             if (result.isFailure) preconnect()
+            // Premier succès : le conteneur est chaud, le délai froid retombe au normal.
+            if (result.isSuccess && warmup.onFirstSuccess()) useTimeoutMs(LIVE_TIMEOUT_SECONDS * 1000)
             if (!gate.isCurrent(era)) return null
             result.getOrNull()?.let { frame -> serverStats.record(frame.elapsedMs) }
             stats.record(clock() - startedAt)
