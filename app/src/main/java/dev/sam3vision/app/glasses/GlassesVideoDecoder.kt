@@ -72,6 +72,9 @@ internal open class GlassesVideoDecoder(
     private var failures = 0
     private var broken = false
 
+    /** Tampons YUV/ARGB réutilisés : ~2,3 Mo/frame hors GC (usage séquentiel seul). */
+    private val scratch = BufferScratch()
+
     /** Dernier format de sortie annoncé (`INFO_OUTPUT_FORMAT_CHANGED`). */
     private var outStride = 0
     private var outSliceHeight = 0
@@ -194,16 +197,19 @@ internal open class GlassesVideoDecoder(
                 frame.width, frame.height, outStride, outSliceHeight, outColorFormat,
             ) ?: return warnFormatOnce()
             val buffer = runCatching { active.getOutputBuffer(index) }.getOrNull() ?: return null
-            val bytes = ByteArray(info.size)
+            // Garde sur les octets RÉELS (`info.size`), pas la capacité du tampon
+            // réutilisé : un tampon plus grand ne doit pas valider un buffer court.
+            if (layout.requiredBytes() > info.size) return null
+            val bytes = scratch.bytes(info.size)
             val view = buffer.duplicate()
             if (info.offset < 0 || info.offset + info.size > view.capacity()) return null
             view.position(info.offset)
             view.limit(info.offset + info.size)
-            view.get(bytes)
+            view.get(bytes, 0, info.size)
             // Demi-résolution : le pont réduit à 320 px de toute façon, le
             // 720p plein (~921 kpx) coûtait ~10-30 ms de CPU jetés par frame.
             val (halfW, halfH) = halfDimensions(frame.width, frame.height)
-            val argb = IntArray(halfW * halfH)
+            val argb = scratch.ints(halfW * halfH)
             if (!YuvConverter.yuv420ToArgbHalf(bytes, layout, argb)) return null
             return ArgbImage(argb, halfW, halfH, info.presentationTimeUs)
         } catch (_: Exception) {
