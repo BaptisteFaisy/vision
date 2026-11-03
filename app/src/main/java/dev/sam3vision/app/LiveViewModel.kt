@@ -6,6 +6,7 @@ import android.os.SystemClock
 import androidx.compose.ui.graphics.toArgb
 import androidx.lifecycle.AndroidViewModel
 import androidx.lifecycle.viewModelScope
+import dev.sam3vision.app.isee.COLD_TIMEOUT_SECONDS
 import dev.sam3vision.app.isee.MaskPainter
 import dev.sam3vision.app.isee.pictosDir
 import dev.sam3vision.app.live.CenterTrails
@@ -195,7 +196,8 @@ class LiveViewModel(app: Application) : AndroidViewModel(app) {
             tracker = TrackRunner(HttpTrackClient(base))
             LiveTransportLog.info("session track ouverte base=" + base)
         } else {
-            val live = LiveMaskTransport.clientFor(base, marks = chronology)
+            // Délai froid comme la sonde : le premier succès le resserre seul (LiveSession).
+            val live = LiveMaskTransport.clientFor(base, timeout = COLD_TIMEOUT_SECONDS, marks = chronology)
             client = live.also { it.preconnect() } // handshake anticipé : la 1re frame part prête.
             session = LiveSession(live, prompts = _state.value.prompts, maxObjects = this.settings.objectsOnScreen)
         }
