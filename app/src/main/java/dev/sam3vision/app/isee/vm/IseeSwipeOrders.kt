@@ -72,6 +72,8 @@ class IseeSwipeOrders(
     private val hapticStart: () -> Unit,
     /** Queue de 200 ms au relâchement (même retour que l'appui long). */
     private val hapticEnd: () -> Unit,
+    /** Vrai quand l'écran iSee est à l'écran : un maintien confirmé hors écran n'ouvre rien. */
+    private val isActive: () -> Boolean,
     private val clock: () -> Long = System::currentTimeMillis,
 ) {
 
@@ -97,26 +99,25 @@ class IseeSwipeOrders(
     }
 
     /**
-     * Balayage vers la droite : « Quoi chercher ? » puis chasse de l'objet
-     * entendu. Dehors, refus parlé comme l'ordre vocal (jamais de picto dehors)
-     * — et pas de micro ouvert pour rien.
-     */
-    /**
      * Maintien après balayage vers le bas : le micro destination s'ouvre (même
      * dictée que l'appui long, sans son contexte photo — une destination n'en
-     * a pas besoin). Sans effet si une écoute tient déjà le micro.
+     * a pas besoin). Sans effet hors écran iSee ou si une écoute tient déjà
+     * le micro. `holding` est posé comme pour l'appui long (scène LISTENING,
+     * voix du guidage et keepalive tus pendant la dictée).
      */
     fun askDestination() {
-        if (listening || destinationListening) return
+        if (!isActive() || listening || destinationListening) return
         destinationListening = true
-        silence()
-        hapticStart()
-        if (dictation.start()) {
-            update { it.copy(status = null) }
-        } else {
+        if (!dictation.start()) {
             destinationListening = false
             update { it.copy(status = IseeStatusText.MIC_UNAVAILABLE) }
+            return
         }
+        // Micro ouvert : la voix en cours est coupée (l'accusé « GPS enabled »
+        // du balayage ne doit pas s'enregistrer) et le doigt sent l'ouverture.
+        silence()
+        hapticStart()
+        update { it.copy(holding = true, status = null) }
     }
 
     /**
@@ -128,13 +129,14 @@ class IseeSwipeOrders(
         if (!destinationListening) return
         destinationListening = false
         hapticEnd()
+        update { it.copy(holding = false) }
         scope.launch {
             val heard = dictation.finish(settings()) ?: return@launch
             if (heard.text.isBlank()) {
                 nothingHeard()
                 return@launch
             }
-            runDestination(heard.text)
+            runCatching { runDestination(heard.text) }
         }
     }
 
@@ -144,8 +146,14 @@ class IseeSwipeOrders(
         destinationListening = false
         dictation.discard()
         hapticEnd()
+        update { it.copy(holding = false) }
     }
 
+    /**
+     * Balayage vers la droite : « Quoi chercher ? » puis chasse de l'objet
+     * entendu. Dehors, refus parlé comme l'ordre vocal (jamais de picto dehors)
+     * — et pas de micro ouvert pour rien.
+     */
     fun askToFind() {
         if (listening || destinationListening) return
         if (!placeMode().pictoEnabled) {
