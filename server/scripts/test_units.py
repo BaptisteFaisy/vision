@@ -409,6 +409,7 @@ RUNNERS = (
     ("graphe : pas de faute CUDGraph", "timing", weights_tests.test_no_cudagraph_typo),
     ("concepts : table déployée synchronisée", "timing", weights_tests.test_concepts_sync),
     ("concepts : bordures et bateaux (rue)", "concepts", concepts_street_tests.test_concepts_street),
+    ("concepts : poussette (rue)", "concepts", concepts_street_tests.test_concepts_poussette),
     ("concepts : feux piétons (traversée)", "concepts",
      crossing_concepts_tests.test_concepts_crossing),
     ("natif : source officielle", "segmentation_native", native_tests.test_native_source),
