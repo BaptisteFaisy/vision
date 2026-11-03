@@ -39,17 +39,21 @@ internal fun linkedStates(): List<LinkState> = runCatching {
  * Rend `false` au bout du délai : l'appelant le dit et n'ouvre pas de session morte.
  * [onWaiting] n'est appelé que si le lien n'est pas déjà monté — un lien déjà là n'affiche
  * rien, et l'attente se voit au lieu de passer pour un bouton sans effet.
+ * [probe]/[waitMs]/[pollMs] s'injectent pour les tests JVM (défauts = production).
  */
 internal suspend fun awaitLinkedDevice(
     clock: () -> Long,
     onWaiting: () -> Unit = {},
+    probe: () -> List<LinkState> = ::linkedStates,
+    waitMs: Long = LINK_WAIT_MS,
+    pollMs: Long = LINK_POLL_MS,
 ): Boolean {
-    if (hasLinkedDevice(linkedStates())) return true
+    if (hasLinkedDevice(probe())) return true
     onWaiting()
-    val deadline = clock() + LINK_WAIT_MS
+    val deadline = clock() + waitMs
     while (clock() < deadline) {
-        if (hasLinkedDevice(linkedStates())) return true
-        delay(LINK_POLL_MS)
+        if (hasLinkedDevice(probe())) return true
+        delay(pollMs)
     }
     return false
 }
