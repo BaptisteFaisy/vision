@@ -59,6 +59,7 @@ class VoiceNavSessionTest {
         engine: (suspend (String, RouteSummary?) -> Boolean)? = { _, _ -> true },
         autoStart: Boolean = false,
         remembered: MutableList<String?>? = null,
+        logged: MutableList<String>? = null,
     ) = VoiceNavSession(
         launcher = launcher,
         guidanceEnabled = { guidance },
@@ -71,6 +72,7 @@ class VoiceNavSessionTest {
         onGpsDisabled = { gpsFlags += false },
         onGpsEnabled = { gpsFlags += true },
         onActiveDestination = { remembered?.add(it) },
+        log = { logged?.add(it) },
     )
 
     @Test
@@ -81,6 +83,39 @@ class VoiceNavSessionTest {
         assertFalse(session.onVoiceTranscript("   "))
         assertEquals(VoiceNavUiState.Idle, session.state.value)
         assertTrue(spoken.isEmpty())
+    }
+
+    @Test
+    fun `demarrage guidage eteint loggue le refus`() = runBlocking {
+        val logged = mutableListOf<String>()
+        val session = session(guidance = false, autoStart = true, logged = logged)
+
+        assertTrue(session.onVoiceTranscript("emmène-moi à la gare"))
+
+        assertEquals(VoiceNavUiState.Idle, session.state.value)
+        assertEquals(listOf("démarrage refusé : guidage éteint"), logged)
+    }
+
+    @Test
+    fun `demarrage moteur en echec loggue indisponible`() = runBlocking {
+        val logged = mutableListOf<String>()
+        val session = session(autoStart = true, engine = { _, _ -> false }, logged = logged)
+
+        assertTrue(session.onVoiceTranscript("emmène-moi à la gare"))
+
+        assertEquals(VoiceNavUiState.Idle, session.state.value)
+        assertEquals(listOf("moteur indisponible"), logged)
+    }
+
+    @Test
+    fun `demarrage reussi loggue moteur demarre`() = runBlocking {
+        val logged = mutableListOf<String>()
+        val session = session(autoStart = true, logged = logged)
+
+        assertTrue(session.onVoiceTranscript("emmène-moi à la gare"))
+
+        assertTrue(session.state.value is VoiceNavUiState.Guiding)
+        assertEquals(listOf("moteur démarré"), logged)
     }
 
     @Test

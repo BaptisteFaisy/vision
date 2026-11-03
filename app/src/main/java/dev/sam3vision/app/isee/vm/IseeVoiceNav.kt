@@ -7,6 +7,7 @@ import dev.sam3vision.app.BuildConfig
 import dev.sam3vision.app.navigation.AndroidGeocoderSource
 import dev.sam3vision.app.navigation.AndroidNavigationLauncher
 import dev.sam3vision.app.navigation.awaitFirstFix
+import dev.sam3vision.app.navigation.VoiceNavTracker
 import dev.sam3vision.app.perms.hasPerm
 import dev.sam3vision.app.speech.NavigationAnnouncer
 import dev.sam3vision.app.speech.VoiceNavAnnouncer
@@ -122,6 +123,7 @@ class IseeVoiceNav(
             autoStartOnVoice = true,
             // Guidage actif : la destination reste en mémoire pour le LLM.
             onActiveDestination = GpsDestinationMemory::remember,
+            log = { android.util.Log.d(VoiceNavTracker.LOG_TAG, it) },
         )
     }
 
