@@ -160,7 +160,7 @@ private const val TIE_EPS = 1e-6f
  * Largeur de champ à [depth] mètres : ce que vaut tout l'axe x en mètres —
  * même projection que le trait du couloir (`halfTangent` borné caméra).
  */
-private fun lateralPerX(depth: Float, halfTangent: Float): Float = 2f * depth * halfTangent
+internal fun lateralPerX(depth: Float, halfTangent: Float): Float = 2f * depth * halfTangent
 
 /** Bandes interdites en cap et géométrie pour l'écart : tampons pré-alloués, une passe. */
 private class ObstacleBands(size: Int) {
