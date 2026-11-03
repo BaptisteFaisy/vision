@@ -17,6 +17,7 @@ import dev.sam3vision.app.isee.guideVoicePack
 import dev.sam3vision.core.crossing.CarLightVeto
 import dev.sam3vision.core.crossing.CrossingPrompts
 import dev.sam3vision.core.crossing.CrossingState
+import dev.sam3vision.core.crossing.NoLightGate
 import dev.sam3vision.core.live.LivePrompts
 import dev.sam3vision.core.model.Detection
 import dev.sam3vision.core.model.LiveFrame
@@ -78,6 +79,13 @@ class TraverseWiring(
     @Volatile var lightGreen: Boolean = false
 
     /**
+     * Porte « sans feu » : 4 frames de suite sans boîte de feu → pas de feu
+     * à lire, les véhicules tranchent (le veto reste armé). Nourrie par
+     * [updateLight], lue par [filter] ; oubliée par [reset] et [deactivate].
+     */
+    private val noLightGate = NoLightGate()
+
+    /**
      * Dernier feu lu (boîte + état) : sert à le **dessiner** sur la vidéo du
      * direct, à l'endroit où les masques sont posés. `null` = mode coupé.
      */
@@ -120,26 +128,33 @@ class TraverseWiring(
         // (Le câblage gyro envisagé en FUSION P4 a été supprimé sur ordre user
         // du 02/11 : verdicts visuels seuls.)
         val background = if (active) backgroundOf(jpegB64) else null
-        val out = pipeline.onFrame(frame.objects, width, height, lightGreen, focalPx, atMs, language, background)
+        val out = pipeline.onFrame(frame.objects, width, height, lightGreen, focalPx, atMs, language, background, noLightGate.noLight)
         CalibrationSnapshots.note(out.detections, width, height, atMs)
         logTransition(out.decision)
         logBackground(pipeline.lastBackgroundMoving)
         return ShownFrame(frame.copy(objects = out.objects), out.detections, out.decision.keepObstacleGuidance)
     }
 
-    /** Seul un vert tranché autorise la traversée ; tout le reste attend (binaire). */
+    /**
+     * Seul un vert tranché autorise la traversée ; tout le reste attend (binaire).
+     * Sans boîte, l'absence de feu ne se prouve pas : la porte s'oublie.
+     */
     fun updateLight(state: CrossingState) {
         lightGreen = state == CrossingState.Green
+        noLightGate.reset()
     }
 
     /**
      * Même règle, en gardant la boîte : l'affichage du direct en a besoin.
      * Fail-closed ([greenForDecision]) : un vert sans boîte ne traverse pas —
-     * l'équivalent binaire de l'ancien « Doute », seuils inchangés.
+     * l'équivalent binaire de l'ancien « Doute », seuils inchangés. La boîte
+     * (ou son absence) nourrit la porte sans-feu : 4 frames sans boîte et ce
+     * sont les véhicules qui tranchent (voir [TraverseVeto.update]).
      */
     fun updateLight(light: CrossingLight) {
         this.light = light
         lightGreen = light.greenForDecision
+        noLightGate.onFrame(light.box)
     }
 
     /**
@@ -199,6 +214,7 @@ class TraverseWiring(
         light = null
         cropLogger = null
         lastBackgroundMoving = null
+        noLightGate.reset()
     }
 
     /** Oublie pistes, veto, vert, annonces et verdict fond (nouvelle séance). */
@@ -207,6 +223,7 @@ class TraverseWiring(
         lightGreen = false
         light = null
         lastBackgroundMoving = null
+        noLightGate.reset()
     }
 
     /** Construit la voix (clips Laure embarqués), préchauffe, renvoie les prompts du mode. */
