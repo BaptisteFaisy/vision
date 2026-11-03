@@ -43,13 +43,25 @@ enum class SamRegion(
             entries.firstOrNull { it.name.equals(name, ignoreCase = true) } ?: Eu
 
         /**
-         * Vrai si [url] n'est que le preset d'une région : c'est une valeur injectée par le
-         * build ou héritée d'une ancienne version, pas un choix manuel — elle ne doit donc
-         * pas figer la région.
+         * Presets retirés (ancien workspace, avant gaiamelie) : une URL persistée qui n'est
+         * que l'un d'eux n'a jamais été un choix manuel — reconnue ici, elle migre vers la
+         * région courante au lieu d'appeler l'ancien workspace à vie.
+         */
+        private val RETIRED_PRESETS = setOf(
+            "https://baptiste-faisy--sam3-eu-a100-sam3live-web.eu-west.modal.run",
+            "https://baptiste-faisy--sam3-us-a100-sam3live-web.us-east.modal.run",
+        )
+
+        /**
+         * Vrai si [url] n'est que le preset d'une région, actuel ou retiré : c'est une valeur
+         * injectée par le build ou héritée d'une ancienne version, pas un choix manuel — elle
+         * ne doit donc pas figer la région.
          */
         fun isPreset(url: String): Boolean {
             val clean = url.trim().trimEnd('/')
-            return clean.isNotEmpty() && entries.any { it.presetBaseUrl.trimEnd('/') == clean }
+            if (clean.isEmpty()) return false
+            return entries.any { it.presetBaseUrl.trimEnd('/') == clean } ||
+                RETIRED_PRESETS.any { it.trimEnd('/') == clean }
         }
     }
 }
