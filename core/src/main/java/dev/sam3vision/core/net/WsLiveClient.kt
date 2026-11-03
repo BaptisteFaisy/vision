@@ -422,6 +422,8 @@ class WsLiveClient(
     /**
      * Socket fermé : les frames en vol échouent, l'état passe en `Degraded` et la reprise
      * est armée — sauf si la fermeture vient d'un socket déjà remplacé (ack tardif).
+     * Idle serveur (`1001`) : reprise **sans backoff** (contrat LIVE-SPEC §9), comme une
+     * invalidation — un idle n'est pas un échec, il ne consomme pas de tentative.
      * [onText] reste sans garde : une réponse tardive au bon `id` reste la bonne.
      */
     private fun onClosed(error: Throwable?, gen: Int) {
@@ -431,7 +433,11 @@ class WsLiveClient(
             } else {
                 connected = false
                 stopPingLocked()
-                link.onFailure()
+                if (error is WsClosedAbnormally && error.code == IDLE_CLOSE_CODE) {
+                    link.onInvalidate(net.iface)
+                } else {
+                    link.onFailure()
+                }
                 false
             }
         }

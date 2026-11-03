@@ -27,3 +27,6 @@ internal const val WS_SEND_REFUSED = "WebSocket /live/ws: send refused"
 /** `id` d'une réponse orpheline (serveur sans binaire) et son marqueur d'erreur. */
 internal const val UNKNOWN_WS_ID = -1
 internal const val ERROR_MARK = "\"error\""
+
+/** Fermeture idle serveur (120 s sans message applicatif) : reprise sans backoff (§9). */
+internal const val IDLE_CLOSE_CODE = 1001

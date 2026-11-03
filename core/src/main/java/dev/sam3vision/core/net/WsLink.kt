@@ -179,8 +179,8 @@ internal const val SILENCE_TICK_MS = 1_000L
 
 /**
  * Horloges du lien sur **un seul** minuteur : le ping applicatif du keepalive (sans lui,
- * l'idle serveur de 45 s coupe le socket) puis le tick de surveillance fourni par le
- * client. Un thread par session, rendu par [stop] — jamais deux horloges à arrêter.
+ * l'idle serveur de 120 s coupe le socket en 1001) puis le tick de surveillance fourni
+ * par le client. Un thread par session, rendu par [stop] — jamais deux horloges à arrêter.
  *
  * Le client ne fournit que des lectures et une action : la cadence, l'espace des `id` de
  * ping (négatifs, hors des frames) et l'arrêt vivent ici.
@@ -230,7 +230,8 @@ class WsLinkPump(
  */
 internal fun wsCloseError(error: Throwable): ApiError = when (error) {
     is WsClosedAbnormally -> when (error.code) {
-        1011 -> ApiError.Network("WebSocket /live/ws : idle 45 s (1011), la frame suivante rouvre")
+        1001 -> ApiError.Network("WebSocket /live/ws : idle 120 s (1001), la frame suivante rouvre")
+        1011 -> ApiError.Network("WebSocket /live/ws : erreur interne serveur (1011)")
         1009 -> ApiError.Network("WebSocket /live/ws : réponse trop grosse (1009)")
         else -> ApiError.Network("WebSocket /live/ws : fermé (${error.code})")
     }

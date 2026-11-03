@@ -1,6 +1,6 @@
 package dev.sam3vision.core.net
 
-/** Pause sans frame avant un ping applicatif : sous l'idle serveur (45 s), avec marge. */
+/** Pause sans frame avant un ping applicatif : sous l'idle serveur (120 s), avec marge. */
 internal const val PING_INTERVAL_MS = 30_000L
 
 /** Premier `id` des pings : négatif, hors de l'espace des frames (`-1` = refus binaire). */
@@ -11,7 +11,7 @@ internal fun pingMessage(id: Int): String = "{\"type\":\"ping\",\"id\":$id}"
 
 /**
  * Décision du keepalive applicatif (FIX-17) : les pings protocole ne resettent pas
- * l'idle serveur (45 s → 1011), seul un message applicatif le fait. [poll] dit s'il
+ * l'idle serveur (120 s → 1001), seul un message applicatif le fait. [poll] dit s'il
  * faut pinger ([clock] injectable : les tests prouvent le délai sans attendre).
  */
 class WsKeepAlive(
