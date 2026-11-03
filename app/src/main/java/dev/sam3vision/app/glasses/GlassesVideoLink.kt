@@ -387,6 +387,17 @@ object GlassesVideoLink {
     /** Frames mesurées jusqu'au pixel (les abandons ne comptent pas). */
     val linkSamples: Long get() = synchronized(timingLock) { linkStats.samples }
 
+    /**
+     * Taux d'abandon mesuré de la session précédente (0.0 = lien sain ou jamais
+     * mesuré) : `GlassesCamera` y lit le [dropRate] de l'attache suivante, et le
+     * repli MEDIUM ([glassesVideoQuality]) devient effectif au lieu de rester à
+     * 0.0. Posé à l'arrêt du flux, avant l'oubli — jamais sur des stats vides
+     * (double arrêt, ouverture) : l'absence de mesure garde l'ancien report.
+     */
+    @Volatile
+    var lastSessionDropRate: Double = 0.0
+        internal set
+
     /** Oublie la mesure du lien : nouvelle session, nouvelles horloges des deux côtés. */
     private fun resetLinkLocked() {
         clockOffset.reset()
@@ -412,7 +423,12 @@ object GlassesVideoLink {
             _videoSize.value = null
             snapshotGeometryField = null
             _renderedSeq.value = null
-            synchronized(timingLock) { resetLinkLocked() }
+            synchronized(timingLock) {
+                // Report inter-sessions : le taux mesuré nourrit le choix qualité
+                // de l'attache suivante, avant que l'oubli l'efface.
+                if (linkStats.samples + linkStats.dropped > 0) lastSessionDropRate = linkStats.dropRate
+                resetLinkLocked()
+            }
         }
     }
 
