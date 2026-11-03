@@ -2,8 +2,11 @@ package dev.sam3vision.core.net
 
 import java.io.IOException
 import java.io.InterruptedIOException
+import java.net.InetAddress
+import java.net.Socket
 import java.net.SocketTimeoutException
 import java.util.concurrent.TimeUnit
+import javax.net.SocketFactory
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
@@ -80,6 +83,8 @@ fun defaultHttpClient(timeoutSeconds: Long = DEFAULT_TIMEOUT_SECONDS): OkHttpCli
  *
  * `retryOnConnectionFailure(false)` : une frame n'est jamais renvoyée (voir [OneShotJsonBody]) ;
  * un keep-alive mort échoue franchement au lieu de rejouer 28 Ko et une 2e inférence GPU.
+ *
+ * `NoDelaySocketFactory` : Nagle coupé sur chaque socket (voir sa doc).
  */
 private val liveSharedClient: OkHttpClient by lazy {
     OkHttpClient.Builder()
@@ -88,10 +93,44 @@ private val liveSharedClient: OkHttpClient by lazy {
         .readTimeout(LIVE_READ_SECONDS, TimeUnit.SECONDS)
         .callTimeout(0, TimeUnit.SECONDS)
         .retryOnConnectionFailure(false)
+        .socketFactory(NoDelaySocketFactory())
         // 8 connexions idle / 5 min : marge pour 1 frame en vol + `/health`, et tunnel chaud
         // entre deux sessions rapprochées (défaut OkHttp : 5 idle).
         .connectionPool(ConnectionPool(8, 5, TimeUnit.MINUTES))
         .build()
+}
+
+/**
+ * Sockets du direct sans algorithme de Nagle : chaque `send` part aussitôt, sans attendre
+ * l'accusé du précédent. À deux créneaux, la seconde frame pipelinée a des octets non
+ * accusés en vol : Nagle la retenait jusqu'à l'ACK (jusqu'à ~40 ms d'ACK retardé côté
+ * serveur), pile la queue `rtt` mesurée en recette (p95 146 ms pour ~53 ms serveur).
+ * Le TLS (`wss://`) est posé par OkHttp au-dessus de ces sockets : l'option porte aussi.
+ *
+ * Une optimisation ne casse jamais la connexion : une option refusée est ignorée.
+ */
+internal class NoDelaySocketFactory(
+    private val delegate: SocketFactory = SocketFactory.getDefault(),
+) : SocketFactory() {
+    override fun createSocket(): Socket = noDelay(delegate.createSocket())
+
+    override fun createSocket(host: String, port: Int): Socket =
+        noDelay(delegate.createSocket(host, port))
+
+    override fun createSocket(host: String, port: Int, localHost: InetAddress?, localPort: Int): Socket =
+        noDelay(delegate.createSocket(host, port, localHost, localPort))
+
+    override fun createSocket(host: InetAddress, port: Int): Socket =
+        noDelay(delegate.createSocket(host, port))
+
+    override fun createSocket(address: InetAddress, port: Int, localAddress: InetAddress?, localPort: Int): Socket =
+        noDelay(delegate.createSocket(address, port, localAddress, localPort))
+
+    /** Coupe Nagle, sans jamais lever : un socket reste un socket. */
+    private fun noDelay(socket: Socket): Socket {
+        runCatching { socket.tcpNoDelay = true }
+        return socket
+    }
 }
 
 /** Le client HTTP du direct : **toujours le même** (pool, DNS, TLS partagés). */
