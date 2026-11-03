@@ -41,9 +41,14 @@ const val DEFAULT_TIMEOUT_SECONDS: Long = 60L
  * tracker, ASR, TTS et vidéo. Avant, chaque `defaultHttpClient()` fabriquait un pool neuf
  * (71,3 ms mesurés de DNS+TCP+TLS à chaque premier appel). `newBuilder()` partage le pool
  * et le dispatcher par défaut, donc les variantes de timeouts restent chaudes.
+ *
+ * `RoutedSocketFactory` : la fabrique suit [BackendRoute] (cellulaire imposé en
+ * session lunettes, route par défaut sinon) — les clients déjà construits suivent
+ * aussi, sans être reconstruits.
  */
 private val sharedBaseClient: OkHttpClient by lazy {
     OkHttpClient.Builder()
+        .socketFactory(RoutedSocketFactory())
         .connectTimeout(DEFAULT_CONNECT_SECONDS, TimeUnit.SECONDS)
         .readTimeout(DEFAULT_TIMEOUT_SECONDS, TimeUnit.SECONDS)
         .writeTimeout(DEFAULT_TIMEOUT_SECONDS, TimeUnit.SECONDS)
@@ -91,7 +96,8 @@ fun defaultHttpClient(timeoutSeconds: Long = DEFAULT_TIMEOUT_SECONDS): OkHttpCli
  * `retryOnConnectionFailure(false)` : une frame n'est jamais renvoyée (voir [OneShotJsonBody]) ;
  * un keep-alive mort échoue franchement au lieu de rejouer 28 Ko et une 2e inférence GPU.
  *
- * `NoDelaySocketFactory` : Nagle coupé sur chaque socket (voir sa doc).
+ * `NoDelaySocketFactory` : Nagle coupé sur chaque socket (voir sa doc), au-dessus de
+ * `RoutedSocketFactory` qui suit [BackendRoute] (même routage que le socle HTTP).
  */
 private val liveSharedClient: OkHttpClient by lazy {
     OkHttpClient.Builder()
@@ -100,7 +106,7 @@ private val liveSharedClient: OkHttpClient by lazy {
         .readTimeout(LIVE_READ_SECONDS, TimeUnit.SECONDS)
         .callTimeout(0, TimeUnit.SECONDS)
         .retryOnConnectionFailure(false)
-        .socketFactory(NoDelaySocketFactory())
+        .socketFactory(NoDelaySocketFactory(RoutedSocketFactory()))
         // 8 connexions idle / 5 min : marge pour 1 frame en vol + `/health`, et tunnel chaud
         // entre deux sessions rapprochées (défaut OkHttp : 5 idle).
         .connectionPool(ConnectionPool(8, 5, TimeUnit.MINUTES))
@@ -200,6 +206,18 @@ private val releaseSharedClient: OkHttpClient by lazy {
 
 /** Le client HTTP de `/release` : **toujours le même**, sans rejeu. */
 fun releaseHttpClient(): OkHttpClient = releaseSharedClient
+
+/**
+ * Vide les pools des deux racines ([defaultHttpClient], [liveHttpClient]) : à
+ * appeler quand [BackendRoute] bascule, sinon les connexions gardées (clé du
+ * pool = hôte, pas fabrique) continueraient sur l'ancienne route. Les
+ * connexions en vol ne sont pas coupées ; le WebSocket, lui, est rouvert par
+ * l'invalidation d'interface. Ne lève jamais.
+ */
+fun drainBackendPools() {
+    runCatching { sharedBaseClient.connectionPool.evictAll() }
+    runCatching { liveSharedClient.connectionPool.evictAll() }
+}
 
 /** Réponse HTTP brute. */
 internal data class HttpOutcome(val code: Int, val body: String)
