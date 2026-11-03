@@ -278,8 +278,9 @@ class HazardWatcher(
         if (last != NO_INSTANT && nowMs - last < gap) return null
         if (fence) lastFenceMs = nowMs else lastDiversMs = nowMs
         otherHits = 0
+        // Doux sans cadran (ordre user 03/11) : l'heure ne se dit plus.
         return HazardCue(
-            HazardText.phrase(candidate.name, language, candidate.centerX),
+            HazardText.phrase(candidate.name, language, null),
             candidate.meters, kind = candidate.kind, trackId = candidate.trackId,
             level = candidate.level,
             antiRepeatKey = if (fence) KEY_FENCE else KEY_POLE,

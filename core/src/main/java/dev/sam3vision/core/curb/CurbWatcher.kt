@@ -245,8 +245,9 @@ class CurbWatcher(
         lastCueAtMs = nowMs
         hits = 0
         val edge = signal.edge ?: CurbEdge.Up
-        val phrase = if (edge == CurbEdge.Uncertain) CurbText.phrase(edge, language, signal.centerX)
-        else CurbText.detectedPhrase(language, signal.centerX)
+        // Détection sans cadran (ordre user 03/11) : l'heure ne se dit plus.
+        val phrase = if (edge == CurbEdge.Uncertain) CurbText.phrase(edge, language, null)
+        else CurbText.detectedPhrase(language, null)
         return CurbCue(
             phrase,
             signal.meters,

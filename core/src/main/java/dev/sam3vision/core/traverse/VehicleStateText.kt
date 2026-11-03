@@ -138,7 +138,7 @@ object VehicleStateText {
         language = language,
     )
 
-    /** Situe [base] — arrêt et stationnement seulement : distance au mètre entier si mesurée, heure sinon. */
+    /** Situe [base] — arrêt et stationnement seulement : distance si mesurée, base seule sinon (sans heure, ordre user 03/11). */
     private fun situate(
         base: String,
         meters: Float?,
@@ -149,6 +149,6 @@ object VehicleStateText {
             SpeechLanguage.Fr -> "$base, à ${DistanceText.spokenShort(meters, language)}."
             SpeechLanguage.En -> "$base, ${DistanceText.spokenShort(meters, language)} away."
         }
-        return PositionText.withHour(base, centerX, language)
+        return PositionText.withHour(base, null, language)
     }
 }

@@ -33,8 +33,8 @@ class VehicleStateTextTest {
     /**
      * Ordre user du 01/11/2026 : « ne me dis plus l'emplacement de la voiture
      * si tu vois une voiture qui bouge ». Un mobile ne se situe jamais — ni
-     * distance, ni heure ; les immobiles (arrêt, stationnement), eux, gardent
-     * leur emplacement, qui ne bouge pas.
+     * distance, ni heure ; les immobiles (arrêt, stationnement) gardent leur
+     * distance mesurée, base seule sinon (ordre user 03/11 : sans heure).
      */
     @Test
     fun `mouvement jamais situe - arret et stationnement si`() {
@@ -46,13 +46,13 @@ class VehicleStateTextTest {
         assertEquals("Voitures.", VehicleStateText.movingPluralPhrase(2, SpeechLanguage.Fr))
         assertEquals("Cars.", VehicleStateText.movingPluralPhrase(2, SpeechLanguage.En))
 
-        // Immobiles : emplacement conservé (distance mesurée, heure sinon).
+        // Immobiles : distance mesurée, base seule sinon (sans heure).
         assertEquals(
             "Voiture à l'arrêt, à 2 mètres.",
             VehicleStateText.stoppedPhrase(car, 2f, null, SpeechLanguage.Fr),
         )
         assertEquals(
-            "Car stopped, at 12 o'clock.",
+            "Car stopped.",
             VehicleStateText.stoppedPhrase(car, null, 0.5f, SpeechLanguage.En),
         )
         assertEquals(

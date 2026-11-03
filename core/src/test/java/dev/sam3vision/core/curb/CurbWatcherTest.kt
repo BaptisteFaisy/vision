@@ -260,7 +260,7 @@ class CurbWatcherTest {
         val near = CurbSignal(detected = true, meters = 0.3f, centerX = 0.5f, edge = CurbEdge.Uncertain)
         assertNull(watcher.onSignal(near, 1000L, SpeechLanguage.Fr))
         val detected = watcher.onSignal(near, 2000L, SpeechLanguage.Fr)
-        assertEquals("Attention bordure, à midi.", detected!!.phrase)
+        assertEquals("Attention bordure.", detected!!.phrase)
         assertNull(watcher.onSignal(near, 3000L, SpeechLanguage.Fr))
         val cue = watcher.onSignal(near, 4000L, SpeechLanguage.Fr)
 

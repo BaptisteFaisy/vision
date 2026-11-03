@@ -40,19 +40,19 @@ class CurbAnnounceTest {
     }
 
     @Test
-    fun `detection avec heure FR et EN`() {
+    fun `detection sans heure FR et EN`() {
         val watcher = CurbWatcher()
         val seen = sig(2.5f, centerX = 0.5f)
         watcher.onSignal(seen, 1_000L, SpeechLanguage.Fr)
         val cue = watcher.onSignal(seen, 2_000L, SpeechLanguage.Fr)
 
-        assertEquals("Bordure détectée, à midi.", cue!!.phrase)
+        assertEquals("Bordure détectée.", cue!!.phrase)
 
         val english = CurbWatcher()
         english.onSignal(seen, 1_000L, SpeechLanguage.En)
         val cueEn = english.onSignal(seen, 2_000L, SpeechLanguage.En)
 
-        assertEquals("Curb detected, at 12 o'clock.", cueEn!!.phrase)
+        assertEquals("Curb detected.", cueEn!!.phrase)
     }
 
     @Test
