@@ -16,10 +16,10 @@ import org.junit.Assert.assertTrue
 import org.junit.Test
 
 /**
- * Rotation 3 groupes côté sonde : un groupe (~7 concepts, `person` partout)
- * par frame, réponses accumulées — voix et overlay lisent la fusion dans
- * l'état, jamais le groupe seul. Repli `ROTATION_OFF` : liste complète, sans
- * accumulation.
+ * Rotation 3 groupes côté sonde (opt-in explicite du harnais) : un groupe
+ * (~7 concepts, `person` partout) par frame, réponses accumulées — voix et
+ * overlay lisent la fusion dans l'état, jamais le groupe seul. Par défaut,
+ * repli `ROTATION_OFF` : liste complète à chaque frame, sans accumulation.
  */
 class LiveProbeRotationTest {
 
@@ -76,9 +76,9 @@ class LiveProbeRotationTest {
     }
 
     @Test
-    fun `repli ROTATION_OFF  - liste complete a chaque frame, sans accumulation`() = runTest {
-        val (probe, fake) = harness(this)
-        probe.rotation.enabled = false
+    fun `ROTATION_OFF par defaut  - liste complete a chaque frame, sans accumulation`() = runTest {
+        // Pas d'opt-in : c'est le défaut du harnais qui est prouvé ici.
+        val (probe, fake) = harness(this, enableRotation = null)
         send(probe, fake, "A", 8_000_000L, frame("person", "car"))
         send(probe, fake, "B", 14_000_000L, frame("person"))
         assertEquals(listOf(LivePrompts.default, LivePrompts.default), fake.sentPrompts)
@@ -107,7 +107,7 @@ class LiveProbeRotationTest {
     }
 
     /** Sonde branchée sur le faux client, réveil négatif, scheduler coupé. */
-    private fun harness(scope: TestScope): Pair<LiveProbe, ProbeTestClient> {
+    private fun harness(scope: TestScope, enableRotation: Boolean? = true): Pair<LiveProbe, ProbeTestClient> {
         val fake = ProbeTestClient(mutableListOf())
         fake.healthGate = CompletableDeferred(
             Result.success(LiveHealth(ok = false, model = "sam3.1", device = "cuda", gpu = "A100")),
@@ -120,6 +120,9 @@ class LiveProbeRotationTest {
         )
         probe.configure(PROBE_TEST_ENDPOINT)
         probe.begin()
+        // Opt-in explicite : la rotation n'est plus le défaut (`ROTATION_OFF`) ;
+        // `null` = drapeau intact, pour prouver le défaut.
+        if (enableRotation != null) probe.rotation.enabled = enableRotation
         probe.adaptive.configure(uploadEnabled = false, keyframesEnabled = false)
         return probe to fake
     }

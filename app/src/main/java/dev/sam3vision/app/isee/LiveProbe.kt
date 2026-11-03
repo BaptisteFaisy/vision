@@ -74,7 +74,9 @@ class LiveProbe(
 ) {
 
     private val openClient = clientFor ?: { base: String, timeout: Long, marks: WireMarks? ->
-        LiveMaskTransport.clientFor(base, timeout, marks, withDepth = true)
+        // `masks = false` : boîtes et scores seuls, aucun masque affiché — la
+        // reconnaissance (labels, voix, guidage, distances) ne lit ni pixels ni masques.
+        LiveMaskTransport.clientFor(base, timeout, marks, withDepth = true, masks = false)
     }
     /** Profondeur de la sonde (serveur en production) : affine les lectures SAM. */
     internal val meters = ProbeMeters(depthMeter)
