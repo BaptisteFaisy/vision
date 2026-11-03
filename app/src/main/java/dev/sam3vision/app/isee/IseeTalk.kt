@@ -8,6 +8,7 @@ import dev.sam3vision.app.isee.vm.IseePhotoShot
 import dev.sam3vision.app.isee.vm.IseeStreamDictation
 import dev.sam3vision.app.isee.vm.IseeWorldTapToggle
 import dev.sam3vision.core.glasses.CaptureAction
+import dev.sam3vision.core.glasses.takesPhoto
 import dev.sam3vision.core.picto.PictoPlaceMode
 import dev.sam3vision.core.settings.Settings
 import java.io.File
