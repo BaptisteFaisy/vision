@@ -288,7 +288,7 @@ fun connectLabel(state: GlassesUiState): String = when {
 }
 
 /**
- * Balayage vers la droite sur iSee : finit de connecter les lunettes (ouvre la session)
+ * Balayage vers la gauche sur iSee : finit de connecter les lunettes (ouvre la session)
  * quand le bouton le pourrait (`canConnect`) **et** que le Bluetooth est déjà monté
  * ([linked] : une paire `CONNECTED` au SDK). Session active ou en démarrage, ou lien
  * pas encore monté : rien, le geste ne coupe jamais un direct et n'attend jamais le

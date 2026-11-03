@@ -3,6 +3,25 @@
 Le journal part du 2026-10-26 après 19 h : le commit de départ, puis une entrée par fait
 livré et ses preuves (tâche, fichiers, chiffres) dans l'arbre.
 
+## 2026-11-03 — iSee : swipe droit crée un picto, swipe gauche connecte les lunettes (branche `feat/swipe-right-picto`)
+
+- **Demande** : swipe vers la droite → mode picto, lunettes sur swipe gauche
+  (ordre user du 03/11/2026). Avant : la droite connectait les lunettes si
+  joignables sinon « Quoi chercher ? », la gauche était muette.
+- **Fait** :
+  - `core/gesture/IseeGestureBrain.kt` : `onSwipeLeft()` émis (gauche =
+    lunettes), droite = création picto ; `IseeRootLayout` relaie les 4 gestes.
+  - `IseeGestures.onSwipeRight` → `picto.onPictoButton()` (même création que le
+    bouton, muette dehors) ; tenue injectée en lambdas, routage testé en JVM.
+  - `MainActivity.swipeLeft` : connexion lunettes si `shouldSwipeConnect`,
+    sinon rien ; « Quoi chercher ? » (`IseeSwipeOrders.askToFind`) devient un
+    flow autonome couvert par tests, sans balayage attitré.
+  - Docs : `docs/ARCHITECTURE.md` (table des gestes), docstrings des gestes.
+- **Preuves** : `IseeGestureBrainTest` 12/12, `IseeGesturesTest` 4/4 (nouveau),
+  `IseeSwipeOrdersTest` 19/19, `GlassesPolicyTest` 20/20 ; suites complètes
+  `:core` 3569/3569 et `:app` 2314/2314, `assembleDebug` OK,
+  `check-kotlin-limits.py` OK (`IseeViewModel.kt` toujours à 499 lignes).
+
 ## 2026-11-03 — iSee : « curb up » en face uniquement, jamais à côté (branche `curb-face-uniquement`)
 
 - **Demande** : la montée de bordure se disait dès 11 h / 1 h (couloir marché),

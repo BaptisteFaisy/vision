@@ -15,10 +15,10 @@ import org.junit.Assert.assertTrue
 import org.junit.Test
 
 /**
- * Les deux balayages de la surface iSee : vers le bas, l'ordre GPS existant
- * « active le GPS » (+ maintien : l'endroit dicté part en destination) ; vers
- * la droite, une question parlée puis le micro — la chasse part avec l'objet
- * entendu, jamais avec un silence.
+ * Le balayage vers le bas de la surface iSee : l'ordre GPS existant
+ * « active le GPS » (+ maintien : l'endroit dicté part en destination) ; et
+ * le flow autonome « Quoi chercher ? » : une question parlée puis le micro —
+ * la chasse part avec l'objet entendu, jamais avec un silence.
  */
 class IseeSwipeOrdersTest {
 
@@ -97,7 +97,7 @@ class IseeSwipeOrdersTest {
     }
 
     @Test
-    fun `dehors, le balayage vers la droite refuse sans ouvrir le micro`() = runTest {
+    fun `dehors, « Quoi chercher ? » refuse sans ouvrir le micro`() = runTest {
         val listening = FakeListening(text = "mes clés")
         val orders = swipe(listening, placeMode = PictoPlaceMode.DEHORS)
 
