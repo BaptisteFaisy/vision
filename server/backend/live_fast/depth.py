@@ -81,12 +81,16 @@ def depth_map_for(model, processor, image, device):
 
 
 def normalize_disparity(values) -> np.ndarray:
-    """Min-max vers 0..1 (ordre préservé : grand = proche) ; carte plate → neutre."""
+    """Min-max vers 0..1 (ordre préservé : grand = proche) ; carte plate → neutre.
+
+    Une seule passe min (le min est réutilisé tel quel, float32 : bit-identique).
+    """
     array = np.asarray(values, dtype=np.float32)
-    span = float(array.max() - array.min())
+    lowest = array.min()
+    span = float(array.max() - lowest)
     if not np.isfinite(span) or span <= 0:
         return np.full(array.shape, NEUTRAL_DEPTH, dtype=np.float32)
-    return ((array - array.min()) / span).astype(np.float32)
+    return ((array - lowest) / span).astype(np.float32)
 
 
 def eroded_box(box):

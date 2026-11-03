@@ -18,7 +18,6 @@ from fast_core import (BATCH_PROMPTS, DEPTH_EVERY, DTYPE_NAME, EDGE, RUNTIME_EDG
                        segment_frame, vision_grid)
 from gpu_guard import Slots, wedged
 from http_errors import validation_detail as _validation_detail
-from live_app_utils import accepts_param, call
 from passage import suggest_passage
 from pipe_compat import accepts_param, call
 from timing import (Stage, build_breakdown, container_age_seconds, elapsed_ms,
