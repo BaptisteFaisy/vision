@@ -153,6 +153,18 @@ def is_curb_label(label: object) -> bool:
     return CURB_ROUTED.get(norm, norm) in CURB_CONCEPTS
 
 
+# Concepts de plan piéton (miroir de ``CurbConcepts.GROUND`` côté client) :
+# le trottoir partage la réserve du bucket bordure, faute de bordure.
+SIDEWALK_CONCEPTS = frozenset({"sidewalk", "pavement", "footpath"})
+
+
+def is_ground_label(label: object) -> bool:
+    """Vrai si [label] désigne le plan piéton (trottoir EN/FR, tolérant)."""
+    if not isinstance(label, str) or not label.strip():
+        return False
+    return model_concept(label) in SIDEWALK_CONCEPTS
+
+
 def is_crosswalk_label(label: object) -> bool:
     """Vrai si [label] désigne un passage piéton (FR/EN, casse/accents tolérés).
 
@@ -223,8 +235,14 @@ def coherent_work_edge(work: int, image_size) -> int:
 
 
 def _split_guarded(entries):
-    """Entrées partagées en (autres, feux, passages, bordures, escaliers, murs)."""
+    """Entrées partagées en (autres, feux, passages, bordures, escaliers, murs).
+
+    Le bucket bordure couvre aussi le plan piéton, bordure d'abord : sans
+    bordure, le meilleur trottoir prend la réserve (+0 slot) ; avec une
+    bordure, le trottoir concourt normalement dans le pool.
+    """
     others, feu, walk, curb, stairs, walls = [], [], [], [], [], []
+    ground = []
     for entry in entries:
         label = entry.get("label")
         if is_feu_label(label):
@@ -237,8 +255,14 @@ def _split_guarded(entries):
             stairs.append(entry)
         elif is_wall_label(label):
             walls.append(entry)
+        elif is_ground_label(label):
+            ground.append(entry)
         else:
             others.append(entry)
+    if curb:
+        others.extend(ground)
+    else:
+        curb = ground
     return others, feu, walk, curb, stairs, walls
 
 
@@ -252,7 +276,7 @@ def finalize_guarded(finalize, entries: list[dict], image_size, max_objects: int
                      mask_encoding: str, mask_format=None, mask_edge: int = 0) -> dict:
     """``finalize`` + une place réservée par famille gardée qui serait évincée.
 
-    Une famille (feux, passages, bordures, escaliers, murs) absente des
+    Une famille (feux, passages, bordures/trottoir, escaliers, murs) absente des
     détections, déjà dans le top, ou ``max_objects`` trop petit pour réserver
     sans tout évincer (≤ une place par famille manquante) : ``finalize`` pur,
     réponse strictement identique. Sinon un appel par famille manquante
