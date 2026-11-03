@@ -10,8 +10,8 @@
 
 | App Modal | Dossier | Routes | Déploiement |
 |---|---|---|---|
-| `sam3-eu-a100` (A100-40GB, `eu-west`) | `backend/live_fast/` | `GET /health`, `POST /segment`, `POST /live`, `WS /live/ws`, `POST /release` | **CI** (`deploy-live-fast.yml`, à chaque push qui touche le dossier) ou `scripts/deploy-live-fast.sh` |
-| `valhalla-idf-cpu` (CPU, tiles Île-de-France) | `backend/valhalla_cpu.py` | `GET /health`, `POST /route`, `GET /signals` | **CI** (`deploy-valhalla-cpu.yml`) |
+| `sam3-eu-a100` (workspace `gaiamelie`, A100-40GB, `eu-west`) | `backend/live_fast/` | `GET /health`, `POST /segment`, `POST /live`, `WS /live/ws`, `POST /release` | **CI** (`deploy-live-fast.yml`, push `[deploy-gpu]` qui touche le dossier) ou `scripts/deploy-live-fast.sh` |
+| `valhalla-idf-cpu` (workspace `gaiamelie`, CPU, tiles Île-de-France) | `backend/valhalla_cpu.py` | `GET /health`, `POST /route`, `GET /signals` | **CI** (`deploy-valhalla-cpu.yml`) |
 | `sam3-vision` (ère photo, A10G) | `backend/modal_app.py` | `GET /health`, `POST /segment`, `POST /analyze`, `POST /ask` | manuel, `scripts/deploy_backend.sh` |
 | tracker | `backend/track_app.py` | `GET /health`, `POST /session`, `POST /frame`, `POST /session/close` | manuel (`modal deploy`) |
 
