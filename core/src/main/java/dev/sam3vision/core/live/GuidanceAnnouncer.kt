@@ -6,7 +6,6 @@ import dev.sam3vision.core.curb.RailState
 import dev.sam3vision.core.curb.SidewalkPosition
 import dev.sam3vision.core.curb.SidewalkRail
 import dev.sam3vision.core.distance.LensSpec
-import dev.sam3vision.core.hazard.HazardConcepts
 import dev.sam3vision.core.model.Passage
 import dev.sam3vision.core.speech.SpeechLanguage
 
@@ -127,7 +126,7 @@ class GuidanceAnnouncer(
      * [samPassage] est le passage conseillé par SAM : bouché et côté du
      * serveur, obstacle chiffré du téléphone ; `null` (backend antérieur) =
      * décision locale. Le serveur ne voit que les personnes : un mur qui
-     * bouche localement reprend la main sur son « libre » ([wallBlocks]).
+     * bouche localement reprend la main sur son « libre » ([resolveDecision]).
      * [holeSide] est le côté du trou de grillage (ouvert,
      * proche, localisé par l'appelant) : sur couloir bouché sans chemin
      * optimal, on part vers lui sauf humain à moins de 1 m — sinon
@@ -164,16 +163,8 @@ class GuidanceAnnouncer(
         val effective = routeCap ?: cap
         val space = free ?: FreeSpace.of(labels, hfovDeg)
         val range = rangeFor(speedMps)
-        val local = Guidance.decide(
-            labels, effective, range, hfovDeg, free = space, speedMps = speedMps,
-            holeSide = holeSide,
-        )
-        val server = samPassage?.let { samDecision(it, labels, effective, hfovDeg, range) }
-        val decision = if (server != null && !server.blocked && wallBlocks(local)) {
-            local
-        } else {
-            server ?: local
-        }
+        val decision = resolveDecision(
+            labels, effective, range, hfovDeg, space, speedMps, holeSide, samPassage)
         lastDecision = decision
         lastSidewalk = sidewalk
         lastNudge = null
@@ -201,15 +192,6 @@ class GuidanceAnnouncer(
         val word = clearedReturnWord(sidewalk, decision.cap, labels, hfovDeg, range)
         return freeWord(atMs, word, language, ageMs)
     }
-
-    /**
-     * Le serveur ne juge que les personnes ([Passage]) : un mur qui bouche
-     * le couloir localement reprend la main sur un « libre » serveur (ordre
-     * user : les murs s'esquivent, ils ne se disent pas — et ils comptent
-     * pour décider gauche/droite).
-     */
-    private fun wallBlocks(decision: GuidanceDecision): Boolean =
-        decision.blocked && decision.obstacle?.label?.let { HazardConcepts.isWall(it) } == true
 
     /**
      * Mot de voie libre, muet sur une frame périmée quand il affirme « Tout
@@ -319,50 +301,6 @@ class GuidanceAnnouncer(
         }
         val word = (cue as RailCue.Direction).word
         return speak(atMs, "rail|dir|" + word.name, word.text(language), RAIL_REPEAT_MS)
-    }
-
-    /**
-     * Décision lue dans le passage SAM : bouché et côté viennent du serveur
-     * (les mêmes boîtes, jugées à pleine résolution), l'obstacle chiffré des
-     * mesures du téléphone. Sans côté (contrat rompu), la gauche — comme
-     * l'égalité côté serveur. Veto local 1 m : si le côté serveur ne
-     * garantit pas 1 m à une personne et que l'autre côté les garantit,
-     * on bascule (la sécurité locale prime sur le juge lointain).
-     */
-    private fun samDecision(
-        passage: Passage,
-        labels: List<PlacedLabel>,
-        cap: SteeringCap,
-        hfovDeg: Float,
-        range: Float,
-    ): GuidanceDecision {
-        if (!passage.blocked) return GuidanceDecision(blocked = false, cap = cap)
-        val side = if (passage.side == "right") GuidanceSide.Right else GuidanceSide.Left
-        val other = if (side == GuidanceSide.Right) GuidanceSide.Left else GuidanceSide.Right
-        val use = if (!PeoplePath.clearsSide(labels, side, range, hfovDeg) &&
-            PeoplePath.clearsSide(labels, other, range, hfovDeg)
-        ) {
-            other
-        } else {
-            side
-        }
-        val exit = if (use == GuidanceSide.Right) SteeringCap.Right else SteeringCap.Left
-        val obstacle = labels
-            .mapNotNull { label -> label.meters?.takeIf { it.isFinite() }?.let { label to it } }
-            .minByOrNull { it.second }?.first
-        val half = if (cap == SteeringCap.Straight) {
-            Guidance.STRAIGHT_HALF_CORRIDOR
-        } else {
-            Guidance.LATERAL_HALF_CORRIDOR
-        }
-        return GuidanceDecision(
-            blocked = true,
-            obstacle = obstacle,
-            side = if (cap == SteeringCap.Straight) use else null,
-            cap = cap,
-            passage = exit,
-            shiftMeters = Guidance.shiftOf(obstacle?.meters, half, hfovDeg),
-        )
     }
 
     /**
