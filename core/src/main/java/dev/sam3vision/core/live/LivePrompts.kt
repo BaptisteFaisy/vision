@@ -26,7 +26,9 @@ object LivePrompts {
 
     /**
      * Concepts dehors : les **21** (spec v4 + restauration 03/11), dans l'ordre.
-     * Liste unique normal/Traversée : la bascule ne change plus les prompts.
+     * Base unique normal/traversée : la sonde iSee rejoue les mêmes prompts ;
+     * le direct écarte poubelle, souvenirs, lampadaire en traversée armée
+     * (`TRAVERSE_DROPPED`, 21 envoyés).
      */
     val default: List<String> = listOf(
         "person", "car", "pedestrian traffic light", "curb", "sidewalk", "crosswalk",
