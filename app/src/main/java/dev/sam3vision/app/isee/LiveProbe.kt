@@ -443,12 +443,14 @@ _state.update { it.cleared() }
 
     private suspend fun runFrame(active: LiveSession, jpegB64: String, at: Long, prompts: List<String>, rotated: Boolean) {
         val result = active.runFrameWith(jpegB64, prompts)
+        // Réponse complète : le poste « reçu » et l'aller-retour sont posés à l'arrivée,
+        // hors file de publication — sinon le `rtt` paie les masques de la frame d'avant.
+        val roundTripMs = System.currentTimeMillis() - at
+        if (result != null) chronology.markReceived()
         // Réseau parallèle, publication sérialisée (instances partagées).
         publishMutex.withLock {
             if (result == null) { adaptive.onDropped(); return@withLock drain() }
-            adaptive.onSettled(System.currentTimeMillis() - at, result, jpegB64.length)
-            // Réponse complète (corps lu et JSON tourné) : le poste « reçu » est posé ici.
-            chronology.markReceived()
+            adaptive.onSettled(roundTripMs, result, jpegB64.length)
             // Frame détachée : elle garde ses marques de rendu quand la suivante démarre.
             val shown = chronology.publishing()
             if (result.isSuccess) if (!warmed) goWarm() else noteAnswer()
