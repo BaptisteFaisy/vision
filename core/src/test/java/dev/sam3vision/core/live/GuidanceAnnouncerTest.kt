@@ -165,8 +165,11 @@ class GuidanceAnnouncerTest {
         assertEquals("Left.", announcer.onFrame(0L, listOf(poteauDroite(3.0f))))
         // même mot : redite 2 s, la frame reste au statique (pas de « Straight. »)
         assertNull(announcer.onFrame(250L, listOf(poteauDroite(2.6f))))
-        // le décalage TTC prend le relais quand il parle
-        assertEquals("Left.", announcer.onFrame(500L, listOf(poteauDroite(2.2f))))
+        // à 500 ms le décalage voudrait reparler, mais « Left. » a moins de
+        // 2 s (clé de direction commune au statique et au décalage) : silence
+        assertNull(announcer.onFrame(500L, listOf(poteauDroite(2.2f))))
+        // redite après 2 s
+        assertEquals("Left.", announcer.onFrame(2_100L, listOf(poteauDroite(1.8f))))
     }
 
     @Test

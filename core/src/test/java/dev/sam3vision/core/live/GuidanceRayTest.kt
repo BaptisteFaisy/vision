@@ -101,8 +101,10 @@ class GuidanceRayTest {
     @Test
     fun `la voix suit le trait`() {
         val announcer = GuidanceAnnouncer()
-        // Objet étroit à côté du trait : voie libre, la voix confirme.
-        assertEquals("Straight.", announcer.onFrame(0L, listOf(boxed("poteau", 0.34f, 0.39f, 3f))))
+        // Objet étroit à côté du trait : le couloir est libre, mais le
+        // poteau à 3 m parle en évitement précoce (ordre user : poteau ou
+        // barrière à 4 m ou moins = consigne immédiate, sans attendre le TTC).
+        assertEquals("Right.", announcer.onFrame(0L, listOf(boxed("poteau", 0.34f, 0.39f, 3f))))
         // Large à cheval : bouché, sortie à gauche (voix TwinLite).
         assertEquals("left.", announcer.onFrame(100L, listOf(boxed("camion", 0.55f, 0.95f, 2f))))
     }
