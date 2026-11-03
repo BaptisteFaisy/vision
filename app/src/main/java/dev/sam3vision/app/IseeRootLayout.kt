@@ -134,8 +134,8 @@ class IseeRootLayout(context: Context) : FrameLayout(context) {
                 onSwipeHoldEnd?.invoke()
             }
 
-            override fun onSwipeHoldCancel() {
-                Log.d(TAG, "maintien GPS annulé (glissement repris)")
+            override fun onSwipeHoldAbandoned(reason: SwipeHoldTrigger.CancelReason) {
+                Log.d(TAG, "maintien GPS abandonné ($reason)")
             }
         },
     )
@@ -150,6 +150,7 @@ class IseeRootLayout(context: Context) : FrameLayout(context) {
                 // Le maintien s'arme sur la position de confirmation : tenu
                 // ~300 ms, il ouvre le micro destination ; relâché vite, le
                 // balayage garde son seul effet GPS.
+                Log.d(TAG, "maintien GPS armé")
                 swipeHold.arm(lastX, lastY)
                 onSwipeDown?.invoke()
             }
@@ -261,6 +262,11 @@ class IseeRootLayout(context: Context) : FrameLayout(context) {
     /** Tous les gestes de la surface passent ici avant de descendre aux enfants. */
     private fun feed(ev: MotionEvent) {
         if (!gesturesEnabled()) {
+            // Reset silencieux rendu visible, mais seulement s'il tue
+            // quelque chose — sinon chaque toucher hors iSee spammerait.
+            if (swipeHold.phase != SwipeHoldTrigger.Phase.Idle) {
+                Log.d(TAG, "maintien GPS reset (gestes coupés, phase=${swipeHold.phase})")
+            }
             trigger.reset()
             swipeHold.reset()
             return
@@ -327,7 +333,7 @@ class IseeRootLayout(context: Context) : FrameLayout(context) {
         /** Bande latérale exclue du geste système (retour) : moindre que le plafond 200dp. */
         private const val EXCLUSION_SIDE_DP = 48f
 
-        /** Traces du maintien GPS (ouverture/annulation du micro destination). */
-        private const val TAG = "IseeSwipeHold"
+        /** Traces du maintien GPS (armement, ouverture, abandon du micro destination). */
+        private const val TAG = SwipeHoldTrigger.LOG_TAG
     }
 }
