@@ -114,6 +114,38 @@ def test_boot_sans_depth(_module) -> None:
           str(sorted(instance.ctx)))
 
 
+def test_health_not_ready(_module) -> None:
+    """``/health`` avant ``load_container`` : 503 + ``ok:false``, jamais un crash 500.
+
+    Un conteneur en boot n'est pas une panne (contrat du docstring de
+    ``health()``) : la sonde répond « pas prêt, réessaie » au lieu de lever
+    ``AttributeError`` sur ``ctx`` absent (500 FastAPI que le client affichait brut).
+    """
+    import asyncio
+    import sys
+
+    from test_units import asgi_call, check
+    from tests_units.weights_tests import LIVE_FAST_DIR, _fresh_live_fast
+
+    service = _fresh_live_fast("service")
+    bare = service.Sam3LiveService()  # init_state seul : ni ctx, ni modèle
+    # api() importe ses voisins (schemas…) au moment de l'appel : chemin déployé
+    # le temps de la requête (même montage que depth_tests._throttle_service).
+    sys.path.insert(0, str(LIVE_FAST_DIR))
+    try:
+        status, payload = asyncio.run(asgi_call(bare.api(), "GET", "/health", b""))
+    except Exception as exc:  # noqa: BLE001 — le rouge pré-fix est un crash
+        check("boot : /health non chargé ne lève pas", False, repr(exc)[:120])
+        return
+    finally:
+        sys.path.remove(str(LIVE_FAST_DIR))
+    check("boot : /health non chargé → 503", status == 503, str(status))
+    check("boot : /health non chargé → ok faux", payload.get("ok") is False,
+          str(payload)[:120])
+    check("boot : /health non chargé → modèle nommé",
+          payload.get("model") == service.MODEL_LABEL, str(payload)[:120])
+
+
 def test_modal_sans_constructeur(_module) -> None:
     """Modal refuse tout ``__init__`` custom, hérité compris (d810277d a cassé
     tous les deploys : ``_validate_construction_mechanism``) : ``Sam3Live``

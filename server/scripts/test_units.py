@@ -419,6 +419,7 @@ RUNNERS = (
     ("live_fast : Modal sans constructeur", "timing", boot_tests.test_modal_sans_constructeur),
     ("live_fast : forme boot /health", "timing", boot_tests.test_health_boot_shape),
     ("live_fast : DA2 absent au boot (paresseux)", "timing", boot_tests.test_boot_sans_depth),
+    ("live_fast : /health non chargé → 503", "timing", boot_tests.test_health_not_ready),
     ("graphe : pas de faute CUDGraph", "timing", weights_tests.test_no_cudagraph_typo),
     ("concepts : table déployée synchronisée", "timing", weights_tests.test_concepts_sync),
     ("concepts : bordures et bateaux (rue)", "concepts", concepts_street_tests.test_concepts_street),
