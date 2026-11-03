@@ -112,6 +112,44 @@ class ScreenTimingsTest {
         assertEquals(-1L, screen.snapshot().seq)
     }
 
+    @Test
+    fun `deuxieme noteDrawn sans nouveaux masques ne rejaillit pas`() {
+        publishFrame()
+        at(1200)
+        assertTrue(screen.noteDrawn())
+        at(1260)
+        assertFalse("un seul tampon PIXEL par génération de masques", screen.noteDrawn())
+    }
+
+    @Test
+    fun `nouveaux masques rearment le tampon pixel`() {
+        publishFrame()
+        at(1200)
+        assertTrue(screen.noteDrawn())
+        at(1300); screen.beginFrame(1300 * MS); screen.markReceived()
+        at(1360); screen.markOverlays()
+        at(1390)
+        assertTrue("nouvelle génération = nouveau tampon", screen.noteDrawn())
+        assertEquals(60L, screen.snapshot().receivedToOverlaysMs)
+    }
+
+    @Test
+    fun `double vol deux publications deux tampons jamais trois`() {
+        // Deux requêtes en vol partagent les marques de la dernière : chaque
+        // publication re-tamponne OVERLAYS, donc chacune a son PIXEL — mais
+        // un troisième appel sans publication ne journalise rien.
+        at(1000); screen.beginFrame(1000 * MS, seq = 1L)
+        at(1050); screen.beginFrame(1050 * MS, seq = 2L)
+        screen.markReceived()
+        val shownA = screen.publishing()
+        at(1100); screen.markOverlays(shownA)
+        at(1130); assertTrue(screen.noteDrawn())
+        val shownB = screen.publishing()
+        at(1200); screen.markOverlays(shownB)
+        at(1230); assertTrue("la 2e publication re-tamponne", screen.noteDrawn())
+        at(1275); assertFalse("pas de 3e ligne sans publication", screen.noteDrawn())
+    }
+
     private companion object {
         private const val MS = 1_000_000L
         private const val BASE_MS = 1_000L

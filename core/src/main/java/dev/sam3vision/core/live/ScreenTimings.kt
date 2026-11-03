@@ -28,6 +28,14 @@ class ScreenTimings(private val clock: () -> Long = System::nanoTime) : WireMark
     @Volatile
     private var drawn: LiveTimings? = null
 
+    /**
+     * Génération des masques : +1 à chaque [markOverlays] (publication, fil
+     * réseau) — [noteDrawn] (fil UI) ne tamponne PIXEL qu'une fois par
+     * génération. Volatile : écrite d'un côté, lue de l'autre.
+     */
+    @Volatile
+    private var overlaysGen = 0
+
     /** Nouvelle frame : les postes de tête sont posés d'un coup ([encodedAtNs] = 0 = maintenant). [seq] = séquence lunettes (`-1` = téléphone, sans jointure). */
     fun beginFrame(captureAtNs: Long = 0L, encodedAtNs: Long = 0L, seq: Long = -1L) {
         val fresh = LiveTimings(clock)
@@ -69,6 +77,7 @@ class ScreenTimings(private val clock: () -> Long = System::nanoTime) : WireMark
     /** Masques de la frame publiée ([publishing]) : rien à voir avec la frame en vol. */
     fun markOverlays(on: LiveTimings) {
         on.mark(LiveStage.OVERLAYS)
+        overlaysGen++
     }
 
     /** Instantané d'une frame précise (et non de celle qui est en vol). */
@@ -85,7 +94,18 @@ class ScreenTimings(private val clock: () -> Long = System::nanoTime) : WireMark
     fun reset() {
         marks = LiveTimings(clock)
         drawn = null
+        overlaysGen = 0
+        stampedRef = null
+        stampedGen = -1
     }
+
+    /**
+     * Dernier tampon PIXEL : la frame et la génération déjà journalisées
+     * (`null`/`-1` = rien). Lus et écrits par [noteDrawn] seul (fil UI) :
+     * pas de partage, pas de verrou.
+     */
+    private var stampedRef: LiveTimings? = null
+    private var stampedGen = -1
 
     /**
      * Vrai si le poste « pixel » vient d'être posé — l'UI doit publier l'instantané.
@@ -93,10 +113,18 @@ class ScreenTimings(private val clock: () -> Long = System::nanoTime) : WireMark
      * Rien n'est posé tant qu'aucune frame n'a ses masques prêts ([drawn] vide) : sans
      * masque, il n'y a rien eu à dessiner, et une latence « perçue » inventée vaudrait
      * mieux que pas de mesure du tout — elle vaut moins que rien.
+     *
+     * Un seul tampon par génération de masques : deux appels pour une seule
+     * publication (deux guetteurs, deux compositions) ne journalisent qu'une
+     * ligne — le second re-tamponnait PIXEL plus tard et gonflait `pixel`
+     * (recette 03/11 : 183 seq sur 644 loggées 2-3 fois, jusqu'à +185 ms).
      */
     fun noteDrawn(): Boolean {
         val frame = drawn ?: return false
+        if (frame === stampedRef && stampedGen == overlaysGen) return false
         frame.mark(LiveStage.PIXEL)
+        stampedRef = frame
+        stampedGen = overlaysGen
         return true
     }
 
