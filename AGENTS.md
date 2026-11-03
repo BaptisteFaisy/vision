@@ -30,7 +30,7 @@ unique du 26/10.
   `settings.gradle.kts` ni sur le disque).
 - `docs/MASQUES-DEBUG.md` — z-order `AndroidView`/Compose et recette des masques.
 - `docs/LIVE-SPEC.md` — contrat du direct (cité par `core/net/HttpLiveClient.kt:42`).
-- `docs/VOIX-DANGER.md` — voix spec v4 : échelle dehors 0-12, traversée 100-102, chaîne dedans, écrasement, antirépétition, clips anglais, 11 ordres dictée, listes 21/10.
+- `docs/VOIX-DANGER.md` — voix spec v4 : échelle dehors 0-12, traversée 100-102, chaîne dedans, écrasement, antirépétition, clips anglais, 11 ordres dictée, listes 21 dehors + 10 dedans.
 - `docs/TRAVERSEE.md` — verdict v4 (« Cross. » / « Don't cross. », voiture uniquement), ordre 100-102, exclusivité.
 - `docs/GUIDAGE-TOUT-DROIT.md` — guidage v4 : GPS (11 + rappel 3), rail trottoir (10), repli (12).
 - `docs/RECETTE-RUE.md` — recette rue v4 (une prise, phrases exactes, checklist).
