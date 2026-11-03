@@ -28,6 +28,7 @@ import dev.sam3vision.core.model.toDetections
 import dev.sam3vision.core.picto.PictoPlaceMode
 import dev.sam3vision.core.settings.Settings
 import dev.sam3vision.core.speech.SpeechLanguage
+import dev.sam3vision.core.traverse.FrameMotion
 import dev.sam3vision.core.traverse.TraversePhase
 import dev.sam3vision.core.traverse.TraverseVeto
 import dev.sam3vision.core.traverse.crossingState
@@ -180,12 +181,13 @@ internal fun crossingPatchOf(
     onCrop: CrossingCropTap? = null,
     noLightGate: NoLightGate? = null,
     contradiction: Boolean = false,
+    motion: FrameMotion? = null,
 ): CrossingPatch? {
     if (!active) return null
     val light = crossingLightOf(frame, jpegB64, onCrop)
     val detections = frame.objects.toDetections(frame.width, frame.height)
     val focalPx = lens.focalPx(frame.width, frame.height)
-    val decision = veto.update(light.greenForDecision, detections, focalPx, atMs)
+    val decision = veto.update(light.greenForDecision, detections, focalPx, atMs, motion = motion)
     if (noLightGate?.onFrame(light.box) == true) {
         // Sans feu confirmé : le feu se tait (pas de « Rouge, attendez. »
         // pour un feu absent), l'état publié reste rouge (aucun vert lu —
