@@ -13,19 +13,22 @@ import java.util.concurrent.atomic.AtomicLong
  * fusion : mêmes événements qu'en batch complet, post serveur ~39 ms au lieu
  * de ~67 ms (bench A100 batch-7 vs batch-21).
  *
- * Levier de repli `ROTATION_OFF` : [enabled] à `false` — la sonde renvoie la
- * liste complète à chaque frame, sans accumulation. Actif par défaut :
- * l'accumulation est prouvée sûre par les tests (continuité, négatif
- * confirmé, expiry, voix inchangée sur scénario suivi).
+ * Repli `ROTATION_OFF` **par défaut** ([enabled] à `false`) : la sonde
+ * renvoie la liste complète à chaque frame, sans accumulation. La rotation
+ * n'interrogeait escaliers et trottoirs qu'une frame sur trois (même groupe)
+ * et ils n'étaient plus reconnus. Réversible : [enabled] à `true` pour
+ * retrouver un groupe par frame (prouvé par les tests : continuité, négatif
+ * confirmé, expiry).
  */
 internal class ProbeRotationState {
 
     /**
-     * Rotation en service (`false` = repli `ROTATION_OFF` : liste complète par
-     * frame, sans accumulation). Bascule à chaud : la frame en vol garde ses
-     * concepts (capturés à l'envoi), la suivante suit le nouveau régime.
+     * Rotation en service (`true` = un groupe par frame + accumulation ;
+     * `false` = repli `ROTATION_OFF`, liste complète par frame). Bascule à
+     * chaud : la frame en vol garde ses concepts (capturés à l'envoi), la
+     * suivante suit le nouveau régime.
      */
-    var enabled: Boolean = true
+    var enabled: Boolean = false
 
     /** Groupes du cycle, rebâtis à chaque (re)configuration par [usePrompts]. */
     private var groups: List<List<String>> = listOf(LivePrompts.default)

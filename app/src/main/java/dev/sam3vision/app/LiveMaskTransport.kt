@@ -39,9 +39,8 @@ object LiveMaskTransport {
      * est toujours un format que le client sait relire. [withDepth] demande en plus la
      * médiane de proximité par objet (`false` = corps historique, octet pour octet).
      * [masks] à `false` ne demande que boîtes et scores (`mask_encoding: none`) : pour
-     * les usages qui ne dessinent jamais de masque (pastilles, guidage) — aucun des
-     * deux écrans actuels, qui affichent tous deux les masques (`LiveScreen`,
-     * `IseeVisionCard`, `GlassesMaskLayer`), donc opt-in explicite.
+     * les usages qui ne dessinent jamais de masque — la sonde iSee (`LiveProbe`),
+     * dont l'écran n'affiche plus les masques ; le Direct (`LiveScreen`) garde `true`.
      * [binaryWs] force le transport WS (`false` = JSON texte, jambe base64 du A/B
      * `docs/LATENCE-M1-HARNESS.md`) ; par défaut le build décide (`live.ws.text`) et
      * le binaire M1 reste le transport (même défaut que la fabrique).
