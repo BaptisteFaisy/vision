@@ -7,9 +7,9 @@ import com.meta.wearable.dat.camera.addCamera
 import com.meta.wearable.dat.camera.removeCamera
 import com.meta.wearable.dat.camera.types.AudioCodec
 import com.meta.wearable.dat.camera.types.AudioSampleRate
-import com.meta.wearable.dat.camera.types.VideoQuality
 import com.meta.wearable.dat.camera.types.StreamState
 import com.meta.wearable.dat.camera.types.VideoFrame
+import com.meta.wearable.dat.camera.types.VideoQuality
 import com.meta.wearable.dat.core.session.DeviceSession
 import com.meta.wearable.dat.core.types.DeviceSessionError
 import android.os.SystemClock
