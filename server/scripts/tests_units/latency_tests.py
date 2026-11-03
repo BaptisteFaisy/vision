@@ -300,6 +300,58 @@ def test_rle(imaging) -> None:
               base64.b64encode(bytes([2, 2])).decode(), (6, 4)), imaging.MaskFormatError))
 
 
+def _naive_rle_b64(cells) -> str:
+    """Encodeur RLE naïf (cellule par cellule) : oracle du format servi."""
+    runs = []
+    level, count = 0, 0
+    for value in np.asarray(cells).reshape(-1).tolist():
+        bit = 1 if value else 0
+        if bit == level:
+            count += 1
+        else:
+            runs.append(count)
+            level, count = bit, 1
+    runs.append(count)
+    out = bytearray()
+    for length in runs:
+        remaining = length
+        while True:
+            chunk = remaining & 0x7F
+            remaining >>= 7
+            if remaining:
+                out.append(chunk | 0x80)
+            else:
+                out.append(chunk)
+                break
+    return base64.b64encode(bytes(out)).decode("ascii")
+
+
+def test_rle_fast_bytes(imaging) -> None:
+    """RLE réécrit : octets identiques à l'oracle naïf, table + frontières."""
+    from test_units import check
+
+    rng = np.random.default_rng(5)
+    ok = True
+    for shape in ((4, 6), (1, 300), (103, 256), (192, 256)):
+        grid = (shape[1], shape[0])
+        for trial in range(3):
+            mask = (rng.random(shape) < (0.05 if trial else 0.3)).astype(np.uint8)
+            ok = ok and (imaging.encode_mask_rle_b64(mask, grid)
+                         == _naive_rle_b64(mask > 0))
+    check("RLE: octets == oracle naïf (4 géométries × 3 tirages)", ok)
+    bounds_ok = True
+    for total, ones in ((16390, 7), (16390, 6), (40000, 0)):
+        mask = np.zeros((1, total), dtype=np.uint8)
+        if ones:
+            mask[0, total - ones:] = 1
+        bounds_ok = bounds_ok and (imaging.encode_mask_rle_b64(mask, (total, 1))
+                                   == _naive_rle_b64(mask > 0))
+    check("RLE: frontières table (16383/16384) + run géant", bounds_ok)
+    spots = (0, 1, 126, 127, 128, 129, 255, 256, 300, 16382, 16383)
+    check("RLE: table == boucle (frontières LEB128)",
+          all(imaging._VARINT_TABLE[i] == imaging._encode_varint(i) for i in spots))
+
+
 def test_rle_finalize(segmentation) -> None:
     """finalize(mask_format=rle) : grille réduite + mask_scale par objet."""
     from test_units import check

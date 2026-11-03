@@ -334,6 +334,8 @@ RUNNERS = (
     ("imaging", "imaging", test_imaging),
     ("masques", "imaging", test_masks),
     ("masques : codec RLE (miroir Kotlin)", "imaging", latency_tests.test_rle),
+    ("masques : RLE réécrit à octets identiques", "imaging",
+     latency_tests.test_rle_fast_bytes),
     ("masques : finalize RLE + mask_scale", "segmentation", latency_tests.test_rle_finalize),
     ("segmentation (logique)", "segmentation", segmentation_tests.test_segmentation_logic),
     ("llm (logique)", "llm", test_llm_logic),
