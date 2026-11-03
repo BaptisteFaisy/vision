@@ -4,9 +4,12 @@ import dev.sam3vision.core.distance.CameraPose
 import dev.sam3vision.core.distance.DistanceMeter
 import dev.sam3vision.core.live.LiveSession
 import dev.sam3vision.core.model.LiveFrame
+import dev.sam3vision.core.model.LiveHealth
 import dev.sam3vision.core.model.SegObject
+import dev.sam3vision.core.net.LiveClient
 import dev.sam3vision.core.net.WsLiveClient
 import dev.sam3vision.core.net.WsTransport
+import kotlinx.coroutines.runBlocking
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertNull
 import org.junit.Assert.assertTrue
@@ -74,6 +77,39 @@ class ProbeFrameTest {
         assertEquals("WebSocket", transportLabel(open, cellular = false))
         assertEquals("WebSocket (cell)", transportLabel(open, cellular = true))
         open.close()
+    }
+
+    @Test
+    fun `repli HTTP dit HTTP sur la sonde`() = runBlocking {
+        val refusing = object : WsTransport {
+            override fun open(
+                url: String,
+                onText: (String) -> Unit,
+                onClosed: (Throwable?) -> Unit,
+                onOpen: () -> Unit,
+                headers: Map<String, String>,
+            ): Boolean = false
+
+            override fun send(text: String): Boolean = false
+
+            override fun sendBytes(bytes: ByteArray): Boolean = false
+
+            override fun close() = Unit
+        }
+        val http = object : LiveClient {
+            override suspend fun live(jpegB64: String, prompts: List<String>?, workEdge: Int, maxObjects: Int) =
+                Result.success(LiveFrame(512, 1138, 118, emptyList()))
+
+            override suspend fun health(): Result<LiveHealth> =
+                Result.success(LiveHealth(ok = true, model = "sam3.1", device = "cuda", gpu = "A100"))
+        }
+        val session = LiveSession(WsLiveClient("https://exemple.invalid", transport = refusing, http = http), clock = { 0L })
+
+        session.runFrame("QQ==")
+
+        assertTrue(session.httpFallback)
+        assertEquals("HTTP", transportLabel(session, cellular = false))
+        session.close()
     }
 
     /** Client WS optimiste : `preconnect` suffit à ouvrir le socket, sans réseau. */

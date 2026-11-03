@@ -33,12 +33,14 @@ class WsLiveContractTest {
     @Test
     fun `un envoi refuse par le socket donne Network sans attendre le delai`() = runBlocking {
         val transport = ContractWsTransport().apply { sendResult = false }
-        val client = WsLiveClient(base, transport, 1_000, RecordingLiveClient(), binaryWs = false)
+        val http = failingHttpClient()
+        val client = WsLiveClient(base, transport, 1_000, http, binaryWs = false)
 
         val result = client.live("QQ==", null, 640, 4)
 
         NetContract.assertError(result, ApiError.Network::class.java, "envoi refusé")
         assertEquals("le message doit quand même avoir été tenté", 1, transport.sent.size)
+        assertEquals("le repli POST a été tenté avant d'échouer", 1, http.liveCalls)
     }
 
     @Test
@@ -48,30 +50,60 @@ class WsLiveContractTest {
             transport?.disconnect(null)      // close() côté serveur, sans exception
             emptyList()
         }
-        val client = WsLiveClient(base, transport, 1_000, RecordingLiveClient(), binaryWs = false)
+        val http = failingHttpClient(ApiError.Network("POST /live : serveur éteint"))
+        val client = WsLiveClient(base, transport, 1_000, http, binaryWs = false)
 
         val result = client.live("QQ==", null, 640, 4)
 
         NetContract.assertError(result, ApiError.Network::class.java, "socket fermé")
-        val error = NetContract.errorOf(result)
-        assertTrue("le message doit rester actionnable : ${error.message}", error.message!!.contains("closed"))
+        assertEquals(
+            "le repli POST a été tenté, son erreur remonte",
+            "POST /live : serveur éteint",
+            NetContract.errorOf(result).message,
+        )
+        assertEquals(1000, client.linkSnapshot.lastCloseCode)
+        assertEquals(1, http.liveCalls)
     }
 
     @Test
-    fun `un handshake refuse donne le code HTTP et non une erreur generique`() = runBlocking {
+    fun `un handshake refuse replie en POST et garde le code 404`() = runBlocking {
         var transport: ContractWsTransport? = null
         transport = ContractWsTransport { _ ->
             transport?.disconnect(WsHandshakeRefused(404, null))
             emptyList()
         }
-        val client = WsLiveClient(base, transport, 1_000, RecordingLiveClient(), binaryWs = false)
+        val http = failingHttpClient(ApiError.Network("POST /live : serveur éteint"))
+        val client = WsLiveClient(base, transport, 1_000, http, binaryWs = false)
 
         val result = client.live("QQ==", null, 640, 4)
 
         NetContract.assertError(result, ApiError.Network::class.java, "handshake refusé")
         assertEquals(
-            "WebSocket /live/ws : handshake refusé (HTTP 404)",
+            "le repli POST a été tenté, son erreur remonte",
+            "POST /live : serveur éteint",
             NetContract.errorOf(result).message,
+        )
+        assertEquals("le motif survit dans le cliché du lien", 404, client.linkSnapshot.lastCloseCode)
+        assertEquals(1, http.liveCalls)
+    }
+
+    /**
+     * Typage des fermetures WS : le motif reste lisible (dans `linkSnapshot` comme dans
+     * le message), même si la frame elle-même est depuis servie par le repli HTTP.
+     */
+    @Test
+    fun `wsCloseError dit le motif au lieu d un reseau generique`() {
+        assertEquals(
+            "WebSocket /live/ws : handshake refusé (HTTP 404)",
+            wsCloseError(WsHandshakeRefused(404, null)).message,
+        )
+        assertEquals(
+            "WebSocket /live/ws : idle 120 s (1001), la frame suivante rouvre",
+            wsCloseError(WsClosedAbnormally(1001, "idle")).message,
+        )
+        assertEquals(
+            "WebSocket /live/ws : erreur interne serveur (1011)",
+            wsCloseError(WsClosedAbnormally(1011, "internal")).message,
         )
     }
 

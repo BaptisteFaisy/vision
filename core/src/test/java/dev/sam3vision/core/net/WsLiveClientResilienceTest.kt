@@ -70,12 +70,16 @@ class WsLiveClientResilienceTest {
         }
     }
 
+    /**
+     * Client qui ne voit que le WS : HTTP en panne et re-sonde à chaque frame — les
+     * états du lien (backoff, silence, reprises) se prouvent comme avant le repli.
+     */
     private fun client(
         transport: LinkTransport,
         net: NetworkState = NetworkState.Always,
         link: WsLink = WsLink(),
         timeoutMs: Long = 1_000L,
-    ) = WsLiveClient(base, transport, timeoutMs, RecordingLiveClient(), binaryWs = false, keepAlive = null, net = net, link = link)
+    ) = WsLiveClient(base, transport, timeoutMs, failingHttpClient(), binaryWs = false, keepAlive = null, net = net, link = link, httpFallback = WsHttpFallback(probeEvery = 1))
 
     @Test
     fun `hors ligne connu n ouvre aucun socket`() = runBlocking {

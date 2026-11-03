@@ -3,6 +3,11 @@ package dev.sam3vision.app
 import dev.sam3vision.core.speech.SpeechLanguage
 import dev.sam3vision.core.live.Cadence
 import dev.sam3vision.core.live.LiveSession
+import dev.sam3vision.core.model.LiveFrame
+import dev.sam3vision.core.model.LiveHealth
+import dev.sam3vision.core.net.ApiError
+import dev.sam3vision.core.net.LiveClient
+import dev.sam3vision.core.net.WsLiveClient
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
 import org.junit.Assert.assertTrue
@@ -152,6 +157,27 @@ class LiveStateTest {
         assertEquals("Tracker", transportLabel(trackerEnabled = true, wsConnected = false))
         assertEquals("WebSocket", transportLabel(trackerEnabled = false, wsConnected = true))
         assertEquals("WebSocket down", transportLabel(trackerEnabled = false, wsConnected = false))
+    }
+
+    @Test
+    fun `libelle de transport dit HTTP quand le repli colle`() {
+        assertEquals("HTTP", transportLabel(trackerEnabled = false, wsConnected = false, httpFallback = true))
+        assertEquals("HTTP", transportLabel(trackerEnabled = false, wsConnected = true, cellular = true, httpFallback = true))
+        assertEquals("Tracker", transportLabel(trackerEnabled = true, wsConnected = false, httpFallback = true))
+    }
+
+    @Test
+    fun `libelle client lit le socket sans transport ni client`() {
+        val httpOnly = object : LiveClient {
+            override suspend fun live(jpegB64: String, prompts: List<String>?, workEdge: Int, maxObjects: Int) =
+                Result.failure<LiveFrame>(ApiError.Network("coupé"))
+
+            override suspend fun health(): Result<LiveHealth> = Result.failure(ApiError.Network("coupé"))
+        }
+        assertEquals("WebSocket down", transportLabel(trackerEnabled = false, client = null))
+        assertEquals("WebSocket down", transportLabel(trackerEnabled = false, client = httpOnly))
+        assertEquals("WebSocket down", transportLabel(trackerEnabled = false, client = WsLiveClient("https://exemple.invalid")))
+        assertEquals("Tracker", transportLabel(trackerEnabled = true, client = httpOnly))
     }
 
     @Test
