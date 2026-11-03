@@ -28,7 +28,11 @@ class ProbeEnsureConceptTest {
         assertEquals(emptyList<String>(), probe.state.value.followed)
         probe.ensureConcept(Settings.Default, "wallet")
         advanceUntilIdle()
-        assertEquals(listOf("wallet"), probe.state.value.followed)
+        // Dehors : l'explicite plus le filtre voitures/bordures (ordre user 03/11).
+        assertEquals(
+            listOf("wallet") + dev.sam3vision.core.live.IseeDistanceFilter.LABELS,
+            probe.state.value.followed,
+        )
     }
 
     @Test

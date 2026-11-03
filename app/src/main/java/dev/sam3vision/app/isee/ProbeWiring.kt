@@ -22,6 +22,7 @@ import dev.sam3vision.core.live.AntiRepeat
 import dev.sam3vision.core.live.FreeSpace
 import dev.sam3vision.core.live.FrameTimings
 import dev.sam3vision.core.live.GuidanceWord
+import dev.sam3vision.core.live.IseeDistanceFilter
 import dev.sam3vision.core.live.LivePrompts
 import dev.sam3vision.core.live.PersonTracker
 import dev.sam3vision.core.live.PlacedLabel
@@ -142,7 +143,7 @@ internal fun LiveProbe.configureFrom(
         language = settings.speechLanguage,
         crossingActive = crossingActive,
         modelsLine = debugModelsLine(settings),
-        followed = LivePrompts.followedOf(effective, settings.outdoorMode),
+        followed = IseeDistanceFilter.followedFor(effective, settings.outdoorMode),
     )
     adaptive.configure(settings.adaptiveUploadEnabled, settings.keyframeSchedulerEnabled)
 }
