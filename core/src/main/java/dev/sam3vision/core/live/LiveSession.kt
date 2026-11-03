@@ -3,10 +3,12 @@ package dev.sam3vision.core.live
 import android.os.SystemClock
 import dev.sam3vision.core.model.LiveFrame
 import dev.sam3vision.core.model.ObjectLimits
+import dev.sam3vision.core.net.ApiError
 import dev.sam3vision.core.net.LIVE_TIMEOUT_SECONDS
 import dev.sam3vision.core.net.LiveClient
 import dev.sam3vision.core.net.WsLiveClient
 import java.util.concurrent.atomic.AtomicInteger
+import java.util.concurrent.atomic.AtomicLong
 
 /**
  * Cadence d'envoi des frames : trois paliers déduits de la latence moyenne.
@@ -110,6 +112,14 @@ class LiveSession(
      * (deux créneaux = deux réponses concurrentes).
      */
     private val belowBudget = AtomicInteger()
+
+    /**
+     * Échéance du backoff « serveur occupé » (LIVE-SPEC §9.3 : un `429` dans la trame
+     * dit « occupé », connexion gardée) : tant que l'horloge n'a pas atteint cette date,
+     * [runGated] jette la frame sans appeler le client — comme un gate saturé, sans
+     * bloquer l'appelant caméra. Atomique : deux créneaux = deux threads réseau.
+     */
+    private val busyUntilMs = AtomicLong(0L)
 
     /**
      * Concepts normalisés **une fois** : [prompts] est figé à la construction, or la
@@ -241,11 +251,16 @@ class LiveSession(
 
     /** Un envoi sous créneau : l'ère, les statistiques et le régulateur de [runFrame]. */
     private suspend fun runGated(send: suspend () -> Result<LiveFrame>): Result<LiveFrame>? {
+        // Serveur occupé (`429`) : on ne martèle pas le verrou GPU, la frame saute.
+        if (clock() < busyUntilMs.get()) return null
         val era = gate.generation
         if (!gate.tryStart(era)) return null
         val startedAt = clock()
         try {
             val result = send()
+            // `429` : le serveur garde la connexion mais demande du temps (§9.3) —
+            // les 250 ms suivantes sautent, sans handshake ni reprise.
+            if (result.exceptionOrNull() is ApiError.RateLimited) busyUntilMs.set(clock() + BUSY_BACKOFF_MS)
             // Échec : le handshake de reprise part en fond (FIX-16), recouvert par l'inter-frame.
             if (result.isFailure) preconnect()
             // Premier succès : le conteneur est chaud, le délai froid retombe au normal.
@@ -305,6 +320,7 @@ class LiveSession(
         stats.reset()
         serverStats.reset()
         belowBudget.set(0)
+        busyUntilMs.set(0L)
         warmup.reset()
     }
 
@@ -334,6 +350,12 @@ class LiveSession(
 
         /** Plafond de la cadence continue : le palier lent du Direct, on n'attend pas plus. */
         const val MAX_MS = 900L
+
+        /**
+         * Backoff « serveur occupé » (LIVE-SPEC §9.3 : `429` dans la trame, connexion
+         * gardée) : 250 ms sans envoi, puis reprise à la cadence normale.
+         */
+        const val BUSY_BACKOFF_MS = 250L
 
         /**
          * Bord de travail déclaré au serveur : 512, la taille exacte envoyée par

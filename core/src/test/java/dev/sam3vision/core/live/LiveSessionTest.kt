@@ -374,4 +374,36 @@ class LiveSessionTest {
         session.runFrame("QQ==")
         assertEquals(LIVE_TIMEOUT_SECONDS * 1_000, client.currentTimeoutMs)
     }
+
+    @Test
+    fun `un 429 fait sauter les frames pendant 250 ms puis repart`() = runBlocking {
+        val client = FakeLiveClient()
+        client.result = Result.failure(ApiError.RateLimited())
+        var now = 10_000L
+        val session = LiveSession(client, clock = { now })
+
+        assertTrue(session.runFrame("QQ==")?.isFailure == true)
+        assertEquals(1, client.calls)
+        assertNull("frame jetée sans appel pendant le backoff", session.runFrame("QQ=="))
+        assertEquals(1, client.calls)
+        now += LiveSession.BUSY_BACKOFF_MS - 1
+        assertNull("249 ms : toujours en backoff", session.runFrame("QQ=="))
+        now += 1
+        client.result = Result.success(LiveFrame(640, 480, 321, emptyList()))
+        assertNotNull("250 ms : la cadence repart", session.runFrame("QQ=="))
+        assertEquals(2, client.calls)
+    }
+
+    @Test
+    fun `reset oublie le backoff 429`() = runBlocking {
+        val client = FakeLiveClient()
+        client.result = Result.failure(ApiError.RateLimited())
+        val session = LiveSession(client, clock = { 10_000L })
+
+        session.runFrame("QQ==")
+        session.reset()
+        session.runFrame("QQ==")
+
+        assertEquals("une séance neuve ne paie pas le 429 passé", 2, client.calls)
+    }
 }
