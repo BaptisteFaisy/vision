@@ -168,7 +168,7 @@ class TraversePipeline(
          * [VehicleConcepts]), puis bordure et trottoir (le bord et le but se
          * suivent en traversée), [base] ensuite, bornés au plafond du direct
          * ([LivePrompts.MAX] : 5 véhicules + 2 + base filtrée dédupliquée —
-         * 21 envoyés, chien et enfant conservés).
+         * 20 envoyés, chien conservé).
          */
         fun promptsFor(base: List<String> = emptyList()): List<String> =
             VehicleConcepts.promptsFor(listOf("curb", "sidewalk") + base)

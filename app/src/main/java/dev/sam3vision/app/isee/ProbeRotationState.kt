@@ -11,7 +11,7 @@ import java.util.concurrent.atomic.AtomicLong
  * 3 groupes ([PromptRotation.split], `person` partout), un groupe par frame,
  * réponses fusionnées dans [accumulator]. Voix, overlay et Traversée lisent la
  * fusion : mêmes événements qu'en batch complet, post serveur ~39 ms au lieu
- * de ~67 ms (bench A100 batch-7 vs batch-21).
+ * de ~67 ms (bench A100 batch-7 vs batch-20).
  *
  * Repli `ROTATION_OFF` **par défaut** ([enabled] à `false`) : la sonde
  * renvoie la liste complète à chaque frame, sans accumulation. La rotation

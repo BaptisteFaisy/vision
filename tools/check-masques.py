@@ -1,8 +1,8 @@
 #!/usr/bin/env python3
-"""Garde des 12 masques de référence (ordre user 03/11).
+"""Garde des 11 masques de référence (ordre user 03/11).
 
 Vérifie, sans compilation ni réseau (stdlib, secondes) :
-  1. les 12 concepts EN sont dans `LivePrompts.default` (prompts dehors) ;
+  1. les 11 concepts EN sont dans `LivePrompts.default` (prompts dehors) ;
   2. `default` tient sous le plafond `LivePrompts.MAX` ;
   3. chaque libellé FR donne son concept EN via `model_concept`, dans les
      DEUX exemplaires serveur (`backend/` et `live_fast/`).
@@ -10,7 +10,7 @@ Vérifie, sans compilation ni réseau (stdlib, secondes) :
 Référence (FR → EN demandé dehors) : escaliers→stairs, voiture→car,
 humain→person (*), poteau→pole, trottoirs→sidewalk,
 feu piéton→pedestrian traffic light, camionnette→van, bus→bus,
-murs→wall, poussette→stroller, chien→dog, enfant→child.
+murs→wall, poussette→stroller, chien→dog.
 (*) « humain » est détecté par le prompt « person » ; la saisie FR
 « humain » (Follow, Find my X) donne « human » côté serveur — les deux
 formes sont exigées, chacune à sa place.
@@ -44,7 +44,6 @@ REFERENCE = (
     ("murs", "wall"),
     ("poussette", "stroller"),
     ("chien", "dog"),
-    ("enfant", "child"),
 )
 
 # Traduction FR→EN attendue côté serveur (saisie FR, Follow, Find my X).
@@ -112,7 +111,7 @@ def check_tree(root: Path) -> list[str]:
 
 
 def main(argv: list[str] | None = None) -> int:
-    parser = argparse.ArgumentParser(description="Garde des 12 masques de référence.")
+    parser = argparse.ArgumentParser(description="Garde des 11 masques de référence.")
     parser.add_argument("--root", default=".", help="racine du dépôt (défaut : .)")
     args = parser.parse_args(argv)
     errors = check_tree(Path(args.root))
@@ -121,7 +120,7 @@ def main(argv: list[str] | None = None) -> int:
         for error in errors:
             print(f"  - {error}")
         return 1
-    print(f"MASQUES-REFERENCE : 12/12 dehors, plafond tenu, alias FR→EN OK")
+    print(f"MASQUES-REFERENCE : 11/11 dehors, plafond tenu, alias FR→EN OK")
     return 0
 
 

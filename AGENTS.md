@@ -30,7 +30,7 @@ unique du 26/10.
   `settings.gradle.kts` ni sur le disque).
 - `docs/MASQUES-DEBUG.md` — z-order `AndroidView`/Compose et recette des masques.
 - `docs/LIVE-SPEC.md` — contrat du direct (cité par `core/net/HttpLiveClient.kt:42`).
-- `docs/VOIX-DANGER.md` — voix spec v4 : échelle dehors 0-12, traversée 100-102, chaîne dedans, écrasement, antirépétition, clips anglais, 11 ordres dictée, listes 21 dehors + 10 dedans.
+- `docs/VOIX-DANGER.md` — voix spec v4 : échelle dehors 0-12, traversée 100-102, chaîne dedans, écrasement, antirépétition, clips anglais, 11 ordres dictée, listes 20 dehors + 10 dedans.
 - `docs/TRAVERSEE.md` — verdict v4 (« Cross. » / « Don't cross. », voiture uniquement), ordre 100-102, exclusivité.
 - `docs/GUIDAGE-TOUT-DROIT.md` — guidage v4 : GPS (11 + rappel 3), rail trottoir (10), repli (12).
 - `docs/RECETTE-RUE.md` — recette rue v4 (une prise, phrases exactes, checklist).
@@ -57,7 +57,7 @@ là, atteignables depuis les Réglages, section « Other screens »
 | `:core` | domaine + réseau + logique pure JVM (`model, net, mask, distance, settings, live, gesture, predict, audio, usecase`), minSdk 26 |
 | `:app` | Compose + CameraX : écrans, ViewModels, `dev.sam3vision.app`, minSdk **29** (`app/build.gradle.kts:87`) |
 | Direct | **WebSocket `/live/ws`**, une frame en vol : `core/net/WsLiveClient.kt` sur `WsTransport` (`OkHttpWsTransport` en prod, faux JVM en test) |
-| Concepts du direct | **21** par défaut (person, car, bus, bicycle, motorcycle, feux piétons ×2, curb, sidewalk, crosswalk, pole, stairs, keys, gate, boutique ×3, wall, foule ×3), `LivePrompts.MAX = 22` (`core/live/LivePrompts.kt:75-81` (+ `MAX`)) ; **spec v4 (mergée le 01/11/2026, voir § 1 bis) + restauration 03/11 : 21 dehors + 10 dedans** |
+| Concepts du direct | **21** par défaut (person, car, bus, bicycle, motorcycle, feux piétons ×2, curb, sidewalk, crosswalk, pole, stairs, keys, gate, boutique ×3, wall, foule ×3), `LivePrompts.MAX = 22` (`core/live/LivePrompts.kt:75-81` (+ `MAX`)) ; **spec v4 (mergée le 01/11/2026, voir § 1 bis) + restauration 03/11 : 20 dehors + 10 dedans (enfant retiré le 03/11, ordre user)** |
 | Tests | **4 809 `@Test`** JVM (`:core` 2 972, `:app` 1 837, relevé du 01/11/2026, voir `docs/TESTING.md`) + 8 instrumentés (`:app` : 7 + 1 banc `MockGlassesTest`) |
 | Taille | **1 215** fichiers `.kt`, **78 831** lignes de prod (`:core` 34 397, `:app` 44 434, mesure du 01/11/2026 par `tools/count-tree.py`) |
 | Versions | JDK Temurin 17.0.21 (par `JAVA_HOME`, hors dépôt) · Gradle 8.14.1 · AGP 8.11.1 · Kotlin 2.2.21 · compileSdk/targetSdk 36 |
@@ -102,10 +102,10 @@ un doc pré-v4, la v4 gagne.
   GPS (ElevenLabs) ; hors-ligne supprimé ; Google Maps supprimé ; vélo,
   camion, moto, clés dehors, borne, arbre, portail, bateau supprimés
   de la détection (bus restauré le 03/11, ordre user).
-- **Listes SAM** : dehors 21 (`person`, `car`, `pedestrian traffic
+- **Listes SAM** : dehors 20 (`person`, `car`, `pedestrian traffic
   light`, `curb`, `sidewalk`, `crosswalk`, `pole`, `stairs`, `fence`,
   `wall`, `barrier`, `sign`, `street lamp`, `animal`, `trash can`,
-  `souvenir shop`, `bus`, `van`, `stroller`, `dog`, `child`) ; dedans 10
+  `souvenir shop`, `bus`, `van`, `stroller`, `dog`) ; dedans 10
   (`keys`, `medicine box`, `glasses`,
   `glasses case`, `phone`, `shoes`, `door`, `wall`, `person`, `socks`).
 
@@ -227,7 +227,7 @@ au premier échec, en nommant le coupable.
   la seule porte est la CI.
 - Une branche non fusionnée n'est pas la vérité du produit : elle se lit dans `master` après
   merge, un point c'est tout. L'état de `master` sur les deux points qui bougeaient le plus :
-  **21 concepts** par défaut, 22 au plus (`core/live/LivePrompts.kt:75-81` (+ `MAX`)) et **deux cadences** — Direct
+  **20 concepts** par défaut, 22 au plus (`core/live/LivePrompts.kt:75-81` (+ `MAX`)) et **deux cadences** — Direct
   350/500/900 ms (`core/live/LiveSession.kt:34-35`), sonde iSee `fastMs = 0`, `concurrency = 2`,
   budget 210 ms (`LiveSession.kt:46-52`).
 - Langue du projet : **français** (code commenté, commits `feat(isee): …`, docs).

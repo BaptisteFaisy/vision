@@ -388,16 +388,16 @@ class TraverseWiringTest {
     }
 
     @Test
-    fun `prompts - poubelle souvenirs lampadaire ecartes, chien enfant gardes`() {
+    fun `prompts - poubelle souvenirs lampadaire ecartes, chien garde enfant sorti`() {
         val prompts = traversePrompts(LivePrompts.default)
 
-        assertEquals(21, prompts.size)
+        assertEquals(20, prompts.size)
         assertEquals(VehicleConcepts.PROMPTS, prompts.take(5))
         assertFalse("trash can" in prompts)
         assertFalse("souvenir shop" in prompts)
         assertFalse("street lamp" in prompts)
         assertTrue("dog" in prompts)
-        assertTrue("child" in prompts)
+        assertFalse("child" in prompts)
     }
 
     @Test

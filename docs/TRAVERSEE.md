@@ -66,10 +66,10 @@ qui **précède** le verdict (plus petit nombre = plus forte priorité, donc
 
 ## 4. Détection en traversée
 
-- Base unique normal/traversée (21 dehors, `docs/VOIX-DANGER.md` § 7),
+- Base unique normal/traversée (20 dehors, `docs/VOIX-DANGER.md` § 7),
   sonde comme direct : la traversée ajoute les véhicules en tête et écarte
-  poubelle, souvenirs, lampadaire (ordre user 03/11) — 21 envoyés,
-  chien/enfant conservés. À la coupure, retour à la liste du monde.
+  poubelle, souvenirs, lampadaire (ordre user 03/11) — 20 envoyés,
+  chien conservé. À la coupure, retour à la liste du monde.
   Le verdict lit le feu
   (`pedestrian traffic light`) et les voitures (`car`) ; les niveaux 101
   et 102 lisent `person` et `curb`.

@@ -88,7 +88,7 @@ class CrossingWiringTest {
     }
 
     @Test
-    fun `bascule traversee applique les 21 filtres puis rend le monde`() = runTest {
+    fun `bascule traversee applique les 20 filtres puis rend le monde`() = runTest {
         val (probe, _) = probeHarness(this)
         val before = probe.state.value.conceptsSent
         probe.setCrossingActive(Settings.Default, true)
@@ -466,12 +466,13 @@ class CrossingWiringTest {
     }
 
     @Test
-    fun `prompts traversee sonde egaux a ceux du direct, 21 filtres`() {
+    fun `prompts traversee sonde egaux a ceux du direct, 20 filtres`() {
         val prompts = crossingPrompts(LivePrompts.default, active = true, wasActive = false, outdoorMode = true)
         assertEquals(traversePrompts(LivePrompts.default), prompts)
-        assertEquals(21, prompts.size)
+        assertEquals(20, prompts.size)
         assertEquals(listOf("car", "bus", "bicycle", "truck", "motorcycle"), prompts.take(5))
-        assertTrue(prompts.contains("dog") && prompts.contains("child"))
+        assertTrue(prompts.contains("dog"))
+        assertFalse(prompts.contains("child"))
     }
 
     @Test

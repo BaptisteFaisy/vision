@@ -43,7 +43,7 @@ class ProbeEnsureConceptTest {
 
     @Test
     fun `defauts exterieur, find the x ajoute sous le plafond`() = runTest {
-        // Le défaut fait 21 concepts — « Find the X » dehors **ajoute**
+        // Le défaut fait 20 concepts — « Find the X » dehors **ajoute**
         // sans évincer (plafond 22), puis reconfigure.
         val (probe, fake) = probeHarness(this)
         val closed = fake.closed
@@ -51,7 +51,7 @@ class ProbeEnsureConceptTest {
         advanceUntilIdle()
         assertTrue(fake.closed > closed)
         val sent = probe.state.value.conceptsSent
-        assertEquals(22, sent.size)
+        assertEquals(21, sent.size)
         assertTrue(sent.contains("wallet"))
         assertTrue(sent.contains("souvenir shop"))
     }
