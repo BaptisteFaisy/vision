@@ -22,6 +22,7 @@ class ValhallaRouteLoaderTest {
 
     private fun loader(
         geocode: suspend (String, RoutePoint?) -> Result<GeocodedPlace> = { _, _ -> Result.success(place) },
+        geocodeAlternate: suspend (String, RoutePoint?) -> Result<GeocodedPlace> = { _, _ -> Result.failure(NoSuchElementException("no alternate")) },
         originNow: suspend () -> RoutePoint? = { origin },
         route: suspend (RoutePoint, RoutePoint) -> Result<RouteTrip> = { _, _ -> Result.success(trip) },
         baseUrl: () -> String = { "https://route.test" },
@@ -29,6 +30,7 @@ class ValhallaRouteLoaderTest {
         onPreview: (NavRoute?) -> Unit = {},
     ) = ValhallaRouteLoader(
         geocode = geocode,
+        geocodeAlternate = geocodeAlternate,
         originNow = originNow,
         routeClient = {
             object : RouteClient {
@@ -218,5 +220,24 @@ class ValhallaRouteLoaderTest {
 
         assertEquals(830L, summary.distanceMeters)
         assertEquals(origin, asked?.first)
+    }
+
+    @Test
+    fun `echec route sur le premier lieu : reprise vers le second geocodage`() = runBlocking {
+        val alt = GeocodedPlace(48.8607, 2.3377, "Gare de Lyon BAN", 0.8f)
+        val asked = mutableListOf<RoutePoint>()
+        val full = loader(
+            geocodeAlternate = { _, _ -> Result.success(alt) },
+            route = { _, to ->
+                asked += to
+                if (to == RoutePoint(place.latitude, place.longitude)) Result.failure(IOException("HTTP error 500")) else Result.success(trip)
+            },
+        )
+
+        val summary = full("la gare").getOrThrow()
+
+        assertEquals("Gare de Lyon BAN", summary.address)
+        assertEquals(2, asked.size)
+        assertEquals(RoutePoint(alt.latitude, alt.longitude), full.lastLoad?.dest)
     }
 }
