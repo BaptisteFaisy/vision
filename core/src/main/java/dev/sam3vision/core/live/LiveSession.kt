@@ -294,13 +294,20 @@ class LiveSession(
     /**
      * Arrêt du direct : la frame en vol est **révoquée** (sa réponse sera jetée, voir
      * [runFrame]) et les mesures de la séance sont oubliées. Le créneau rendu est celui
-     * de l'époque close, il n'est jamais volé à la séance suivante.
+     * de l'époque close, il n'est jamais volé à la séance suivante. Le régulateur repart
+     * lui aussi de zéro : créneaux rouverts ([Cadence.concurrency]) et bascule froid →
+     * chaud ré-armée — sinon une séance réutilisée redémarrerait bridée à un créneau
+     * (huit frames à mi-débit avant réouverture) ou collée à 60 s après un ré-armement
+     * froid (un backend qui pend tient alors le créneau une minute, la réserve ne draine
+     * plus). Le vol reste borné par [Cadence.concurrency] : une frame en vol en Direct.
      */
     override fun reset() {
         gate.invalidate()
+        gate.capacity = cadence.concurrency
         stats.reset()
         serverStats.reset()
         belowBudget.set(0)
+        warmup.reset()
     }
 
     /**
