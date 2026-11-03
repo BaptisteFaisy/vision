@@ -145,9 +145,9 @@ frappe ne fait jamais taire une annonce).
 - **Dedans (10)** : `keys`, `medicine box`, `glasses`, `glasses case`,
   `phone`, `shoes`, `door`, `wall`, `person`, `socks`.
 - `mode find my X` ajoute le concept (le dernier cède son slot au plafond).
-  Base unique normal/traversée : la sonde rejoue les mêmes prompts ; le
-  direct écarte poubelle, souvenirs, lampadaire en traversée armée (21
-  envoyés — voir `docs/TRAVERSEE.md` § 4).
+  Base unique normal/traversée : sonde et direct écartent poubelle,
+  souvenirs, lampadaire en traversée armée (21 envoyés — voir
+  `docs/TRAVERSEE.md` § 4).
 
 ## 8. Contrats partagés (l'intégration suppose ces signatures)
 

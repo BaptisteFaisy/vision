@@ -21,7 +21,6 @@ import dev.sam3vision.core.distance.DistanceReading
 import dev.sam3vision.core.distance.LensSpec
 import dev.sam3vision.core.live.AntiRepeat
 import dev.sam3vision.core.live.GuidanceWord
-import dev.sam3vision.core.live.LivePrompts
 import dev.sam3vision.core.live.PlacedLabel
 import dev.sam3vision.core.model.LiveFrame
 import dev.sam3vision.core.model.SegObject
@@ -39,8 +38,8 @@ import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 
 /**
- * Câblage du **mode Traversée** de la sonde : mêmes masques qu'en mode normal
- * (liste unique [LivePrompts.default]), couleur du feu lue dans la frame,
+ * Câblage du **mode Traversée** de la sonde : les 21 filtrés du mode
+ * ([crossingPrompts], comme le direct), couleur du feu lue dans la frame,
  * annonces et vibrations.
  *
  * Isolé de [LiveProbe] pour que celle-ci reste sous la limite de 500 lignes
@@ -65,14 +64,11 @@ class CrossingChipZone {
 }
 
 /**
- * Active ou coupe le mode Traversée : les prompts **ne changent pas** (liste
- * unique normal/Traversée, ordre user du 30/10 — mêmes masques dans les deux
- * modes), seule la voix bascule (feu + veto trafic au lieu du guidage). Les
- * prompts courants sont rejoués tels quels : monde (dehors/dedans), champ
- * « Suivre » et « mode find my X » survivent à la bascule. Le guidage obstacles
- * n'est plus coupé (§ 25) : ses ordres d'évitement (« Gauche. », « Droite. »,
- * stop) passent devant la voix rouge/vert, « Tout droit. » restant tu tant
- * que le mode est actif. Toute bascule est manuelle (puce, ordre vocal).
+ * Active ou coupe le mode Traversée ([crossingPrompts]) : en traversée, les
+ * 21 filtrés du mode (comme le direct) ; à la coupure, retour à la liste du
+ * monde ; simple reconfiguration : base rejouée. La voix bascule aussi (feu
+ * + veto trafic au lieu du guidage, ordres d'évitement gardés devant). Toute
+ * bascule est manuelle (puce, ordre vocal).
  */
 internal fun LiveProbe.setCrossingActive(
     settings: Settings,
@@ -82,7 +78,8 @@ internal fun LiveProbe.setCrossingActive(
     fromGlasses: Boolean = GlassesVideoLink.live.value,
     glassesLens: LensSpec? = null,
 ) {
-    configureFrom(settings, state.value.conceptsSent.ifEmpty { LivePrompts.default }, active, sensorLens, onLens, glassesLens, fromGlasses)
+    val prompts = crossingPrompts(state.value.conceptsSent, active, state.value.crossingActive, settings.outdoorMode)
+    configureFrom(settings, prompts, active, sensorLens, onLens, glassesLens, fromGlasses)
     // Activation : le verdict repart de zéro (premier verdict parlé aussitôt).
     if (active) verdictEngine.reset()
 }
