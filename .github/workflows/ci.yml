@@ -190,6 +190,16 @@ jobs:
           python3 tools/check-masques.py
           python3 -m unittest tools/test_check_masques.py
 
+      # Le runbook du direct colle au code et à l'exploitation : budgets du §2
+      # (`docs/WS-RUNBOOK.md`) relus dans le Kotlin/Python, invariants d'ordre
+      # (ping < idle, froid < frame…), GPU unique (un conteneur, clamp 0..1,
+      # déploiement épinglé, pas de `min_containers=1`), job `ci-budget` câblé.
+      # Secondes, stdlib, aucun réseau, aucune compilation.
+      - name: Garde du runbook WS (doc ↔ code, GPU unique)
+        run: |
+          python3 tools/check-ws-runbook.py
+          python3 -m unittest tools/test_check_ws_runbook.py
+
       # La garde clés embarquées (`ci-native.yml`, job `apk`) a ses tests ici :
       # quelques secondes, aucune compilation, aucun réseau.
       - name: Tests de la garde clés embarquées
