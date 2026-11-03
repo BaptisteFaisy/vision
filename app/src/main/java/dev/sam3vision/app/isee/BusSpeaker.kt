@@ -67,6 +67,27 @@ internal fun sliceMsForLevel(level: Int): Long? = when (level) {
     else -> VOICE_SLICE_MS
 }
 
+/**
+ * Porte-parole du [VoiceBus] : le câblage applicatif (une seule implémentation,
+ * posée au démarrage — voir le câblage du ViewModel). [idle] vrai = le lecteur
+ * partagé est libre ; [say] parle (en coroutine — le bus ne suspend jamais ;
+ * le bus ne l'appelle qu'au repos, la coupe pré-verrou est un secours) ;
+ * [cut] coupe la lecture en cours et rend son fanion.
+ */
+interface VoiceBusSpeaker {
+    /** Vrai si rien ne parle sur le lecteur partagé (non bloquant). */
+    fun idle(): Boolean
+
+    /**
+     * Parle [text] au niveau [level] : séquence [clips] si non vide, sinon
+     * clip [clipId] d'abord, synthèse réseau sinon (tous niveaux).
+     */
+    fun say(level: Int, text: String, clipId: String?, clips: List<String>)
+
+    /** Coupe la lecture en cours (parole du user, préemption). */
+    fun cut()
+}
+
 internal class SpeechPlayerClipSink(private val player: SpeechPlayer) : ClipSink {
     override suspend fun playFile(file: File): Result<Unit> = player.playFile(file)
     override suspend fun playSlice(file: File, sliceMs: Long): Result<Unit> = player.playSliceFile(file, sliceMs)
