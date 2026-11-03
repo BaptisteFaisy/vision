@@ -52,6 +52,7 @@ class GlassesMessagesTest {
         assertEquals(MessageKind.INFO, GlassesMessages.mockReady().kind)
         assertEquals(MessageKind.INFO, GlassesMessages.framesVoiceRoute().kind)
         assertEquals(MessageKind.INFO, GlassesMessages.sessionRetrying(1, 3).kind)
+        assertEquals(MessageKind.INFO, GlassesMessages.sessionReconnecting(1).kind)
     }
 
     @Test

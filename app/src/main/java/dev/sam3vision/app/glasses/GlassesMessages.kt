@@ -35,6 +35,12 @@ object GlassesMessages {
         "Glasses cut the session instantly, retrying ($attempt/$max)…",
     )
 
+    /** La session établie est tombée : l'app rouvre seule, l'utilisateur patiente. */
+    fun sessionReconnecting(attempt: Int) = GlassesMessage(
+        MessageKind.INFO,
+        "Glasses link lost, reconnecting ($attempt)…",
+    )
+
     /** Refus en boucle : le geste qui répare est sur les lunettes, pas dans l'app. */
     fun sessionRefusedByGlasses() = GlassesMessage(
         MessageKind.ERROR,
