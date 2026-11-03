@@ -54,12 +54,15 @@ internal fun GlassesProbeWiring(probe: LiveProbe, glassesFeed: Boolean, guidance
         if (!glassesFeed) return@LaunchedEffect
         val gate = GuidanceGate()
         try {
-            GlassesVideoLink.frames.collect { box ->
-                if (box == null || !probe.wantsFrame()) return@collect
-                if (!gate.admits(guiding.value, SystemClock.elapsedRealtime())) return@collect
-                // Décodage, redressement, JPEG et envoi : tout en fond, comme le
-                // fil d'analyse du téléphone.
-                withContext(Dispatchers.Default) {
+            // Collecte hors fil UI : le réveil (StateFlow) et les gardes ne doivent
+            // pas attendre un à-coup de composition — chaque ms d'attente vieillit
+            // `arrivedAtNs` et gonfle le poste `capt` ("Slow main thread" > 1 s vu
+            // en recette 13c). Le téléphone fait déjà ses `wantsFrame`/`onFrame`
+            // hors Main (fil analyseur CameraX) : même contrat de fil ici.
+            withContext(Dispatchers.Default) {
+                GlassesVideoLink.frames.collect { box ->
+                    if (box == null || !probe.wantsFrame()) return@collect
+                    if (!gate.admits(guiding.value, SystemClock.elapsedRealtime())) return@collect
                     sendBridgeFrame(probe, sampler, box)
                 }
             }
