@@ -9,7 +9,8 @@ package dev.sam3vision.core.model
  * Réglages ; elle est bornée à [[MIN_ON_SCREEN], [MAX_ON_SCREEN]] avant usage.
  *
  * Chaîne du direct : `Settings.maxObjects` ([DEFAULT_ON_SCREEN] par défaut) est
- * envoyé tel quel en `max_objects`, borné serveur à 1..32 (16 si absent). Dans
+ * envoyé tel quel en `max_objects`, borné serveur à 1..32 (16 si absent).
+ * (La sonde iSee demande toujours [MAX_ON_SCREEN], hors ce réglage.) Dans
  * ce plafond, le serveur réserve [GUARDED_SLOTS] places (feu, passage
  * piéton, bordure, escalier, mur) :
  * un plafond client sous cette réserve ne protège plus rien — le tri pur

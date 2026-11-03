@@ -33,6 +33,20 @@ import dev.sam3vision.core.model.LiveFrame
  * jetée après l'instantané. Sonde à `null` quand le levier est éteint : le chemin de
  * décodage n'y voit qu'un test de nullité — coût nul, aucune lecture d'horloge.
  */
+/**
+ * Masque sauté au décodage : de quoi dire pourquoi (pas de bitmap).
+ * `chars` = longueur base64 (caractères, ≈ octets × 4/3). Un `paint()`
+ * nul (bitmap incréé) n'y figure pas : décodage seul ici.
+ */
+data class SkippedMask(val label: String, val encoding: String, val chars: Int)
+
+/**
+ * Résumé des masques sautés pour le log périodique : `label(encodage,caractères)`.
+ * Pur (JVM) : le peintre ne fait que le coller à sa ligne.
+ */
+internal fun skippedSummary(skipped: List<SkippedMask>): String =
+    skipped.take(6).joinToString(",") { "${it.label}(${it.encoding},${it.chars}c)" }
+
 class MaskPainter(
     /** Couleur de la palette pour l'emplacement donné (même palette que l'aperçu). */
     private val paletteArgb: (Int) -> Int,
@@ -67,6 +81,11 @@ class MaskPainter(
     var lastGrays: List<GrayMask?> = emptyList()
         private set
 
+    /** Masques sautés de la dernière frame ([overlays]), pour le log périodique. */
+    @Volatile
+    var lastSkipped: List<SkippedMask> = emptyList()
+        private set
+
     /** Masques coloriés de [frame], dans l'ordre des objets ; un masque illisible est sauté. */
     fun overlays(frame: LiveFrame): List<Bitmap> {
         front = 1 - front
@@ -75,9 +94,18 @@ class MaskPainter(
         // publication (distances, marches), via [lastGrays].
         val grays = frame.objects.map { obj -> decodeObjectGray(obj, frame.width, frame.height, probe) }
         lastGrays = grays
+        val skipped = ArrayList<SkippedMask>()
         return grays.mapIndexedNotNull { index, gray ->
-            gray?.let { paint(index, it, paletteArgb(index), probe) }
-        }.also { lastSplit = probe?.snapshot(totalMs = -1, masks = it.size) ?: DecodeSplit.EMPTY }
+            if (gray == null) {
+                frame.objects.getOrNull(index)?.let { skipped += SkippedMask(it.label, it.maskEncoding, it.maskPngB64.length) }
+                null
+            } else {
+                paint(index, gray, paletteArgb(index), probe)
+            }
+        }.also {
+            lastSkipped = skipped
+            lastSplit = probe?.snapshot(totalMs = -1, masks = it.size) ?: DecodeSplit.EMPTY
+        }
     }
 
     /**
@@ -90,7 +118,9 @@ class MaskPainter(
         decodedFrames += 1
         if (lastSplit.known) lastSplit = lastSplit.withTotal(ms)
         if (decodedFrames % LOG_EVERY_FRAMES != 0) return
-        android.util.Log.i("sam3vision", "masques décodés: $masks en ${ms} ms")
+        val skipped = lastSkipped
+        val tail = if (skipped.isEmpty()) "" else " (sautés: ${skippedSummary(skipped)})"
+        android.util.Log.i("sam3vision", "masques décodés: $masks en ${ms} ms$tail")
         if (lastSplit.known) android.util.Log.i(LiveLatencyLog.TAG, TimingsText.decsplit(lastSplit))
     }
 

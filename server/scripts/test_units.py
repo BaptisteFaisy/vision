@@ -29,7 +29,8 @@ if __name__ == "__main__": sys.modules.setdefault("test_units", sys.modules["__m
 from tests_units import (boot_tests, concepts_street_tests, crossing_concepts_tests,  # noqa: E402
                          depth_tests, detr_evict_tests, feux_guard_tests, latency_tests,
                          live_fast_tests, live_fast_perf_tests, llm_tests, m1_vectors_tests,
-                         merge_tests, native_tests, post_tests, preproc_tests, tracking_tests,
+                         merge_tests, native_tests, post_tests, preproc_tests, segmentation_tests,
+                         tracking_tests,
                          valhalla_grid_tests, weights_tests, ws_binary_tests, ws_pump_tests)
 
 BACKEND_DIR = Path(__file__).resolve().parent.parent / "backend"
@@ -134,27 +135,6 @@ def test_masks(imaging) -> None:
     check("mask PNG: 0/255 uniquement", values == [0, 255], str(values))
     resized = imaging.mask_to_uint8(mask, (12, 8))
     check("mask: remise à l'échelle nearest", resized.shape == (8, 12) and resized.max() == 255)
-
-
-def test_segmentation_logic(segmentation) -> None:
-    check("prompts null géré en amont (normalize lève)",
-          raises(lambda: segmentation.normalize_prompts(None), segmentation.PromptError))
-    check("prompts nettoyés et dédupliqués",
-          segmentation.normalize_prompts([" voiture ", "voiture", "piéton"]) == ["voiture", "piéton"])
-    check("prompts vides → PromptError",
-          raises(lambda: segmentation.normalize_prompts([]), segmentation.PromptError))
-    check("prompts que vides → PromptError",
-          raises(lambda: segmentation.normalize_prompts(["", "   "]), segmentation.PromptError))
-    check("prompts > MAX → PromptError",
-          raises(lambda: segmentation.normalize_prompts([f"c{i}" for i in range(segmentation.MAX_PROMPTS + 1)]),
-                 segmentation.PromptError))
-    check("prompt trop long → PromptError",
-          raises(lambda: segmentation.normalize_prompts(["x" * (segmentation.MAX_PROMPT_CHARS + 1)]),
-                 segmentation.PromptError))
-    check("concept FR → EN", segmentation.model_concept("une voiture") == "car")
-    check("concept inconnu passes through", segmentation.model_concept("kayak") == "kayak")
-    box = segmentation._clamp_box([-10, 5, 9999, 20], 2.0, 2.0, (100, 40))
-    check("box bornée dans l'image", box == [0.0, 10.0, 100.0, 40.0], str(box))
 
 
 def test_llm_logic(llm) -> None:
@@ -354,7 +334,7 @@ RUNNERS = (
     ("masques", "imaging", test_masks),
     ("masques : codec RLE (miroir Kotlin)", "imaging", latency_tests.test_rle),
     ("masques : finalize RLE + mask_scale", "segmentation", latency_tests.test_rle_finalize),
-    ("segmentation (logique)", "segmentation", test_segmentation_logic),
+    ("segmentation (logique)", "segmentation", segmentation_tests.test_segmentation_logic),
     ("llm (logique)", "llm", test_llm_logic),
     ("modal_app (helpers)", "modal_app", test_modal_helpers),
     ("contrat HTTP (app FastAPI)", "modal_app", test_http_contract),
@@ -375,6 +355,7 @@ RUNNERS = (
     ("chronos : breakdown servi par /live", "timing", latency_tests.test_breakdown_live_wiring),
     ("chronos : levier FAST_TIMING", "fast_core", live_fast_tests.test_timing_gate),
     ("latence : équivalence du cap par concept", "segmentation", live_fast_tests.test_cap_equivalence),
+    ("live_fast : labels évincés listés", "segmentation", segmentation_tests.test_finalize_truncated),
     ("live_fast : ordre des étages / verrou", "fast_core", live_fast_tests.test_run_frame_order),
     ("live_fast : chemin sans verrou", "fast_core", live_fast_tests.test_run_frame_no_lock),
     ("live_fast : contention du verrou GPU", "fast_core", live_fast_tests.test_gpu_contention),

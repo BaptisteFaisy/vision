@@ -173,6 +173,7 @@ def _finalize_rle(entries: list[dict], image_size, max_objects: int, mask_edge: 
         "width": image_size[0],
         "height": image_size[1],
         "mask_encoding": "rle",
+        "truncated": [item["label"] for item in ordered[max_objects:]],
         "objects": [
             {
                 "label": item["label"],
@@ -200,6 +201,10 @@ def finalize(entries: list[dict], image_size, max_objects: int = MAX_OBJECTS,
     ``mask_format="rle"`` (+ ``mask_edge``, défaut 256) : masques en runs LEB128 sur
     grille réduite, chaque objet portant ``mask_scale`` (ratio grille/frame) pour que
     le client redérive les dimensions. Absent = chemin historique inchangé.
+
+    ``truncated`` liste les labels évincés du top global (ordre de score) : le
+    client y lit ce que la coupe a supprimé au lieu de le deviner (vide = rien
+    de coupé). Champ additif : un client antérieur l'ignore.
     """
     if (mask_format or "").strip().lower() == "rle":
         return _finalize_rle(entries, image_size, max_objects, mask_edge)
@@ -209,6 +214,7 @@ def finalize(entries: list[dict], image_size, max_objects: int = MAX_OBJECTS,
         "width": image_size[0],
         "height": image_size[1],
         "mask_encoding": encoding,
+        "truncated": [item["label"] for item in ordered[max_objects:]],
         "objects": [
             {
                 "label": item["label"],

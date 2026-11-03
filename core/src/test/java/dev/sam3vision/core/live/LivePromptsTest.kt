@@ -26,6 +26,26 @@ class LivePromptsTest {
     }
 
     @Test
+    fun `demandes absents de la reponse, casse neutralisee, ordre envoi`() {
+        assertEquals(
+            listOf("stairs", "sidewalk"),
+            LivePrompts.missing(
+                listOf("person", "stairs", "sidewalk"),
+                listOf("Person", "car"),
+            ),
+        )
+        assertEquals(
+            emptyList<String>(),
+            LivePrompts.missing(listOf("person"), listOf("  PERSON  ")),
+        )
+        assertEquals(emptyList<String>(), LivePrompts.missing(emptyList(), listOf("person")))
+        assertEquals(
+            listOf("Stairs", "STAIRS"),
+            LivePrompts.missing(listOf("Stairs", "STAIRS"), listOf("car")),
+        )
+    }
+
+    @Test
     fun `murs clotures barrieres suivis en exterieur, portail et cles hors defaut`() {
         // Spec v4 : grillages, murs et barrières au même rang dehors ;
         // portail et clés sortis (clés = dedans).

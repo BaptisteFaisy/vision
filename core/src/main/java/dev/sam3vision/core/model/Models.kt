@@ -108,6 +108,12 @@ data class LiveFrame(
      * ce qui laisse `elapsedMs` seul. Le contrat `elapsed_ms` ne change pas.
      */
     val timingsMs: Map<String, Double> = emptyMap(),
+    /**
+     * Labels évincés du top global serveur (ordre de score) : ce que la coupe
+     * `max_objects` a supprimé. Vide sur un backend antérieur (champ absent)
+     * ou quand rien n'est coupé. Diagnostic seul : la voix ne le lit pas.
+     */
+    val truncated: List<String> = emptyList(),
 )
 
 /** État du backend live : `GET /health`. */

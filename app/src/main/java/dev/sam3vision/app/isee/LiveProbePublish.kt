@@ -2,6 +2,7 @@ package dev.sam3vision.app.isee
 
 import dev.sam3vision.app.BuildConfig
 import dev.sam3vision.core.distance.DistanceReading
+import dev.sam3vision.core.live.LivePrompts
 import dev.sam3vision.core.live.LiveSession
 import dev.sam3vision.core.mask.GrayMask
 import dev.sam3vision.core.live.LiveTimings
@@ -137,7 +138,9 @@ private fun LiveProbe.muteProbeLine(frame: LiveFrame, readings: List<DistanceRea
     val labels = frame.objects.take(6).joinToString(",") { it.label }
     val poseOk = distances.effectivePose() != null
     val memo = rotation.accumulator.concepts(nowMs).size
-    android.util.Log.d(TAG_MUTE, "sonde objets=${frame.objects.size} lectures=${readings.size} pose=$poseOk rotation=${rotation.enabled} memo=$memo etiquettes=[$labels] phrase=[$phrase]")
+    val absent = LivePrompts.missing(_state.value.conceptsSent, frame.objects.map { it.label }).take(6).joinToString(",")
+    val cut = frame.truncated.take(6).joinToString(",")
+    android.util.Log.d(TAG_MUTE, "sonde objets=${frame.objects.size} lectures=${readings.size} pose=$poseOk rotation=${rotation.enabled} memo=$memo etiquettes=[$labels] phrase=[$phrase] absents=[$absent] tronques=[$cut]")
 }
 
 /**

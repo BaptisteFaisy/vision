@@ -29,6 +29,7 @@ import dev.sam3vision.core.live.SteeringCue
 import dev.sam3vision.core.live.Timing
 import dev.sam3vision.core.live.TwinLiteWord
 import dev.sam3vision.core.model.LiveFrame
+import dev.sam3vision.core.model.ObjectLimits
 import dev.sam3vision.core.model.SegObject
 import dev.sam3vision.core.picto.PictoPlaceMode
 import dev.sam3vision.core.settings.Settings
@@ -82,7 +83,11 @@ private fun rawClip(app: Application, fileName: String): ByteArray? = runCatchin
  * Applique les Réglages à la sonde : endpoint résolu (saisie manuelle > région
  * EU/US > URL du build), monde sensoriel (dehors/dedans), guidage « tout droit »
  * (il prime sur l'annonce), annonce vocale des objets et de leur distance,
- * focale de la caméra, distances on/off, plafond d'objets. L'annonce et le
+ * focale de la caméra, distances on/off. La sonde demande toujours le plafond
+ * serveur ([ObjectLimits.MAX_ON_SCREEN]) : la coupe top-global y efface les
+ * concepts faibles non gardés (trottoir, mobilier — les 5 familles gardées
+ * ont leur place réservée) ; le curseur Réglages garde le Direct et la
+ * photo. L'annonce et le
  * guidage suivent les bascules brutes (clé non exigée) : sans clé, la voix de
  * proximité parle au TTS système (repli + alerte unique) au lieu de se taire.
  *
@@ -115,7 +120,7 @@ internal fun LiveProbe.configureFrom(
         lens = chosen.spec,
         distancesOn = settings.distanceOverlayEnabled,
         collectCrops = settings.collectLightCrops,
-        maxObjects = settings.objectsOnScreen,
+        maxObjects = ObjectLimits.MAX_ON_SCREEN,
         language = settings.speechLanguage,
         crossingActive = crossingActive,
         modelsLine = debugModelsLine(settings),

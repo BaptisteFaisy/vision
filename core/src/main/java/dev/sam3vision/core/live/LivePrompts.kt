@@ -106,6 +106,19 @@ object LivePrompts {
     }
 
     /**
+     * Concepts demandés absents de la réponse (comparaison insensible à la
+     * casse, ordre d'envoi, sans normalisation : l'appelant passe ce qui
+     * est parti sur le fil) : le diagnostic « demandé mais non renvoyé »
+     * (coupe top-global serveur, seuil 0,35, dédup). Vide = tout est
+     * revenu. En rotation (opt-in), ne comparer qu'au groupe envoyé.
+     * Pur, testé en JVM.
+     */
+    fun missing(sent: List<String>, received: List<String>): List<String> {
+        val seen = received.map { it.trim().lowercase() }.toSet()
+        return sent.filter { it.trim().lowercase() !in seen }
+    }
+
+    /**
      * Champ « Follow » saisi par l'utilisateur : découpé sur les virgules,
      * points-virgules et retours ligne, nettoyé des vides — vide = [default].
      * La session borne et normalise ensuite (voir [normalize]).

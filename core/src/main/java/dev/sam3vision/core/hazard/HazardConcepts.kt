@@ -93,15 +93,44 @@ object HazardConcepts {
         "chaussettes" to HazardName("aux chaussettes", "socks"),
     )
 
-    /** Nom parlé de [label], `null` si ni personne ni mobilier suivi. */
+    /**
+     * Nom parlé de [label], `null` si ni personne ni mobilier suivi.
+     * Libellé entier d'abord (dont « street lamp », « traffic sign »),
+     * puis mot à mot ([wordHit]) : le serveur échoie le prompt tel que
+     * saisi, les composés viennent des suivis (« metal pole » en Follow).
+     */
     fun nameOf(label: String): HazardName? {
         val key = KnownSizes.canonical(label)
         if (key.isEmpty()) return null
         NAMES[key]?.let { return it }
         if (key.endsWith("s") && key.length > 3) NAMES[key.dropLast(1)]?.let { return it }
+        wordHit(key)?.let { return it }
         if (PersonLabels.isPerson(label)) return HazardName("à la personne", "person")
         return null
     }
+
+    /**
+     * Premier mot connu NON-personne de [NAMES] (pluriel toléré), `null`
+     * sinon. Les entrées personne sont exclues : « child seat » (siège
+     * auto) ne doit pas annoncer un enfant de niveau 2 — une personne ne
+     * se reconnaît qu'en libellé entier. Même raison pour [PersonLabels],
+     * jamais consulté mot à mot (« pedestrian traffic light » contient
+     * « pedestrian » et n'est pas une personne). Premier mot assumé :
+     * « sign language » donne « sign » (niveau 7, les composés ne venant
+     * que des suivis) quand « poteau métallique » donne « poteau ».
+     */
+    private fun wordHit(key: String): HazardName? {
+        for (word in key.split(' ')) {
+            if (word.isEmpty()) continue
+            nonPerson(NAMES[word])?.let { return it }
+            if (word.endsWith("s") && word.length > 3) nonPerson(NAMES[word.dropLast(1)])?.let { return it }
+        }
+        return null
+    }
+
+    /** [name] sauf s'il parle d'une personne (`en == "child"`, voir [isPerson]). */
+    private fun nonPerson(name: HazardName?): HazardName? =
+        if (name?.en == "child") null else name
 
     /** Vrai si [label] désigne une personne ou du mobilier suivi (casse, accents, pluriel neutralisés). */
     fun isHazard(label: String): Boolean = nameOf(label) != null

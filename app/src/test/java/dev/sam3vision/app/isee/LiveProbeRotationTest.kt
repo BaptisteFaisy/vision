@@ -5,7 +5,9 @@ import dev.sam3vision.core.live.PromptRotation
 import dev.sam3vision.core.model.LiveFrame
 import dev.sam3vision.core.model.LiveHealth
 import dev.sam3vision.core.model.MASK_ENCODING_NONE
+import dev.sam3vision.core.model.ObjectLimits
 import dev.sam3vision.core.model.SegObject
+import dev.sam3vision.core.settings.Settings
 import kotlinx.coroutines.CompletableDeferred
 import kotlinx.coroutines.test.StandardTestDispatcher
 import kotlinx.coroutines.test.TestScope
@@ -83,6 +85,34 @@ class LiveProbeRotationTest {
         send(probe, fake, "B", 14_000_000L, frame("person"))
         assertEquals(listOf(LivePrompts.default, LivePrompts.default), fake.sentPrompts)
         assertTrue(probe.state.value.samDetections.none { it.label == "car" })
+    }
+
+    @Test
+    fun `configureFrom demande le plafond serveur, pas le curseur`() = runTest {
+        val (probe, fake) = harness(this)
+        probe.configureFrom(Settings.Default)
+        send(probe, fake, "A", 8_000_000L, frame("person"))
+        assertEquals(listOf(ObjectLimits.MAX_ON_SCREEN), fake.sentMaxObjects)
+    }
+
+    @Test
+    fun `ROTATION_OFF - un vide rejoue, deux vides effacent`() = runTest {
+        val (probe, fake) = harness(this, enableRotation = null)
+        send(probe, fake, "A", 8_000_000L, frame("person", "car"))
+        assertTrue(probe.state.value.samDetections.any { it.label == "car" })
+        send(probe, fake, "B", 14_000_000L, frame())
+        assertTrue(probe.state.value.samDetections.any { it.label == "car" })
+        send(probe, fake, "C", 20_000_000L, frame())
+        assertTrue(probe.state.value.samDetections.none { it.label == "car" })
+    }
+
+    @Test
+    fun `reset vide le filet 1-manque`() = runTest {
+        val (probe, fake) = harness(this, enableRotation = null)
+        send(probe, fake, "A", 8_000_000L, frame("person", "car"))
+        probe.rotation.reset()
+        send(probe, fake, "B", 14_000_000L, frame())
+        assertTrue(probe.state.value.samDetections.isEmpty())
     }
 
     @Test

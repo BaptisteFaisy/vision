@@ -25,6 +25,16 @@ class StairConceptsTest {
     }
 
     @Test
+    fun `step singulier et variantes reconnus, sens garde`() {
+        listOf("step", "Step", "stairway", "stairwell").forEach {
+            assertTrue(it, StairConcepts.isStairs(it))
+        }
+        assertEquals(StairDirection.Unknown, StairConcepts.direction("step"))
+        assertEquals(StairDirection.Down, StairConcepts.direction("step down"))
+        assertEquals(StairDirection.Up, StairConcepts.direction("stairway up"))
+    }
+
+    @Test
     fun `le sens vient des mots du libelle`() {
         assertEquals(StairDirection.Up, StairConcepts.direction("stairs going up"))
         assertEquals(StairDirection.Down, StairConcepts.direction("stairs going down"))

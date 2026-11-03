@@ -18,7 +18,8 @@ import java.util.concurrent.atomic.AtomicLong
  * n'interrogeait escaliers et trottoirs qu'une frame sur trois (même groupe)
  * et ils n'étaient plus reconnus. Réversible : [enabled] à `true` pour
  * retrouver un groupe par frame (prouvé par les tests : continuité, négatif
- * confirmé, expiry).
+ * confirmé, expiry). Hors rotation, le filet [holdLastGood] rejoue une
+ * réponse vide isolée au lieu d'effacer voix et overlay.
  */
 internal class ProbeRotationState {
 
@@ -39,6 +40,12 @@ internal class ProbeRotationState {
     /** Mémoire `concept → derniers objets` : nourrit voix et overlay en continu. */
     val accumulator = ConceptAccumulator()
 
+    /** Dernière frame non vide (filet hors rotation) ; `null` = rien à garder. */
+    private var lastGood: LiveFrame? = null
+
+    /** Vides consécutifs depuis [lastGood] : 1 = rejoué, 2 = passé (vraiment vide). */
+    private var misses = 0
+
     /** Envoi d'une frame : ses concepts, et si la réponse devra être accumulée. */
     data class Send(val prompts: List<String>, val rotated: Boolean)
 
@@ -51,9 +58,11 @@ internal class ProbeRotationState {
         reset()
     }
 
-    /** Nouvelle séance : mémoire et compteur oubliés, groupes gardés. */
+    /** Nouvelle séance : mémoires et compteur oubliés, groupes gardés. */
     fun reset() {
         accumulator.reset()
+        lastGood = null
+        misses = 0
         seq.set(0)
     }
 
@@ -72,14 +81,40 @@ internal class ProbeRotationState {
     /** Réponse d'une frame tournante : objets fusionnés (voir [ConceptAccumulator]). */
     fun accumulate(sent: List<String>, frame: LiveFrame, nowMs: Long): LiveFrame =
         frame.copy(objects = accumulator.update(sent, frame.objects, nowMs))
+
+    /**
+     * Filet 1-manqué hors rotation : une réponse vide isolée (troncature
+     * d'une frame) rejoue la précédente au lieu d'effacer voix et overlay ;
+     * deux vides de suite passent (scène vraiment vide). Les échecs
+     * (`null`) passent avant ([accumulated]) : le chemin erreur garde déjà
+     * les derniers masques. La frame rejouée est la même instance
+     * (`elapsedMs`, `truncated` périmés d'une frame). Sans horloge : le
+     * compteur seul décide. Remis à zéro par [reset].
+     */
+    fun holdLastGood(raw: LiveFrame): LiveFrame {
+        if (raw.objects.isNotEmpty()) {
+            lastGood = raw
+            misses = 0
+            return raw
+        }
+        val held = lastGood
+        if (held != null && misses < 1) {
+            misses += 1
+            return held
+        }
+        lastGood = null
+        misses = 0
+        return raw
+    }
 }
 
 /**
  * Frame à publier : la fusion accumulée quand la frame tournait ([Send.rotated],
  * concepts capturés à l'envoi — un vol chevauché ne mélange pas les groupes),
- * la réponse brute sinon. `null` = échec, inchangé.
+ * le filet 1-manqué sinon ([holdLastGood]). `null` = échec, inchangé.
  */
 internal fun LiveProbe.accumulated(raw: LiveFrame?, prompts: List<String>, rotated: Boolean): LiveFrame? {
-    if (raw == null || !rotated) return raw
-    return rotation.accumulate(prompts, raw, System.currentTimeMillis())
+    if (raw == null) return null
+    if (rotated) return rotation.accumulate(prompts, raw, System.currentTimeMillis())
+    return rotation.holdLastGood(raw)
 }
