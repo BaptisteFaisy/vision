@@ -133,8 +133,8 @@ class Sam3LiveService:
             self.ctx["detr_graphs"] = detr_graph.DetrGraphs()
         else:
             self.ctx["detr_graphs"] = None
-        from depth import ensure_depth
-        ensure_depth(self.ctx, device, dtype)
+        # DA2-Small n'est plus chargé au boot : `attach_frame_depth` le charge à
+        # la 1re frame with_depth (boot/thaw plus courts, frames sans depth à 0).
         self._gpu_lock = threading.Lock()
         self._warmup_frame()
         self.gpu_name = gpu_name()

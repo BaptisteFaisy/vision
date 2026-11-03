@@ -207,18 +207,25 @@ def attach_frame_depth(ctx, image, entries: list, with_depth: bool, timers: dict
                        max_objects=None, rescue=None):
     """Étage profondeur de ``run_frame`` : médiane par entrée (verrou selon l'appelant).
 
-    Sans ``with_depth``, sans modèle chargé, ou sans entrée (DETR n'a rien
-    trouvé : aucune médiane à mesurer) : les entrées repartent intactes, sans
-    forward (repli gracieux — le client bascule sur sa profondeur embarquée).
-    Le poste ``depth_ms`` n'est émis que si le levier ``FAST_TIMING`` est vrai
-    et qu'un forward a réellement eu lieu.
+    Sans ``with_depth`` ou sans entrée (DETR n'a rien trouvé : aucune médiane
+    à mesurer) : les entrées repartent intactes, sans forward (repli gracieux —
+    le client bascule sur sa profondeur embarquée). Le modèle se charge à la
+    1re frame with_depth (paresseux : le boot ne le charge plus) ; en échec,
+    les entrées repartent intactes comme avant. Le poste ``depth_ms`` n'est
+    émis que si le levier ``FAST_TIMING`` est vrai et qu'un forward a
+    réellement eu lieu.
     ``max_objects`` (+ ``rescue(entries)`` : rescapés de la garde anti-éviction)
     borne la mesure aux survivants possibles (``shortlist_entries``) : réponse
     identique, ~20 ms en moins à 100 entrées sur les frames depth (1 sur 8).
     Implémentation unique, partagée par les deux variantes du backend.
     """
-    if not with_depth or ctx.get("depth_model") is None or not entries:
+    if not with_depth or not entries:
         return entries
+    if ctx.get("depth_model") is None:
+        # Deux 1res frames en vol peuvent charger deux fois : le dernier gagne.
+        ensure_depth(ctx, ctx.get("device") or "cpu", ctx.get("dtype"))
+        if ctx.get("depth_model") is None:
+            return entries
     from timing import add_ms, elapsed_ms, now
 
     started = now()
