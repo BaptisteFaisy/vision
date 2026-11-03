@@ -85,7 +85,7 @@ class ObstacleCurbVoiceTest {
 
         assertEquals(1, speaker.said.size)
         assertEquals(OutdoorLevel.CURB, speaker.said.single().level)
-        assertEquals("Bordure détectée, à midi.", speaker.said.single().text)
+        assertEquals("Bordure détectée.", speaker.said.single().text)
     }
 
     @Test

@@ -139,7 +139,7 @@ class VehicleStateTest {
         stopped.update(listOf(det("car", box(100f))), emptyList(), atMs = 100L)
         val parked = stopped.update(listOf(det("car", box(100f))), emptyList(), atMs = 200L)
 
-        assertEquals("Car stopped, at 12 o'clock.", parked!!.phrase)
+        assertEquals("Car stopped.", parked!!.phrase)
         assertNull(parked.meters)
         assertFalse(parked.urgent)
         assertNull(parked.safetyPhrase)

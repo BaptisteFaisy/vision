@@ -137,7 +137,7 @@ class SeuilsDehorsV4Test {
         val watcher = HazardWatcher()
         val barrier = HazardSignal(detected = true, meters = 5.5f, label = "barrier", centerX = 0.5f)
         watcher.onSignal(barrier, 1_000L, En)
-        assertEquals("Attention, barrier, at 12 o'clock.", watcher.onSignal(barrier, 1_100L, En)!!.phrase)
+        assertEquals("Attention, barrier.", watcher.onSignal(barrier, 1_100L, En)!!.phrase)
     }
 
     @Test
@@ -240,7 +240,7 @@ class SeuilsDehorsV4Test {
         assertNull(watcher.onSignal(signal, 1_000L, En))
         val cue = watcher.onSignal(signal, 1_100L, En)
 
-        assertEquals("Curb detected, at 12 o'clock.", cue!!.phrase)
+        assertEquals("Curb detected.", cue!!.phrase)
         assertEquals(5, cue.level)
         assertEquals("curb", cue.antiRepeatKey)
     }
@@ -283,7 +283,7 @@ class SeuilsDehorsV4Test {
         watcher.onSignal(signal, 1_100L, En, StairDirection.Up, 0.2f)
         val cue = watcher.onSignal(signal, 1_200L, En, StairDirection.Up, 0.2f)
 
-        assertEquals("Stairs up, at 10 o'clock.", cue!!.phrase)
+        assertEquals("Stairs up.", cue!!.phrase)
         assertEquals(6, cue.level)
         assertEquals("stairs", cue.antiRepeatKey)
     }

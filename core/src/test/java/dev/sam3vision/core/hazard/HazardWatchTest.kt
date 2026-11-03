@@ -30,13 +30,13 @@ class HazardWatchTest {
     }
 
     @Test
-    fun `l'heure situe l'annonce`() {
+    fun `l'annonce douce ne dit plus l'heure`() {
         val watcher = HazardWatcher()
         val signal = HazardSignal(detected = true, meters = 0.8f, label = "barrier", centerX = 0.8f)
         watcher.onSignal(signal, 1_000L, SpeechLanguage.Fr)
         val cue = watcher.onSignal(signal, 2_000L, SpeechLanguage.Fr)
 
-        assertEquals("Attention à la barrière, à 2 heures.", cue!!.phrase)
+        assertEquals("Attention à la barrière.", cue!!.phrase)
     }
 
     @Test
@@ -357,7 +357,7 @@ class HazardWatchTest {
         assertNull(watcher.onSignal(alone, 13_000L, SpeechLanguage.Fr))
         val barrier = watcher.onSignal(alone, 14_000L, SpeechLanguage.Fr)
 
-        assertEquals("Attention à la barrière, à midi.", barrier!!.phrase)
+        assertEquals("Attention à la barrière.", barrier!!.phrase)
         assertEquals(HazardKind.BARRIER, barrier.kind)
     }
 

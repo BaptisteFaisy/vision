@@ -252,9 +252,9 @@ class TraverseVoiceTest {
     }
 
     @Test
-    fun `stationnement - heure du cadran sans mesure, seule sans geometrie`() {
-        assertEquals("Voiture en stationnement, à 9 heures.", TraverseParkedText.parkedPhrase(null, 0.1f, SpeechLanguage.Fr))
-        assertEquals("Car parked, at 9 o'clock.", TraverseParkedText.parkedPhrase(null, 0.1f, SpeechLanguage.En))
+    fun `stationnement - base seule sans mesure, sans heure`() {
+        assertEquals("Voiture en stationnement.", TraverseParkedText.parkedPhrase(null, 0.1f, SpeechLanguage.Fr))
+        assertEquals("Car parked.", TraverseParkedText.parkedPhrase(null, 0.1f, SpeechLanguage.En))
         assertEquals("Car parked.", TraverseParkedText.parkedPhrase(null, null, SpeechLanguage.En))
     }
 }

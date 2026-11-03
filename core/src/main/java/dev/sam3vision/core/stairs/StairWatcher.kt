@@ -35,12 +35,12 @@ data class StairCue(
  * contourne pas l'escalier qu'on veut prendre.
  */
 object StairText {
-    /** « Escalier montant, à 11 heures. » (`null` = sans heure, ex. flux Canny). */
+    /** « Escalier montant. » — sans heure (ordre user 03/11, [centerX] ignoré). */
     fun phrase(
         language: SpeechLanguage,
         direction: StairDirection = StairDirection.Unknown,
         centerX: Float? = null,
-    ): String = PositionText.withHour(base(language, direction), centerX, language)
+    ): String = PositionText.withHour(base(language, direction), null, language)
 
     /**
      * « Escalier 2 m. » / « Stairs 2 m. » — jalon d'approche, court et sans
