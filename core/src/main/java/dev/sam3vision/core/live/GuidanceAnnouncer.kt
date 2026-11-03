@@ -111,7 +111,6 @@ class GuidanceAnnouncer(
     private var lastRailLevel: RailLevel = RailLevel.NONE
 
     private val nudge = LateralNudgeTracker()
-
     private val staticAvoidance = StaticAvoidanceTracker(repeatMs)
 
     /**
@@ -185,11 +184,8 @@ class GuidanceAnnouncer(
         // frame. Un obstacle pile dans l'axe n'a pas de côté : le couloir parle seul.
         val cue = nudgeOf(atMs, labels, hfovDeg, ageMs, speedMps, space)
         if (cue != null) return nudgeWord(atMs, cue, language)
-        // Poteau/barrière à portée : le mot du côté libre à 1 m passe devant
-        // le couloir (statique identifié vs bouché générique). Trigger actif
-        // = frame possédée (mot ou silence) ; bouché total = main au couloir,
-        // qui dit la sortie — aucun stop produit ici depuis le 31/10.
-        val statObstacle = nearestStaticObstacle(labels)
+        // Statique à portée : mot du côté libre à 1 m, devant le couloir.
+        val statObstacle = StaticAvoidance.nearest(labels)
         val statWord = statObstacle?.let { staticAvoidance.onFrame(it, labels, atMs, hfovDeg = hfovDeg) }
         if (statObstacle != null && staticAvoidance.isActive() && statWord != GuidanceWord.Stop) {
             return statWord?.let { sideWord(atMs, it, language) }
@@ -205,17 +201,6 @@ class GuidanceAnnouncer(
         val word = clearedReturnWord(sidewalk, decision.cap, labels, hfovDeg, range)
         return freeWord(atMs, word, language, ageMs)
     }
-
-    /**
-     * Statique mesuré le plus proche (poteau/barrière, [StaticAvoidance]) :
-     * le danger le plus imminent parle ; `null` = main au couloir.
-     */
-    private fun nearestStaticObstacle(labels: List<PlacedLabel>): PlacedLabel? =
-        labels.mapNotNull { label ->
-            label.meters?.takeIf { it.isFinite() && it > 0f }?.let { label to it }
-        }.filter { (label, _) ->
-            label.centerX.isFinite() && StaticAvoidance.isStaticObstacle(label.label)
-        }.minByOrNull { it.second }?.first
 
     /**
      * Le serveur ne juge que les personnes ([Passage]) : un mur qui bouche
