@@ -223,7 +223,7 @@ class ValhallaRouteLoaderTest {
     }
 
     @Test
-    fun `echec route sur le premier lieu : reprise vers le second geocodage`() = runBlocking {
+    fun `echec route sur le premier lieu - reprise vers le second geocodage`() = runBlocking {
         val alt = GeocodedPlace(48.8607, 2.3377, "Gare de Lyon BAN", 0.8f)
         val asked = mutableListOf<RoutePoint>()
         val full = loader(
