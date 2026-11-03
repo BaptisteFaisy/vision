@@ -13,6 +13,7 @@ import dev.sam3vision.core.picto.PictoPlaceMode
 import dev.sam3vision.core.settings.Settings
 import java.io.File
 import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.Job
 import kotlinx.coroutines.launch
 
 /**
@@ -121,6 +122,8 @@ internal class IseeGlassesInbox(
 ) {
     /** Compteur des photos lunettes affichées : deux photos n'ont jamais le même `seq`. */
     private var seq = 0L
+    private var describeJob: Job? = null
+    private var describingSeq: Long? = null
 
     /**
      * Photo prise avec les lunettes : elle s'affiche sur cet écran (personne
@@ -162,9 +165,15 @@ internal class IseeGlassesInbox(
      * — pas de `dismiss`, qui effacerait le contexte épinglé avant l'appel.
      */
     fun describePhoto() {
-        if (snapshot().glassesPhoto == null) return
+        val photo = snapshot().glassesPhoto ?: return
+        // Une photo ne se décrit qu'une fois à la fois : l'auto-description
+        // (arrivée) + le bouton manuel (ou une rafale) préemptaient sinon la
+        // description en cours, perçue comme une boucle. Une photo suivante
+        // (nouveau `seq`) se décrit normalement.
+        if (describeJob?.isActive == true && describingSeq == photo.seq) return
+        describingSeq = photo.seq
         silence()
-        scope.launch { answer(DESCRIBE_PHOTO_QUESTION, ByteArray(0)) }
+        describeJob = scope.launch { answer(DESCRIBE_PHOTO_QUESTION, ByteArray(0)) }
     }
 
     /**
