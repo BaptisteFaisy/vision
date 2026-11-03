@@ -4,6 +4,7 @@ import android.content.Context
 import android.net.ConnectivityManager
 import android.net.Network
 import android.net.NetworkCapabilities
+import dev.sam3vision.core.net.BackendRoute
 import dev.sam3vision.core.net.NetworkState
 
 /**
@@ -35,7 +36,13 @@ class AndroidNetworkState(context: Context) : NetworkState {
 
     override val available: Boolean get() = online
 
-    override val iface: String? get() = ifaceName
+    /**
+     * Interface en service, suffixée `+cell` quand le backend passe par le
+     * cellulaire imposé (session lunettes) : le client du direct y voit un
+     * changement d'interface et rouvre son socket sur la nouvelle route — le
+     * Wi-Fi lunettes garderait sinon le même nom `wifi` sur une route morte.
+     */
+    override val iface: String? get() = ifaceName?.let { if (BackendRoute.active) "$it$IFACE_CELL_SUFFIX" else it }
 
     /** Branche le suivi ; le premier état est lu tout de suite (pas d'attente de callback). */
     fun start() {
@@ -103,5 +110,6 @@ class AndroidNetworkState(context: Context) : NetworkState {
         const val IFACE_ETHERNET = "ethernet"
         const val IFACE_BLUETOOTH = "bluetooth"
         const val IFACE_OTHER = "other"
+        const val IFACE_CELL_SUFFIX = "+cell"
     }
 }
