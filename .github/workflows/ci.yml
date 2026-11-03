@@ -181,6 +181,15 @@ jobs:
           python3 tools/check-voice-nav-doc.py
           python3 -m unittest tools/test_check_voice_nav_doc.py
 
+      # Les 12 masques de référence (ordre user 03/11) : dehors 21 concepts
+      # dont stairs/car/person/pole/sidewalk/pedestrian traffic light/van/bus/
+      # wall/stroller/dog/child + alias FR→EN serveur (deux exemplaires).
+      # Secondes, stdlib, aucun réseau, aucune compilation.
+      - name: Garde des masques de référence (prompts + alias FR→EN)
+        run: |
+          python3 tools/check-masques.py
+          python3 -m unittest tools/test_check_masques.py
+
       # La garde clés embarquées (`ci-native.yml`, job `apk`) a ses tests ici :
       # quelques secondes, aucune compilation, aucun réseau.
       - name: Tests de la garde clés embarquées
