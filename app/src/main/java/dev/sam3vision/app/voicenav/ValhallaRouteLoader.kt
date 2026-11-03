@@ -47,6 +47,7 @@ class ValhallaRouteLoader(
     private val routeTimeoutMs: Long = ROUTE_TIMEOUT_SECONDS * 1000,
     /** Reçoit l'itinéraire guidable (`null` en chargement ou en échec) pour la carte d'aperçu. */
     private val onPreview: (NavRoute?) -> Unit = {},
+    private val log: (String) -> Unit = {},
     private val nowMs: () -> Long = System::currentTimeMillis,
 ) {
     /**
@@ -111,14 +112,18 @@ class ValhallaRouteLoader(
      * sans second, reprise identique (transitoire). Gagnant renvoyé avec.
      */
     private suspend fun loadRoute(client: RouteClient, from: RoutePoint, destination: String, place: GeocodedPlace): Result<Pair<RouteTrip, GeocodedPlace>> {
-        timedRoute(client, from, RoutePoint(place.latitude, place.longitude))
-            .onSuccess { return Result.success(it to place) }
+        val first = timedRoute(client, from, RoutePoint(place.latitude, place.longitude))
+        first.onSuccess { return Result.success(it to place) }
+        log("résumé /route : 1er essai en échec (${first.exceptionOrNull()?.javaClass?.simpleName})")
         val alt = try {
             geocodeAlternate(destination, from).getOrNull()
         } catch (_: Exception) {
             null
-        } ?: place
-        return timedRoute(client, from, RoutePoint(alt.latitude, alt.longitude)).map { it to alt }
+        }
+        if (alt == null) log("résumé /route : sans second géocodage, reprise identique")
+        else log("résumé /route : reprise vers « ${alt.label} »")
+        val dest = alt ?: place
+        return timedRoute(client, from, RoutePoint(dest.latitude, dest.longitude)).map { it to dest }
     }
 
     /** Une tentative `/route`, bornée : tout échec devient un `Result`. */
