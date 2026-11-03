@@ -112,15 +112,26 @@ internal fun startsWithAnnexB(bytes: ByteArray): Boolean {
 
 /**
  * Faut-il tenter le décodage bitmap avant le codec ? Non pour un bitstream déjà en
- * Annex B : `BitmapFactory` y échoue à coup sûr après 1 à 3 ms (15 i/s, c'est jusqu'à ~45 ms
- * de CPU jetées par seconde). Les images fixes (JPEG/PNG/WebP, jamais `00 00 01…` en
- * tête) et le brut non compressé gardent la sonde ; le longueur-préfixé ambigu aussi
- * (prudence : [annexB] tranche déjà ce cas vers Annex B, la sonde reste le repli sûr).
- * Pur, testé en JVM.
+ * Annex B : `BitmapFactory` y échoue à coup sûr après 1 à 3 ms (~45 ms de CPU jetées
+ * par seconde à 15 i/s). Les images fixes (jamais `00 00 01…` en tête) et le brut
+ * non compressé gardent la sonde ; le longueur-préfixé ambigu aussi ([annexB] tranche
+ * déjà ce cas, la sonde reste le repli sûr). Pur, testé en JVM.
  */
 internal fun shouldProbeBitmap(frame: GlassesFrame): Boolean {
     if (!frame.compressed) return true
     return !startsWithAnnexB(frame.bytes)
+}
+
+/**
+ * Même sonde, flux H.265 longueur-préfixé avéré : [annexB] l'a déjà converti au
+ * moins une fois, la sonde y échouerait comme en Annex B — 1 à 3 ms sautées par
+ * frame. Le brut garde la sonde (jamais du H.265), l'indécis garde la prudence
+ * (une session JPEG ne pose jamais le mémo : ses bitmaps partent avant [annexB]).
+ * Pur, testé en JVM.
+ */
+internal fun shouldProbeBitmap(frame: GlassesFrame, streamProvenH265: Boolean): Boolean {
+    if (streamProvenH265 && frame.compressed) return false
+    return shouldProbeBitmap(frame)
 }
 
 /** Premiers octets en hexadécimal (une ligne de diagnostic, jamais le flux entier). */
@@ -225,7 +236,9 @@ class GlassesLiveDecoder(
             stashConfig(target, frame)
             return false
         }
-        if (shouldProbeBitmap(frame)) {
+        // H.265 longueur-préfixé avéré : la sonde y échouerait à coup sûr (1 à 3 ms
+        // jetées par frame), on la saute — l'indécis garde la prudence.
+        if (shouldProbeBitmap(frame, annexBStable == false)) {
             frame.asSdkFrame().toBitmapOrNull()?.let {
                 try {
                     return drawBitmap(target, frame, it)

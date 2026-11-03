@@ -147,6 +147,25 @@ class GlassesAnnexBTest {
         assertTrue(shouldProbeBitmap(frame(byteArrayOf(), compressed = true)))
     }
 
+    @Test
+    fun `le h265 avere saute la sonde meme longueur-prefixe`() {
+        // 1 à 3 ms économisées par frame : BitmapFactory y échouerait à coup sûr.
+        val framed = byteArrayOf(0, 0, 0, 6, 0x42, 0x01, 0x02, 0x03, 0x04, 0x05)
+        assertFalse(shouldProbeBitmap(frame(framed, compressed = true), true))
+    }
+
+    @Test
+    fun `le h265 avere garde la sonde pour le brut`() {
+        val raw = byteArrayOf(0, 0, 0, 6, 0x42, 0x01, 0x02, 0x03, 0x04, 0x05)
+        assertTrue(shouldProbeBitmap(frame(raw, compressed = false), true))
+    }
+
+    @Test
+    fun `l indecis garde la prudence meme compresse`() {
+        val framed = byteArrayOf(0, 0, 0, 6, 0x42, 0x01, 0x02, 0x03, 0x04, 0x05)
+        assertTrue(shouldProbeBitmap(frame(framed, compressed = true), false))
+    }
+
     private fun frame(bytes: ByteArray, compressed: Boolean) =
         GlassesFrame(bytes, width = 720, height = 1280, presentationTimeUs = 1L, compressed = compressed, codecConfig = false)
 }
