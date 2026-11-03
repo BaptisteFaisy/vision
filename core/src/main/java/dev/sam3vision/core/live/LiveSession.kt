@@ -161,6 +161,9 @@ class LiveSession(
     /** Le socket du direct est-il ouvert ? `false` pour un client sans transport socket. */
     val socketOpen: Boolean get() = (client as? WsLiveClient)?.isConnected ?: false
 
+    /** Les frames partent-elles en POST /live (repli HTTP) ? `false` sans socket. */
+    val httpFallback: Boolean get() = (client as? WsLiveClient)?.httpFallbackActive ?: false
+
     /**
      * Handshake anticipé (voir [LiveClient.preconnect]) : à appeler dès la liaison caméra,
      * pour que la première frame parte sans attendre l'ouverture du socket.

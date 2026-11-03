@@ -1,9 +1,7 @@
 package dev.sam3vision.app.isee
 
 import dev.sam3vision.app.DistanceLayer
-import dev.sam3vision.app.TRANSPORT_WS
-import dev.sam3vision.app.TRANSPORT_WS_CELL
-import dev.sam3vision.app.TRANSPORT_WS_KO
+import dev.sam3vision.app.transportLabel
 import dev.sam3vision.core.distance.CameraPose
 import dev.sam3vision.core.distance.DistanceMeter
 import dev.sam3vision.core.distance.DistanceReading
@@ -42,11 +40,12 @@ internal fun labelsOf(labels: FrameLabels, frame: LiveFrame): List<String> = lab
  * pour rester testable en JVM sans état global.
  */
 internal fun transportLabel(active: LiveSession, cellular: Boolean = BackendRoute.active): String =
-    when {
-        !active.socketOpen -> TRANSPORT_WS_KO
-        cellular -> TRANSPORT_WS_CELL
-        else -> TRANSPORT_WS
-    }
+    transportLabel(
+        trackerEnabled = false,
+        wsConnected = active.socketOpen,
+        cellular = cellular,
+        httpFallback = active.httpFallback,
+    )
 
 /**
  * Pose exploitable pour cette frame : `null` en lunettes-live (branche sol

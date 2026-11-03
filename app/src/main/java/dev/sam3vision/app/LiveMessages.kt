@@ -21,11 +21,14 @@ fun samUnreachableLine(reason: String): String =
 /** Direct en WebSocket : une frame par message, sans le surcoût HTTP d'un POST. */
 const val TRANSPORT_WS: String = "WebSocket"
 
-/** Socket tombé : plus aucun transport (le POST a été retiré), à signaler franchement. */
+/** Socket tombé sans repli HTTP (jamais replié, hors ligne, fermé) : à signaler franchement. */
 const val TRANSPORT_WS_KO: String = "WebSocket down"
 
 /** Direct en WebSocket via le cellulaire imposé (session lunettes, Wi-Fi lunettes sans internet). */
 const val TRANSPORT_WS_CELL: String = "WebSocket (cell)"
+
+/** Repli HTTP : le socket est tombé, les frames partent en `POST /live`. */
+const val TRANSPORT_HTTP: String = "HTTP"
 
 /**
  * Direct sur le **tracker** (`/session` + `/frame`) : les ids d'objets sont stables d'une
@@ -37,16 +40,18 @@ const val TRANSPORT_TRACK: String = "Tracker"
 const val LLM_ABSENT_LINE = "LLM key missing — enter it in Settings"
 
 /**
- * Libellé du transport : le tracker prime, sinon WebSocket ou KO selon le socket.
- * [cellular] se lit seul en session lunettes ([BackendRoute.active]) ; injecté
- * pour rester testable en JVM sans état global.
+ * Libellé du transport : le tracker prime, sinon HTTP si le repli colle, sinon
+ * WebSocket ou KO selon le socket. [cellular] se lit seul en session lunettes
+ * ([BackendRoute.active]) ; injecté pour rester testable en JVM sans état global.
  */
 fun transportLabel(
     trackerEnabled: Boolean,
     wsConnected: Boolean,
     cellular: Boolean = BackendRoute.active,
+    httpFallback: Boolean = false,
 ): String = when {
     trackerEnabled -> TRANSPORT_TRACK
+    httpFallback -> TRANSPORT_HTTP
     !wsConnected -> TRANSPORT_WS_KO
     cellular -> TRANSPORT_WS_CELL
     else -> TRANSPORT_WS

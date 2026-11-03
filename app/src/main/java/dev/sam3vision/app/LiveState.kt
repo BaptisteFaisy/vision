@@ -275,12 +275,14 @@ internal const val MEMORY_WINDOW_MS = 30_000L
 internal const val POSITION_VOICE_DIR = "positions"
 
 /**
- * « Tracker » en mode sessions, sinon « WebSocket » ou « WebSocket down » (aucun repli POST) :
- * lit l'état du socket sur le client, la table des libellés restant pure et testée en JVM
- * ([transportLabel] à drapeau, dans `LiveMessages`).
+ * « Tracker » en mode sessions, sinon « HTTP » si le repli colle, « WebSocket » ou
+ * « WebSocket down » selon le socket : lit l'état du client, la table des libellés
+ * restant pure et testée en JVM ([transportLabel] à drapeau, dans `LiveMessages`).
  */
-internal fun transportLabel(trackerEnabled: Boolean, client: LiveClient?): String =
-    transportLabel(trackerEnabled, (client as? WsLiveClient)?.isConnected == true)
+internal fun transportLabel(trackerEnabled: Boolean, client: LiveClient?): String {
+    val ws = client as? WsLiveClient
+    return transportLabel(trackerEnabled, ws?.isConnected == true, httpFallback = ws?.httpFallbackActive == true)
+}
 
 /**
  * Envoie la frame au pipeline actif, quel que soit le transport ; `null` = frame jetée
