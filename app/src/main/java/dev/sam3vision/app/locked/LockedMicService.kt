@@ -24,6 +24,7 @@ import dev.sam3vision.core.speech.LockedMicStartRunner
 import dev.sam3vision.core.speech.LockedMicState
 import dev.sam3vision.core.speech.MicStartOutcome
 import dev.sam3vision.core.speech.parseMicStartAction
+import dev.sam3vision.core.speech.sticky
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.Job
@@ -92,14 +93,12 @@ class LockedMicService : Service() {
             return START_NOT_STICKY
         }
         outcome.warnings.forEach { Log.w(LockedMic.TAG, it) }
-        return when (outcome) {
-            is MicStartOutcome.Armed -> START_STICKY
-            is MicStartOutcome.Refused -> {
-                Log.w(LockedMic.TAG, "armement refusé : ${outcome.reason}")
-                START_NOT_STICKY
-            }
-            is MicStartOutcome.Stopped -> START_NOT_STICKY
+        if (outcome is MicStartOutcome.Refused) {
+            Log.w(LockedMic.TAG, "armement refusé : ${outcome.reason}")
         }
+        // Le code de retour vit dans `:core` ([sticky]) : seul l'armé redémarre, le refusé
+        // et l'arrêté restent morts — sinon le refus bouclerait en SecurityException.
+        return if (outcome.sticky) START_STICKY else START_NOT_STICKY
     }
 
     /**

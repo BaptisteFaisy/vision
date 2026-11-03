@@ -72,6 +72,15 @@ sealed interface MicStartOutcome {
 }
 
 /**
+ * Seul un service armé redémarre après sa mort : un refusé relancé bouclerait en
+ * `SecurityException` (premier plan `microphone` interdit en arrière-plan, Android 14+),
+ * d'où `START_NOT_STICKY` hors armement — le cœur du fix du FATAL du 27/10, épinglé ici
+ * pour que le service (`:app`, non testé en JVM) ne puisse pas le régresser.
+ */
+val MicStartOutcome.sticky: Boolean
+    get() = this is MicStartOutcome.Armed
+
+/**
  * Tous les effets Android d'un démarrage, fournis par le service ; le runner ([LockedMicStartRunner])
  * les appelle un par un, chacun gardé : celui qui lève est noté et le suivant part quand même.
  * `enterForeground` lève au refus (dont la `SecurityException` du type `microphone` sur
