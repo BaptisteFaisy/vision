@@ -35,6 +35,8 @@ internal data class ProbeRest(
     val phrase: String?,
     /** Frame du moteur verdict (`null` hors Traversée : l'écran garde l'ancien état). */
     val verdict: CrossingVerdictFrame? = null,
+    /** Sur le passage : le verdict parle à 99/101, le guidage latéral se tait. */
+    val onCrosswalk: Boolean = false,
 )
 
 /**
@@ -114,6 +116,12 @@ internal fun LiveProbe.computeRest(
         onCrop = cropLogger?.tap(), noLightGate = noLightGate,
         motion = ProbeBackgroundMotion.lastMotion,
     ) else null
+    // Sur-passage : calculé avant le verdict (son niveau en dépend : 99 le
+    // changement, 101 la répétition) et avant le latéral (muet sur passage).
+    val onWalk = OnPathWatch.update(
+        crossingActive, frame.objects, frame.width, frame.height,
+        readings, distances.effectivePose(), lens, at, speechLanguage,
+    )
     // Traversée : le verdict parle au bus (niveau 100 = CrossingLevels.VERDICT),
     // la phrase parlée se tait (humains et bordures passent par le guetteur
     // obstacles, 101/102). Le veto trafic de la même frame lui est passé :
@@ -122,18 +130,22 @@ internal fun LiveProbe.computeRest(
     val verdictFrame = if (crossingActive) {
         verdictEngine.onFrame(
             frame, readings, jpegB64, at, motion = ProbeBackgroundMotion.lastMotion,
-            carVeto = cross?.veto == true,
+            carVeto = cross?.veto == true, onCrosswalk = onWalk,
         )
     } else null
     val phrase = phraseOf(placed, readings, frame, at, speechLanguage,
         lens.widthFovDeg(frame.width, frame.height))
-    feedCrossingLateral(crossingActive, frame.objects, frame.width, frame.height, readings, distances.effectivePose(), lens, at, speechLanguage)
+    // Sur le passage, le guidage latéral se tait (déjà arrivé : un « Gauche. »
+    // d'alignement y serait ambigu avec l'évitement) — sans toucher son fichier
+    // (plafond 500) : sa mémoire retombe ici au lieu d'être nourrie.
+    if (onWalk) CrossingLateralWatch.reset()
+    else feedCrossingLateral(crossingActive, frame.objects, frame.width, frame.height, readings, distances.effectivePose(), lens, at, speechLanguage)
     feedCrosswalkLost(crossingActive, frame.objects, at, speechLanguage)
     pulse.feed(at, voice.lastDecision, placed)
     // Compteur de marches : le masque exact borne les frames suivantes (repli boîte sinon).
     StairCannyCount.setMaskPlane(stairsMaskPlaneOf(frame.objects, frame.width, frame.height, grays))
     muteProbeLine(frame, readings, phrase)
-    return ProbeRest(rawDetections, readings, placed, cross, phrase, verdictFrame)
+    return ProbeRest(rawDetections, readings, placed, cross, phrase, verdict = verdictFrame, onCrosswalk = onWalk)
 }
 
 /**
@@ -192,6 +204,7 @@ internal fun LiveProbe.publishRest(active: LiveSession, frame: LiveFrame, rest: 
             crossingVerdict = rest.verdict?.verdict,
             traversePhase = rest.cross?.phase,
             scanLines = CrosswalkScanWatch.display(speechLanguage),
+            onCrosswalk = rest.onCrosswalk,
             motion = ProbeBackgroundMotion.lastDebug,
         )
     }
