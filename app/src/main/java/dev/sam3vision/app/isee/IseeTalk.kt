@@ -41,9 +41,9 @@ internal class IseeHoldTalk(
     private val applyPlace: suspend (PictoPlaceMode, String) -> Unit,
     private val clock: () -> Long,
     /**
-     * Un autre geste tient la surface (écoute « Quoi chercher ? » du balayage
-     * vers la droite) : la tenue et le tap se taisent, sinon deux gestes se
-     * disputeraient le même micro.
+     * Un autre geste tient la surface (écoute destination du maintien après
+     * balayage vers le bas, ou « Quoi chercher ? ») : la tenue et le tap se
+     * taisent, sinon deux gestes se disputeraient le même micro.
      */
     private val busy: () -> Boolean = { false },
 ) {

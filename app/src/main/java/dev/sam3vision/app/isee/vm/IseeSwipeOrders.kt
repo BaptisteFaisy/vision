@@ -27,7 +27,7 @@ interface FindListening {
 }
 
 /**
- * Les deux balayages de la surface iSee (demande user du 02/11/2026) :
+ * Le balayage vers le bas de la surface iSee (demande user du 02/11/2026) :
  *
  * - **vers le bas** : la fonction GPS, exactement l'ordre vocal « active le
  *   GPS » ([runGpsOrder] → `VoiceNavSession.enableFromVoice` : réglage
@@ -35,12 +35,15 @@ interface FindListening {
  * - **vers le bas + maintien** (demande user du 03/11/2026) : le doigt resté
  *   posé ouvre le micro ([askDestination]), l'endroit dicté part tel quel en
  *   destination au relâchement ([sendDestination] → [runDestination]) et le
- *   guidage démarre direct, sans question ni bouton ;
- * - **vers la droite** : iSee demande « Quoi chercher ? », ouvre le micro sans
- *   doigt ([listenForObject], fin à la fin de la parole — [FindAskPolicy]),
- *   puis la chasse part par le chemin existant `mode find my X` ([runMode] :
- *   concept SAM, génération du picto à sa première détection, ancrage, refus
- *   dehors et confirmation parlée).
+ *   guidage démarre direct, sans question ni bouton.
+ *
+ * « Quoi chercher ? » ([askToFind], demande user du 02/11/2026) reste un flow
+ * autonome : question parlée, micro ouvert sans doigt ([listenForObject], fin
+ * à la fin de la parole — [FindAskPolicy]), puis chasse par le chemin
+ * existant `mode find my X` ([runMode] : concept SAM, génération du picto à
+ * sa première détection, ancrage, refus dehors et confirmation parlée). Il
+ * n'a plus de balayage attitré depuis que la droite crée un picto (demande
+ * user du 03/11/2026) — couvert par tests, prêt à resservir.
  *
  * Rien n'est réimplémenté ici : les gestes rejouent les ordres vocaux, ils ne
  * parlent ni à SAM ni à la caméra. Pendant une écoute, la surface appartient à
@@ -169,9 +172,10 @@ class IseeSwipeOrders(
     }
 
     /**
-     * Balayage vers la droite : « Quoi chercher ? » puis chasse de l'objet
-     * entendu. Dehors, refus parlé comme l'ordre vocal (jamais de picto dehors)
-     * — et pas de micro ouvert pour rien.
+     * « Quoi chercher ? » puis chasse de l'objet entendu (flow autonome, sans
+     * balayage attitré : la droite crée désormais un picto). Dehors, refus
+     * parlé comme l'ordre vocal (jamais de picto dehors) — et pas de micro
+     * ouvert pour rien.
      */
     fun askToFind() {
         if (listening || destinationListening) return

@@ -232,7 +232,7 @@ class IseeViewModel(app: Application) : AndroidViewModel(app) {
         glasses = { glassesOrder.run("iSee") },
     ))
     private val glassesInbox = IseeGlassesInbox(viewModelScope, shots, { _state.value }, ::update, ::silenceForGlasses, ::answerHeard, cameraOps::stopVideo, probe::stop, { cameraOps.startVideo(); syncProbe() })
-    /** Balayages bas/droite : fonction GPS et « Quoi chercher ? » (voir [IseeSwipeOrders]). */
+    /** Balayage bas : fonction GPS (+ maintien destination) ; « Quoi chercher ? » autonome (voir [IseeSwipeOrders]). */
     private val swipe = IseeSwipeOrders(viewModelScope, modes::run, voiceNav::runOrder, dictation, { mic.preview().speaking }, { settings }, { _state.value.placeMode }, { navSpeaker.speakClipAndWait(it) }, ::update, voiceNav::goTo, { silenceForGlasses(); clipPlayer.stop() }, haptics::holdStart, haptics::holdEnd, { active }, log = { android.util.Log.d(SwipeHoldTrigger.LOG_TAG, it) })
     private val holdTalk = IseeHoldTalk(viewModelScope, { active }, ::silenceForGlasses, shots, { _state.value }, ::update, haptics, dictation, liveDictation, streamDictation, { settings }, cameraOps, ::transcribeAndAnswer, glassesInbox::onTap, { _state.value.placeMode }, modes::applyPlace, System::currentTimeMillis, swipe::asking)
     private val glassesOrder = IseeGlassesOrder({ navSpeaker.speakNavigation(it) }, ::update, { glassesSession })
@@ -307,7 +307,7 @@ class IseeViewModel(app: Application) : AndroidViewModel(app) {
     val modeChips = IseeModeChips(viewModelScope, { _state.value.placeMode }, modes::run, { if (steering.toggleCrossing()) spine.onCrossingChanged() })
 
     /** Gestes de la surface (tenue, tap, balayages) : relais unique, voir [IseeGestures]. */
-    val gestures = IseeGestures(holdTalk, swipe, modeChips::toggleCrossing)
+    val gestures = IseeGestures(holdTalk::start, holdTalk::end, holdTalk::cancel, holdTalk::singleTap, swipe, modeChips::toggleCrossing, picto::onPictoButton)
 
     override fun onCleared() {
         liveDictation.stop()

@@ -22,9 +22,10 @@ import dev.sam3vision.core.gesture.SwipeHoldTrigger
  *   vue intercepte alors tout (les enfants reçoivent un ACTION_CANCEL) jusqu'au
  *   relâchement qui émet [onHoldEnd] ;
  * - [IseeGestureBrain] : tap simple (vidéo, dès le relâchement), balayage vers
- *   le haut (bascule Traversée), vers le bas (mode GPS) et vers la droite
- *   (« quoi chercher ? »). Ni double tap, ni page horizontale vers la gauche :
- *   iSee n'a qu'une page ni qu'une bulle à parcourir ;
+ *   le haut (bascule Traversée), vers le bas (mode GPS), vers la droite
+ *   (création d'un picto) et vers la gauche (connexion des lunettes). Ni
+ *   double tap, ni page à feuilleter : iSee n'a qu'une page ni qu'une bulle
+ *   à parcourir ;
  * - [SwipeHoldTrigger] : balayage vers le bas confirmé puis doigt maintenu
  *   ~300 ms → [onSwipeHoldStart] (micro destination) jusqu'au relâchement qui
  *   émet [onSwipeHoldEnd] (envoi). Un balayage relâché vite garde son seul
@@ -33,8 +34,8 @@ import dev.sam3vision.core.gesture.SwipeHoldTrigger
  * Les taps ne sont jamais consommés en-dehors d'une tenue : ce sont des observations
  * posées sur les événements, les écrans iSee restent libres de leur rendu. Les deux
  * bords latéraux restent exclus du geste système « retour » ; le balayage vers le
- * haut bascule le mode Traversée, vers le bas la fonction GPS, et vers la droite
- * iSee demande l'objet à chercher (balayage vers la gauche : rien).
+ * haut bascule le mode Traversée, vers le bas la fonction GPS, vers la droite
+ * la création d'un picto et vers la gauche la connexion des lunettes.
  */
 class IseeRootLayout(context: Context) : FrameLayout(context) {
 
@@ -51,8 +52,11 @@ class IseeRootLayout(context: Context) : FrameLayout(context) {
     /** Balayage vers le bas confirmé : active la fonction GPS (ordre « active le GPS »). */
     var onSwipeDown: (() -> Unit)? = null
 
-    /** Balayage vers la droite confirmé : session lunettes si joignable, sinon « Quoi chercher ? ». */
+    /** Balayage vers la droite confirmé : création d'un picto (comme le bouton). */
     var onSwipeRight: (() -> Unit)? = null
+
+    /** Balayage vers la gauche confirmé : finit de connecter les lunettes si joignables, sinon rien. */
+    var onSwipeLeft: (() -> Unit)? = null
 
     /** Maintien après balayage vers le bas : ouvrir le micro destination. */
     var onSwipeHoldStart: (() -> Unit)? = null
@@ -155,6 +159,7 @@ class IseeRootLayout(context: Context) : FrameLayout(context) {
                 onSwipeDown?.invoke()
             }
             override fun onSwipeRight() = onSwipeRight?.invoke() ?: Unit
+            override fun onSwipeLeft() = onSwipeLeft?.invoke() ?: Unit
         },
     )
 

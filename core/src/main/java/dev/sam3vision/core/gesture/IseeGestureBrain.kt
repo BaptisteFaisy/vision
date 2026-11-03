@@ -11,10 +11,11 @@ import kotlin.math.hypot
  *   a plus de fenêtre de confirmation (le tap répondait 450 ms après le doigt).
  * - Balayage vers le **haut** : [Listener.onSwipeUp] (bascule du mode Traversée).
  * - Balayage vers le **bas** : [Listener.onSwipeDown] (mode GPS).
- * - Balayage vers la **droite** : [Listener.onSwipeRight] (session lunettes si joignable, sinon « quoi chercher ? »).
+ * - Balayage vers la **droite** : [Listener.onSwipeRight] (création d'un picto).
+ * - Balayage vers la **gauche** : [Listener.onSwipeLeft] (connexion des lunettes).
  *
- * Le balayage vers la gauche est reconnu puis **muet** : iSee n'a qu'une page, il
- * n'y a rien à feuilleter — mais le geste reste un glissement, jamais un tap.
+ * Chaque balayage reste un glissement, jamais un tap : iSee n'a qu'une page,
+ * il n'y a rien à feuilleter.
  *
  * L'appui long reste le domaine de [LongPressTrigger] — dans la vue : quand une
  * tenue démarre, [handOffToHold] glisse tout l'état présent sous le contrôle
@@ -42,8 +43,11 @@ class IseeGestureBrain(
         /** Balayage vers le bas confirmé (mode GPS). */
         fun onSwipeDown()
 
-        /** Balayage vers la droite confirmé (iSee demande l'objet à chercher). */
+        /** Balayage vers la droite confirmé (création d'un picto). */
         fun onSwipeRight()
+
+        /** Balayage vers la gauche confirmé (connexion des lunettes). */
+        fun onSwipeLeft()
     }
 
     private enum class Axis { None, Horizontal, Vertical }
@@ -82,7 +86,7 @@ class IseeGestureBrain(
         if (current.swipeEmitted) return
         if (current.axis == Axis.Horizontal && abs(dx) > horizontalMinPx) {
             current.swipeEmitted = true
-            if (dx > 0) listener.onSwipeRight()
+            if (dx > 0) listener.onSwipeRight() else listener.onSwipeLeft()
         }
         if (current.axis == Axis.Vertical && abs(dy) > verticalMinPx) {
             current.swipeEmitted = true
@@ -135,7 +139,7 @@ class IseeGestureBrain(
         /** Durée maximale d'une pression pour valoir tap (au-delà : rien). */
         const val DEFAULT_TAP_MAX_MS = 450L
 
-        /** Course horizontale pour valoir balayage (droite seule a un effet). */
+        /** Course horizontale pour valoir balayage (droite = picto, gauche = lunettes). */
         const val DEFAULT_HORIZONTAL_MIN_PX = 80f
 
         /** Course verticale pour valoir bascule : haut = Traversée, bas = GPS. */

@@ -68,14 +68,16 @@ Gestes, tous câblés dans `MainActivity.buildRoot` :
 | balayage vers le haut | bascule du mode Traversée (marche/arrêt, comme la puce) | `IseeGestures.onSwipeUp` → `modeChips.toggleCrossing()` |
 | balayage vers le bas | active la fonction GPS : ordre « active le GPS » (réglage persisté) + accusé parlé | `IseeGestures.onSwipeDown` → `IseeSwipeOrders.gpsOn()` |
 | balayage vers le bas + maintien (300 ms) | micro destination : l'endroit dicté part tel quel, guidage direct au relâchement | `IseeGestures.onSwipeHoldStart/End` → `IseeSwipeOrders.askDestination()/sendDestination()`, `core/gesture/SwipeHoldTrigger.kt` |
-| balayage vers la droite | iSee demande « Find what? », ouvre le micro, puis chasse `mode find my X` avec le mot entendu | `IseeGestures.onSwipeRight` → `IseeSwipeOrders.askToFind()` |
-| balayage vers la gauche | **reconnu mais sans effet** (une seule page, rien à feuilleter) | `core/gesture/IseeGestureBrain.kt` |
+| balayage vers la droite | photo de l'objet filmé puis pictogramme Muse, stocké et armé aussitôt — comme le bouton « Picto » (muet dehors) | `IseeGestures.onSwipeRight` → `picto.onPictoButton()` |
+| balayage vers la gauche | finit de connecter les lunettes (session) si joignables, sinon rien | `MainActivity.swipeLeft` → `glasses.connect()` si `shouldSwipeConnect` |
 
 Les **gestes passent tous par `IseeGestures`** (`app/isee/IseeGestures.kt`), relais
 posé dans `MainActivity.buildRoot` — le ViewModel garde ses exécutants, l'appelant
-n'a qu'un point d'entrée. Pendant l'écoute « Quoi chercher ? », la surface lui
-appartient (`IseeSwipeOrders.asking`) : tenue et tap sont ignorés, deux gestes ne
-se disputent jamais le micro.
+n'a qu'un point d'entrée. Seule exception : la gauche (lunettes) reste dans
+`MainActivity`, seule à voir les lunettes. Pendant une écoute (micro destination
+du maintien, ou « Quoi chercher ? » du flow autonome), la surface lui appartient
+(`IseeSwipeOrders.asking`) : tenue et tap sont ignorés, deux gestes ne se
+disputent jamais le micro.
 
 Le **double tap** (photo) reste supprimé, et le vertical n'a plus de changement de
 bulle : `IseeViewModel` n'a ni `onVerticalDrag*` ni `onDoubleTap`, et il n'y a aucun

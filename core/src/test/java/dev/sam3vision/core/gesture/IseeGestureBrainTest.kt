@@ -8,9 +8,9 @@ import org.junit.Test
  * a plus de fenêtre de confirmation. Deux taps rapprochés valent deux taps
  * simples ; une pression trop longue ne vaut rien ; la tenue garde la main.
  *
- * Balayages : vers le haut (Traversée), vers le bas (GPS) et vers la droite
- * (« quoi chercher ? ») partent une fois ; vers la gauche, rien — mais jamais un
- * tap pour autant.
+ * Les quatre balayages partent une fois : vers le haut (Traversée), vers le
+ * bas (GPS), vers la droite (création d'un picto) et vers la gauche (connexion
+ * des lunettes) — et aucun n'est jamais un tap.
  */
 class IseeGestureBrainTest {
 
@@ -19,6 +19,7 @@ class IseeGestureBrainTest {
         var up = 0
         var down = 0
         var right = 0
+        var left = 0
 
         fun listener() = object : IseeGestureBrain.Listener {
             override fun onSingleTap() {
@@ -35,6 +36,10 @@ class IseeGestureBrainTest {
 
             override fun onSwipeRight() {
                 right++
+            }
+
+            override fun onSwipeLeft() {
+                left++
             }
         }
     }
@@ -107,7 +112,7 @@ class IseeGestureBrainTest {
     }
 
     @Test
-    fun `un balayage vers la droite demande quoi chercher, une seule fois`() {
+    fun `un balayage vers la droite emet swipe-droite, une seule fois`() {
         val events = Events()
         val brain = IseeGestureBrain(events.listener())
 
@@ -119,19 +124,22 @@ class IseeGestureBrainTest {
         assertEquals("un seul swipe-droite", 1, events.right)
         assertEquals("pas de tap", 0, events.single)
         assertEquals("rien de vertical", 0, events.up + events.down)
+        assertEquals("rien à gauche", 0, events.left)
     }
 
     @Test
-    fun `un balayage vers la gauche ne fait rien et n'est jamais un tap`() {
+    fun `un balayage vers la gauche emet swipe-gauche, une seule fois, sans tap`() {
         val events = Events()
         val brain = IseeGestureBrain(events.listener())
 
         brain.onDown(nowMs = 0, x = 300f, y = 100f)
-        brain.onMove(nowMs = 30, x = 100f, y = 100f)
-        brain.onUp(nowMs = 60, x = 100f, y = 100f)
+        brain.onMove(nowMs = 30, x = 200f, y = 104f)
+        brain.onMove(nowMs = 45, x = 140f, y = 108f)
+        brain.onUp(nowMs = 60, x = 100f, y = 108f)
 
-        assertEquals("aucun balayage", 0, events.right + events.up + events.down)
+        assertEquals("un seul swipe-gauche", 1, events.left)
         assertEquals("pas de tap", 0, events.single)
+        assertEquals("rien d'autre", 0, events.right + events.up + events.down)
     }
 
     @Test
@@ -157,7 +165,7 @@ class IseeGestureBrainTest {
         brain.onUp(nowMs = 40, x = 140f, y = 130f)
 
         assertEquals("toujours un tap", 1, events.single)
-        assertEquals("aucun balayage", 0, events.up + events.down + events.right)
+        assertEquals("aucun balayage", 0, events.up + events.down + events.right + events.left)
     }
 
     @Test
@@ -175,7 +183,7 @@ class IseeGestureBrainTest {
     }
 
     @Test
-    fun `pendant une tenue, le swipe bas et le swipe droite sont ignores`() {
+    fun `pendant une tenue, les swipes bas droite et gauche sont ignores`() {
         val events = Events()
         val brain = IseeGestureBrain(events.listener())
 
@@ -186,9 +194,12 @@ class IseeGestureBrainTest {
         brain.onDown(nowMs = 400, x = 100f, y = 100f)
         brain.onMove(nowMs = 430, x = 250f, y = 100f)
         brain.onUp(nowMs = 460, x = 250f, y = 100f)
+        brain.onDown(nowMs = 800, x = 300f, y = 100f)
+        brain.onMove(nowMs = 830, x = 150f, y = 100f)
+        brain.onUp(nowMs = 860, x = 150f, y = 100f)
         brain.holdReleased()
 
-        assertEquals("rien pendant la tenue", 0, events.down + events.right)
+        assertEquals("rien pendant la tenue", 0, events.down + events.right + events.left)
     }
 
     @Test

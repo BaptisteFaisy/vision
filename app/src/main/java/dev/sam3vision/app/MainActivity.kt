@@ -58,9 +58,9 @@ private val SamColorScheme = darkColorScheme(
  * La racine n'est pas le ComposeView mais [IseeRootLayout] : elle voit chaque geste
  * de la surface de l'app — appui long (micro maintenu, transcription Muse, photo
  * filmée jointe), tap simple (vidéo), balayage vers le haut (bascule Traversée),
- * vers le bas (fonction GPS) et vers la droite (« Quoi chercher ? » puis chasse) ;
- * vers la gauche, rien. Double tap supprimé. Les gestes ne s'appliquent que quand
- * les panneaux iSee sont à l'écran.
+ * vers le bas (fonction GPS), vers la droite (création d'un picto) et vers la
+ * gauche (connexion des lunettes). Double tap supprimé. Les gestes ne
+ * s'appliquent que quand les panneaux iSee sont à l'écran.
  */
 class MainActivity : ComponentActivity() {
 
@@ -201,7 +201,8 @@ class MainActivity : ComponentActivity() {
         onSingleTap = isee.gestures::onSingleTap
         onSwipeUp = isee.gestures::onSwipeUp
         onSwipeDown = isee.gestures::onSwipeDown
-        onSwipeRight = { swipeRight() }
+        onSwipeRight = isee.gestures::onSwipeRight
+        onSwipeLeft = { swipeLeft() }
         onSwipeHoldStart = isee.gestures::onSwipeHoldStart
         onSwipeHoldEnd = isee.gestures::onSwipeHoldEnd
         onSwipeHoldCancel = isee.gestures::onSwipeHoldCancel
@@ -217,16 +218,14 @@ class MainActivity : ComponentActivity() {
     }
 
     /**
-     * Balayage droit : finit de connecter les lunettes (session) quand le bouton le
-     * pourrait et que le Bluetooth est déjà monté, sinon le « Quoi chercher ? » d'avant.
+     * Balayage gauche : finit de connecter les lunettes (session) quand le bouton le
+     * pourrait et que le Bluetooth est déjà monté, sinon rien.
      * Le geste ne coupe jamais un direct et n'attend jamais le Bluetooth.
      */
-    private fun swipeRight() {
+    private fun swipeLeft() {
         if (shouldSwipeConnect(glasses.state.value, hasLinkedDevice(linkedStates()))) {
             Log.i("GlassesChain", "swipe connect")
             glasses.connect()
-        } else {
-            isee.gestures.onSwipeRight()
         }
     }
 
