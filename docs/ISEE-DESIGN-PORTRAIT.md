@@ -23,13 +23,15 @@
   module que la lumière, il ne teinte plus rien. Le bas du verre et les 50 %
   restants restent blanc laiteux. Shader AGSL sur API 33+,
   repli en dégradés en dessous. **Aucun pixel sur la boule, aucun satellite.**
-- **Caméra = la rue en haut**, sans cadre ni carte (`IseePortraitCamera`) :
-  elle occupe 62,5 % du haut quand elle est affichée (la taille parole,
+- **Caméra = un bloc comme la carte** (`IseePortraitCamera`) : elle occupe
+  62,5 % du haut quand elle est affichée (la taille parole,
   `PICTURE_SPEAKING_H`), 75 % en guidage (`PICTURE_GUIDING_H`, la boule
-  s'efface entre la rue et la carte, la phrase reste), et un **trait gris
-  clair** l'en sépare (`DIVIDER`, 4 dp de haut, arrondi 10 dp aux extrémités).
-  À l'ouverture
-  elle arrive **floue et agrandie** (×1,05, flou max 24) puis devient nette (`focusPull`).
+  s'efface entre le bloc et la carte, la phrase reste), avec les mêmes bords
+  que la map — arrondi 16 dp (`IseeBlockShape`), même ombre portée, marges
+  latérales 16 dp (`IseeBlockSide`), coins natifs rognés
+  (`View.clipToIseeBlock`). Le bord du bloc remplace le trait de séparation.
+  À l'ouverture elle arrive **floue et agrandie** (×1,05, flou max 24) puis
+  devient nette (`focusPull`) ; un **voile haut** garde la pastille lisible.
   Elle reste visible **tant qu'une capture est vivante** (`captureLive`),
   quel que soit l'état (tenir le micro sous vidéo ne la cache pas).
 - **La boule respire** (respiration + ombre de contact). Au repos : centrée à
@@ -73,7 +75,7 @@
   point (`focusPull`), voix (`voiceEnvelope`, `wordsSpoken`), palettes. Testé
   sur JVM, aucune dépendance Android.
 - **UI fine, `:app`** : `app/…/isee/IseeScenePane.kt` (assemblage),
-  `IseePortraitOrb.kt` (boule), `IseePortraitCamera.kt` (rue + trait),
+  `IseePortraitOrb.kt` (boule), `IseePortraitCamera.kt` (bloc caméra),
   `IseeSpokenLine.kt` (phrase mot à mot). Le contrat `iseeSceneLayers`
   (caméra vivante → carte caméra) est conservé ; le paramètre `dissolving`
   n'est gardé que pour le contrat — **le design n'a plus de dissolution
