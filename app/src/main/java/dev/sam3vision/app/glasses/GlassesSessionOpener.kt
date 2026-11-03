@@ -46,9 +46,13 @@ internal class GlassesSessionOpener(
     /** Morts rapides déjà rejouées dans ce cycle (remis à zéro par [open]). */
     private var quickDeaths: Int = 0
 
+    /** Chutes de sessions établies déjà reprises dans ce cycle (remis à zéro par [open]). */
+    private var rescueDeaths: Int = 0
+
     /** Ouvre une session ; tue une ouverture précédente restée en vie. */
     fun open() {
         quickDeaths = 0
+        rescueDeaths = 0
         relaunch()
     }
 
@@ -69,25 +73,45 @@ internal class GlassesSessionOpener(
     }
 
     /**
-     * Session retombée (`STOPPED`) : les capacités se libèrent toujours, puis
-     * une mort rapide se rejoue seule, espacée ([quickDeathDelayMs]) — passé
-     * [QUICK_DEATH_MAX_RETRIES], c'est un refus et il se dit comme tel.
+     * Session retombée (`STOPPED`) : les capacités se libèrent toujours, puis la
+     * chute se reprend seule — mort rapide espacée ([quickDeathDelayMs]) comme
+     * session établie tombée (backoff [rescueDelayMs]). Passé le budget
+     * ([QUICK_DEATH_MAX_RETRIES], [RESCUE_MAX_RETRIES]), c'est un refus durable
+     * et il se dit comme tel.
      */
     fun settled(release: () -> Unit) {
         release()
-        if (!isQuickDeath(startMs, clock())) {
-            quickDeaths = 0
+        if (isQuickDeath(startMs, clock())) {
+            if (quickDeaths >= QUICK_DEATH_MAX_RETRIES) {
+                quickDeaths = 0
+                note(GlassesMessages.sessionRefusedByGlasses())
+                return
+            }
+            quickDeaths += 1
+            note(GlassesMessages.sessionRetrying(quickDeaths, QUICK_DEATH_MAX_RETRIES))
+            scheduleRetry(quickDeathDelayMs(quickDeaths))
             return
         }
-        if (quickDeaths >= QUICK_DEATH_MAX_RETRIES) {
-            quickDeaths = 0
+        quickDeaths = 0
+        // Une longue séance pardonne : seule une chute rapprochée accumule.
+        if (rescueForgiven(startMs, clock())) rescueDeaths = 0
+        if (rescueDeaths >= RESCUE_MAX_RETRIES) {
+            rescueDeaths = 0
             note(GlassesMessages.sessionRefusedByGlasses())
             return
         }
-        quickDeaths += 1
-        note(GlassesMessages.sessionRetrying(quickDeaths, QUICK_DEATH_MAX_RETRIES))
+        rescueDeaths += 1
+        note(GlassesMessages.sessionReconnecting(rescueDeaths))
+        scheduleRetry(rescueDelayMs(rescueDeaths))
+    }
+
+    /**
+     * Nouvel essai espacé de [waitMs] : annule l'essai précédent en attente,
+     * patiente, puis rouvre — sauf si l'utilisateur a repris la main (son ordre
+     * gagne) ou a tout arrêté ([cancel] a tué l'attente).
+     */
+    private fun scheduleRetry(waitMs: Long) {
         retryJob?.cancel()
-        val waitMs = quickDeathDelayMs(quickDeaths)
         retryJob = scope.launch {
             delay(waitMs)
             retryJob = null
