@@ -101,6 +101,19 @@ def test_health_boot_shape(_module) -> None:
           str(baseten.get("load_breakdown")))
 
 
+def test_boot_sans_depth(_module) -> None:
+    """DA2 paresseux : ``load_container`` ne charge plus la profondeur au boot."""
+    from test_units import check
+    from tests_units.weights_tests import _fresh_live_fast
+
+    service = _fresh_live_fast("service")
+    instance = _booted(service, 20.4, 185.8)
+    check("boot : DA2 absent au boot (paresseux)",
+          "depth_model" not in instance.ctx
+          and instance.health().get("depth") is None,
+          str(sorted(instance.ctx)))
+
+
 def test_modal_sans_constructeur(_module) -> None:
     """Modal refuse tout ``__init__`` custom, hérité compris (d810277d a cassé
     tous les deploys : ``_validate_construction_mechanism``) : ``Sam3Live``
