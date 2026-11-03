@@ -74,6 +74,12 @@ class IseeSwipeOrders(
     private val hapticEnd: () -> Unit,
     /** Vrai quand l'écran iSee est à l'écran : un maintien confirmé hors écran n'ouvre rien. */
     private val isActive: () -> Boolean,
+    /**
+     * Observabilité des refus de [askDestination] : chaque garde qui refuse
+     * y écrit son motif (logcat en prod via l'appelant, capturé sous test).
+     * Injecté pour rester testable en JVM — jamais de `Log` direct ici.
+     */
+    private val log: (String) -> Unit = {},
     private val clock: () -> Long = System::currentTimeMillis,
 ) {
 
@@ -102,14 +108,27 @@ class IseeSwipeOrders(
      * Maintien après balayage vers le bas : le micro destination s'ouvre (même
      * dictée que l'appui long, sans son contexte photo — une destination n'en
      * a pas besoin). Sans effet hors écran iSee ou si une écoute tient déjà
-     * le micro. `holding` est posé comme pour l'appui long (scène LISTENING,
-     * voix du guidage et keepalive tus pendant la dictée).
+     * le micro — mais chaque refus écrit son motif dans [log], plus aucun
+     * n'est silencieux. `holding` est posé comme pour l'appui long (scène
+     * LISTENING, voix du guidage et keepalive tus pendant la dictée).
      */
     fun askDestination() {
-        if (!isActive() || listening || destinationListening) return
+        if (!isActive()) {
+            log("destination refusée : écran iSee inactif")
+            return
+        }
+        if (listening) {
+            log("destination refusée : « Quoi chercher ? » tient le micro")
+            return
+        }
+        if (destinationListening) {
+            log("destination refusée : écoute destination déjà en cours")
+            return
+        }
         destinationListening = true
         if (!dictation.start()) {
             destinationListening = false
+            log("destination refusée : micro indisponible")
             update { it.copy(status = IseeStatusText.MIC_UNAVAILABLE) }
             return
         }
