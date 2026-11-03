@@ -10,13 +10,14 @@ import org.junit.Test
 class LivePromptsTest {
 
     @Test
-    fun `seize concepts exterieur par defaut, plafond client a vingt deux`() {
-        assertEquals(16, LivePrompts.default.size)
+    fun `vingt et un concepts exterieur par defaut, plafond client a vingt deux`() {
+        assertEquals(21, LivePrompts.default.size)
         assertEquals(
             listOf(
                 "person", "car", "pedestrian traffic light", "curb", "sidewalk",
                 "crosswalk", "pole", "stairs", "fence", "wall", "barrier", "sign",
-                "street lamp", "animal", "trash can", "souvenir shop",
+                "street lamp", "animal", "trash can", "souvenir shop", "bus",
+                "van", "stroller", "dog", "child",
             ),
             LivePrompts.default,
         )
@@ -60,15 +61,16 @@ class LivePromptsTest {
     }
 
     @Test
-    fun `foule et vehicules sortis du defaut, souvenirs restes`() {
-        // Spec v4 : la foule (poussette, enfant, chien), les véhicules hors
-        // voiture et la trottinette sortent de la détection dehors ; la
-        // boutique de souvenirs reste.
-        assertFalse("stroller" in LivePrompts.default)
-        assertFalse("child" in LivePrompts.default)
-        assertFalse("dog" in LivePrompts.default)
+    fun `foule bus camionnette restaures dans le defaut, trottinette velo dehors`() {
+        // Restauration 03/11 (ordre user) : poussette, enfant, chien, bus et
+        // camionnette reviennent dans la détection dehors ; trottinette,
+        // vélo, moto, camion restent dehors ; les souvenirs restent.
+        assertTrue("stroller" in LivePrompts.default)
+        assertTrue("child" in LivePrompts.default)
+        assertTrue("dog" in LivePrompts.default)
         assertFalse("electric scooter" in LivePrompts.default)
-        assertFalse("bus" in LivePrompts.default)
+        assertTrue("bus" in LivePrompts.default)
+        assertTrue("van" in LivePrompts.default)
         assertFalse("bicycle" in LivePrompts.default)
         assertFalse("motorcycle" in LivePrompts.default)
         assertTrue("sidewalk" in LivePrompts.default)
@@ -77,8 +79,8 @@ class LivePromptsTest {
         assertFalse("beanie" in LivePrompts.default)
         assertFalse("socks" in LivePrompts.default)
         assertFalse("keys" in LivePrompts.default)
-        assertFalse("stroller" in LivePrompts.outdoor)
-        assertFalse("child" in LivePrompts.outdoor)
+        assertTrue("stroller" in LivePrompts.outdoor)
+        assertTrue("child" in LivePrompts.outdoor)
         assertFalse("electric scooter" in LivePrompts.outdoor)
         assertFalse("truck" in LivePrompts.default)
         assertFalse("scooter" in LivePrompts.default)
@@ -96,9 +98,11 @@ class LivePromptsTest {
                 (CrossingPrompts.isLightLabel(concept) && CrossingPrompts.LIGHT in LivePrompts.default)
             assertTrue(concept, covered)
         }
-        // Depuis « vire bus, bicycle … » (ordre user du 01/11) le défaut ne
-        // porte plus les cinq véhicules : c'est `VehicleConcepts.promptsFor`
-        // qui les rétablit quand la Traversée s'arme, et elle les met en tête.
+        // « vire bus, bicycle … » (01/11) avait sorti bus/bicycle/truck/motorcycle
+        // du défaut (car gardée) ; bus restauré le 03/11 (ordre user).
+        // `VehicleConcepts.promptsFor` met les cinq en tête quand la Traversée
+        // s'arme (car/bus dédupliqués, bicycle/truck/motorcycle ajoutés, queue
+        // dog/child coupée au plafond 22).
         val crossing = VehicleConcepts.promptsFor(LivePrompts.default)
         (VehicleConcepts.PROMPTS).forEach { concept ->
             assertTrue(concept, concept in crossing)
@@ -108,9 +112,9 @@ class LivePromptsTest {
     }
 
     @Test
-    fun `preset exterieur replie sur le defaut seize concepts`() {
+    fun `preset exterieur replie sur le defaut vingt et un concepts`() {
         assertEquals(LivePrompts.default, LivePrompts.outdoor)
-        assertEquals(16, LivePrompts.outdoor.size)
+        assertEquals(21, LivePrompts.outdoor.size)
         assertTrue(LivePrompts.outdoor.size <= LivePrompts.MAX)
         assertEquals(LivePrompts.outdoor, LivePrompts.normalize(LivePrompts.outdoor))
     }
@@ -121,7 +125,7 @@ class LivePromptsTest {
         assertFalse("dumpster" in LivePrompts.outdoor)
         assertFalse("dumpster" in LivePrompts.default)
         assertFalse("benne" in LivePrompts.default)
-        assertEquals(16, LivePrompts.outdoor.size)
+        assertEquals(21, LivePrompts.outdoor.size)
     }
 
     @Test
@@ -141,9 +145,9 @@ class LivePromptsTest {
     }
 
     @Test
-    fun `le mode exterieur iSee suit les defauts seize concepts`() {
+    fun `le mode exterieur iSee suit les defauts vingt et un concepts`() {
         val exterior = LivePrompts.forMode(true)
-        assertEquals(16, exterior.size)
+        assertEquals(21, exterior.size)
         assertTrue("wall" in exterior)
         assertFalse("gate" in exterior)
         assertTrue("fence" in exterior)
@@ -233,10 +237,10 @@ class LivePromptsTest {
 
     @Test
     fun `find the x sous le plafond s ajoute sans rien chasser`() {
-        // La liste par défaut est à 16, le plafond à 22 : « Find the X »
+        // La liste par défaut est à 21, le plafond à 22 : « Find the X »
         // ajoute (« wallet ») sans évincer personne.
         val next = LivePrompts.withConcept(LivePrompts.default, "wallet")
-        assertEquals(17, next.size)
+        assertEquals(22, next.size)
         assertTrue("wallet" in next)
         assertTrue("souvenir shop" in next)
         assertEquals(LivePrompts.default + "wallet", next)
@@ -260,5 +264,18 @@ class LivePromptsTest {
     fun `suivis explicites dedans hors liste du monde`() {
         assertEquals(emptyList<String>(), LivePrompts.followedOf(LivePrompts.indoor, false))
         assertEquals(listOf("wallet"), LivePrompts.followedOf(LivePrompts.withConcept(LivePrompts.indoor, "wallet"), false))
+    }
+
+    @Test
+    fun `les douze masques de reference sont demandes dehors`() {
+        // Ordre user 03/11 (miroir JVM de tools/check-masques.py) : humain
+        // via « person », camionnette via « van ».
+        listOf(
+            "stairs", "car", "person", "pole", "sidewalk",
+            "pedestrian traffic light", "van", "bus", "wall", "stroller",
+            "dog", "child",
+        ).forEach { concept ->
+            assertTrue(concept, concept in LivePrompts.default)
+        }
     }
 }

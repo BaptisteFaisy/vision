@@ -19,7 +19,7 @@ import org.junit.Test
 
 /**
  * Rotation 3 groupes côté sonde (opt-in explicite du harnais) : un groupe
- * (~7 concepts, `person` partout) par frame, réponses accumulées — voix et
+ * (~8 concepts, `person` partout) par frame, réponses accumulées — voix et
  * overlay lisent la fusion dans l'état, jamais le groupe seul. Par défaut,
  * repli `ROTATION_OFF` : liste complète à chaque frame, sans accumulation.
  */
@@ -44,7 +44,7 @@ class LiveProbeRotationTest {
         send(probe, fake, "D", 26_000_000L, frame("person"))
         assertEquals(listOf(groups[0], groups[1], groups[2], groups[0]), fake.sentPrompts)
         assertTrue(fake.sentPrompts.all { it?.contains("person") == true })
-        assertEquals(listOf(6, 6, 6, 6), fake.sentPrompts.map { it?.size })
+        assertEquals(listOf(8, 8, 7, 8), fake.sentPrompts.map { it?.size })
     }
 
     @Test

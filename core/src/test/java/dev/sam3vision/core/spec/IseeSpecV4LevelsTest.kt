@@ -37,7 +37,7 @@ class IseeSpecV4LevelsTest {
 
     /** Labels interdits dehors en v4 (détection supprimée). */
     private val deletedOutdoorLabels = setOf(
-        "bus", "bicycle", "bike", "truck", "motorcycle",
+        "bicycle", "bike", "truck", "motorcycle",
         "bollard", "borne", "tree", "arbre", "gate", "portail",
         "boat", "bateau", "keys",
     )
@@ -171,7 +171,7 @@ class IseeSpecV4LevelsTest {
     }
 
     @Test
-    fun `dehors = bus velo camion moto borne arbre portail bateau cles supprimes`() {
+    fun `dehors = velo camion moto borne arbre portail bateau cles supprimes, bus restaure`() {
         val kept = setOf(
             "car", "person", "fence", "wall", "barrier", "curb",
             "stairs", "pole", "lamppost", "sign", "animal", "bin",
@@ -179,7 +179,7 @@ class IseeSpecV4LevelsTest {
         )
 
         assertTrue(deletedOutdoorLabels.none { it in kept })
-        assertEquals(14, deletedOutdoorLabels.size)
+        assertEquals(13, deletedOutdoorLabels.size)
     }
 
     @Test

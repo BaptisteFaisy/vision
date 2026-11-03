@@ -253,17 +253,19 @@ du conteneur
 pool 8 connexions inactives / 5 min (`Http.kt:56-67`). Le corps d'une frame est **one-shot** :
 OkHttp ne le rejoue jamais, donc pas de seconde inférence facturée (`Http.kt:98-112`).
 
-## 5. Concepts suivis : 16 dehors + 10 dedans (plafond 22, spec v4)
+## 5. Concepts suivis : 21 dehors + 10 dedans (plafond 22, spec v4 + restauration 03/11)
 
 - Liste dehors : `["person", "car", "pedestrian traffic light", "curb",
   "sidewalk", "crosswalk", "pole", "stairs", "fence", "wall", "barrier",
-  "sign", "street lamp", "animal", "trash can", "souvenir shop"]`
-  (**16 concepts**, spec v4 : listes verrouillées, deux mondes — sortis de la
-  détection : bus, vélo, camion, moto, clés dehors, borne, arbre, portail, bateau,
-  tête du feu, trottinette, poussette, enfant, chien, bonnet)
-  (`core/src/main/java/dev/sam3vision/core/live/LivePrompts.kt:29-33`).
+  "sign", "street lamp", "animal", "trash can", "souvenir shop", "bus", "van",
+  "stroller", "dog", "child"]`
+  (**21 concepts**, spec v4 + restauration 03/11 (ordre user, garde
+  `tools/check-masques.py`) : listes verrouillées, deux mondes — sortis de la
+  détection : vélo, camion, moto, clés dehors, borne, arbre, portail, bateau,
+  tête du feu, trottinette, bonnet)
+  (`core/src/main/java/dev/sam3vision/core/live/LivePrompts.kt`, `val default`).
 - Preset extérieur : replié sur la liste dehors (`LivePrompts.outdoor = default`,
-  spec v4, détection unifiée à 16 concepts). Gardé pour la pastille « Outdoor »
+  détection unifiée à 21 concepts). Gardé pour la pastille « Outdoor »
   du direct, qui envoie la même liste que « Street ».
 - Liste d'intérieur : `["keys", "medicine box", "glasses", "glasses case",
   "phone", "shoes", "door", "wall", "person", "socks"]` (10 objets,

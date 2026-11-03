@@ -290,7 +290,7 @@ class VehicleStateTest {
             "Car parked, 8 meters away.",
             VehicleStateText.parkedPhrase(voiture, 8f, null, SpeechLanguage.En),
         )
-        assertNull("bus hors liste dehors", VehicleStateText.nameOf("bus"))
+        assertNull("bus non parlé", VehicleStateText.nameOf("bus"))
         assertNull("camion hors liste dehors", VehicleStateText.nameOf("camion"))
         assertNull("moto hors liste dehors", VehicleStateText.nameOf("moto"))
     }

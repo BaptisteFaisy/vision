@@ -4,16 +4,18 @@ package dev.sam3vision.core.live
  * Prompts du direct : concepts suivis par SAM 3.1, liste courte modifiable depuis l'UI.
  * [normalize] assainit avant l'envoi au backend (`max_objects` borne la réponse).
  *
- * Spec v4 : listes verrouillées, deux mondes.
- * - Dehors ([default]) : 16 concepts — personne, voiture, feu piéton, bordure,
+ * Spec v4 + restauration 03/11 (ordre user) : listes verrouillées, deux mondes.
+ * - Dehors ([default]) : 21 concepts — personne, voiture, feu piéton, bordure,
  *   trottoir, passage piéton, poteau, escaliers, grillage, mur, barrière, panneau,
- *   lampadaire, animal, poubelle, souvenirs.
+ *   lampadaire, animal, poubelle, souvenirs, bus, camionnette, poussette,
+ *   chien, enfant.
  * - Dedans ([indoor]) : 10 objets — clés, boîte de médicaments, lunettes, boîtier
  *   de lunettes, téléphone, chaussures, porte, murs, humain, chaussettes.
  *
- * Supprimés de la détection (spec v4) : bus, vélo, camion, moto, clés dehors,
+ * Supprimés de la détection (spec v4) : vélo, camion, moto, clés dehors,
  * borne, arbre, portail, bateau — plus les anciens doublons (tête du feu,
- * trottinette, poussette, enfant, chien, bonnet).
+ * trottinette, bonnet). Restaurés le 03/11 (ordre user, garde
+ * `tools/check-masques.py`) : bus, camionnette, poussette, enfant, chien.
  *
  * Concepts en anglais : c'est la langue que SAM 3.1 segmente le mieux.
  * [forMode] bascule les listes dehors/dedans (`Settings.outdoorMode` côté sonde).
@@ -23,18 +25,19 @@ package dev.sam3vision.core.live
 object LivePrompts {
 
     /**
-     * Concepts dehors : les **16** de la spec v4, dans l'ordre de la spec.
+     * Concepts dehors : les **21** (spec v4 + restauration 03/11), dans l'ordre.
      * Liste unique normal/Traversée : la bascule ne change plus les prompts.
      */
     val default: List<String> = listOf(
         "person", "car", "pedestrian traffic light", "curb", "sidewalk", "crosswalk",
         "pole", "stairs", "fence", "wall", "barrier", "sign", "street lamp",
-        "animal", "trash can", "souvenir shop",
+        "animal", "trash can", "souvenir shop", "bus", "van", "stroller", "dog",
+        "child",
     )
 
     /**
-     * Preset extérieur : replié sur [default] (spec v4, détection unifiée à 16
-     * concepts). Gardé pour la pastille « Outdoor » du direct, qui envoie la
+     * Preset extérieur : replié sur [default] (détection unifiée à 21 concepts).
+     * Gardé pour la pastille « Outdoor » du direct, qui envoie la
      * même liste que « Street ».
      */
     val outdoor: List<String> = default
@@ -48,7 +51,7 @@ object LivePrompts {
     )
 
     /**
-     * Liste du monde sensoriel : dehors = [default] (16 concepts), dedans =
+     * Liste du monde sensoriel : dehors = [default] (21 concepts), dedans =
      * [indoor] (10 objets). La sonde iSee bascule via `Settings.outdoorMode`.
      */
     fun forMode(outdoor: Boolean): List<String> = if (outdoor) default else indoor
@@ -67,7 +70,7 @@ object LivePrompts {
      * Nombre maximal de concepts : **22** (le backend suit : `MAX_PROMPTS = 22`
      * sur `/live`, `PROMPT_LIMIT = 22` côté tracker ; un serveur resté en
      * arrière **refuse** la frame, il ne tronque pas). Les listes spec v4
-     * (16 dehors, 10 dedans) tiennent sous ce plafond ; la marge sert à
+     * (21 dehors, 10 dedans) tiennent sous ce plafond ; la marge sert à
      * « Find my X » ([withConcept]), pas à allonger le suivi au repos.
      */
     const val MAX = 22

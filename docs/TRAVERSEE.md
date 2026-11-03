@@ -65,7 +65,7 @@ qui **précède** le verdict (plus petit nombre = plus forte priorité, donc
 
 ## 4. Détection en traversée
 
-- Liste unique normal/traversée (16 dehors, `docs/VOIX-DANGER.md` § 7) :
+- Liste unique normal/traversée (21 dehors, `docs/VOIX-DANGER.md` § 7) :
   la bascule ne change plus les prompts. Le verdict lit le feu
   (`pedestrian traffic light`) et les voitures (`car`) ; les niveaux 101
   et 102 lisent `person` et `curb`.

@@ -6,24 +6,25 @@ import org.junit.Assert.assertTrue
 import org.junit.Test
 
 /**
- * Spec v4 : listes de concepts caméra verrouillées.
- * Dehors = 16 concepts, dedans = 10 objets, plafond respecté, « Find my X »
+ * Spec v4 + restauration 03/11 : listes de concepts caméra verrouillées.
+ * Dehors = 21 concepts, dedans = 10 objets, plafond respecté, « Find my X »
  * ajoute (éviction du dernier au plafond), champ « Follow » gardé, bascule
  * indoor-outdoor des listes.
  */
 class LivePromptsSpecV4Test {
 
     @Test
-    fun `dehors seize concepts exacts dans l ordre de la spec`() {
+    fun `dehors vingt et un concepts exacts dans l ordre`() {
         assertEquals(
             listOf(
                 "person", "car", "pedestrian traffic light", "curb", "sidewalk", "crosswalk",
                 "pole", "stairs", "fence", "wall", "barrier", "sign", "street lamp",
-                "animal", "trash can", "souvenir shop",
+                "animal", "trash can", "souvenir shop", "bus", "van", "stroller", "dog",
+                "child",
             ),
             LivePrompts.default,
         )
-        assertEquals(16, LivePrompts.default.size)
+        assertEquals(21, LivePrompts.default.size)
     }
 
     @Test
@@ -42,9 +43,9 @@ class LivePromptsSpecV4Test {
     fun `concepts supprimes absents de la detection dehors`() {
         val dehors = LivePrompts.default
         listOf(
-            "bus", "bicycle", "truck", "motorcycle", "keys", "bollard", "tree",
+            "bicycle", "truck", "motorcycle", "keys", "bollard", "tree",
             "gate", "boat", "pedestrian signal head", "electric scooter",
-            "stroller", "child", "dog", "beanie",
+            "beanie",
         ).forEach { concept ->
             assertFalse(concept, concept in dehors)
         }
@@ -76,7 +77,7 @@ class LivePromptsSpecV4Test {
     @Test
     fun `find my x ajoute sous le plafond sans rien chasser`() {
         val next = LivePrompts.withConcept(LivePrompts.default, "wallet")
-        assertEquals(17, next.size)
+        assertEquals(22, next.size)
         assertEquals(LivePrompts.default + "wallet", next)
         val indoorNext = LivePrompts.withConcept(LivePrompts.indoor, "wallet")
         assertEquals(LivePrompts.indoor + "wallet", indoorNext)
@@ -110,7 +111,7 @@ class LivePromptsSpecV4Test {
     fun `bascule indoor-outdoor des listes`() {
         assertEquals(LivePrompts.default, LivePrompts.forMode(true))
         assertEquals(LivePrompts.indoor, LivePrompts.forMode(false))
-        assertEquals(16, LivePrompts.forMode(true).size)
+        assertEquals(21, LivePrompts.forMode(true).size)
         assertEquals(10, LivePrompts.forMode(false).size)
     }
 

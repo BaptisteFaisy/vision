@@ -18,8 +18,9 @@
   muets — pas de TTS système en repli.
 - **Google Maps supprimé** : ni handoff, ni repli navigateur, ni fiche lieu.
   Le GPS, c'est le guidage in-app (Valhalla) ou rien.
-- **Supprimés de la détection** : bus, vélo, camion, moto, clés dehors,
-  borne, arbre, portail, bateau. Ils ne sont ni suivis, ni reconnus, ni dits.
+- **Supprimés de la détection** : vélo, camion, moto, clés dehors,
+  borne, arbre, portail, bateau. Ils ne sont ni suivis, ni reconnus, ni dits
+  (bus restauré le 03/11, ordre user).
 
 ## 1. Dehors : échelle 0 à 12
 
@@ -136,9 +137,11 @@ frappe ne fait jamais taire une annonce).
 
 ## 7. Listes de détection (SAM 3.1, anglais)
 
-- **Dehors (16)** : `person`, `car`, `pedestrian traffic light`, `curb`,
+- **Dehors (21)** : `person`, `car`, `pedestrian traffic light`, `curb`,
   `sidewalk`, `crosswalk`, `pole`, `stairs`, `fence`, `wall`, `barrier`,
-  `sign`, `street lamp`, `animal`, `trash can`, `souvenir shop`.
+  `sign`, `street lamp`, `animal`, `trash can`, `souvenir shop`, `bus`,
+  `van`, `stroller`, `dog`, `child` (restauration 03/11, ordre user ;
+  garde `tools/check-masques.py`).
 - **Dedans (10)** : `keys`, `medicine box`, `glasses`, `glasses case`,
   `phone`, `shoes`, `door`, `wall`, `person`, `socks`.
 - `mode find my X` ajoute le concept (le dernier cède son slot au plafond).
