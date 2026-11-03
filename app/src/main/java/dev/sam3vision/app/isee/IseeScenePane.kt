@@ -267,23 +267,18 @@ internal fun orbLookOf(scene: IseeScene, time: Float, open: Float): OrbLook {
     return OrbLook(time = time, you = you, see = see, amp = amp, level = level)
 }
 
-/** Demi-largeur, demi-hauteur, opacité : le contact se resserre vers le centre. */
-private val SHADOW_LOBES = listOf(
-    Triple(0.94f, 0.18f, 0.09f),
-    Triple(0.66f, 0.085f, 0.14f),
-    Triple(0.34f, 0.032f, 0.18f),
-)
-
-// Statiques : les reconstruire à chaque frame de la boule alloue pour rien.
-private val SHADOW_INK = Color(IseePortrait.INK)
-private val CROWN_SEE = Color(IseePortrait.SEE)
-
 /** Pénombre diffuse, ombre portée et cœur de contact, fondus sur le sol blanc. */
 private fun androidx.compose.ui.graphics.drawscope.DrawScope.drawOrbShadow(c: Offset, r: Float, k: Float) {
     if (k <= 0.01f) return
+    // Demi-largeur, demi-hauteur, opacité : le contact se resserre vers le centre.
+    val lobes = listOf(
+        Triple(0.94f, 0.18f, 0.09f),
+        Triple(0.66f, 0.085f, 0.14f),
+        Triple(0.34f, 0.032f, 0.18f),
+    )
     val center = Offset(c.x + r * 0.045f, c.y + r * 1.13f)
-    val ink = SHADOW_INK
-    SHADOW_LOBES.forEach { (width, height, opacity) ->
+    val ink = Color(IseePortrait.INK)
+    lobes.forEach { (width, height, opacity) ->
         // Comprimer le dégradé lui-même évite le bord dur d'un disque rogné en ovale.
         withTransform({
             translate(center.x, center.y)
@@ -310,7 +305,7 @@ private fun androidx.compose.ui.graphics.drawscope.DrawScope.drawOrbShadow(c: Of
 /** La couronne de 120 barres fines qui monte du verre avec la voix d'iSee. */
 private fun androidx.compose.ui.graphics.drawscope.DrawScope.drawVoiceCrown(c: Offset, r: Float, t: Float, k: Float, amp: Float) {
     val n = 120
-    val see = CROWN_SEE
+    val see = Color(IseePortrait.SEE)
     for (i in 0 until n) {
         val a = i / n.toFloat() * 2f * Math.PI.toFloat()
         val e = 0.5f + 0.28f * kotlin.math.sin(a * 3 + t * 2.1f) + 0.18f * kotlin.math.sin(a * 7 - t * 3.3f + 1.3f) +

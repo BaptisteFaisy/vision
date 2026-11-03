@@ -130,9 +130,9 @@ internal class GlassesSessionOpener(
         // Arrêt demandé avant même l'attente : rien à ouvrir.
         if (snapshot().phase != SessionPhase.STARTING) return
         // Paire simulée : aucun lien Bluetooth à attendre.
-        val linked = snapshot().mockActive || awaitLinkedDevice(clock) {
+        val linked = snapshot().mockActive || awaitLinkedDevice(clock, onWaiting = {
             note(GlassesMessages.waitingForLink())
-        }
+        })
         if (!linked) {
             idle()
             note(GlassesMessages.noLinkedDevice())
