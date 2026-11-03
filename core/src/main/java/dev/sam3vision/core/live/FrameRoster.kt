@@ -25,7 +25,15 @@ class FrameLabels {
 
     private val seen = LinkedHashSet<String>()
 
-    /** Étiquettes de [objects], sans doublon. La liste rendue est neuve (elle part en état). */
+    /**
+     * Étiquettes de [objects], sans doublon. La liste rendue est neuve (elle part en état).
+     *
+     * Synchronisée : l'instance est partagée par toute la sonde (`LiveProbe.labels`) et la
+     * publication sérialisée ne protège que le chemin nominal — deux `of` entrelacés
+     * (clear/add concurrents sur l'ensemble réutilisé) tuaient l'app
+     * (`ArrayIndexOutOfBounds`, émulateur le 01/11). Même remède que les trackers.
+     */
+    @Synchronized
     fun of(objects: List<SegObject>): List<String> {
         seen.clear()
         var i = 0
