@@ -19,7 +19,7 @@ import androidx.compose.ui.graphics.Path
 import androidx.compose.ui.graphics.PathFillType
 import androidx.compose.ui.unit.dp
 
-/** Rayon des coins de la carte GPS, partagé avec le repli schéma. */
+/** Rayon des coins de la carte GPS, partagé avec le repli schéma et le bloc caméra. */
 val GuideMapCornerRadius = 16.dp
 
 /**
