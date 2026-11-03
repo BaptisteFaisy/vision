@@ -23,6 +23,7 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
+import dev.sam3vision.app.FirstPixelWatcher
 import dev.sam3vision.core.iseedesign.focusPull
 import dev.sam3vision.core.iseedesign.pictureAlpha
 import dev.sam3vision.core.picto.PictoPlaceMode
@@ -141,6 +142,9 @@ private fun BoxScope.StreetFeed(
 private fun GlassesMasksScoped(probe: LiveProbe) {
     val pixels = probe.collectPixels()
     GlassesMaskLayer(pixels.masks, pixels.width, pixels.height)
+    // Miroir du chemin téléphone (`IseeCameraWiring`) : sans ce guet, `noteDrawn`
+    // n'est jamais appelé sur le chemin lunettes et la ligne `latency` (E2E) ne sort jamais.
+    FirstPixelWatcher(pixels.pixelSeq, pixels.pixelSeq > 0) { probe.noteDrawn() }
 }
 
 /**
