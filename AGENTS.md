@@ -56,7 +56,7 @@ là, atteignables depuis les Réglages, section « Other screens »
 |---|---|
 | `:core` | domaine + réseau + logique pure JVM (`model, net, mask, distance, settings, live, gesture, predict, audio, usecase`), minSdk 26 |
 | `:app` | Compose + CameraX : écrans, ViewModels, `dev.sam3vision.app`, minSdk **29** (`app/build.gradle.kts:87`) |
-| Direct | **WebSocket `/live/ws`**, une frame en vol : `core/net/WsLiveClient.kt` sur `WsTransport` (`OkHttpWsTransport` en prod, faux JVM en test) |
+| Direct | **WebSocket `/live/ws`** (repli `POST /live` quand le socket tombe), une frame en vol : `core/net/WsLiveClient.kt` sur `WsTransport` (`OkHttpWsTransport` en prod, faux JVM en test) |
 | Concepts du direct | **21** par défaut (person, car, bus, bicycle, motorcycle, feux piétons ×2, curb, sidewalk, crosswalk, pole, stairs, keys, gate, boutique ×3, wall, foule ×3), `LivePrompts.MAX = 22` (`core/live/LivePrompts.kt:75-81` (+ `MAX`)) ; **spec v4 (mergée le 01/11/2026, voir § 1 bis) + restauration 03/11 : 20 dehors + 10 dedans (enfant retiré le 03/11, ordre user)** |
 | Tests | **4 809 `@Test`** JVM (`:core` 2 972, `:app` 1 837, relevé du 01/11/2026, voir `docs/TESTING.md`) + 8 instrumentés (`:app` : 7 + 1 banc `MockGlassesTest`) |
 | Taille | **1 215** fichiers `.kt`, **78 831** lignes de prod (`:core` 34 397, `:app` 44 434, mesure du 01/11/2026 par `tools/count-tree.py`) |
@@ -186,11 +186,13 @@ au premier échec, en nommant le coupable.
    `liveClient()`, WebSocket ; `LiveProbe` et `LiveViewModel` partagent cette fabrique), un seul
    mapper JSON (`org.json`, `net/Json.kt`). Pas de Retrofit, pas de kotlinx-serialization, pas
    de MockWebServer. `Result.flatMap` n'existe pas → helper `Result.then` (`net/Http.kt:306`).
-7. **Direct = WebSocket, pas de repli HTTP sur les frames.** `POST /live` **n'est plus appelé**
-   en production : le seul appel de `LiveClient.live(…)` en prod part de `LiveSession.kt:138`,
-   et le client vient toujours de `liveClient()` → `WsLiveClient`. `HttpLiveClient` ne garde
-   `POST /live` que pour les tests JVM, et n'est monté dans la fabrique que pour déléguer
-   `GET /health` (`LiveClientFactory.kt:47`, `WsLiveClient.kt:98`). Ne pas le réintroduire.
+7. **Direct = WebSocket, avec repli HTTP sur les frames.** Les frames partent sur
+   `/live/ws` (le seul appel de `LiveClient.live(…)` en prod part de `LiveSession`, le
+   client venant toujours de `liveClient()` → `WsLiveClient`) ; quand le socket ne peut
+   pas servir — ouverture impossible, envoi refusé, fermeture en vol — la frame part en
+   `POST /live` via le délégué `HttpLiveClient`, avec les mêmes knobs (repli collant +
+   re-sonde WS, `core/net/WsHttpFallback.kt`). Pas de repli sur délai (serveur lent),
+   endpoint inutilisable, hors-ligne connu ni après `close`.
    `POST /segment` (photo) et `POST /video` (mode tap) restent HTTP — **`/video` n'a aucune
    implémentation backend connue** : le client est écrit, la route serveur n'est pas
    vérifiable ici (`git grep -n '"/video"' server/backend` vide). Toute frame WS porte un `id`

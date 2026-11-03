@@ -180,10 +180,10 @@ Trois mémoires différentes, à ne pas confondre :
   pas la réponse du chat (lecteur différent) mais rien ne l'empêche de parler **en
   même temps** ; le `Mutex speak` ne protège que les annonces entre elles.
 
-⚠️ **Correction** : la formule « la voix parle sans couper le chat via POST /live » est fausse
-sur les deux points. Les frames du direct arrivent par le **WebSocket `/live/ws`**
-(`core/net/WsTransport.kt:35` : `LIVE_WS_PATH = "/live/ws"`, `WsLiveClient`), sans repli ni
-envoi HTTP ; et la
+⚠️ **Correction** : la formule « la voix parle sans couper le chat via POST /live » est fausse.
+Les frames du direct arrivent par le **WebSocket `/live/ws`**
+(`core/net/WsTransport.kt:35` : `LIVE_WS_PATH = "/live/ws"`, `WsLiveClient`), avec repli
+`POST /live` quand le socket tombe (contrat `docs/LIVE-SPEC.md` §1) ; et la
 non-interruption vient du garde `playerIdle`, pas du transport.
 
 ## Transport et latences de référence (citées, non re-mesurées ici)
