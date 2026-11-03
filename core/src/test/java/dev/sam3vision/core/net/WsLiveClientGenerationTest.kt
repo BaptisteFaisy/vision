@@ -103,17 +103,38 @@ class WsLiveClientGenerationTest {
     }
 
     @Test
-    fun `une fermeture idle 1011 dit son motif`() = runBlocking {
+    fun `une fermeture idle 1001 dit son motif sans consommer de backoff`() = runBlocking {
         var transport: ContractWsTransport? = null
         transport = ContractWsTransport { _ ->
-            transport?.disconnect(WsClosedAbnormally(1011, "idle"))
+            transport?.disconnect(WsClosedAbnormally(1001, "idle"))
             emptyList()
         }
-        val client = WsLiveClient(base, transport, 1_000, RecordingLiveClient(), binaryWs = false)
+        val link = WsLink()
+        val client = WsLiveClient(base, transport, 1_000, RecordingLiveClient(), binaryWs = false, link = link)
+
+        val failure = client.live("QQ==", listOf("person"), 640, 4).exceptionOrNull()
+
+        assertTrue("attendu Network, obtenu $failure", failure is ApiError.Network)
+        assertTrue("motif 1001 attendu, obtenu ${failure?.message}", "1001" in (failure?.message ?: ""))
+        assertEquals("un idle n'est pas un échec", 0, link.attemptCount)
+        assertTrue("reprise immédiate, sans backoff", link.canAttempt())
+        assertEquals(WsLinkState.Degraded, client.linkState.value)
+    }
+
+    @Test
+    fun `une fermeture 1011 dit erreur interne et consomme un backoff`() = runBlocking {
+        var transport: ContractWsTransport? = null
+        transport = ContractWsTransport { _ ->
+            transport?.disconnect(WsClosedAbnormally(1011, "internal"))
+            emptyList()
+        }
+        val link = WsLink(clock = { 0L })
+        val client = WsLiveClient(base, transport, 1_000, RecordingLiveClient(), binaryWs = false, link = link)
 
         val failure = client.live("QQ==", listOf("person"), 640, 4).exceptionOrNull()
 
         assertTrue("attendu Network, obtenu $failure", failure is ApiError.Network)
         assertTrue("motif 1011 attendu, obtenu ${failure?.message}", "1011" in (failure?.message ?: ""))
+        assertEquals("un 1011 consomme une tentative", 1, link.attemptCount)
     }
 }
