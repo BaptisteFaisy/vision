@@ -2,6 +2,7 @@ package dev.sam3vision.app.isee
 
 import android.graphics.RectF
 import androidx.compose.foundation.background
+import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.BoxScope
@@ -72,6 +73,16 @@ class PlaceModeChipZone {
  * [CrossingChip] (fond, pastille 7 dp, texte 10 sp gras) : les deux puces
  * forment une seule rangée de témoins en haut de la rue Portrait.
  */
+/**
+ * Contour néon d'une puce : halo externe translucide puis liseré vif, dans
+ * la couleur d'état (même teinte que la pastille). Partagé avec
+ * `CrossingChip` (même gabarit, même package).
+ */
+@Composable
+internal fun Modifier.neonEdge(color: Color, shape: RoundedCornerShape): Modifier =
+    border(4.dp, color.copy(alpha = 0.22f), shape)
+        .border(1.5.dp, color.copy(alpha = 0.95f), shape)
+
 @Composable
 internal fun BoxScope.PlaceModeChip(
     mode: PictoPlaceMode,
@@ -92,6 +103,7 @@ internal fun BoxScope.PlaceModeChip(
             }
             .padding(8.dp)
             .background(Color(0x99000000), RoundedCornerShape(8.dp))
+            .neonEdge(dot, RoundedCornerShape(8.dp))
             .clickable(onClick = onToggle)
             .padding(horizontal = 8.dp, vertical = 4.dp),
         verticalAlignment = Alignment.CenterVertically,
