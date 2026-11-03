@@ -57,9 +57,11 @@ object TimingsText {
         // construisait une liste, six chaînes intermédiaires puis une seconde liste, à
         // chaque frame publiée (mesuré au banc JVM, [LiveFrameBudgetTest]).
         val out = StringBuilder(COMPACT_CAPACITY)
-        out.append("latency ").append(ms(t.totalMs))
+        out.append("latency ")
+        appendMs(out, t.totalMs)
         for (poste in POSTES) {
-            out.append(SEPARATOR).append(poste.short).append(' ').append(ms(poste.value(t)))
+            out.append(SEPARATOR).append(poste.short).append(' ')
+            appendMs(out, poste.value(t))
         }
         if (t.seq >= 0L) out.append(SEPARATOR).append("seq ").append(t.seq)
         return out.toString()
@@ -99,9 +101,16 @@ object TimingsText {
         cbMs: Long,
         totalMs: Long,
         intervalMs: Long,
-    ): String =
-        "capsplit age $ageMs · enc $encMs · b64 $b64Ms · cb $cbMs · total $totalMs" +
-            " · int $intervalMs"
+    ): String {
+        val out = StringBuilder(CAPSPLIT_CAPACITY)
+        out.append("capsplit age ").append(ageMs)
+        out.append(SEPARATOR).append("enc ").append(encMs)
+        out.append(SEPARATOR).append("b64 ").append(b64Ms)
+        out.append(SEPARATOR).append("cb ").append(cbMs)
+        out.append(SEPARATOR).append("total ").append(totalMs)
+        out.append(SEPARATOR).append("int ").append(intervalMs)
+        return out.toString()
+    }
 
     /**
      * Décomposition du poste `mask` (réponse → masques), loggée 1 frame sur 20 par
@@ -116,8 +125,14 @@ object TimingsText {
      * dans le même dump `ISEE_LAT`, sans fausser le verdict — même contrat que
      * [capsplit], qui décompose `capt` de la même façon.
      */
-    fun decsplit(d: DecodeSplit): String =
-        "decsplit ${decodeStages(d)} · total ${ms(d.totalMs)} · masks ${d.masks}"
+    fun decsplit(d: DecodeSplit): String {
+        val out = StringBuilder(DECSPLIT_CAPACITY).append("decsplit ")
+        appendDecodeStages(out, d)
+        out.append(SEPARATOR).append("total ")
+        appendMs(out, d.totalMs)
+        out.append(SEPARATOR).append("masks ").append(d.masks)
+        return out.toString()
+    }
 
     /**
      * Frame lunettes rendue puis affichée, en **microsecondes** : « link seq 12 ·
@@ -131,9 +146,19 @@ object TimingsText {
      * `parse_isee_lat.py` (ni `latency`, ni `server:`) : la ligne vit dans le
      * dump `GlassesLink`, sans fausser le verdict du Direct.
      */
-    fun link(seq: Long, linkUs: Long, decodeUs: Long, displayUs: Long, perceivedUs: Long): String =
-        "link seq $seq · lien ${us(linkUs)} · dec ${us(decodeUs)} · aff ${us(displayUs)}" +
-            " · percu ${us(perceivedUs)}"
+    fun link(seq: Long, linkUs: Long, decodeUs: Long, displayUs: Long, perceivedUs: Long): String {
+        val out = StringBuilder(LINK_CAPACITY)
+        out.append("link seq ").append(seq)
+        out.append(SEPARATOR).append("lien ")
+        appendUs(out, linkUs)
+        out.append(SEPARATOR).append("dec ")
+        appendUs(out, decodeUs)
+        out.append(SEPARATOR).append("aff ")
+        appendUs(out, displayUs)
+        out.append(SEPARATOR).append("percu ")
+        appendUs(out, perceivedUs)
+        return out.toString()
+    }
 
     /**
      * Jambe du A/B binaire-vs-base64 : « leg binary » ou « leg text », loggée à la
@@ -149,11 +174,26 @@ object TimingsText {
      */
     fun servers(timings: Map<String, Double>): String {
         if (timings.isEmpty()) return "server: $MISSING"
-        val named = timings.entries.associate { cleanKey(it.key) to it.value }
-        val known = SERVER_STAGES.filter(named::containsKey)
-        val others = named.keys.filterNot { it in known || it == FrameTimings.SERVER_TOTAL }.sorted()
-        val parts = (known + others).joinToString(" · ") { "$it ${named.getValue(it).roundToLong()} ms" }
-        return "server: $parts"
+        // Une seule passe + un seul `StringBuilder` : la version `associate` + filtres +
+        // `joinToString` construisait une carte, quatre listes et une chaîne par étage à
+        // chaque frame complète (neuf étages en recette — `lat_capture18`).
+        val named = HashMap<String, Long>(timings.size * 2)
+        for ((key, value) in timings) named[cleanKey(key)] = value.roundToLong()
+        val out = StringBuilder(SERVERS_CAPACITY).append("server: ")
+        var first = true
+        for (stage in SERVER_STAGES) {
+            val ms = named.remove(stage) ?: continue
+            if (!first) out.append(SEPARATOR) else first = false
+            out.append(stage).append(' ').append(ms).append(" ms")
+        }
+        val others = ArrayList<String>(named.size)
+        for (name in named.keys) if (name != FrameTimings.SERVER_TOTAL) others.add(name)
+        others.sort()
+        for (name in others) {
+            if (!first) out.append(SEPARATOR) else first = false
+            out.append(name).append(' ').append(named.getValue(name)).append(" ms")
+        }
+        return out.toString()
     }
 
     /** Une ligne de détail ; l'aller-retour et les masques sont décomposés quand c'est daté. */
@@ -170,16 +210,32 @@ object TimingsText {
 
     /** Les quatre postes du décodage, ordre du trajet : [decsplit] et le détail partagent. */
     private fun decodeStages(d: DecodeSplit): String =
-        "b64 ${ms(d.b64Ms)} · img ${ms(d.imgMs)} · up ${ms(d.upMs)} · paint ${ms(d.paintMs)}"
+        buildString(DECODE_STAGES_CAPACITY) { appendDecodeStages(this, d) }
+
+    /** Mêmes postes, ajoutés à [out] sans chaîne intermédiaire ([decsplit], chemin chaud). */
+    private fun appendDecodeStages(out: StringBuilder, d: DecodeSplit) {
+        out.append("b64 ")
+        appendMs(out, d.b64Ms)
+        out.append(SEPARATOR).append("img ")
+        appendMs(out, d.imgMs)
+        out.append(SEPARATOR).append("up ")
+        appendMs(out, d.upMs)
+        out.append(SEPARATOR).append("paint ")
+        appendMs(out, d.paintMs)
+    }
 
     /** Clé serveur lisible : `vision_ms` et `vision` désignent le même étage. */
     private fun cleanKey(key: String): String = key.removeSuffix("_ms")
 
-    /** Millisecondes affichables : le nombre, ou [MISSING] si le poste manque. */
-    private fun ms(value: Long): String = if (value >= 0) value.toString() else MISSING
+    /** Millisecondes ajoutées : le nombre, ou [MISSING] si le poste manque. */
+    private fun appendMs(out: StringBuilder, value: Long) {
+        if (value >= 0) out.append(value) else out.append(MISSING)
+    }
 
-    /** Microsecondes affichables : même contrat que [ms], pour la ligne [link]. */
-    private fun us(value: Long): String = if (value >= 0) value.toString() else MISSING
+    /** Microsecondes ajoutées : même contrat que [appendMs], pour la ligne [link]. */
+    private fun appendUs(out: StringBuilder, value: Long) {
+        if (value >= 0) out.append(value) else out.append(MISSING)
+    }
 
     /** Aller-retour : son chiffre serveur a sa propre ligne dans le détail. */
     private const val SRV = "srv"
@@ -193,4 +249,19 @@ object TimingsText {
      * pré-dimensionner évite les recopies de croissance.
      */
     private const val COMPACT_CAPACITY = 176
+
+    /** Même contrat que [COMPACT_CAPACITY], pour les lignes échantillonnées. */
+    private const val CAPSPLIT_CAPACITY = 96
+
+    /** Même contrat que [COMPACT_CAPACITY], pour la ligne de décodage. */
+    private const val DECSPLIT_CAPACITY = 112
+
+    /** Les quatre postes `b64 · img · up · paint` tiennent en une soixantaine de signes. */
+    private const val DECODE_STAGES_CAPACITY = 64
+
+    /** Même contrat que [COMPACT_CAPACITY], pour la ligne lunettes. */
+    private const val LINK_CAPACITY = 96
+
+    /** Neuf étages à ~20 signes en recette : large sans recopie de croissance. */
+    private const val SERVERS_CAPACITY = 224
 }

@@ -133,4 +133,33 @@ class TimingsTextTest {
         val line = TimingsText.compact(FrameTimings(captureToPixelMs = 348L))
         assertFalse(line.contains("seq"))
     }
+
+    @Test
+    fun `servers remet les etages connus en ordre, _ms tolere, total exclu`() {
+        // Ordre d'arrivée mélangé : la ligne reste connue-triée-inconnue.
+        assertEquals(
+            "server: preprocess 7 ms · vision 47 ms · detr 39 ms · decode 2 ms",
+            TimingsText.servers(
+                mapOf(
+                    "detr_ms" to 38.6,
+                    "total" to 92.0,
+                    "vision_ms" to 47.0,
+                    "decode" to 2.0,
+                    "preprocess" to 7.1,
+                ),
+            ),
+        )
+    }
+
+    @Test
+    fun `servers garde la ligne vide historique quand seul le total arrive`() {
+        // `total` est exclu des inconnus : la bizarrerie « server:  » est conservée
+        // octet pour octet, les parseurs ne lisent que les étages `… ms`.
+        assertEquals("server: ", TimingsText.servers(mapOf("total" to 92.0)))
+    }
+
+    @Test
+    fun `servers marque la carte vide sans inventer d'etage`() {
+        assertEquals("server: ${TimingsText.MISSING}", TimingsText.servers(emptyMap()))
+    }
 }
