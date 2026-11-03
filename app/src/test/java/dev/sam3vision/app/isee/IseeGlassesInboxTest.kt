@@ -132,6 +132,33 @@ class IseeGlassesInboxTest {
     }
 
     @Test
+    fun `photo PHOTO — decrite automatiquement des larrivee`() = runTest {
+        testScope = this
+        val inbox = TestScopeInbox()
+
+        inbox.onPhoto(photo("lunettes-1.jpg"), CaptureAction.PHOTO)
+        testScheduler.advanceUntilIdle()
+
+        assertEquals(listOf(DESCRIBE_PHOTO_QUESTION), answers.map { it.first })
+        assertEquals(1, silences)
+        assertNotNull("photo toujours affichée", state.value.glassesPhoto)
+        assertEquals("b64:lunettes-1.jpg", shots.imageBase64())
+    }
+
+    @Test
+    fun `photo ASK — affichee mais pas decrite, attend la dictee`() = runTest {
+        testScope = this
+        val inbox = TestScopeInbox()
+
+        inbox.onPhoto(photo("lunettes-ask.jpg"), CaptureAction.ASK)
+        testScheduler.advanceUntilIdle()
+
+        assertNotNull("photo affichée", state.value.glassesPhoto)
+        assertTrue("aucune description auto", answers.isEmpty())
+        assertEquals(0, silences)
+    }
+
+    @Test
     fun `question entendue — sans photo, repondue comme une dictee`() = runTest {
         testScope = this
         val inbox = TestScopeInbox()
