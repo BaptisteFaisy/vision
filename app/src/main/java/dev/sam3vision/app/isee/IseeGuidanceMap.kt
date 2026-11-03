@@ -55,7 +55,7 @@ internal fun IseeGuidanceBlock(
  * Tout en bas de l'écran : la navigation quand elle a un objectif (calcul
  * d'itinéraire, ou guidage avec carte suivie), sinon la boule et la
  * phrase ([orb]). Pendant le guidage, caméra ouverte, la boule s'efface
- * entre la rue agrandie et la carte (la phrase reste, le transcript du
+ * entre le bloc caméra et la carte (la phrase reste, le transcript du
  * user la remplace quand il parle) : voir [hideGuidanceOrb] et
  * [showGuidanceTranscript]. Le choix vit ici (état de session observé)
  * pour garder `PortraitScene` sous le plafond de 50 lignes. La barre du
@@ -90,7 +90,7 @@ internal fun isGuidanceOverlay(navState: VoiceNavUiState): Boolean =
 
 /**
  * En guidage, la boule s'efface-t-elle entre la rue et la carte : oui
- * quand la caméra est ouverte (la rue grandit, la phrase reste), non
+ * quand la caméra est ouverte (le bloc caméra prend le haut, la phrase reste), non
  * sinon (sans caméra, la boule reste au milieu). Le transcript du user
  * garde sa place ([showGuidanceTranscript]). Pure : même état, même
  * réponse, testée sur JVM.

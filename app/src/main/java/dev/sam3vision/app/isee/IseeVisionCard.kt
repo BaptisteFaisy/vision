@@ -175,8 +175,9 @@ internal fun CameraLive(glue: CameraGlue, probe: LiveProbe, viewModel: IseeViewM
         )
         return
     }
+    // Coins du bloc : le contour natif arrondit la surface, le clip Compose ne le peut pas.
     AndroidView(
-        factory = { ctx -> CameraSurface(ctx, glue.preview) },
+        factory = { ctx -> CameraSurface(ctx, glue.preview).also { it.clipToIseeBlock() } },
         update = { surface -> surface.setMasks(pixels.masks) },
         modifier = modifier,
     )

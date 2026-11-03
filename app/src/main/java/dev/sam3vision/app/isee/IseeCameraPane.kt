@@ -142,6 +142,8 @@ internal class IseeCameraHost(private val context: Context) : CameraBindHost {
      */
     val previewView: PreviewView = PreviewView(context).apply {
         scaleType = PreviewView.ScaleType.FILL_CENTER
+        // TextureView : seule rogniable par le contour arrondi, une SurfaceView le traverserait.
+        implementationMode = PreviewView.ImplementationMode.COMPATIBLE
         // Sans flux, la surface montre ce fond sombre au lieu du blanc système.
         setBackgroundColor(AppColors.background.toArgb())
     }

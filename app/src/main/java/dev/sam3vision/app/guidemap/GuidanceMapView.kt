@@ -30,6 +30,7 @@ import androidx.compose.ui.viewinterop.AndroidView
 import androidx.lifecycle.Lifecycle
 import androidx.lifecycle.LifecycleEventObserver
 import dev.sam3vision.app.AppColors
+import dev.sam3vision.app.isee.clipToIseeBlock
 import dev.sam3vision.core.model.RoutePoint
 import dev.sam3vision.core.nav.GuidanceMapState
 import dev.sam3vision.core.nav.MapCamera
@@ -49,6 +50,7 @@ import org.maplibre.android.camera.CameraUpdateFactory
 import org.maplibre.android.geometry.LatLng
 import org.maplibre.android.geometry.LatLngBounds
 import org.maplibre.android.maps.MapLibreMap
+import org.maplibre.android.maps.MapLibreMapOptions
 import org.maplibre.android.maps.MapView
 import org.maplibre.android.maps.Style
 
@@ -124,13 +126,16 @@ private fun releaseGuideMap(view: MapView) {
     runCatching { view.onDestroy() }
 }
 
-/** MapView mémorisée : SDK initialisé (sans clé) avant création, cycle ouvert. */
+/**
+ * MapView mémorisée : SDK initialisé (sans clé) avant création, cycle ouvert.
+ * Vue texture requise — une SurfaceView traverserait le contour arrondi.
+ */
 @Composable
 private fun rememberGuideMapView(): MapView {
     val context = LocalContext.current
     return remember(context) {
         MapLibre.getInstance(context)
-        MapView(context).apply { onCreate(null) }
+        MapView(context, MapLibreMapOptions().textureMode(true)).apply { onCreate(null); clipToIseeBlock() }
     }
 }
 

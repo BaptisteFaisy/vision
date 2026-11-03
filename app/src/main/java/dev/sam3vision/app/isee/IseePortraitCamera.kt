@@ -4,7 +4,6 @@ import androidx.compose.animation.core.Animatable
 import androidx.compose.animation.core.FastOutSlowInEasing
 import androidx.compose.animation.core.tween
 import androidx.compose.foundation.background
-import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.BoxScope
 import androidx.compose.foundation.layout.BoxWithConstraintsScope
@@ -18,20 +17,21 @@ import androidx.compose.runtime.remember
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.blur
-import androidx.compose.ui.draw.clipToBounds
+import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import dev.sam3vision.app.FirstPixelWatcher
-import dev.sam3vision.core.iseedesign.IseePortrait
 import dev.sam3vision.core.iseedesign.focusPull
 import dev.sam3vision.core.picto.PictoPlaceMode
 
 /**
- * La caméra du design « Portrait » : la rue occupe le haut, sa hauteur suit la parole et un trait
- * clair l'en sépare ; pas de cadre, pas de carte. À l'ouverture la rue arrive floue et un peu
+ * La caméra du design « Portrait » : la rue est un bloc comme la carte (mêmes coins
+ * 16 dp, même ombre, mêmes marges latérales 16 dp), 62,5 % de l'écran (75 % en
+ * guidage), sans trait de séparation (le bord du bloc suffit) ; le voile haut est
+ * conservé pour la pastille. À l'ouverture la rue arrive floue et un peu
  * agrandie, puis devient nette (mise au point). L'aperçu porte toujours les masques SAM et les
  * distances.
  *
@@ -61,9 +61,12 @@ internal fun BoxWithConstraintsScope.PortraitCamera(
     Box(
         Modifier
             .align(Alignment.TopCenter)
+            .padding(top = 8.dp)
+            .padding(horizontal = IseeBlockSide)
             .fillMaxWidth()
             .height(height)
-            .clipToBounds()
+            .clip(IseeBlockShape)
+            .background(Color(0xFF14161B))
             .graphicsLayer { alpha = open.coerceIn(0f, 1f) },
     ) {
         Box(
@@ -74,7 +77,6 @@ internal fun BoxWithConstraintsScope.PortraitCamera(
         ) {
             StreetFeed(state, glue, probe, viewModel, showGlasses)
         }
-        CameraDivider()
         if (state.placeMode.pictoEnabled && state.recordingVideo && !showGlasses) {
             PictoChip(
                 state.picto,
@@ -150,8 +152,8 @@ private fun GlassesMasksScoped(probe: LiveProbe) {
 }
 
 /**
- * L'ombre douce du haut de la rue, pour la pastille : le nuage blanc du bas est viré
- * (demande user 2026-11-03), seul l'ombrage du haut reste — voir [CameraDivider].
+ * L'ombre douce du haut du bloc, pour la pastille : le bas du bloc a son
+ * propre bord (ni nuage blanc, ni trait de séparation).
  */
 @Composable
 private fun HeaderShade(modifier: Modifier) {
@@ -162,25 +164,6 @@ private fun HeaderShade(modifier: Modifier) {
     }
     Box(modifier.background(shade))
 }
-
-/**
- * Le trait de séparation entre la rue et le bloc blanc : fin, gris clair, arrondi
- * aux seules extrémités (demande user 2026-11-03). Premier overlay pour que les
- * chips (Picto) restent au-dessus.
- */
-@Composable
-private fun BoxScope.CameraDivider() {
-    Box(
-        Modifier
-            .align(Alignment.BottomCenter)
-            .fillMaxWidth()
-            .padding(horizontal = 16.dp)
-            .height(IseePortrait.DIVIDER_H_DP.dp)
-            .background(Color(IseePortrait.DIVIDER), RoundedCornerShape(IseePortrait.DIVIDER_CORNER_DP.dp)),
-    )
-}
-
-
 
 /** L'ouverture de la caméra : 0 → 1 en 0,8 s quand elle s'allume, 1 → 0 en 0,7 s à la fin. */
 @Composable
