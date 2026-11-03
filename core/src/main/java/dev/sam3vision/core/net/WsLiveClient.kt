@@ -186,6 +186,7 @@ class WsLiveClient(
      * reprise armée (l'écran dit « reconnexion »), `Closed` = après [close].
      */
     val linkState: StateFlow<WsLinkState> get() = link.state
+    val linkSnapshot: LinkSnapshot get() = synchronized(lock) { link.snapshot() }
 
     /**
      * Le lien n'est plus celui qu'on croyait : réseau changé, socket déclaré mort par le
@@ -433,9 +434,9 @@ class WsLiveClient(
                 connected = false
                 stopPingLocked()
                 if (error is WsClosedAbnormally && error.code == IDLE_CLOSE_CODE) {
-                    link.onInvalidate(net.iface)
+                    link.onInvalidate(net.iface, closeCodeOf(error))
                 } else {
-                    link.onFailure()
+                    link.onFailure(closeCodeOf(error))
                 }
                 false
             }

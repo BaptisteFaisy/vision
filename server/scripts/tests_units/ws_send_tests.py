@@ -12,7 +12,7 @@ from __future__ import annotations
 import asyncio
 import time
 
-from tests_units.ws_pump_tests import _ScriptSocket, _Service, _fresh
+from tests_units.ws_pump_tests import _HANG, _ScriptSocket, _Service, _fresh
 
 _BOUND = 0.02  # borne de test : un pair vivant répond en millisecondes
 
@@ -164,6 +164,33 @@ def test_one_message_none_closes(pump) -> None:
     check("socket fermé: rien envoyé", socket.sent == [], str(socket.sent)[:80])
 
 
+def test_close_line_codes(pump) -> None:
+    """Ligne ``ws: close`` : motif + code envoyé — le grep d'après-incident."""
+    import io
+    from contextlib import redirect_stdout
+
+    from test_units import check
+
+    buf = io.StringIO()
+    with redirect_stdout(buf):
+        asyncio.run(pump.ws_loop(_Service(), _ScriptSocket([_HANG]), 0.02, 5.0, 8))
+    idle = buf.getvalue()
+    check("close idle → code=1001", "reason=idle code=1001" in idle, idle[-160:])
+
+    buf = io.StringIO()
+    with redirect_stdout(buf):
+        asyncio.run(pump.ws_loop(_Service(), _ScriptSocket([None]), 5.0, 5.0, 8))
+    bye = buf.getvalue()
+    check("close client → code=1000", "reason=client code=1000" in bye, bye[-160:])
+
+    buf = io.StringIO()
+    with redirect_stdout(buf):
+        asyncio.run(pump._close_session(_ScriptSocket([]), {"open": 1, "frames": 2},
+                                       "oversize", 0.0))
+    fat = buf.getvalue()
+    check("close oversize → code=1009", "reason=oversize code=1009" in fat, fat[-160:])
+
+
 def test_ws_send(_module) -> None:
     """Envois WS bornés : réponse, pong et fermeture rendent la session."""
     session = _fresh("ws_session")
@@ -176,3 +203,4 @@ def test_ws_send(_module) -> None:
     test_loop_closes_on_stuck_send(pump)
     test_accept_failure_no_session()
     test_one_message_none_closes(pump)
+    test_close_line_codes(pump)

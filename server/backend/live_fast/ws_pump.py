@@ -429,11 +429,14 @@ async def _close_session(websocket, stats, reason, started) -> None:
 
     Un seul endroit tient le contrat de fermeture (le motif est aussi celui de la
     dernière ``reason`` envoyée au pair) : la ligne ``ws: close`` est ce qui rend
-    le taux de reconnexion mesurable après coup.
+    le taux de reconnexion mesurable après coup. ``code`` = trame envoyée pour ce
+    motif (1001 idle, 1009 indégradable, 1000 tentative de politesse vers un pair
+    parti) : c'est le même chiffre que le client retient (``lastCloseCode``).
     """
     stats["open"] = max(0, stats["open"] - 1)
     stats[f"close_{reason}"] = stats.get(f"close_{reason}", 0) + 1
-    print(f"ws: close reason={reason} open={stats['open']} "
+    code = {"idle": 1001, "oversize": 1009}.get(reason, 1000)
+    print(f"ws: close reason={reason} code={code} open={stats['open']} "
           f"dur={time.monotonic() - started:.1f}s frames={stats['frames']}", flush=True)
     await close_bounded(websocket)  # déjà fermé ou parqué : rien à faire
 

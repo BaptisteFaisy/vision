@@ -33,3 +33,6 @@ internal const val IDLE_CLOSE_CODE = 1001
 
 /** Annulation one-way (FIX-8) : le serveur annule l'inférence abandonnée, sans répondre. */
 internal fun cancelMessage(id: Int): String = "{\"id\":$id,\"cancel\":true}"
+
+/** Fermeture propre : la seule valeur que `closeCodeOf` invente (transport = `null`). */
+internal const val NORMAL_CLOSE_CODE = 1000
