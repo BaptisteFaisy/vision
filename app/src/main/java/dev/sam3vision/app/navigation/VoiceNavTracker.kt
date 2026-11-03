@@ -34,6 +34,11 @@ class VoiceNavTracker(
     private val onEvent: (NavEvent) -> Unit = {},
     /** Chaque fix brut, après le dispatch moteur (le rappel 5 s y lit position + cap). */
     private val onFix: (NavFix) -> Unit = {},
+    /**
+     * Observabilité du flux GPS (démarrage, amorce, premier fix, arrêt :
+     * 3-4 lignes par guidage). Injecté pour rester testable en JVM.
+     */
+    private val log: (String) -> Unit = {},
 ) {
 
     private val locations: LocationManager? =
@@ -50,6 +55,11 @@ class VoiceNavTracker(
      */
     @Volatile
     var lastFix: NavFix? = null
+        private set
+
+    /** Rappels live reçus depuis le démarrage (0 = fournisseurs muets). */
+    @Volatile
+    var fixCount: Int = 0
         private set
 
     /** État courant du moteur (repos, guidage, écart, arrivé). */
@@ -84,13 +94,20 @@ class VoiceNavTracker(
         val manager = locations
         // Localisation coupée : les abonnements seraient acceptés sans
         // jamais rappeler — `false` plutôt qu'un guidage muet.
-        if (manager == null || !anyProviderEnabled(manager)) return false
+        if (manager == null || !anyProviderEnabled(manager)) {
+            log("écoute refusée : localisation coupée")
+            return false
+        }
         listening = listen(LocationManager.GPS_PROVIDER) or listen(LocationManager.NETWORK_PROVIDER)
-        if (!listening) return false
+        if (!listening) {
+            log("écoute refusée : aucun fournisseur")
+            return false
+        }
         // Dernier fix connu : la carte affiche un point aussitôt, sans
         // attendre un GPS froid (miroir de `SharePosition`, affichage seul —
         // le moteur, lui, attend ses fixes frais).
         if (lastFix == null) seedLastKnown()
+        log("écoute GPS+réseau @2s, amorce=${describeFixForLog(lastFix, System.currentTimeMillis())}")
         return true
     }
 
@@ -124,8 +141,10 @@ class VoiceNavTracker(
 
     /** Coupe l'écoute et oublie l'itinéraire (fin du guidage). */
     fun stop() {
+        log("arrêt écoute, $fixCount fix(s) reçus")
         listening = false
         lastFix = null
+        fixCount = 0
         try {
             locations?.removeUpdates(listener)
         } catch (_: SecurityException) {
@@ -137,6 +156,8 @@ class VoiceNavTracker(
     private fun onLocation(location: Location) {
         val fix = location.toNavFix()
         lastFix = fix
+        fixCount++
+        if (fixCount == 1) log("premier fix live : ${describeFixForLog(fix, System.currentTimeMillis())}")
         engine.onFix(fix).forEach(onEvent)
         onFix(fix)
     }
@@ -163,6 +184,7 @@ class VoiceNavTracker(
         val gps = runCatching { manager.getLastKnownLocation(LocationManager.GPS_PROVIDER) }.getOrNull()
         val net = runCatching { manager.getLastKnownLocation(LocationManager.NETWORK_PROVIDER) }.getOrNull()
         seedFixOf(gps?.toNavFix(), net?.toNavFix())?.let { lastFix = it }
+        log("amorce lastKnown : ${describeFixForLog(lastFix, System.currentTimeMillis())}")
     }
 
     private inner class FixListener : LocationListener {
@@ -171,10 +193,24 @@ class VoiceNavTracker(
         override fun onStatusChanged(provider: String?, status: Int, extras: Bundle?) = Unit
     }
 
-    private companion object {
+    companion object {
         /** Cadence GPS du guidage : une position toutes les 2 s. */
         const val NAV_GPS_MS = 2_000L
+
+        /** Tag logcat du flux GPS guidage. */
+        const val LOG_TAG = "VoiceNavFix"
     }
+}
+
+/**
+ * Résumé d'un fix pour logcat : présence, exploitabilité, précision,
+ * âge — JAMAIS de coordonnées (vie privée). Pur, testé en JVM.
+ */
+fun describeFixForLog(fix: NavFix?, nowMs: Long): String {
+    if (fix == null) return "none"
+    val usable = if (fix.isUsable()) "usable" else "unusable"
+    val ageMin = ((nowMs - fix.atMs) / 60_000L).coerceAtLeast(0L)
+    return "$usable acc=${fix.accM}m age=${ageMin}min"
 }
 
 /**

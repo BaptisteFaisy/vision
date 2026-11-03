@@ -97,4 +97,38 @@ class VoiceNavTrackerTest {
 
         assertEquals(gps, seedFixOf(gps, net))
     }
+
+    @Test
+    fun `log fix nul donne none`() {
+        assertEquals("none", describeFixForLog(null, 0L))
+    }
+
+    @Test
+    fun `log fix usable donne precision et age sans coords`() {
+        val line = describeFixForLog(NavFix(48.85, 2.35, 30f, atMs = 0L), 300_000L)
+
+        assertEquals("usable acc=30.0m age=5min", line)
+        assertFalse(line.contains("48.85"))
+    }
+
+    @Test
+    fun `log fix precision nulle donne unusable`() {
+        val line = describeFixForLog(NavFix(48.85, 2.35, 0f, atMs = 1_000L), 1_000L)
+
+        assertEquals("unusable acc=0.0m age=0min", line)
+    }
+
+    @Test
+    fun `log fix nan donne unusable`() {
+        val line = describeFixForLog(NavFix(Double.NaN, 2.35, 8f, atMs = 1_000L), 1_000L)
+
+        assertTrue(line.startsWith("unusable"))
+    }
+
+    @Test
+    fun `log fix futur plafonne l age a zero`() {
+        val line = describeFixForLog(NavFix(48.85, 2.35, 8f, atMs = 5_000L), 1_000L)
+
+        assertEquals("usable acc=8.0m age=0min", line)
+    }
 }

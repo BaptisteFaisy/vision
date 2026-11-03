@@ -106,7 +106,7 @@ class VoiceNavEngineDriver(
 ) {
 
     private val app = appContext.applicationContext
-    private val tracker = VoiceNavTracker(app, onEvent = ::handleEvent, onFix = ::onTrackerFix)
+    private val tracker = VoiceNavTracker(app, onEvent = ::handleEvent, onFix = ::onTrackerFix, log = { android.util.Log.d(VoiceNavTracker.LOG_TAG, it) })
     private val ttsLazy = lazy { SystemTtsEngine(AndroidTtsDriver(app)) }
     private val speakerLazy = lazy { VoiceNavSpeaker(ttsLazy.value, settings, userSpeaking = userSpeaking) }
     private val speaker by speakerLazy
