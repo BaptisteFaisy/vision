@@ -35,9 +35,24 @@ class SwipeHoldTriggerTest {
         override fun onSwipeHoldEnd() { events += "end" }
     }
 
+    /** Collecte les motifs d'abandon (chaque mort du timer est observable). */
+    private class AbandonRecorder : SwipeHoldTrigger.Listener {
+        val abandoned = mutableListOf<SwipeHoldTrigger.CancelReason>()
+        override fun onSwipeHoldStart() {}
+        override fun onSwipeHoldEnd() {}
+        override fun onSwipeHoldAbandoned(reason: SwipeHoldTrigger.CancelReason) { abandoned += reason }
+    }
+
     private val scheduler = FakeScheduler()
     private val recorder = Recorder()
     private val trigger = SwipeHoldTrigger(scheduler, recorder)
+
+    /** Déclencheur frais branché sur un collecteur d'abandons. */
+    private fun abandonSetup(): Triple<FakeScheduler, AbandonRecorder, SwipeHoldTrigger> {
+        val sched = FakeScheduler()
+        val rec = AbandonRecorder()
+        return Triple(sched, rec, SwipeHoldTrigger(sched, rec))
+    }
 
     @Test
     fun `le swipe confirme arme un delai de 300 ms`() {
@@ -150,5 +165,71 @@ class SwipeHoldTriggerTest {
         trigger.onUp()
         assertEquals(listOf("start", "end", "start", "end"), recorder.events)
         assertTrue(scheduler.cancelled >= 2)
+    }
+
+    @Test
+    fun `bond franc signale JUMP_SLOP`() {
+        val (sched, rec, trig) = abandonSetup()
+        trig.arm(10f, 90f)
+        trig.onMove(10f, 200f)
+        sched.elapse()
+        assertEquals(listOf(SwipeHoldTrigger.CancelReason.JUMP_SLOP), rec.abandoned)
+    }
+
+    @Test
+    fun `releve avant le seuil signale UP_EARLY`() {
+        val (sched, rec, trig) = abandonSetup()
+        trig.arm(10f, 90f)
+        trig.onUp()
+        sched.elapse()
+        assertEquals(listOf(SwipeHoldTrigger.CancelReason.UP_EARLY), rec.abandoned)
+    }
+
+    @Test
+    fun `annulation systeme signale CANCEL_SYSTEM`() {
+        val (sched, rec, trig) = abandonSetup()
+        trig.arm(10f, 90f)
+        trig.onCancel()
+        sched.elapse()
+        assertEquals(listOf(SwipeHoldTrigger.CancelReason.CANCEL_SYSTEM), rec.abandoned)
+    }
+
+    @Test
+    fun `second doigt signale SECOND_FINGER`() {
+        val (sched, rec, trig) = abandonSetup()
+        trig.arm(10f, 90f)
+        trig.onPointerDown()
+        sched.elapse()
+        assertEquals(listOf(SwipeHoldTrigger.CancelReason.SECOND_FINGER), rec.abandoned)
+    }
+
+    @Test
+    fun `reset externe signale RESET_EXTERNAL`() {
+        val (sched, rec, trig) = abandonSetup()
+        trig.arm(10f, 90f)
+        trig.reset()
+        sched.elapse()
+        assertEquals(listOf(SwipeHoldTrigger.CancelReason.RESET_EXTERNAL), rec.abandoned)
+    }
+
+    @Test
+    fun `reset a vide reste muet`() {
+        val (_, rec, trig) = abandonSetup()
+        trig.reset()
+        assertEquals(emptyList<SwipeHoldTrigger.CancelReason>(), rec.abandoned)
+    }
+
+    @Test
+    fun `compatibilite : l'ancien onSwipeHoldCancel recoit aussi UP_EARLY`() {
+        val events = mutableListOf<String>()
+        val legacy = SwipeHoldTrigger(scheduler, object : SwipeHoldTrigger.Listener {
+            override fun onSwipeHoldStart() { events += "start" }
+            override fun onSwipeHoldEnd() { events += "end" }
+            override fun onSwipeHoldCancel() { events += "cancel" }
+        })
+        legacy.arm(10f, 90f)
+        legacy.onUp()
+        scheduler.elapse()
+        assertEquals(listOf("cancel"), events)
     }
 }
