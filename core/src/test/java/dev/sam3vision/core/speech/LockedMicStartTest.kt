@@ -137,6 +137,39 @@ class LockedMicStartTest {
     }
 
     @Test
+    fun `le geste en arriere plan sur service mort refuse micro indisponible`() {
+        val fx = Fx(
+            throwsOn = mapOf(
+                "enterForeground" to SecurityException(
+                    "Starting FGS with type microphone requires permissions",
+                ),
+            ),
+        )
+
+        val outcome = run(fx, action = MicStartAction.TOGGLE)
+
+        assertTrue(
+            "pas de FATAL : un refus parlé, comme le geste notif du 27/10",
+            outcome is MicStartOutcome.Refused,
+        )
+        assertEquals(MicStartRefus.UNAVAILABLE, (outcome as MicStartOutcome.Refused).reason)
+        assertEquals(LockedMicPhase.READY, fx.foregrounds.single().phase)
+        assertEquals(MicStartRefus.UNAVAILABLE, fx.published.single().error)
+        assertTrue(fx.calls.contains("stopSelf"))
+        assertEquals(1, outcome.warnings.size)
+        assertTrue(outcome.warnings.single().contains("premier plan"))
+    }
+
+    @Test
+    fun `seul l arme redemarre le refuse et l arrete restent morts`() {
+        assertTrue(MicStartOutcome.Armed(gesture = false).sticky)
+        assertTrue(MicStartOutcome.Armed(gesture = true).sticky)
+        assertFalse(MicStartOutcome.Refused(MicStartRefus.OPEN_ISEE).sticky)
+        assertFalse(MicStartOutcome.Refused(MicStartRefus.UNAVAILABLE).sticky)
+        assertFalse(MicStartOutcome.Stopped().sticky)
+    }
+
+    @Test
     fun `armer prend le premier plan avant de publier`() {
         val fx = Fx()
         val outcome = run(fx)
