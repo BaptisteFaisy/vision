@@ -1,14 +1,13 @@
 package dev.sam3vision.app.isee
 
 import androidx.compose.foundation.background
+import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Row
-import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.statusBarsPadding
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
-import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.font.FontWeight
@@ -18,15 +17,14 @@ import dev.sam3vision.core.iseedesign.IseePortrait
 import dev.sam3vision.core.iseedesign.IseeScene
 
 /**
- * En-tête de la scène iSee : wordmark et pastille d'état. Tiré de `IseeScenePane.kt` :
- * que de l'affichage, aucune logique de capture.
+ * En-tête de la scène iSee : pastille d'état seule (wordmark retiré le
+ * 2026-11-03 sur demande user). Tiré de `IseeScenePane.kt` : que de
+ * l'affichage, aucune logique de capture.
  */
-/** En-tête : « iSee » et la pastille d'état ; en blanc sur la rue quand elle est ouverte. */
+/** En-tête : la pastille d'état en haut à droite ; en blanc sur la rue quand elle est ouverte. */
 @Composable
 internal fun Header(scene: IseeScene, onPicture: Boolean, modifier: Modifier = Modifier) {
-    Row(modifier.statusBarsPadding().padding(horizontal = 22.dp, vertical = 10.dp), verticalAlignment = Alignment.CenterVertically) {
-        Text("iSee", color = if (onPicture) Color.White else Color(IseePortrait.INK), fontSize = 30.sp, fontWeight = FontWeight.ExtraBold)
-        Spacer(Modifier.weight(1f))
+    Row(modifier.statusBarsPadding().padding(horizontal = 22.dp, vertical = 10.dp), horizontalArrangement = Arrangement.End) {
         StatusChip(scene, onPicture)
     }
 }

@@ -149,7 +149,7 @@ private fun GlassesMasksScoped(probe: LiveProbe) {
 
 /**
  * Le fondu vers le blanc : un dégradé posé sur le bas de la rue, échantillonné sur la courbe
- * de [pictureAlpha] (même courbe que la maquette), plus une ombre douce en haut pour l'en-tête.
+ * de [pictureAlpha] (même courbe que la maquette), plus une ombre douce en haut pour la pastille.
  */
 @Composable
 private fun PictureFade(modifier: Modifier) {
