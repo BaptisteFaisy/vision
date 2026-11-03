@@ -327,12 +327,15 @@ class Sam3LiveService:
         """
         sha = deploy_sha()
         ready = getattr(self, "ctx", None) is not None and not wedged(self)
+        # Totale avant load_container : un conteneur en boot répond « pas prêt »
+        # (la route rend 503), jamais un AttributeError sur ctx absent (500).
+        ctx = getattr(self, "ctx", None) or {}
         return {"ok": ready, "model": MODEL_LABEL, "version": MODEL_LABEL,
                 "sha": sha, "commit": sha, "ws_binary": True,
                 "ws_ready": ready,
                 "warm": bool(getattr(self, "warm", False)),
-                "device": self.ctx.get("device_label", "cpu"),
-                "depth": self.ctx.get("depth_model_id"),
+                "device": ctx.get("device_label", "cpu"),
+                "depth": ctx.get("depth_model_id"),
                 "gpu": getattr(self, "gpu_name", "unknown"),
                 "region": (os.environ.get("MODAL_REGION") or os.environ.get("BASETEN_REGION")
                            or "unknown"),
@@ -347,13 +350,13 @@ class Sam3LiveService:
                 "restored": getattr(self, "restored", None),
                 "ws": ws_snapshot(self),
                 "levers": levers(), "applied": {
-                    "edge_applied": self.ctx.get("edge_applied"),
-                    "vision_grid": self.ctx.get("vision_grid"),
-                    "vision_accel": self.ctx.get("vision_accel"),
-                    "attn_impl": self.ctx.get("attn_impl"),
-                    "detr_patch": self.ctx.get("detr_patch"),
-                    "detr_graph": (self.ctx["detr_graphs"].status()
-                                   if self.ctx.get("detr_graphs") else None),
+                    "edge_applied": ctx.get("edge_applied"),
+                    "vision_grid": ctx.get("vision_grid"),
+                    "vision_accel": ctx.get("vision_accel"),
+                    "attn_impl": ctx.get("attn_impl"),
+                    "detr_patch": ctx.get("detr_patch"),
+                    "detr_graph": (ctx["detr_graphs"].status()
+                                   if ctx.get("detr_graphs") else None),
                     "post": levers().get("post", "hf")}}
 
     @asynccontextmanager
@@ -433,7 +436,11 @@ class Sam3LiveService:
 
         @api.get("/health")
         async def health():
-            return service.health()
+            """200 prêt, 503 en boot ou carte bloquée : « réessaie », pas « cassé »."""
+            body = service.health()
+            if body.get("ok"):
+                return body
+            return JSONResponse(status_code=503, content=body)
 
         @api.post("/segment")
         async def segment(request: SegmentRequest):
