@@ -27,7 +27,7 @@ from pathlib import Path
 if __name__ == "__main__": sys.modules.setdefault("test_units", sys.modules["__main__"])
 
 from tests_units import (boot_tests, concepts_street_tests, crossing_concepts_tests,  # noqa: E402
-                         depth_deploy_tests, depth_shortlist_tests, depth_tests,
+                         deploy_tests, depth_deploy_tests, depth_shortlist_tests, depth_tests,
                          detr_evict_tests, feux_guard_tests,
                          latency_tests,
                          live_fast_tests, live_fast_perf_tests, llm_tests, m1_vectors_tests,
@@ -386,10 +386,8 @@ RUNNERS = (
      depth_tests.test_depth_throttle_io),
     ("profondeur : défaut EVERY=8 (déployé)", "timing",
      depth_tests.test_depth_default_every),
-    ("profondeur : EVERY transmissible au deploy", "timing",
-     depth_deploy_tests.test_depth_every_deploy),
-    ("profondeur : DA2 paresseux (1re frame)", "timing",
-     depth_deploy_tests.test_depth_lazy_load),
+    ("profondeur : EVERY transmissible au deploy", "timing", depth_deploy_tests.test_depth_every_deploy),
+    ("profondeur : DA2 paresseux (1re frame)", "timing", depth_deploy_tests.test_depth_lazy_load),
     ("profondeur : throttle WS (répétition)", "timing",
      depth_tests.test_ws_depth_throttle),
     ("profondeur : throttle WS (mixte)", "timing",
@@ -409,6 +407,7 @@ RUNNERS = (
     ("poids : image (téléchargement au build, snapshot)", "live_app_fast",
      weights_tests.test_weights_image),
     ("déploiement : leviers du script", "timing", weights_tests.test_deploy_script),
+    ("déploiement : pin gaiamelie/A100/eu", "timing", deploy_tests.test_deploy_pin),
     ("fusion : contrat de load_cpu", "fast_core", merge_tests.test_load_cpu),
     ("fusion : conteneur (snapshot + latence)", "live_app_fast", merge_tests.test_fusion_live_app),
     ("live_fast : poids locaux (module déployé)", "timing", weights_tests.test_live_fast_weights),
@@ -420,7 +419,7 @@ RUNNERS = (
     ("live_fast : forme boot /health", "timing", boot_tests.test_health_boot_shape),
     ("live_fast : DA2 absent au boot (paresseux)", "timing", boot_tests.test_boot_sans_depth),
     ("live_fast : /health non chargé → 503", "timing", boot_tests.test_health_not_ready),
-    ("graphe : pas de faute CUDGraph", "timing", weights_tests.test_no_cudagraph_typo),
+    ("graphe : pas de faute CUDGraph", "timing", deploy_tests.test_no_cudagraph_typo),
     ("concepts : table déployée synchronisée", "timing", weights_tests.test_concepts_sync),
     ("concepts : bordures et bateaux (rue)", "concepts", concepts_street_tests.test_concepts_street),
     ("concepts : poussette (rue)", "concepts", concepts_street_tests.test_concepts_poussette),

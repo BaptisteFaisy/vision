@@ -36,8 +36,8 @@ Leviers (voir ``fast_core.py`` pour le détail technique) :
 
 Déploiement (GPU, région, nom d'app en variables — jamais lancé d'ici) :
 
-    FAST_APP_NAME=sam3-live FAST_GPU=A100 FAST_REGION=eu-west \
-      modal deploy backend/live_fast/live_app_fast.py
+    LIVE_APP_NAME=sam3-eu-a100 FAST_GPU=A100-40GB FAST_REGION=eu \
+      FAST_ROUTING_REGION=eu-west modal deploy backend/live_fast/live_app_fast.py
 
 Le MÊME service tourne sur Baseten (``backend/baseten/``) : seule la couche d'amorçage
 change, les routes et les leviers sont identiques.
@@ -55,9 +55,11 @@ from fast_core import clamp_int
 from service import MODEL_LABEL, Sam3LiveService
 
 APP_NAME = os.environ.get("LIVE_APP_NAME", "sam3-eu-a100")
-GPU_TYPE = os.environ.get("FAST_GPU", "A100")
-REGION = os.environ.get("FAST_REGION") or None
-ROUTING = os.environ.get("FAST_ROUTING_REGION") or None
+# Cible pincée (workspace gaiamelie, A100-40GB, eu/eu-west) : même un déploiement
+# manuel sans env atterrit sur la prod — le script pose les mêmes valeurs.
+GPU_TYPE = os.environ.get("FAST_GPU", "A100-40GB")
+REGION = os.environ.get("FAST_REGION") or "eu"
+ROUTING = os.environ.get("FAST_ROUTING_REGION") or "eu-west"
 # Plafond 60 s : une sortie ratée coûte ≤ 0,04 $, pas 0,20 $ (règle user 27/10 :
 # éteinte = 0 €). La voie normale reste POST /release (~1 s).
 SCALEDOWN = clamp_int(os.environ.get("FAST_SCALEDOWN"), 20, 5, 60)

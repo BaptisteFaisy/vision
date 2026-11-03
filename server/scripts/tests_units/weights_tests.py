@@ -223,15 +223,6 @@ def test_deploy_script(_module) -> None:
           "DEPLOY_SHA" in app.lever_env(), "absent de lever_env()")
 
 
-def test_no_cudagraph_typo(_module) -> None:
-    """Pas de `CUDGraph` (sans A) : la faute a cassé vision_accel au déploiement du 27/10."""
-    from test_units import check
-
-    src = (BACKEND_DIR / "live_fast" / "vision_setup.py").read_text(encoding="utf-8")
-    check("graphe : CUDAGraph orthographié", "CUDAGraph" in src, "absent")
-    check("graphe : pas de CUDGraph", "CUDGraph" not in src, "faute présente")
-
-
 def test_concepts_sync(_module) -> None:
     """La table FR→EN déployée (live_fast) est la même qu'à la racine."""
     from test_units import check
