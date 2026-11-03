@@ -112,6 +112,49 @@ class LiveClientFactoryTest {
         assertFalse("pas de mask_edge sans masque", sent.has("mask_edge"))
     }
 
+    @Test
+    fun `liveHost extrait l hote ou vide si inutilisable`() {
+        assertEquals("sam.example", liveHost("https://sam.example"))
+        assertEquals("sam.example", liveHost("  https://sam.example:443/live/ "))
+        assertEquals("h", liveHost("http://h:8080/x"))
+        assertEquals("", liveHost(""))
+        assertEquals("", liveHost("   "))
+        assertEquals("", liveHost("pas-une-url"))
+        assertEquals("", liveHost("sam.example/sans-scheme"))
+    }
+
+    @Test
+    fun `warmLiveNetwork resout l hote une fois sans reseau ni thread`() {
+        val resolved = mutableListOf<String>()
+        warmLiveNetwork("https://warm-once.invalid", resolve = { resolved += it }, run = { it() })
+        assertEquals(listOf("warm-once.invalid"), resolved)
+    }
+
+    @Test
+    fun `warmLiveNetwork est idempotent par hote`() {
+        var calls = 0
+        repeat(2) {
+            warmLiveNetwork("https://warm-idem.invalid", resolve = { calls++ }, run = { it() })
+        }
+        assertEquals(1, calls)
+    }
+
+    @Test
+    fun `warmLiveNetwork sans hote ne resout rien et ne leve pas`() {
+        var calls = 0
+        warmLiveNetwork("pas-une-url", resolve = { calls++ }, run = { it() })
+        assertEquals(0, calls)
+    }
+
+    @Test
+    fun `warmLiveNetwork avale les echecs DNS`() {
+        warmLiveNetwork(
+            "https://warm-fail.invalid",
+            resolve = { throw java.net.UnknownHostException(it) },
+            run = { it() },
+        )
+    }
+
     /**
      * Le gain clé du portage : le transport WebSocket n'est plus un client neuf, il dérive
      * du client partagé (`newBuilder`), donc pool de connexions et dispatcher identiques —
