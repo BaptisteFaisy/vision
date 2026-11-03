@@ -36,4 +36,15 @@ class GlassesBufferScratchTest {
         assertTrue(grown.size >= 1024)
         assertTrue(first !== grown)
     }
+
+    @Test
+    fun `la repousse amortie absorbe la taille suivante sans reallocuer`() {
+        val scratch = BufferScratch()
+        scratch.bytes(100)
+        // Trop court → ×2 : 200, la demande suivante qui tient réemploie.
+        val grown = scratch.bytes(150)
+        assertTrue(grown.size >= 200)
+        assertSame(grown, scratch.bytes(200))
+        assertSame(grown, scratch.bytes(120))
+    }
 }
