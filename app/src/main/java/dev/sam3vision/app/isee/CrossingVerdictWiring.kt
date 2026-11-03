@@ -108,9 +108,12 @@ class CrossingVerdictEngine(
      * qui suit la caméra (pan sur une garée) ne conclut plus le mouvement.
      * [carVeto] est le veto trafic de la frame (`TraverseVeto` : véhicule
      * proche, en approche, bus/camion/moto compris) : veto présent ⇒ jamais de
-     * feu vert (A9 § 3 D7). Le verdict n'est réputé prononcé que si [poster]
-     * l'a **retenu** ; sinon l'annonceur est ré-armé et la frame suivante
-     * rejoue la phrase (A9 § 3 D8).
+     * feu vert (A9 § 3 D7). [onCrosswalk] (sur le passage) : le verdict changé
+     * coupe à 99 ([CrossingLevels.ALERT]), le maintenu recule à 101
+     * ([CrossingLevels.verdictLevelFor]) — le premier verdict compte comme
+     * changé (jamais entendu : il doit couper). Le verdict n'est réputé
+     * prononcé que si [poster] l'a **retenu** ; sinon l'annonceur est ré-armé
+     * et la frame suivante rejoue la phrase (A9 § 3 D8).
      */
     fun onFrame(
         frame: LiveFrame,
@@ -121,6 +124,7 @@ class CrossingVerdictEngine(
         curb: CrossingPost? = null,
         motion: FrameMotion? = null,
         carVeto: Boolean = false,
+        onCrosswalk: Boolean = false,
     ): CrossingVerdictFrame {
         val read = readLight(frame, jpegB64)
         val evidence = gate.onFrame(
@@ -146,7 +150,7 @@ class CrossingVerdictEngine(
         // dès la première frame qui a une preuve (sinon l'annonceur croyait
         // avoir parlé et le silence durait 2 s de plus).
         if (silent) announcer.rearm(atMs)
-        val verdictPost = if (silent) null else cue?.let { CrossingPost(CrossingLevels.VERDICT, it.phrase, it.clipId) }
+        val verdictPost = if (silent) null else cue?.let { CrossingPost(CrossingLevels.verdictLevelFor(onCrosswalk, felt != verdict), it.phrase, it.clipId) }
         val posts = CrossingPriority.order(verdictPost, human, curb)
         publish(posts, verdictPost, atMs)
         val overlay = overlayOf(verdict)
