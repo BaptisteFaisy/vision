@@ -7,6 +7,7 @@ import android.content.ContextWrapper
 import android.content.Intent
 import android.content.pm.PackageManager
 import android.util.Log
+import dev.sam3vision.app.safety.CrashGuard
 
 /**
  * Cycle de vie du guidage hors écran : l'app en fond (home, verrouillage)
@@ -56,7 +57,11 @@ object GuidanceLifecycle {
         if (!servicePresent(app)) return
         if (hostIsChangingConfigurations(context)) return
         runCatching { app.startForegroundService(serviceIntent(app)) }
-            .onFailure { Log.w(TAG, "démarrage du guidage refusé : ${it.javaClass.simpleName}") }
+            .onFailure {
+                val detail = "démarrage du guidage refusé : ${it.javaClass.simpleName}"
+                Log.w(TAG, detail)
+                CrashGuard.noteEvent("guidage-demarrage", detail)
+            }
     }
 
     /**

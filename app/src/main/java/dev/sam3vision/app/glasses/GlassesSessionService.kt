@@ -8,12 +8,12 @@ import android.content.Context
 import android.content.Intent
 import android.content.pm.ServiceInfo
 import android.os.IBinder
-import android.util.Log
 import androidx.core.app.NotificationCompat
 import dev.sam3vision.app.ForegroundChannels
 import dev.sam3vision.app.MainActivity
 import dev.sam3vision.app.voicenav.ForegroundFx
 import dev.sam3vision.app.voicenav.GuidanceServiceRunner
+import dev.sam3vision.app.voicenav.reportForegroundHold
 import kotlinx.coroutines.flow.MutableSharedFlow
 import kotlinx.coroutines.flow.MutableStateFlow
 
@@ -74,7 +74,7 @@ class GlassesSessionService : Service(), ForegroundFx {
     private fun holdForeground(): Boolean {
         val held = runner.start()
         val label = if (held) "premier plan" else "premier plan refusé, sortie propre"
-        runner.incidents.forEach { Log.w(TAG, "$label : $it") }
+        reportForegroundHold(TAG, "lunettes-premier-plan", held, label, runner.incidents)
         if (!held) {
             GlassesSessionKeepAlive.running.value = false
             stopSelf()

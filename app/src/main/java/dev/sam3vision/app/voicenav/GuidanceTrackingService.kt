@@ -8,7 +8,6 @@ import android.content.Context
 import android.content.Intent
 import android.content.pm.ServiceInfo
 import android.os.IBinder
-import android.util.Log
 import androidx.core.app.NotificationCompat
 import dev.sam3vision.app.ForegroundChannels
 import dev.sam3vision.app.MainActivity
@@ -73,7 +72,7 @@ class GuidanceTrackingService : Service(), ForegroundFx {
     private fun holdForeground(): Boolean {
         val held = runner.start()
         val label = if (held) "premier plan" else "premier plan refusé, sortie propre"
-        runner.incidents.forEach { Log.w(TAG, "$label : $it") }
+        reportForegroundHold(TAG, "guidage-premier-plan", held, label, runner.incidents)
         if (!held) {
             GuidanceTracking.running.value = false
             stopSelf()

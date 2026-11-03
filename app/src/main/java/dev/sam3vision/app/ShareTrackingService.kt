@@ -9,10 +9,10 @@ import android.content.Intent
 import android.content.pm.ServiceInfo
 import android.os.IBinder
 import android.os.PowerManager
-import android.util.Log
 import androidx.core.app.NotificationCompat
 import dev.sam3vision.app.voicenav.ForegroundFx
 import dev.sam3vision.app.voicenav.GuidanceServiceRunner
+import dev.sam3vision.app.voicenav.reportForegroundHold
 import dev.sam3vision.core.settings.Settings
 import dev.sam3vision.core.settings.SettingsStore
 import dev.sam3vision.core.settings.SettingsStoreFactory
@@ -151,7 +151,7 @@ class ShareTrackingService : Service(), ForegroundFx {
     private fun holdForeground(): Boolean {
         val held = runner.start()
         val label = if (held) "foreground" else "foreground refused, clean exit"
-        runner.incidents.forEach { Log.w(TAG, "$label: $it") }
+        reportForegroundHold(TAG, "suivi-premier-plan", held, label, runner.incidents)
         if (!held) {
             ShareTracking.running.value = false
             stopSelf()
