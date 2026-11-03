@@ -343,6 +343,18 @@ internal fun Throwable.toApiError(): ApiError = when (this) {
     else -> ApiError.Network(message = message ?: "backend unreachable", cause = this)
 }
 
+/**
+ * Corps d'erreur retenu, borné à 8 Ko : une page d'erreur de proxy (HTML, parfois ~1 Mo)
+ * ne doit ni gonfler la mémoire ni les rapports — le diagnostic tient en tête (les
+ * marqueurs `model_not_found`, `unknown model`, `invalid function call` sont en début
+ * de corps). Le message affiché reste, lui, à 160 caractères ([ApiError.Http]).
+ */
+internal const val MAX_ERROR_BODY_CHARS = 8_192
+
+/** Tête du corps conservée dans l'erreur : l'intégralité sous la borne, sinon 8 Ko. */
+internal fun errorSnippet(body: String): String =
+    if (body.length <= MAX_ERROR_BODY_CHARS) body else body.take(MAX_ERROR_BODY_CHARS)
+
 /** 401/402/409/429 ont des messages dédiés, le reste tombe dans [ApiError.Http]. */
 internal fun httpError(code: Int, body: String): ApiError = when (code) {
     401, 403 -> ApiError.InvalidKey(if (code == 403) "access refused (403)" else "invalid key (401)")
@@ -356,10 +368,10 @@ internal fun httpError(code: Int, body: String): ApiError = when (code) {
     404 -> if (body.contains("invalid function call", ignoreCase = true)) {
         ApiError.BackendStopped()
     } else {
-        ApiError.Http(code, body)
+        ApiError.Http(code, errorSnippet(body))
     }
 
-    else -> ApiError.Http(code, body)
+    else -> ApiError.Http(code, errorSnippet(body))
 }
 
 /**
