@@ -9,7 +9,6 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.graphics.Color
 import dev.sam3vision.core.crossing.CrossingLevels
 import dev.sam3vision.core.crossing.CrossingLightDue
-import dev.sam3vision.core.crossing.CrossingVerdict
 import dev.sam3vision.core.crossing.CrossingVerdictText
 import dev.sam3vision.core.live.GuidanceHeartbeat
 import dev.sam3vision.core.live.GuidanceInstruction
@@ -25,7 +24,7 @@ import kotlinx.coroutines.delay
 /**
  * Cas d'affichage, par priorité décroissante (l'ordre de déclaration tranche) :
  * voiture (danger, miroir voix niveau 0) > escaliers (état escalier) > verdict
- * (traverser/ne-pas-traverser) > direction parlée (défaut, battement 500 ms).
+ * (« Cross. » seul, le refus se tait) > direction parlée (défaut, battement 500 ms).
  *
  * [voice] est le niveau voix miroir (le verdict vaut 100 : l'ordre numérique
  * ne suit pas la priorité d'affichage, seul l'ordre de déclaration compte) ;
@@ -162,14 +161,14 @@ internal fun stairsDisplayText(crossingActive: Boolean, found: StairLabelSignal,
 }
 
 /**
- * Texte verdict : la phrase du verdict voix (« Cross. » / « Don't cross. »,
- * littéraux des clips, anglais comme la voix) en Traversée — seul
- * [TraversePhase.TRAVERSER] autorise ; `null` sinon. Pur, testé en JVM.
+ * Texte verdict : « Cross. » (littéral du clip, anglais comme la voix) quand
+ * [TraversePhase.TRAVERSER] autorise ; `null` sinon — le refus ne s'affiche
+ * plus, la voix seule dit « Don't cross. » (ordre user du 03/11). Pur, testé
+ * en JVM.
  */
 internal fun verdictDisplayText(crossingActive: Boolean, phase: TraversePhase?): String? {
-    if (!crossingActive || phase == null) return null
-    val verdict = if (phase == TraversePhase.TRAVERSER) CrossingVerdict.Cross else CrossingVerdict.DontCross
-    return CrossingVerdictText.phrase(verdict)
+    if (!crossingActive || phase != TraversePhase.TRAVERSER) return null
+    return CrossingVerdictText.CROSS
 }
 
 /**

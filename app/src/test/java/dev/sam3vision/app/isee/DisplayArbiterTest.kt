@@ -159,11 +159,11 @@ class DisplayArbiterTest {
     }
 
     @Test
-    fun `texte verdict - seul traverser autorise, litteraux des clips`() {
+    fun `texte verdict - seul traverser s'affiche, le refus se tait`() {
         assertEquals("Cross.", verdictDisplayText(true, TraversePhase.TRAVERSER))
-        assertEquals("Don't cross.", verdictDisplayText(true, TraversePhase.ATTENDRE))
-        assertEquals("Don't cross.", verdictDisplayText(true, TraversePhase.PRET))
-        assertEquals("Don't cross.", verdictDisplayText(true, TraversePhase.ALERTE))
+        assertNull(verdictDisplayText(true, TraversePhase.ATTENDRE))
+        assertNull(verdictDisplayText(true, TraversePhase.PRET))
+        assertNull(verdictDisplayText(true, TraversePhase.ALERTE))
         assertNull(verdictDisplayText(true, null))
         assertNull(verdictDisplayText(false, TraversePhase.TRAVERSER))
     }
@@ -188,11 +188,11 @@ class DisplayArbiterTest {
     }
 
     @Test
-    fun `entrees depuis la sonde - alerte traverse un verdict frais`() {
+    fun `entrees depuis la sonde - alerte tait le verdict`() {
         val rest = LiveProbeState(crossingActive = true, traversePhase = TraversePhase.ALERTE)
         val inputs = displayInputsOf(rest, 9_500L, SpeechLanguage.En)
         assertEquals("Stop, car moving.", inputs.vehicleText)
-        assertEquals("Don't cross.", inputs.verdictText)
+        assertNull(inputs.verdictText)
         assertEquals(9_500L, inputs.verdictProofAtMs)
         assertNull(inputs.stairsText)
         val arbiter = DisplayArbiter()
