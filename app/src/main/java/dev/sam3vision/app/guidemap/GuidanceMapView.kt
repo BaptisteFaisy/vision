@@ -221,29 +221,32 @@ private const val RING_ALPHA = 0.25f
 private const val PIN_SIZE_PX = 48
 private const val PIN_RING_PX = 5f
 
+/** Pastille de position : 1,5× les manœuvres — au départ, l'user est sous la punaise « Start » et resterait invisible à taille égale. */
+private const val POSITION_PIN_PX = 72
+
 /**
- * Pastilles de couleur des punaises : un bitmap par couleur, cachés
- * (IconFactory + MarkerOptions, annotations classiques du SDK).
+ * Pastilles de couleur des punaises : un bitmap par (couleur, taille),
+ * cachés (IconFactory + MarkerOptions, annotations classiques du SDK).
  */
 private class GuidePinIcons(context: Context) {
     private val factory = IconFactory.getInstance(context)
-    private val cache = mutableMapOf<Int, Icon>()
+    private val cache = mutableMapOf<Pair<Int, Int>, Icon>()
 
-    /** Pastille de la couleur [color] (créée une fois, réutilisée ensuite). */
-    fun icon(color: Color): Icon =
-        cache.getOrPut(color.toArgb()) { factory.fromBitmap(pinBitmap(color.toArgb())) }
+    /** Pastille de la couleur [color] ([sizePx], créée une fois, réutilisée ensuite). */
+    fun icon(color: Color, sizePx: Int = PIN_SIZE_PX): Icon =
+        cache.getOrPut(color.toArgb() to sizePx) { factory.fromBitmap(pinBitmap(color.toArgb(), sizePx)) }
 }
 
-/** Pastille : disque couleur cerclé de blanc, lisible sur tout fond. */
-private fun pinBitmap(colorArgb: Int): Bitmap {
-    val bitmap = Bitmap.createBitmap(PIN_SIZE_PX, PIN_SIZE_PX, Bitmap.Config.ARGB_8888)
+/** Pastille : disque couleur cerclé de blanc, lisible sur tout fond (liseré proportionnel). */
+private fun pinBitmap(colorArgb: Int, sizePx: Int = PIN_SIZE_PX, ringPx: Float = PIN_RING_PX * sizePx / PIN_SIZE_PX): Bitmap {
+    val bitmap = Bitmap.createBitmap(sizePx, sizePx, Bitmap.Config.ARGB_8888)
     val canvas = Canvas(bitmap)
-    val radius = PIN_SIZE_PX / 2f
+    val radius = sizePx / 2f
     val paint = Paint(Paint.ANTI_ALIAS_FLAG)
     paint.color = android.graphics.Color.WHITE
     canvas.drawCircle(radius, radius, radius, paint)
     paint.color = colorArgb
-    canvas.drawCircle(radius, radius, radius - PIN_RING_PX, paint)
+    canvas.drawCircle(radius, radius, radius - ringPx, paint)
     return bitmap
 }
 
@@ -394,7 +397,7 @@ private fun movePositionMarker(
         return
     }
     marks.position = map.addMarker(
-        MarkerOptions().position(latLng).title("Position").icon(pins.icon(AppColors.primary)),
+        MarkerOptions().position(latLng).title("Position").icon(pins.icon(AppColors.primary, POSITION_PIN_PX)),
     )
 }
 
