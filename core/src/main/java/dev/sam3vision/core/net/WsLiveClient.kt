@@ -294,10 +294,9 @@ class WsLiveClient(
             webSocketUrl(baseUrl, LIVE_WS_PATH),
             { text -> onText(text) },
             { error -> onClosed(error, gen) },
-            // Handshake accepté : aucun poste daté — attribuer ces en-têtes uniques
-            // (1x/session) à la frame courante serait trompeur ; le split HEADERS/BODY
-            // reste réservé au HTTP, `sentToHeadersMs` vaut `-1` ici.
-            { },
+            // `101` : la reprise aboutit ICI — `open()` est optimiste (OkHttp rend
+            // `true` avant), y remettre le compteur à zéro tuait le backoff.
+            { onSocketOpen(gen) },
         )
         if (!opened) {
             link.onFailure()
@@ -305,7 +304,6 @@ class WsLiveClient(
         }
         connected = true
         socketGen = gen
-        link.onOpen(net.iface)
         startPingLocked()
         return true
     }
@@ -445,6 +443,13 @@ class WsLiveClient(
         failPending(error?.let(::wsCloseError) ?: ApiError.Network(WS_CLOSED))
     }
 
+    /** `101` de [gen] : reprise aboutie — raz compteur/backoff, sauf `101` tardif. */
+    private fun onSocketOpen(gen: Int) {
+        synchronized(lock) {
+            if (connected && gen == socketGen) link.onOpen(net.iface)
+        }
+    }
+
     private fun failPending(failure: Throwable) {
         val waiting = synchronized(lock) { pending.values.toList().also { pending.clear() } }
         waiting.forEach { frame -> frame.reply.completeExceptionally(failure) }
@@ -490,8 +495,5 @@ class WsLiveClient(
 
 }
 
-/**
- * Annulation one-way (FIX-8) : au timeout, le client prévient — le serveur annule
- * l'inférence abandonnée **sans répondre**, et le GPU passe à la frame suivante.
- */
+/** Annulation one-way (FIX-8) : le serveur annule l'inférence abandonnée, sans répondre. */
 internal fun cancelMessage(id: Int): String = "{\"id\":$id,\"cancel\":true}"

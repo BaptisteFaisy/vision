@@ -85,8 +85,13 @@ class WsLink(
     /** Délai restant avant la prochaine ouverture (0 = tout de suite). */
     fun waitMs(): Long = (nextAttemptAtMs - clock()).coerceAtLeast(0L)
 
-    /** Handshake lancé : l'état le dit **avant** le `101`, pas seulement après. */
+    /**
+     * Handshake lancé : l'état le dit **avant** le `101`, pas seulement après — et le
+     * watchdog repart de zéro (un socket neuf a son budget entier, même si le
+     * précédent est mort muet). Compteur et backoff intacts : seul le `101` les remet.
+     */
     fun startConnecting() {
+        lastProofAtMs = clock()
         _state.value = WsLinkState.Connecting
     }
 
