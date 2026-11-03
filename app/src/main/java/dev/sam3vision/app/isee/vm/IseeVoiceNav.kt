@@ -98,6 +98,7 @@ class IseeVoiceNav(
             geocodeAlternate = { address, near -> chain.geocodeFallback(address, near = near) },
             originNow = ::awaitOrigin,
             baseUrl = { settings().routeBaseUrl },
+            log = { android.util.Log.d(VoiceNavTracker.LOG_TAG, it) },
         )
         VoiceNavSession(
             launcher = AndroidNavigationLauncher(context),
