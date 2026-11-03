@@ -69,16 +69,15 @@ fun annexB(bytes: ByteArray): ByteArray {
     }
     // Deux passes, tableau à taille exacte : l'ancien `ByteArrayOutputStream`
     // recopiait l'accès entier (fin + croissances) — 1 à 3 copies par accès.
-    var units = 0
     var pos = 0
     while (pos + 4 <= bytes.size) {
         val length = u32be(bytes, pos)
         if (length <= 0 || pos + 4 + length > bytes.size) return bytes
-        units += 1
         pos += 4 + length
     }
     if (pos != bytes.size) return bytes
-    val out = ByteArray(bytes.size + units * ANNEX_B_START.size)
+    // Taille exacte : chaque start code (4 o) remplace une longueur (4 o).
+    val out = ByteArray(bytes.size)
     var read = 0
     var written = 0
     while (read < pos) {
