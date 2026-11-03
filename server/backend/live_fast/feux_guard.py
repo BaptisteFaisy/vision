@@ -266,6 +266,19 @@ def _split_guarded(entries):
     return others, feu, walk, curb, stairs, walls
 
 
+def family_bests(entries):
+    """Meilleure entrée de chaque famille gardée non vide (rescapés potentiels).
+
+    ``finalize_guarded`` ne sauve qu'une place par famille manquante — la
+    première au score (``finalize(famille, 1)``) : avec le top ``max_objects``,
+    ces cinq au plus couvrent tous les survivants (``depth.shortlist_entries``).
+    ``max`` rend le premier ex æquo, comme le tri stable de ``finalize``.
+    """
+    _others, feu, walk, curb, stairs, walls = _split_guarded(entries)
+    return [max(family, key=lambda entry: entry["score"])
+            for family in (feu, walk, curb, stairs, walls) if family]
+
+
 def _top_keeps(entries: list[dict], max_objects: int, is_guarded) -> bool:
     """Le tri pur de ``finalize`` garde-t-il déjà un objet gardé dans le top ?"""
     top = sorted(entries, key=lambda item: item["score"], reverse=True)[:max_objects]
