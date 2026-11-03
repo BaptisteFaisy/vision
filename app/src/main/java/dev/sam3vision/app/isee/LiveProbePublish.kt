@@ -1,6 +1,8 @@
 package dev.sam3vision.app.isee
 
 import dev.sam3vision.app.BuildConfig
+import dev.sam3vision.app.ProbeWorkDispatcher
+import dev.sam3vision.app.live.LiveLatencyLog
 import dev.sam3vision.core.distance.DistanceReading
 import dev.sam3vision.core.live.LivePrompts
 import dev.sam3vision.core.live.LiveSession
@@ -12,6 +14,7 @@ import dev.sam3vision.core.model.Detection
 import dev.sam3vision.core.model.LiveFrame
 import dev.sam3vision.core.stairs.stairsMaskPlaneOf
 import kotlinx.coroutines.flow.update
+import kotlinx.coroutines.launch
 
 /** Étiquette des diagnostics du mutisme spontané (`logcat -s VoiceMute:*`). */
 private const val TAG_MUTE = "VoiceMute"
@@ -141,6 +144,21 @@ private fun LiveProbe.muteProbeLine(frame: LiveFrame, readings: List<DistanceRea
     val absent = LivePrompts.missing(_state.value.conceptsSent, frame.objects.map { it.label }).take(6).joinToString(",")
     val cut = frame.truncated.take(6).joinToString(",")
     android.util.Log.d(TAG_MUTE, "sonde objets=${frame.objects.size} lectures=${readings.size} pose=$poseOk rotation=${rotation.enabled} memo=$memo etiquettes=[$labels] phrase=[$phrase] absents=[$absent] tronques=[$cut]")
+}
+
+/**
+ * Frame effectivement **dessinée** : dernier poste de la chronologie, posé par l'écran
+ * après la composition (`withFrameNanos`) ; sans lui la ligne s'arrête aux masques et
+ * `pixel` affiche « — ». Ici (extension) car `LiveProbe` est au plafond des 500 lignes.
+ */
+fun LiveProbe.noteDrawn() {
+    if (!chronology.noteDrawn()) return
+    val snap = chronology.snapshot(_state.value.timings)
+    _state.update { current -> current.copy(timings = snap) }.also {
+        // Journal hors main (fil sonde, ordonné) : le formatage + 2× Log.i
+        // ne bloquent plus le main — sous pression logd, Log.i attend.
+        scope.launch(ProbeWorkDispatcher) { LiveLatencyLog.frame(snap) }
+    }
 }
 
 /**

@@ -11,7 +11,6 @@ import dev.sam3vision.core.live.ScreenTimings
 import dev.sam3vision.app.ForegroundTracker
 import dev.sam3vision.app.GpuWake
 import dev.sam3vision.app.MASK_ALPHA
-import dev.sam3vision.app.ProbeWorkDispatcher
 import dev.sam3vision.app.maskColorAt
 import dev.sam3vision.app.TRANSPORT_WS
 import dev.sam3vision.core.distance.DistanceMeter
@@ -55,7 +54,8 @@ import kotlinx.coroutines.yield
  * implémentation de l'appel SAM et de la mesure par frame, deux écrans qui la montrent.
  */
 class LiveProbe(
-    private val scope: CoroutineScope,
+    /** Portée des lancements (voix, réveil, journal) : `internal` pour [noteDrawn] déporté. */
+    internal val scope: CoroutineScope,
     /** Horloge monotone en ns (même base qu'`imageInfo.timestamp`) ; injectable en test. */
     private val clock: () -> Long = { SystemClock.elapsedRealtimeNanos() },
     /** Exécuteur du travail hors thread principal : sérialisation de la frame, masques. */
@@ -475,21 +475,6 @@ _state.update { it.cleared() }
             }
             noteCrowd(rawBodiesOf(raw))
             publish(active, frame, jpegB64, at, shown)
-        }
-    }
-
-    /**
-     * Frame effectivement **dessinée** : dernier poste de la chronologie, posé par l'écran
-     * après la composition (`withFrameNanos`) ; sans lui la ligne s'arrête aux masques et
-     * `pixel` affiche « — ».
-     */
-    fun noteDrawn() {
-        if (!chronology.noteDrawn()) return
-        val snap = chronology.snapshot(_state.value.timings)
-        _state.update { current -> current.copy(timings = snap) }.also {
-            // Journal hors main (fil sonde, ordonné) : le formatage + 2× Log.i
-            // ne bloquent plus le main — sous pression logd, Log.i attend.
-            scope.launch(ProbeWorkDispatcher) { LiveLatencyLog.frame(snap) }
         }
     }
 
