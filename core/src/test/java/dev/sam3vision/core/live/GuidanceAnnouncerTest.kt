@@ -156,13 +156,43 @@ class GuidanceAnnouncerTest {
     }
 
     @Test
-    fun `poteau qui s approche a droite dit gauche`() {
+    fun `poteau a droite dit gauche des 4 m`() {
         val announcer = GuidanceAnnouncer()
         fun poteauDroite(meters: Float) = PlacedLabel("poteau", 0.7f, 0.5f, meters)
 
-        assertEquals("Straight.", announcer.onFrame(0L, listOf(poteauDroite(3.0f))))
+        // Ordre user : poteau/barrière à 4 m ou moins = consigne immédiate,
+        // sans attendre le TTC du décalage (qui parle, lui, à 2,2 m).
+        assertEquals("Left.", announcer.onFrame(0L, listOf(poteauDroite(3.0f))))
+        // même mot : redite 2 s, la frame reste au statique (pas de « Straight. »)
         assertNull(announcer.onFrame(250L, listOf(poteauDroite(2.6f))))
+        // le décalage TTC prend le relais quand il parle
         assertEquals("Left.", announcer.onFrame(500L, listOf(poteauDroite(2.2f))))
+    }
+
+    @Test
+    fun `barriere a gauche dit droite des 4 m`() {
+        val announcer = GuidanceAnnouncer()
+        fun barriereGauche(meters: Float) = PlacedLabel("barrière", 0.3f, 0.5f, meters)
+
+        assertEquals("Right.", announcer.onFrame(0L, listOf(barriereGauche(3.0f))))
+        assertNull(announcer.onFrame(250L, listOf(barriereGauche(2.6f))))
+    }
+
+    @Test
+    fun `poteau au dela de 4 m laisse parler le couloir`() {
+        val announcer = GuidanceAnnouncer()
+
+        assertEquals("Straight.", announcer.onFrame(0L, listOf(PlacedLabel("poteau", 0.7f, 0.5f, 4.5f))))
+    }
+
+    @Test
+    fun `statique bouche des deux cotes ne dit jamais stop`() {
+        val announcer = GuidanceAnnouncer()
+        val labels = listOf(PlacedLabel("poteau", 0.5f, 0.5f, 2.0f), PlacedLabel("mur", 0.2f, 0.5f, 1.5f), PlacedLabel("mur", 0.8f, 0.5f, 1.5f))
+
+        val said = announcer.onFrame(0L, labels)
+
+        assertTrue("pas de stop : $said", said != "Stop.")
     }
 
     @Test
