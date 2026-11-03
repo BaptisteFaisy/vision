@@ -114,6 +114,27 @@ object CrashGuard {
         }
     }
 
+    /**
+     * Journalise un événement sans exception (refus de premier plan, démarrage refusé) :
+     * même ligne logcat + disque qu'un incident, avec `type=event`. Ne lève jamais.
+     */
+    fun noteEvent(origin: String, detail: String) {
+        seen.incrementAndGet()
+        runCatching {
+            Log.w(TAG, "[$origin] $detail")
+        }
+        runCatching {
+            journal.enqueue(
+                JournalLine.event(
+                    millis = System.currentTimeMillis(),
+                    thread = Thread.currentThread().name,
+                    origin = origin,
+                    detail = detail,
+                ),
+            )
+        }
+    }
+
     /** Incidents journalisés depuis le démarrage. */
     fun incidents(): Long = seen.get()
 
