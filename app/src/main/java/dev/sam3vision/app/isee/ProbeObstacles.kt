@@ -101,6 +101,10 @@ internal fun obstacleFrame(
     val loopActive = watchers.curbUp.onSignal(curbSignal)
     val loopWish =
         if (loopActive && !indoor && !st.crossingActive && !VoiceBus.curbSpeaking()) curbUpWish() else null
+    // Sur le passage (dehors seul : le lieu est gardé ici, la sonde publie
+    // brut) : le mot d'évitement des occupants parle à 100, devant le verdict
+    // maintenu et les humains hors passage (101).
+    val onPathSide = OnPathWatch.side().takeIf { st.onCrosswalk && !indoor }
     offer(
         decideFrame(
             listOf(
@@ -108,6 +112,7 @@ internal fun obstacleFrame(
                     ?.takeIf { (!indoor || (!st.crossingActive && hazardCue?.kind == HazardKind.PERSON)) && !guidanceHolds },
                 curbWish(curbCue, st.crossingActive).takeUnless { indoor || (loopActive && !st.crossingActive) },
                 loopWish,
+                onPathWish(onPathSide, lang),
             ),
         ),
         nowMs,
