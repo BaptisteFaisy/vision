@@ -34,7 +34,7 @@ chat (9) et GPS (3, 11) en synthèse réseau.
 | 2 | Humains ≤ 15 m droit devant (plein axe ≤ 2 m) | **Mot d'évitement en continu** « Droite. »/« Gauche. », répété toutes les 300 ms (§ 36) | `guide_left`, `guide_right` |
 | 3 | Rappel GPS | Si silence depuis 15 s ou plus : répète la dernière consigne + distance restante | Synthèse réseau (GPS) |
 | 4 | Grillages + murs + barrières < 6 m | **Mot d'évitement en continu** « Droite. »/« Gauche. », répété toutes les 300 ms (§ 36) | `guide_left`, `guide_right` |
-| 5 | Bordures < 6 m | Montée / descente | `curb_up`, `curb_down` |
+| 5 | Bordures < 6 m | Montée **en face seule** (bande « midi », à côté = silence) / descente | `curb_up`, `curb_down` |
 | 6 | Escaliers | **Jalons 4 / 2 / 1 m** + **nombre de marches dit** | `stairs_up/down_4/2/1`, `n_1..12` + `stairs_steps` |
 | 7 | Poteaux + mobilier vertical + divers < 6 m (poteau ≤ 15 m droit devant) | **Mot d'évitement en continu** « Droite. »/« Gauche. », répété toutes les 300 ms (§ 36) | `guide_left`, `guide_right` |
 | 8 | Passages piétons < 6 m | Annonce (**« Crosswalk. »**, joué < 500 ms à vitesse de base, toutes les 2 s hors Traversée ; 1 fois par vue sinon) + alignement **au changement** + arrivée **1 fois** | `crosswalk`, `crosswalk_aligned`, `cross_arrived` |

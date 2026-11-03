@@ -3,6 +3,20 @@
 Le journal part du 2026-10-26 après 19 h : le commit de départ, puis une entrée par fait
 livré et ses preuves (tâche, fichiers, chiffres) dans l'arbre.
 
+## 2026-11-03 — iSee : « curb up » en face uniquement, jamais à côté (branche `curb-face-uniquement`)
+
+- **Demande** : la montée de bordure se disait dès 11 h / 1 h (couloir marché),
+  alors qu'elle ne se monte que droit devant.
+- **Fait** :
+  - `core/curb/CurbSignal.kt` : `nearCurb` tait la montée (`CurbEdge.Up`) hors
+    bande « midi » (`PositionText.clockHour == 12`, réutilisée) ; descente et
+    sens incertain gardent le couloir (sécurité / prudence).
+  - Tests : 5 cas `CurbWatcherTest` (11 h muet, 1 h muet, midi parlé, descente
+    11 h parlée, route 11 h incertaine) ; contrat niveau 5 (`docs/VOIX-DANGER.md`).
+- **Preuves** : `CurbWatcherTest` 27/27, package `core.curb` + `SeuilsDehorsV4Test` +
+  `DeadConceptsRemovedTest` 133/133, `ObstacleCurbVoiceTest` (:app) 9/9,
+  build-serveur r630 ; échec authentique 2/27 avant correctif.
+
 ## 2026-11-02 — iSee Traversée : une garée ne dit plus « Don't cross. » sur gigue 1-frame (branche `fix/traverser-garee-vs-circulation`)
 
 - **Demande** : la voix du verdict (SPEC v4) disait « Don't cross. » devant une voiture garée.
