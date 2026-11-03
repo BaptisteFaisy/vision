@@ -9,9 +9,10 @@
 
 ## 1. Ce que l'écran montre
 
-- **Fond blanc**, plein écran. En-tête « iSee » + pastille d'état, en blanc
-  sur la rue quand la caméra est ouverte, en encre sinon ; bandeau blanc
-  derrière les boutons système du bas.
+- **Fond blanc**, plein écran. En-tête : pastille d'état seule (wordmark
+  « iSee » retiré le 2026-11-03 sur demande user), en blanc sur la rue
+  quand la caméra est ouverte, en encre sinon ; bandeau blanc derrière
+  les boutons système du bas.
 - **Une seule boule de verre** au liquide marbré (`IseePortraitOrb`) : reflet
   de boîte à lumière, irisation au bord, liseré. Le verre **n'a pas de couleur
   propre**, et son irisation reste **très légère et seulement sur le haut** :
@@ -23,8 +24,8 @@
   restants restent blanc laiteux. Shader AGSL sur API 33+,
   repli en dégradés en dessous. **Aucun pixel sur la boule, aucun satellite.**
 - **Caméra = la rue en haut**, sans cadre ni carte (`IseePortraitCamera`) :
-  elle occupe 50 % du haut quand elle est affichée (la taille parole,
-  `PICTURE_SPEAKING_H`), 60 % en guidage (`PICTURE_GUIDING_H`, la boule
+  elle occupe 62,5 % du haut quand elle est affichée (la taille parole,
+  `PICTURE_SPEAKING_H`), 75 % en guidage (`PICTURE_GUIDING_H`, la boule
   s'efface entre la rue et la carte, la phrase reste), et **se fond dans
   le blanc** sur ses 34 % du bas (`FADE`, courbe `pictureAlpha`). À l'ouverture
   elle arrive **floue et agrandie** (×1,05, flou max 24) puis devient nette (`focusPull`).
