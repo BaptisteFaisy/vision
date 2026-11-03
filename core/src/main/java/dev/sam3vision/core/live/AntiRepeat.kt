@@ -20,6 +20,7 @@ package dev.sam3vision.core.live
  * - `gps-reminder` = sans antirépétition (niveau 3, rappel aux 15 s de silence) ;
  * - `fence` = 4 s (niveau 4, grillages + murs + barrières < 6 m) ;
  * - `curb` = 2 s (niveau 5, bordures < 6 m) ;
+ * - `curb-up` = immédiat hors table (niveau 5, boucle montée < 1 m) ;
  * - `stairs` = 2 s (niveau 6, escaliers : annonce, montée ; jalons :
  *   `stairs:<palier>`, même durée, mémoire par palier) ;
  * - `stairs-count` = 1 s (niveau 6, compte des marches — ordre user du
@@ -83,6 +84,13 @@ object AntiRepeat {
 
     /** Niveau 5 : bordures < 6 m — 2 s. */
     const val KEY_CURB = "curb"
+
+    /**
+     * Niveau 5 : boucle « curb up » (montée < 1 m) — hors table, toujours
+     * autorisée ([allow] ne mémorise rien pour cette clé) : la cadence
+     * vient du bus libre (`curbSpeaking`), pas d'un délai.
+     */
+    const val KEY_CURB_UP = "curb-up"
 
     /**
      * Niveau 6 : escaliers (annonce, montée — le compte a sa clé) — 2 s.
@@ -200,7 +208,7 @@ object AntiRepeat {
         KEY_CROSSWALK_ANNOUNCE -> 2_000L
         KEY_CROSSWALK_ARRIVAL -> ONCE_MS
         // Mots continus, rappel GPS, alignement, perte : sans délai (toujours autorisés).
-        KEY_HUMAN_IMMINENT, KEY_POLE_AVOID, KEY_WALL_AVOID, KEY_GPS_REMINDER, KEY_CROSSWALK_ALIGN, KEY_CROSSWALK_LOST -> 0L
+        KEY_HUMAN_IMMINENT, KEY_POLE_AVOID, KEY_WALL_AVOID, KEY_GPS_REMINDER, KEY_CROSSWALK_ALIGN, KEY_CROSSWALK_LOST, KEY_CURB_UP -> 0L
         // Clés inconnues : sans antirépétition (jamais bloquantes).
         else -> 0L
     }
