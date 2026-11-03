@@ -19,6 +19,12 @@ import dev.sam3vision.core.live.LivePrompts
  * bavardage continu).
  */
 object CrossingLevels {
+    /**
+     * Verdict changé sur le passage (front, rouge comme vert) : coupe tout,
+     * une voiture qui bouge tôle avant les piétons. Hors passage : inutilisé.
+     */
+    const val ALERT = 99
+
     /** Verdict (feu piéton puis voitures) : prioritaire sur humains et bordures. */
     const val VERDICT = 100
 
@@ -27,6 +33,17 @@ object CrossingLevels {
 
     /** Bordures du passage, après les humains. */
     const val CURB = 102
+
+    /**
+     * Niveau du verdict : 100 hors passage ; sur le passage, 99 si le verdict
+     * vient de changer (front, à couper), 101 s'il se répète (l'évitement
+     * continu des occupants, 100, domine la répétition informative).
+     */
+    fun verdictLevelFor(onCrosswalk: Boolean, changed: Boolean): Int = when {
+        !onCrosswalk -> VERDICT
+        changed -> ALERT
+        else -> HUMAN
+    }
 }
 
 /** Verdict de traversée : traverser, ou attendre. */
