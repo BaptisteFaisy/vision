@@ -11,6 +11,7 @@ import kotlinx.coroutines.test.StandardTestDispatcher
 import kotlinx.coroutines.test.TestScope
 import kotlinx.coroutines.test.runTest
 import org.junit.Assert.assertEquals
+import org.junit.Assert.assertNull
 import org.junit.Assert.assertTrue
 import org.junit.Test
 
@@ -60,6 +61,14 @@ class LiveProbePublishSplitTest {
         assertEquals(1, chiffres.frames)
         assertEquals("pixelSeq ne bouge plus en #2", 1, chiffres.pixelSeq)
         assertTrue("détections en #2", chiffres.samDetections.isNotEmpty())
+    }
+
+    @Test
+    fun `computeRest hors traversee rend un patch nul et des chiffres`() = runTest {
+        val probe = probe(this)
+        val rest = probe.computeRest(frame(listOf(personne())), "A", 8_000_000L)
+        assertNull("pas de patch hors Traversée", rest.cross)
+        assertTrue("détections quand même", rest.rawDetections.isNotEmpty())
     }
 
     @Test
