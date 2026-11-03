@@ -104,10 +104,14 @@ data class TraverseDecision(
  *
  * Un véhicule bloque (hors vert) quand son score dépasse [SCORE_MIN] **et**
  * qu'il approche
- * (surface de boîte croissante sur deux frames) **ou** qu'il est proche (distance
- * sténopé sous [VETO_METERS]). L'approche se lit sur les boîtes seules — sans
- * focale, elle reste le seul critère ; la distance réutilise [KnownSizes] (déjà
- * calibré pour les sept véhicules) et [Pinhole]. Un véhicule prouvé immobile
+ * (croissance franche de boîte contre sa mémoire appariée, au-delà du tremblé
+ * [AREA_JITTER_RATIO]) **ou** qu'il est proche (distance sténopé sous
+ * [VETO_METERS]). L'approche se lit sur les boîtes seules — sans focale, elle
+ * reste le seul critère ; la distance réutilise [KnownSizes] (déjà calibré
+ * pour les sept véhicules) et [Pinhole]. Les vus se suivent par instance
+ * (label + seau L/C/R, appariement IoU) : deux garées sous le même label ne
+ * fusionnent plus, une bascule de max ne fait plus une approche fantôme. Un
+ * véhicule prouvé immobile
  * (mesuré sous [STILL_EXEMPT_METERS], centre quasi fixe, portée stable à
  * [STILL_RANGE_M] près, croissance sous le tremblé [AREA_JITTER_RATIO], fond
  * fixe — voir [stoppedKeys]) ne bloque plus :
@@ -132,11 +136,8 @@ class TraverseVeto {
     var currentState: TraversePhase = TraversePhase.ATTENDRE
         private set
 
-    /** Surface max par véhicule à la frame précédente (clé : label singulier canonique). */
-    private var previousAreas: Map<String, Float> = emptyMap()
-
-    /** Dernier centre/seau/date par véhicule (clé : label singulier canonique). */
-    private var previousStill: Map<String, StillMemory> = emptyMap()
+    /** Véhicules vus à la frame précédente, par instance (clé : label + seau L/C/R, voir [instanceKey]). */
+    private var previousSeen: Map<String, List<StillMemory>> = emptyMap()
 
     /** Suivi temporel des véhicules (IoU + TTC) — ceinture et bretelles du veto. */
     private val approach = VehicleApproach()
@@ -145,8 +146,7 @@ class TraverseVeto {
     @Synchronized
     fun reset() {
         currentState = TraversePhase.ATTENDRE
-        previousAreas = emptyMap()
-        previousStill = emptyMap()
+        previousSeen = emptyMap()
         approach.reset()
     }
 
@@ -173,11 +173,11 @@ class TraverseVeto {
         depthByBox: Map<List<Float>, Float>? = null, // PISTE2 : proximités par boîte vers le suivi — null = repli géométrie.
         noLight: Boolean = false,
     ): TraverseDecision {
-        val stopped = stoppedKeys(detections, focalPx, atMs, motion)
+        val picked = seenByInstance(detections)
+        val stopped = stoppedKeys(picked, focalPx, atMs, motion)
         val hushed = if (atMs < 0L) emptySet() else approach.cameraMovedKeys
-        val blocking = findBlocking(detections, focalPx, stopped + hushed)
-        previousAreas = vehicleAreas(detections)
-        previousStill = stillMemoryOf(detections, focalPx, atMs)
+        val blocking = findBlocking(picked, focalPx, stopped, hushed)
+        previousSeen = stillMemoryOf(picked, focalPx, atMs)
         val tracked = approachVerdict(detections, atMs, motion, depthByBox)
         // Vert confirmé : le vert gagne toujours (ordre user du 02/11). Le
         // suivi (instantané + pistes) tourne quand même, tenu chaud pour
@@ -202,38 +202,45 @@ class TraverseVeto {
     }
 
     /** Le véhicule bloquant le plus proche, `null` sans veto. */
-    private fun findBlocking(detections: List<Detection>, focalPx: Float, stopped: Set<String>): Blocking? =
-        detections.mapNotNull { vetoCandidate(it, focalPx, stopped) }
+    private fun findBlocking(
+        picked: Map<String, List<Seen>>,
+        focalPx: Float,
+        stopped: Set<Seen>,
+        hushed: Set<String>,
+    ): Blocking? =
+        picked.values.flatten().mapNotNull { vetoCandidate(it, focalPx, stopped, hushed) }
             .minByOrNull { it.meters ?: Float.MAX_VALUE }
 
     /**
-     * Candidature d'une détection au veto : véhicule confiant qui approche ou proche
-     * (croissance de boîte, ou proximité mesurée sous [VETO_METERS]).
+     * Candidature d'un véhicule vu au veto : croissance franche de boîte
+     * ([isGrowingBeyondJitter] : le tremblé SAM ≤ 4 % n'est pas une approche),
+     * ou proximité mesurée sous [VETO_METERS]. La croissance se lit contre la
+     * mémoire appariée ([matchOf]) — à défaut (jeune sans recouvrement),
+     * contre la surface max de la clé (repli fail-closed, miroir de l'ancienne
+     * fusion).
      *
-     * @param stopped pistes neutralisées (arrêt confirmé [stoppedKeys] + suivi
-     * caméra `VehicleApproach.cameraMovedKeys`), écartées de la sélection du
-     * veto — les deux granularités (label, instance) sont honorées.
+     * @param stopped vus prouvés immobiles ([stoppedKeys]), écartés un par un
+     * (une garée n'exempte pas la voiture qui roule à côté).
+     * @param hushed clés d'instance tues par le suivi caméra
+     * (`VehicleApproach.cameraMovedKeys`) — les deux granularités (label,
+     * instance) sont honorées.
      */
-    private fun vetoCandidate(detection: Detection, focalPx: Float, stopped: Set<String>): Blocking? {
-        if (!VehicleConcepts.isVehicle(detection.label)) return null
-        if (detection.score <= SCORE_MIN) return null
-        val area = Box.fromProto(detection.box)?.area
-        val previous = previousAreas[vehicleKey(detection.label)]
-        val growing = area != null && previous != null && area > previous
-        val centerX = detection.normalizedBox()?.let { (it[0] + it[2]) / 2f } ?: 0.5f
-        if (vehicleKey(detection.label) in stopped) return null
-        if (VehicleApproach.instanceKeyOf(detection.label, centerX) in stopped) return null
-        val meters = distanceOf(detection, focalPx)
+    private fun vetoCandidate(seen: Seen, focalPx: Float, stopped: Set<Seen>, hushed: Set<String>): Blocking? {
+        if (seen in stopped) return null
+        if (seen.key in hushed || vehicleKey(seen.detection.label) in hushed) return null
+        val previous = matchOf(seen)?.area ?: fallbackArea(seen.key)
+        val growing = previous != null && isGrowingBeyondJitter(previous, seen.box.area)
+        val meters = distanceOf(seen.detection, focalPx)
         val near = meters != null && meters < VETO_METERS
         if (!growing && !near) return null
-        return Blocking(detection.label, meters)
+        return Blocking(seen.detection.label, meters)
     }
 
     /**
-     * Clés des véhicules prouvés immobiles : mesurés au sténopé sous
-     * [STILL_EXEMPT_METERS], quasi immobiles et à portée stable
-     * ([isStableRange] : ±[STILL_RANGE_M], pas d'égalité de seau — une frontière
-     * ne casse pas l'arrêt) depuis la frame précédente datée, boîte qui ne
+     * Vus prouvés immobiles : mesurés au sténopé sous [STILL_EXEMPT_METERS],
+     * quasi immobiles et à portée stable ([isStableRange] : ±[STILL_RANGE_M],
+     * pas d'égalité de seau — une frontière ne casse pas l'arrêt) depuis la
+     * mémoire appariée ([matchOf]) de la frame précédente datée, boîte qui ne
      * grandit pas au-delà du tremblé ([isGrowingBeyondJitter] : une approche
      * de face garde son centre et peut garder sa portée — la croissance
      * franche tranche), fond fixe (un pan prouvé refuse toute exemption : une
@@ -242,35 +249,28 @@ class TraverseVeto {
      * garée sur le côté, prouvée immobile, n'interdit pas la traversée.
      */
     private fun stoppedKeys(
-        detections: List<Detection>,
+        picked: Map<String, List<Seen>>,
         focalPx: Float,
         atMs: Long,
         motion: FrameMotion?,
-    ): Set<String> {
+    ): Set<Seen> {
         if (atMs < 0L || focalPx <= 0f || backgroundPanning(motion)) return emptySet()
-        val currentAreas = vehicleAreas(detections)
-        return detections.mapNotNull { detection ->
-            if (!VehicleConcepts.isVehicle(detection.label)) return@mapNotNull null
-            if (detection.score <= SCORE_MIN) return@mapNotNull null
-            val box = Box.fromProto(detection.box) ?: return@mapNotNull null
-            if (!box.isSane) return@mapNotNull null
-            val key = vehicleKey(detection.label)
-            val prev = previousStill[key] ?: return@mapNotNull null
+        return picked.values.flatten().mapNotNull { seen ->
+            val prev = matchOf(seen) ?: return@mapNotNull null
             if (prev.atMs < 0L) return@mapNotNull null
             val dtSeconds = (atMs - prev.atMs) / 1000f
             if (dtSeconds <= 0f || dtSeconds > STILL_STALE_SECONDS) return@mapNotNull null
-            val meters = distanceOf(detection, focalPx) ?: return@mapNotNull null
+            val meters = distanceOf(seen.detection, focalPx) ?: return@mapNotNull null
             if (meters > STILL_EXEMPT_METERS) return@mapNotNull null
-            val previousArea = previousAreas[key] ?: return@mapNotNull null
-            if (isGrowingBeyondJitter(previousArea, currentAreas[key] ?: 0f)) return@mapNotNull null
-            val center = detection.normalizedBox() ?: return@mapNotNull null
+            if (isGrowingBeyondJitter(prev.area, seen.box.area)) return@mapNotNull null
+            val center = seen.detection.normalizedBox() ?: return@mapNotNull null
             val cx = (center[0] + center[2]) / 2f
             val cy = (center[1] + center[3]) / 2f
             val px = prev.cx ?: return@mapNotNull null
             val py = prev.cy ?: return@mapNotNull null
             if (hypot(cx - px, cy - py) / dtSeconds > VehicleStateWatcher.STILL_SPEED) return@mapNotNull null
             if (!isStableRange(meters, prev.meters)) return@mapNotNull null
-            key
+            seen
         }.toSet()
     }
 
@@ -288,20 +288,29 @@ class TraverseVeto {
         return ground > VehicleBackground.LATERAL_RATIO
     }
 
-    /** Mémoire d'immobilité de la frame (boîte max par label, miroir du veto). */
-    private fun stillMemoryOf(detections: List<Detection>, focalPx: Float, atMs: Long): Map<String, StillMemory> =
-        detections.mapNotNull { detection ->
-            if (!VehicleConcepts.isVehicle(detection.label)) return@mapNotNull null
-            if (detection.score <= SCORE_MIN) return@mapNotNull null
-            val box = Box.fromProto(detection.box) ?: return@mapNotNull null
-            if (!box.isSane) return@mapNotNull null
-            vehicleKey(detection.label) to detection
-        }.groupBy({ it.first }, { it.second })
-            .mapValues { (_, same) ->
-                val seen = same.maxBy { Box.fromProto(it.box)?.area ?: -1f }
-                val center = seen.normalizedBox()
-                val meters = distanceOf(seen, focalPx)
+    /** Véhicules confiants à boîte saine, groupés par instance (deux garées à deux endroits ne fusionnent plus). */
+    private fun seenByInstance(detections: List<Detection>): Map<String, List<Seen>> {
+        val picked = LinkedHashMap<String, MutableList<Seen>>()
+        for (detection in detections) {
+            if (!VehicleConcepts.isVehicle(detection.label)) continue
+            if (detection.score <= SCORE_MIN) continue
+            val box = Box.fromProto(detection.box) ?: continue
+            if (!box.isSane) continue
+            val key = instanceKey(detection)
+            picked.getOrPut(key) { mutableListOf() } += Seen(key, detection, box)
+        }
+        return picked
+    }
+
+    /** Mémoire de la frame : chaque vu retient boîte, surface, centre, portée et date. */
+    private fun stillMemoryOf(picked: Map<String, List<Seen>>, focalPx: Float, atMs: Long): Map<String, List<StillMemory>> =
+        picked.mapValues { (_, seen) ->
+            seen.map { current ->
+                val center = current.detection.normalizedBox()
+                val meters = distanceOf(current.detection, focalPx)
                 StillMemory(
+                    box = current.box,
+                    area = current.box.area,
                     cx = center?.let { (it[0] + it[2]) / 2f },
                     cy = center?.let { (it[1] + it[3]) / 2f },
                     meters = meters,
@@ -309,15 +318,25 @@ class TraverseVeto {
                     atMs = atMs,
                 )
             }
+        }
 
-    /** Surface max par véhicule de la frame (les doublons de label fusionnent). */
-    private fun vehicleAreas(detections: List<Detection>): Map<String, Float> =
-        detections.mapNotNull { detection ->
-            if (!VehicleConcepts.isVehicle(detection.label)) return@mapNotNull null
-            val area = Box.fromProto(detection.box)?.area ?: return@mapNotNull null
-            vehicleKey(detection.label) to area
-        }.groupBy({ it.first }, { it.second })
-            .mapValues { (_, areas) -> areas.max() }
+    /** Mémoire précédente qui recouvre [seen] (meilleur IoU, [CONTINUITY_IOU_MIN] min) : la même voiture, pas la voisine. */
+    private fun matchOf(seen: Seen): StillMemory? {
+        val memories = previousSeen[seen.key] ?: return null
+        return memories.maxByOrNull { it.box.iou(seen.box) }
+            ?.takeIf { it.box.iou(seen.box) >= CONTINUITY_IOU_MIN }
+    }
+
+    /** Surface max des mémoires de [key] (`null` sans mémoire) : repli fail-closed du jeune sans recouvrement. */
+    private fun fallbackArea(key: String): Float? =
+        previousSeen[key]?.maxOfOrNull { it.area }
+
+    /** Clé d'instance d'une détection (label + seau L/C/R, miroir de l'approche). */
+    private fun instanceKey(detection: Detection): String {
+        val center = detection.normalizedBox()
+        val cx = center?.let { (it[0] + it[2]) / 2f } ?: 0.5f
+        return VehicleApproach.instanceKeyOf(detection.label, cx)
+    }
 
     /** Distance sténopé d'une détection, `null` si focale ou calibrage manquant. */
     private fun distanceOf(detection: Detection, focalPx: Float): Float? {
@@ -358,8 +377,17 @@ class TraverseVeto {
     /** Clé de suivi d'un véhicule entre deux frames (« Cars » et « car » fusionnent). */
     private fun vehicleKey(label: String): String = VehicleConcepts.keyOf(label)
 
-    /** Immobilité mémorisée : centre normalisé, portée, seau-mètre et date de la frame. */
+    /** Véhicule vu de la frame, rattaché à sa clé d'instance. */
+    private data class Seen(
+        val key: String,
+        val detection: Detection,
+        val box: Box,
+    )
+
+    /** Vu mémorisé : boîte, surface, centre normalisé, portée, seau-mètre et date de la frame. */
     private data class StillMemory(
+        val box: Box,
+        val area: Float,
         val cx: Float?,
         val cy: Float?,
         val meters: Float?,
@@ -382,5 +410,8 @@ class TraverseVeto {
 
         /** Fraîcheur exigée de la frame précédente pour conclure à l'arrêt (s). */
         const val STILL_STALE_SECONDS = 1.0f
+
+        /** Recouvrement minimal pour rattacher un vu à sa mémoire (miroir du watcher : téléportation interdite). */
+        private const val CONTINUITY_IOU_MIN = 0.3f
     }
 }
