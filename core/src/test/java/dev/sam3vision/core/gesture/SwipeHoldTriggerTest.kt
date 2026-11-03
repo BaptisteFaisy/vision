@@ -45,13 +45,19 @@ class SwipeHoldTriggerTest {
 
     private val scheduler = FakeScheduler()
     private val recorder = Recorder()
-    private val trigger = SwipeHoldTrigger(scheduler, recorder)
+    private var nowMs = 0L
+    private val trigger = SwipeHoldTrigger(scheduler, recorder, nowMs = { nowMs })
 
     /** Déclencheur frais branché sur un collecteur d'abandons. */
     private fun abandonSetup(): Triple<FakeScheduler, AbandonRecorder, SwipeHoldTrigger> {
         val sched = FakeScheduler()
         val rec = AbandonRecorder()
-        return Triple(sched, rec, SwipeHoldTrigger(sched, rec))
+        return Triple(sched, rec, SwipeHoldTrigger(sched, rec, nowMs = { nowMs }))
+    }
+
+    /** Sort de la grâce post-armement : le jugement des bonds est actif. */
+    private fun pastGrace() {
+        nowMs = SwipeHoldTrigger.ARM_GRACE_MS
     }
 
     @Test
@@ -82,6 +88,7 @@ class SwipeHoldTriggerTest {
     @Test
     fun `glissement repris avant le seuil annule`() {
         trigger.arm(10f, 90f)
+        pastGrace()
         trigger.onMove(10f, 200f)
         scheduler.elapse()
         assertEquals(emptyList<String>(), recorder.events)
@@ -112,6 +119,7 @@ class SwipeHoldTriggerTest {
     @Test
     fun `bond extreme au-dela de 48px annule toujours`() {
         trigger.arm(10f, 90f)
+        pastGrace()
         trigger.onMove(10f, 150f)
         scheduler.elapse()
         assertEquals(emptyList<String>(), recorder.events)
@@ -125,8 +133,9 @@ class SwipeHoldTriggerTest {
             override fun onSwipeHoldStart() { events += "start" }
             override fun onSwipeHoldEnd() { events += "end" }
             override fun onSwipeHoldCancel() { events += "cancel" }
-        })
+        }, nowMs = { nowMs })
         watched.arm(10f, 90f)
+        pastGrace()
         watched.onMove(10f, 200f)
         scheduler.elapse()
         assertEquals(listOf("cancel"), events)
@@ -190,7 +199,33 @@ class SwipeHoldTriggerTest {
     fun `bond franc signale JUMP_SLOP`() {
         val (sched, rec, trig) = abandonSetup()
         trig.arm(10f, 90f)
+        pastGrace()
         trig.onMove(10f, 200f)
+        sched.elapse()
+        assertEquals(listOf(SwipeHoldTrigger.CancelReason.JUMP_SLOP), rec.abandoned)
+    }
+
+    @Test
+    fun `pas rapides dans la grace post-armement gardent le maintien`() {
+        trigger.arm(10f, 90f)
+        nowMs = 10
+        trigger.onMove(10f, 160f)
+        nowMs = 25
+        trigger.onMove(10f, 240f)
+        nowMs = 300
+        scheduler.elapse()
+        assertEquals(listOf("start"), recorder.events)
+        assertTrue(trigger.holding)
+    }
+
+    @Test
+    fun `bond juste apres la grace signale JUMP_SLOP`() {
+        val (sched, rec, trig) = abandonSetup()
+        trig.arm(10f, 90f)
+        nowMs = 50
+        trig.onMove(10f, 120f)
+        pastGrace()
+        trig.onMove(10f, 250f)
         sched.elapse()
         assertEquals(listOf(SwipeHoldTrigger.CancelReason.JUMP_SLOP), rec.abandoned)
     }
