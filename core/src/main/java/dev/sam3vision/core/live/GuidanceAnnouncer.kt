@@ -257,8 +257,9 @@ class GuidanceAnnouncer(
     /**
      * Sécurité bordure (< 1 m ⇒ inverse forcé), devant tout sauf le
      * stop-contact. Le niveau est re-jugé ici (marge + mémoire) : l'hystérésis
-     * vit dans l'annonceur. `null` = pas de sécurité (ou frame périmée :
-     * une image de 1,5 s ne force pas une direction), la frame continue.
+     * vit dans l'annonceur. Mêmes clés que [railSpeak] (une consigne = une
+     * clé) : la redite est partagée entre sécurité et rail. `null` = pas de
+     * sécurité (ou frame périmée), la frame continue.
      */
     private fun safetySpeak(
         atMs: Long,
@@ -275,8 +276,8 @@ class GuidanceAnnouncer(
         if (lastRailLevel != RailLevel.SAFETY || side == null || Timing.isStale(ageMs)) return null
         if (decision.blocked && decision.contactStop) return null
         return when (val cue = SidewalkRail.safetyCue(labels, side, hfovDeg, range)) {
-            RailCue.Stop -> speak(atMs, "safety|stop", GuidanceWord.Stop.text(language), RAIL_REPEAT_MS, urgent = true)
-            is RailCue.Direction -> speak(atMs, "safety|dir|" + cue.word.name, cue.word.text(language), RAIL_REPEAT_MS)
+            RailCue.Stop -> speak(atMs, "rail|stop", GuidanceWord.Stop.text(language), RAIL_REPEAT_MS, urgent = true)
+            is RailCue.Direction -> speak(atMs, "rail|dir|" + cue.word.name, cue.word.text(language), RAIL_REPEAT_MS)
             null -> null
         }
     }
