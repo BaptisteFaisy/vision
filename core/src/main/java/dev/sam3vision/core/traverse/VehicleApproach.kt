@@ -114,7 +114,15 @@ class VehicleApproach {
     var lastGlobalDtMs: Long = 0L // PISTE1
         private set
 
-    /** Oublie toutes les pistes (nouvelle traversée). */
+    /**
+     * Oublie toutes les pistes (nouvelle traversée).
+     *
+     * Synchronisé avec [update] : l'instance est partagée entre les
+     * `runFrame` entrelacés du direct, et un `reset` pendant un `update`
+     * vidait `tracks` sous une lecture (`NoSuchElementException`, crash
+     * constaté sur émulateur le 01/11).
+     */
+    @Synchronized
     fun reset() {
         tracks.clear()
         nextId = 0
@@ -140,6 +148,7 @@ class VehicleApproach {
      * comportement inchangé) : une radiale franche confirme l'approche,
      * jamais elle ne supprime un tau.
      */
+    @Synchronized
     fun update(
         detections: List<Detection>,
         atMs: Long,
