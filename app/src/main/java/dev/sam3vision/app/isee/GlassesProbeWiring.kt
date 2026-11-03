@@ -10,6 +10,7 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberUpdatedState
 import dev.sam3vision.app.bitmapToJpegBase64
 import dev.sam3vision.app.glasses.GlassesBackgroundFrames
+import dev.sam3vision.app.glasses.GlassesFrameBox
 import dev.sam3vision.app.glasses.GlassesVideoLink
 import dev.sam3vision.app.uprightScaled
 import dev.sam3vision.core.distance.CropGeometry
@@ -56,19 +57,10 @@ internal fun GlassesProbeWiring(probe: LiveProbe, glassesFeed: Boolean, guidance
             GlassesVideoLink.frames.collect { box ->
                 if (box == null || !probe.wantsFrame()) return@collect
                 if (!gate.admits(guiding.value, SystemClock.elapsedRealtime())) return@collect
-                // Décodage, redressement, JPEG, Canny et envoi : tout en fond, comme le
+                // Décodage, redressement, JPEG et envoi : tout en fond, comme le
                 // fil d'analyse du téléphone.
                 withContext(Dispatchers.Default) {
-                    val decodeStart = SystemClock.elapsedRealtime()
-                    val bitmap = sampler.bitmapOf(box) ?: return@withContext
-                    val jpegStart = SystemClock.elapsedRealtime()
-                    applyGlassesLens(probe, fromView = false)
-                    val jpeg = bitmapToProbeJpeg(bitmap) ?: return@withContext
-                    val sentAt = SystemClock.elapsedRealtime()
-                    // Arrivée + séquence du flux : le poste `capt` mesure enfin le pont
-                    // (décodage + JPEG), et la ligne rejoint le GlassesLink de même seq.
-                    probe.onFrame(jpeg, box.frame.arrivedAtNs, box.seq)
-                    countBridgeSplit(jpegStart - decodeStart, sentAt - jpegStart)
+                    sendBridgeFrame(probe, sampler, box)
                 }
             }
         } finally {
@@ -95,16 +87,36 @@ private class GuidanceGate {
     }
 }
 
-/** Bitmap de la rue → JPEG d'envoi (hors fil UI) ; les bitmaps jetables sont recyclés aussitôt. */
-private fun bitmapToProbeJpeg(bitmap: Bitmap): String? {
+/**
+ * Une poussée → JPEG envoyé : décodage, focale, redressement, encodage, envoi —
+ * puis SEULEMENT le compteur de marches. Le Canny (~2-40 ms, au plus 1/s)
+ * vivait entre le redressement et l'envoi et gonflait le poste `capt` (pics
+ * `enc` à 41 ms en recette 13c) ; le compteur garde sa valeur 1,5 s, il ne
+ * voit pas ces ~5 ms. `bridgesplit` garde son sens (`decode` = poussée →
+ * bitmap, `enc` = redressement + JPEG, Canny exclu). Hors fil UI, ne lève
+ * jamais pour un compteur : le pont vers SAM ne tombe pas pour ça.
+ */
+private fun sendBridgeFrame(probe: LiveProbe, sampler: GlassesBackgroundFrames, box: GlassesFrameBox) {
+    val decodeStart = SystemClock.elapsedRealtime()
+    val bitmap = sampler.bitmapOf(box) ?: return
+    val jpegStart = SystemClock.elapsedRealtime()
+    applyGlassesLens(probe, fromView = false)
     // Parité téléphone (320/q55) : le 480/q65 coûtait 2,25× pixels à l'encodage.
     val upright = uprightScaled(bitmap, 0, ISEE_FRAME_EDGE)
-    feedStairCounter(upright)
+    if (upright !== bitmap) bitmap.recycle()
     val jpeg = runCatching { bitmapToJpegBase64(upright, ISEE_FRAME_QUALITY) }.getOrNull()
-    if (upright !== bitmap) upright.recycle()
-    bitmap.recycle()
-    if (jpeg != null) countSnapshot()
-    return jpeg
+    try {
+        if (jpeg == null) return
+        val encMs = SystemClock.elapsedRealtime() - jpegStart
+        countSnapshot()
+        // Arrivée + séquence du flux : le poste `capt` mesure le pont
+        // (décodage + JPEG), et la ligne rejoint le GlassesLink de même seq.
+        probe.onFrame(jpeg, box.frame.arrivedAtNs, box.seq)
+        countBridgeSplit(jpegStart - decodeStart, encMs)
+    } finally {
+        feedStairCounter(upright)
+        if (upright === bitmap) bitmap.recycle() else upright.recycle()
+    }
 }
 
 /**
