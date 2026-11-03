@@ -27,6 +27,7 @@ import dev.sam3vision.core.share.sharedPictosOf
 import dev.sam3vision.app.glasses.LocalBenchOpener
 import dev.sam3vision.app.glasses.bench.BenchEntryPoint
 import dev.sam3vision.app.glasses.bench.BenchScreen
+import dev.sam3vision.app.isee.HideStatusBarWhileComposed
 import dev.sam3vision.app.isee.IseeHome
 import dev.sam3vision.app.isee.IseeViewModel
 import dev.sam3vision.app.isee.OnboardingGesturesScreen
@@ -202,6 +203,10 @@ fun AppNav(
     BackHandler(enabled = stack.size > 1) { pop() }
     // Accueil iSee plein écran : le téléphone ne doit pas se mettre en veille.
     KeepScreenOnEffect(keepsScreenOn(route))
+    // iSee et direct : la barre de statut ne recouvre plus la caméra. Un seul
+    // effet ici (pas un par écran) : au changement de route, l'effet survit
+    // et la barre reste cachée, sans bataille show/hide entre les écrans.
+    if (hidesStatusBar(route)) HideStatusBarWhileComposed()
 
     Box(Modifier.fillMaxSize()) {
         // Les lunettes nourrissent iSee : photos posées sans changer de page, questions parlées comme des dictées.

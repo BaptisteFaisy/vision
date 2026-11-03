@@ -18,10 +18,17 @@ import androidx.compose.ui.unit.dp
 import androidx.core.view.WindowCompat
 
 /**
- * Écrans clairs (fond blanc) : le bandeau système du haut (heure, batterie)
- * y est blanc, aux icônes sombres. La scène iSee cache la barre ; les écrans
- * sombres et caméra gardent leurs icônes claires sur fond sombre.
+ * Écrans sans barre système du haut : la scène iSee et le direct (caméra plein
+ * écran dans les deux cas). Un seul effet au niveau navigation (voir AppNav) :
+ * un effet par écran se battait au changement de route — le `show()` du
+ * dispose iSee passait après le `hide()` du direct, qui gardait sa barre.
+ *
+ * Écrans clairs (fond blanc) : le bandeau système y est blanc, aux icônes
+ * sombres. Les autres écrans sombres gardent leurs icônes claires.
  */
+/** Routes sans barre système du haut : iSee et direct (caméra plein écran). */
+internal fun hidesStatusBar(route: Route): Boolean = route == Route.Isee || route == Route.Live
+
 internal fun whiteStatusBar(route: Route): Boolean = when (route) {
     Route.Settings, Route.Caregiver, Route.Onboarding -> true
     Route.Isee, Route.Capture, Route.Analysis, Route.Chat, Route.Live,
