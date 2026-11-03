@@ -102,25 +102,29 @@ internal fun LiveProbe.computeRest(
     val (rawDetections, pinhole) = detectionsAndReadingsOf(distances, frame, grays)
     val readings = meters.readingsFor(frame, pinhole)
     val placed = placedLabels(frame, readings)
-    val cross = crossingPatchOf(
-        crossing, traverseVeto, _state.value.crossingActive, frame, distances.lensSpec, jpegB64, at, speechLanguage,
+    // Un seul instantané par frame : le mode ne change plus entre le patch et la
+    // voix, et le patch (nul hors mode) n'alloue plus son `tap()` crops pour rien.
+    val crossingActive = _state.value.crossingActive
+    val lens = distances.lensSpec
+    val cross = if (crossingActive) crossingPatchOf(
+        crossing, traverseVeto, true, frame, lens, jpegB64, at, speechLanguage,
         onCrop = cropLogger?.tap(), noLightGate = noLightGate,
-    )
+    ) else null
     // Traversée : le verdict parle au bus (niveau 100 = CrossingLevels.VERDICT),
     // la phrase parlée se tait (humains et bordures passent par le guetteur
     // obstacles, 101/102). Le veto trafic de la même frame lui est passé :
     // voiture proche/en approche ⇒ jamais « Cross. » (le feu vert ne suffit
     // plus). Le fond juge les pistes voitures : un pan sur une garée ne bloque pas.
-    if (_state.value.crossingActive) {
+    if (crossingActive) {
         verdictEngine.onFrame(
             frame, readings, jpegB64, at, motion = ProbeBackgroundMotion.lastMotion,
             carVeto = cross?.veto == true,
         )
     }
     val phrase = phraseOf(placed, readings, frame, at, speechLanguage,
-        distances.lensSpec.widthFovDeg(frame.width, frame.height))
-    feedCrossingLateral(_state.value.crossingActive, frame.objects, frame.width, frame.height, readings, distances.effectivePose(), distances.lensSpec, at, speechLanguage)
-    feedCrosswalkLost(_state.value.crossingActive, frame.objects, at, speechLanguage)
+        lens.widthFovDeg(frame.width, frame.height))
+    feedCrossingLateral(crossingActive, frame.objects, frame.width, frame.height, readings, distances.effectivePose(), lens, at, speechLanguage)
+    feedCrosswalkLost(crossingActive, frame.objects, at, speechLanguage)
     pulse.feed(at, voice.lastDecision, placed)
     // Compteur de marches : le masque exact borne les frames suivantes (repli boîte sinon).
     StairCannyCount.setMaskPlane(stairsMaskPlaneOf(frame.objects, frame.width, frame.height, grays))
