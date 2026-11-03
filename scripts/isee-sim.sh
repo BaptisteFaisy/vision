@@ -8,6 +8,8 @@ set -euo pipefail
 export LC_ALL=C.UTF-8 LANG=C.UTF-8
 . "$(dirname -- "${BASH_SOURCE[0]}")/lib/common.sh" ||
   { printf 'ERREUR : scripts/lib/common.sh introuvable\n' >&2; exit 1; }
+. "$(dirname -- "${BASH_SOURCE[0]}")/lib/emu_guard.sh" ||
+  { printf 'ERREUR : scripts/lib/emu_guard.sh introuvable\n' >&2; exit 1; }
 
 read -r -d '' USAGE <<'EOF' || true
 Usage : isee-sim.sh --video <fichier.mp4> [options]
@@ -23,6 +25,8 @@ Options :
   --seconds N         durée de l'enregistrement d'écran (défaut : 30)
   --record <s.mp4>    fichier d'enregistrement (défaut : sous TMPDIR)
   --avd <nom>         AVD à utiliser, créée si absente (défaut : isee-sim)
+  --camera <mode>     caméra arrière : videofile (défaut), virtualscene, webcam0, none
+  --gpu <mode>        moteur GPU : swiftshader_indirect (défaut), swiftshader, host…
   --no-build          réutilise l'APK existant, ne lance jamais Gradle
   --keep              laisse l'émulateur allumé (série affichée)
   --help              cette aide
@@ -44,6 +48,7 @@ SYSIMG="system-images;android-35;google_apis;x86_64"
 TAGS="sam3vision iSeeLive iSeeMotion Traverse ISEE_VOIX"
 
 VIDEO="" ROUTE="" RECORD="" AVD="isee-sim"
+CAMERA_MODE="videofile" GPU_MODE="${ISEESIM_GPU:-swiftshader_indirect}"
 SECONDS_REC=30
 NO_BUILD=0 KEEP=0
 ADB="" EMU="" FFMPEG="${FFMPEG:-}" AVDM=""
@@ -72,6 +77,8 @@ parse_args() {
       --seconds) arg_value "$arg" "${1:-}"; SECONDS_REC="$1"; shift ;;
       --record) arg_value "$arg" "${1:-}"; RECORD="$1"; shift ;;
       --avd) arg_value "$arg" "${1:-}"; AVD="$1"; shift ;;
+      --camera) arg_value "$arg" "${1:-}"; CAMERA_MODE="$1"; shift ;;
+      --gpu) arg_value "$arg" "${1:-}"; GPU_MODE="$1"; shift ;;
       --no-build) NO_BUILD=1 ;;
       --keep) KEEP=1 ;;
       *)
@@ -89,6 +96,8 @@ resolve_tools() {
   if [[ -n "$ROUTE" && ! -f "$ROUTE" ]]; then
     die "trajet absent : $ROUTE (--route attend un CSV 'lat,lon' ou un GPX)"
   fi
+  emu_gpu_flag "$GPU_MODE" >/dev/null || exit 1
+  emu_camera_args "$CAMERA_MODE" "x" >/dev/null || exit 1
   resolve_adb
   require_cmd sha256sum "Installez coreutils (paquet 'coreutils')."
   require_cmd timeout "Installez coreutils (paquet 'coreutils')."
@@ -141,8 +150,12 @@ prepare_video() {
   mkdir -p -- "$cache_dir" || die "impossible de créer le cache : $cache_dir"
   SIM_VIDEO="${cache_dir}/video-${size}-${key}.mp4"
   if [[ -s "$SIM_VIDEO" ]]; then
-    echo "→ cache vidéo : $SIM_VIDEO (empreinte ${key})"
-    return 0
+    if emu_probe_video "$FFMPEG" "$SIM_VIDEO"; then
+      echo "→ cache vidéo : $SIM_VIDEO (empreinte ${key})"
+      return 0
+    fi
+    warn "cache vidéo illisible, re-transcodage : $SIM_VIDEO"
+    rm -f -- "$SIM_VIDEO"
   fi
   echo "→ transcodage ${size} H.264 yuv420p, 30 fps, audio retiré (empreinte ${key})"
   part="${SIM_VIDEO}.part-$$"
@@ -225,24 +238,7 @@ ensure_avd() {
   cfg_set "$ini" hw.camera.back emulated
 }
 
-# port_busy <port> : vrai si une série adb ou un processus local tient le port.
-port_busy() {
-  local port="$1"
-  if timeout 5 "$ADB" devices 2>/dev/null |
-    awk -v s="emulator-$port" '$1 == s { found = 1 } END { exit !found }'; then
-    return 0
-  fi
-  (exec 3<>"/dev/tcp/127.0.0.1/$port") 2>/dev/null
-}
-
-# pick_port : premier port libre de la plage 5554-5600, jamais celui d'un autre.
-pick_port() {
-  local candidate
-  for candidate in $(seq 5554 2 5600); do
-    port_busy "$candidate" || { PORT="$candidate"; return 0; }
-  done
-  die "aucun port libre entre 5554 et 5600 : éteignez un émulateur avant de relancer"
-}
+# pick_port et port_busy vivent dans lib/emu_guard.sh (zéro duplication).
 
 # adb_emu <délai> <args adb...> — un seul endroit qui porte la série et le timeout.
 adb_emu() {
@@ -251,14 +247,21 @@ adb_emu() {
   timeout "$limit" "$ADB" -s "$SERIAL" "$@"
 }
 
-# boot_emulator : démarre l'émulateur sur PORT avec la vidéo en caméra arrière.
+# boot_emulator : démarre l'émulateur sur PORT (caméra et GPU paramétrables).
 boot_emulator() {
   BOOT_T0="$SECONDS"
+  emu_lock "$AVD" || exit 1
   timeout 10 "$ADB" devices 2>/dev/null | awk 'NF > 1 { print $1, $2 }' >"$OUT_DIR/devices-before.txt" || :
   pick_port
-  echo "→ boot $AVD sur le port $PORT, caméra arrière = $SIM_VIDEO"
+  local gpu cam extra=()
+  gpu="$(emu_gpu_flag "$GPU_MODE")" || exit 1
+  if [[ "$CAMERA_MODE" != "none" ]]; then
+    cam="$(emu_camera_args "$CAMERA_MODE" "$SIM_VIDEO")" || exit 1
+    extra=(-camera-back "$cam")
+  fi
+  echo "→ boot $AVD sur le port $PORT (gpu=$gpu, caméra=$CAMERA_MODE)"
   "$EMU" -avd "$AVD" -port "$PORT" -no-window -no-audio -no-snapshot -no-boot-anim \
-    -gpu swiftshader_indirect -camera-back "videofile:$SIM_VIDEO" >"$OUT_DIR/emulator.log" 2>&1 &
+    -gpu "$gpu" "${extra[@]}" >"$OUT_DIR/emulator.log" 2>&1 &
   EMU_PID=$!
   SERIAL="emulator-${PORT}"
   wait_serial
@@ -272,10 +275,7 @@ emu_alive() { kill -0 "$EMU_PID" 2>/dev/null; }
 wait_serial() {
   local waited=0
   while (( waited < BOOT_TIMEOUT )); do
-    if ! emu_alive; then
-      tail -20 "$OUT_DIR/emulator.log" >&2 || :
-      die "l'émulateur s'est arrêté au démarrage (journal : $OUT_DIR/emulator.log)"
-    fi
+    emu_alive || { emu_diagnose "$EMU_PID" "$OUT_DIR/emulator.log" "démarrage"; exit 1; }
     if timeout 5 "$ADB" devices 2>/dev/null |
       awk -v s="$SERIAL" '$1 == s && $2 == "device" { found = 1 } END { exit !found }'; then
       if grep -qx "$SERIAL device" "$OUT_DIR/devices-before.txt" 2>/dev/null; then
@@ -303,10 +303,7 @@ wait_boot() {
       adb_emu 20 shell input keyevent 82 >/dev/null 2>&1 || :
       return 0
     fi
-    if ! emu_alive; then
-      tail -20 "$OUT_DIR/emulator.log" >&2 || :
-      die "l'émulateur s'est arrêté pendant le boot (journal : $OUT_DIR/emulator.log)"
-    fi
+    emu_alive || { emu_diagnose "$EMU_PID" "$OUT_DIR/emulator.log" "boot"; exit 1; }
     sleep 2
     waited=$((waited + 2))
   done
@@ -361,6 +358,7 @@ start_app() {
 wait_frames() {
   local waited=0
   while (( waited < 60 )); do
+    emu_alive || { emu_diagnose "$EMU_PID" "$OUT_DIR/emulator.log" "premières frames"; exit 1; }
     if adb_emu 20 logcat -d -s sam3vision 2>/dev/null | grep -q 'conversion:'; then
       echo "→ caméra reliée : 1re frame convertie après ${waited}s"
       return 0
@@ -395,10 +393,9 @@ record_screen() {
       echo "→ écran enregistré : $RECORD ($(du -h "$RECORD" | cut -f1))"
       return 0
     fi
-    emu_alive || break
+    emu_alive || { emu_diagnose "$EMU_PID" "$OUT_DIR/emulator.log" "enregistrement"; break; }
     warn "enregistrement non rapatrié, nouvelle tentative"
   done
-  emu_alive || tail -5 "$OUT_DIR/emulator.log" >&2 || :
   die "enregistrement absent ou vide : $RECORD"
 }
 
@@ -462,8 +459,8 @@ summary() {
   printf '  logcat iSee     : %s ligne(s) de tags — %s\n' "${tags_line:-0}" "$OUT_DIR/logcat.txt"
   printf '  phrases voix    : %s attente(s) EXPECT — %s\n' "${phrases:-0}" "$OUT_DIR/logcat.txt"
   printf '  crash           : %s ligne(s) fatale(s) — %s\n' "${fatals:-0}" "$OUT_DIR/crash.txt"
-  printf '  boot            : %ss, série %s (%s)\n' "$BOOT_SECONDS" "$SERIAL" \
-    "$( ((KEEP == 1)) && echo 'laissé allumé' || echo 'éteint')"
+  printf '  boot            : %ss, série %s, gpu=%s, caméra=%s (%s)\n' "$BOOT_SECONDS" \
+    "$SERIAL" "$GPU_MODE" "$CAMERA_MODE" "$( ((KEEP == 1)) && echo 'laissé allumé' || echo 'éteint')"
   printf '  dossier         : %s\n' "$OUT_DIR"
   [[ "${fatals:-0}" == "0" ]] || warn "$fatals ligne(s) fatale(s) : lisez $OUT_DIR/crash.txt"
 }
