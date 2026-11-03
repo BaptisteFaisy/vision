@@ -6,10 +6,11 @@ import kotlin.math.hypot
  * Machine à états du « slide vers le bas + maintien », sans dépendance
  * Android (testable en JVM). Le balayage vers le bas confirmé l'arme
  * ([arm], position du doigt à la confirmation) ; si le doigt reste posé
- * [holdMs] sans glisser de plus de [slopPx], [Listener.onSwipeHoldStart]
- * ouvre le micro destination — le relâchement clôt par
- * [Listener.onSwipeHoldEnd] (envoi). Mêmes seuils que l'appui long
- * ([LongPressTrigger]) : le maintien « se sent » pareil.
+ * [holdMs] sans bondir de plus de [slopPx] entre deux pas,
+ * [Listener.onSwipeHoldStart] ouvre le micro destination — le relâchement
+ * clôt par [Listener.onSwipeHoldEnd] (envoi). Même durée que l'appui long
+ * ([LongPressTrigger]), slop doublé ([HOLD_SLOP_PX]) : le doigt est en
+ * mouvement à l'armement (80 px de course), pas immobile sur un DOWN.
  *
  * Un bond franc (> slop entre deux MOVE), un relâchement avant le seuil,
  * une annulation système, un doigt supplémentaire ou un [reset] externe
@@ -19,13 +20,13 @@ import kotlin.math.hypot
  * doigt finit son slide en décélérant) déplace l'ancre et garde le
  * maintien. L'appui long normal ne peut pas coexister avec une attente
  * ici : il s'est déjà annulé au-delà de son slop quand le balayage est
- * confirmé (80 px >> 24 px).
+ * confirmé (80 px >> 48 px).
  */
 class SwipeHoldTrigger(
     private val scheduler: LongPressTrigger.DelayScheduler,
     private val listener: Listener,
     private val holdMs: Long = LongPressTrigger.DEFAULT_LONG_PRESS_MS,
-    private val slopPx: Float = LongPressTrigger.DEFAULT_SLOP_PX,
+    private val slopPx: Float = HOLD_SLOP_PX,
 ) {
 
     /** Rappels d'état, émis sur le thread du scheduler (main thread dans l'app). */
@@ -72,6 +73,14 @@ class SwipeHoldTrigger(
     companion object {
         /** Tag logcat commun du chemin maintien GPS (layout + ordres). */
         const val LOG_TAG = "IseeSwipeHold"
+
+        /**
+         * Tolérance post-swipe : le doigt file encore à l'armement, et un
+         * événement livré peut couvrir plusieurs échantillons batchés — 2×
+         * le tremblement statique. Un vrai fling relâche avant 300 ms
+         * ([CancelReason.UP_EARLY], GPS seul), pas besoin du 24 px.
+         */
+        const val HOLD_SLOP_PX = 48f
     }
 
     var phase: Phase = Phase.Idle

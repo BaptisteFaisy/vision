@@ -281,13 +281,14 @@ class IseeRootLayout(context: Context) : FrameLayout(context) {
             }
 
             MotionEvent.ACTION_MOVE -> {
-                // Position mémorisée avant le brain : sa confirmation de
-                // balayage vers le bas arme le maintien dessus aussitôt.
-                lastX = ev.x
-                lastY = ev.y
-                trigger.onMove(ev.x, ev.y)
-                brain.onMove(now, ev.x, ev.y)
-                swipeHold.onMove(ev.x, ev.y)
+                // Les MOVE arrivent batchés (coalescés au vsync / à la
+                // charge) : rejouer chaque sous-échantillon, sinon le bond
+                // inter-événements (doigt rapide) tue le maintien à tort —
+                // JUMP_SLOP mesuré sur téléphone à 28 ms post-armement.
+                for (i in 0 until ev.historySize) {
+                    feedMove(now, ev.getHistoricalX(i), ev.getHistoricalY(i))
+                }
+                feedMove(now, ev.x, ev.y)
             }
 
             MotionEvent.ACTION_POINTER_DOWN -> {
@@ -298,10 +299,23 @@ class IseeRootLayout(context: Context) : FrameLayout(context) {
 
             MotionEvent.ACTION_UP, MotionEvent.ACTION_CANCEL -> {
                 trigger.onUp()
-                swipeHold.onUp()
+                if (ev.actionMasked == MotionEvent.ACTION_CANCEL) swipeHold.onCancel() else swipeHold.onUp()
                 if (ev.actionMasked == MotionEvent.ACTION_CANCEL) brain.onCancel() else brain.onUp(now, ev.x, ev.y)
             }
         }
+    }
+
+    /**
+     * Un pas tactile (historique ou live) vers les trois machines, dans
+     * l'ordre : position mémorisée avant le brain, dont la confirmation de
+     * balayage vers le bas arme le maintien dessus aussitôt.
+     */
+    private fun feedMove(nowMs: Long, x: Float, y: Float) {
+        lastX = x
+        lastY = y
+        trigger.onMove(x, y)
+        brain.onMove(nowMs, x, y)
+        swipeHold.onMove(x, y)
     }
 
     override fun onSizeChanged(w: Int, h: Int, oldw: Int, oldh: Int) {
