@@ -16,6 +16,7 @@ import dev.sam3vision.core.settings.Settings
 import dev.sam3vision.core.speech.SpeechLanguage
 import dev.sam3vision.core.traverse.TraversePhase
 import dev.sam3vision.core.traverse.TraverseVeto
+import kotlinx.coroutines.test.TestScope
 import kotlinx.coroutines.test.runCurrent
 import kotlinx.coroutines.test.runTest
 import org.junit.Assert.assertEquals
@@ -404,34 +405,24 @@ class CrossingWiringTest {
             val objects = listOf(obj("crosswalk", box))
             val readings = listOf(reading("crosswalk", 2.0f, box))
             val nobody = listOf(obj("person", box))
-            fun feed(objs: List<SegObject>, atMs: Long) {
+            fun TestScope.feed(objs: List<SegObject>, atMs: Long) {
                 CrossingLateralWatch.update(objs, 512, 1138, readings, null, LensSpec.Default, atMs, SpeechLanguage.En)
+                runCurrent()
             }
             // Vue 1 : parle une fois (2 frames).
             feed(objects, 0L)
-            runCurrent()
             feed(objects, 200L)
-            runCurrent()
             VoiceBus.onSpeechIdle() // fin mot vue 1 : sinon vue 2 identique = doublon.
             // Dropout isolé + retour : ne reparle pas.
             feed(nobody, 400L)
-            runCurrent()
             feed(objects, 600L)
-            runCurrent()
             feed(objects, 800L)
-            runCurrent()
             // Vue perdue (2 absences) + vue 2 : reparle une fois.
             feed(nobody, 1000L)
-            runCurrent()
             feed(nobody, 1200L)
-            runCurrent()
-            // Fin du mot de la vue 1 : sinon l'annonce de la vue 2,
-            // identique, serait doublon du mot en cours.
-            VoiceBus.onSpeechIdle()
+            VoiceBus.onSpeechIdle() // fin mot vue 1 : sinon annonce vue 2 = doublon.
             feed(objects, 1400L)
-            runCurrent()
             feed(objects, 1600L)
-            runCurrent()
             VoiceBus.onSpeechIdle() // fin du mot : l'annonce vue 2 se dit.
 
             val announces = speaker.calls.filter { it.second == "Left, 2 meters." }

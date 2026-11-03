@@ -11,6 +11,7 @@ import java.nio.file.Files
 import kotlinx.coroutines.CompletableDeferred
 import kotlinx.coroutines.NonCancellable
 import kotlinx.coroutines.test.advanceTimeBy
+import kotlinx.coroutines.test.TestScope
 import kotlinx.coroutines.test.runCurrent
 import kotlinx.coroutines.test.runTest
 import kotlinx.coroutines.withContext
@@ -84,6 +85,12 @@ class BusSpeakerWatchdogTest {
             pack.put("guide_left", SpeechLanguage.En, voiceId, "audio".toByteArray())
             extraClips.forEach { pack.put(it, SpeechLanguage.En, voiceId, "audio".toByteArray()) }
         }
+    }
+
+    /** Parole directe + tour de boucle (le bus retient les re-posts : le secours du speaker se pilote hors bus). */
+    private fun TestScope.paroleDirecte(bus: BusSpeaker) {
+        bus.say(OutdoorLevel.HUMAN, "Left.", "guide_left", emptyList())
+        runCurrent()
     }
 
     private var savedSpeaker: VoiceBusSpeaker? = null
@@ -205,10 +212,7 @@ class BusSpeakerWatchdogTest {
                 runCurrent()
                 advanceTimeBy(3_500L)
                 runCurrent()
-                // Paroles directes : le bus retient les re-posts, le speaker
-                // garde son secours (abandon du coincé, coupes tues).
-                bus.say(OutdoorLevel.HUMAN, "Left.", "guide_left", emptyList())
-                runCurrent()
+                paroleDirecte(bus)
                 assertEquals(2, rig.sink.slices.size)
                 advanceTimeBy(RELEASE_TIMEOUT_MS) // calme : superviseur rend le bus (25 s)
                 runCurrent()
@@ -216,12 +220,10 @@ class BusSpeakerWatchdogTest {
                 rig.sink.stuck = false // lecteur réparé : la suivante parle
                 advanceTimeBy(3_500L)
                 runCurrent()
-                bus.say(OutdoorLevel.HUMAN, "Left.", "guide_left", emptyList())
-                runCurrent()
+                paroleDirecte(bus)
                 assertEquals(3, rig.sink.slices.size)
                 assertEquals(listOf("stop", "stop"), rig.playerEvents) // coincé : coupes tues
-                bus.say(OutdoorLevel.HUMAN, "Left.", "guide_left", emptyList())
-                runCurrent()
+                paroleDirecte(bus)
                 assertEquals(4, rig.sink.slices.size)
                 assertEquals(listOf("stop", "stop", "stop"), rig.playerEvents)
             } finally {
