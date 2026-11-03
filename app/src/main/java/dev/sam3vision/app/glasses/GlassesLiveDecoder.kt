@@ -13,16 +13,10 @@ import java.io.ByteArrayOutputStream
 import java.nio.ByteBuffer
 
 /**
- * Recadrage « remplit la vue » pour un `TextureView` : les facteurs à passer à
- * `setTransform` via `setScale(scaleX, scaleY, viewW / 2f, viewH / 2f)` (pivot = centre
- * de la vue), pour une vidéo [srcW]×[srcH] dans une vue [dstW]×[dstH].
- *
- * Un `TextureView` étire d'abord son buffer pour remplir la vue, **puis** applique la
- * matrice en coordonnées vue : la matrice n'est donc pas le placage complet
- * (échelle uniforme + décalage — qui sur-zoomait et déformait la rue, constaté sur
- * téléphone), mais la **correction** qui rend le total uniforme et centré. L'un des
- * deux facteurs vaut toujours 1 (l'axe déjà rempli par l'étirement), l'autre ≥ 1
- * (l'axe à recadrer). Pur, testé en JVM (`GlassesVideoCropTest`).
+ * Recadrage « remplit la vue » : facteurs `setScale` (pivot = centre) pour une
+ * vidéo [srcW]×[srcH] dans une vue [dstW]×[dstH]. La matrice corrige l'étirement
+ * préalable (pas un placage complet, qui déformait — constaté sur téléphone) :
+ * un facteur vaut 1, l'autre ≥ 1. Pur, testé en JVM (`GlassesVideoCropTest`).
  */
 data class TextureCrop(val scaleX: Float, val scaleY: Float)
 
@@ -35,16 +29,10 @@ fun textureViewCrop(srcW: Int, srcH: Int, dstW: Int, dstH: Int): TextureCrop {
 }
 
 /**
- * Recadrage source « remplit le canvas » : le rectangle centré du bitmap
- * ([srcW]×[srcH]) qui a exactement le ratio du canvas ([dstW]×[dstH]).
- *
- * Le chemin bitmap du direct dessine dans un canvas à taille vidéo (voir
- * `IseeGlassesLive`) que la matrice « remplit la vue » agrandit ensuite : le
- * bitmap doit donc y entrer en conservant son ratio, sinon l'image est
- * étirée puis re-zoomée par la matrice (double mise à l'échelle). Cas
- * nominal : bitmap et canvas à taille vidéo → rectangle plein, dessin 1:1,
- * et la matrice fait l'unique upscale. Pur, testé en JVM
- * (`GlassesBitmapCropTest`) ; dégénéré → bitmap entier, jamais de crash.
+ * Recadrage source « remplit le canvas » : rectangle centré du bitmap
+ * ([srcW]×[srcH]) au ratio du canvas ([dstW]×[dstH]). Le ratio est conservé
+ * ici pour que la matrice « remplit la vue » fasse l'unique upscale (1:1 au
+ * nominal). Pur, testé en JVM (`GlassesBitmapCropTest`) ; dégénéré → entier.
  */
 internal fun bitmapSourceCrop(srcW: Int, srcH: Int, dstW: Int, dstH: Int): CropRect {
     val crop = CropGeometry.fillViewCrop(srcW, srcH, dstW, dstH)
@@ -55,20 +43,14 @@ internal fun bitmapSourceCrop(srcW: Int, srcH: Int, dstW: Int, dstH: Int): CropR
 private val ANNEX_B_START = byteArrayOf(0, 0, 0, 1)
 
 /**
- * Format H.265 mémorisé : stable par session (les deux décodeurs — direct et
- * pont — lisent le même flux), donc la première détection tranche pour toutes
- * les poussées suivantes. `null` = indécis (oublié par [resetAnnexBMemo]).
- * Volatile : écrit depuis les deux fils décodeurs (valeurs idempotentes, une
- * détection redondante au pire en cas de course).
+ * Format H.265 mémorisé, stable par session (`null` = indécis, oublié par
+ * [resetAnnexBMemo]). Volatile : écrit depuis les deux fils décodeurs
+ * (idempotent, course bénigne).
  */
 @Volatile
 private var annexBStable: Boolean? = null
 
-/**
- * Oublie le format H.265 mémorisé ([annexB]) : la session suivante peut parler
- * un autre format (réel vs simulé). Appelé en fin de session, voir
- * `GlassesVideoLink.clear` — et entre chaque cas de `GlassesAnnexBTest`.
- */
+/** Oublie le format mémorisé (session suivante, voir `GlassesVideoLink.clear`). */
 internal fun resetAnnexBMemo() {
     annexBStable = null
 }
@@ -174,18 +156,14 @@ internal fun needsCodecRebuild(
 ): Boolean = !hasCodec || width != codecW || height != codecH
 
 /**
- * Rend les frames du flux des lunettes sur une `Surface` (celle de l'accueil iSee).
+ * Rend les frames des lunettes sur la `Surface` de l'accueil iSee : les configs
+ * codec nourrissent le décodeur sans afficher, le bitmap décodable (JPEG, brut
+ * ARGB_8888) est dessiné tel quel, sinon le H.265 part vers `MediaCodec` (zéro
+ * duplication : le bitmap passe par `GlassesFrames`, comme ailleurs).
  *
- * Trois cas, dans l'ordre : les frames de configuration codec nourrissent le décodeur sans
- * rien afficher ; une frame décodable en bitmap (JPEG compressé, ou brut ARGB_8888) est
- * dessinée telle quelle ; sinon le bitstream H.265 part vers `MediaCodec`, qui rend
- * directement sur la surface. Le décodage bitmap est exactement celui de `GlassesFrames`
- * (les octets copiés y repassent en `VideoFrame`) : zéro duplication.
- *
- * Un seul appelant de `render` à la fois (le collecteur du flux) ; `setSurface`/`release`
- * viennent de l'UI. Seul le cliché (surface, fermé) est pris sous verrou : le rendu
- * (`MediaCodec`, dessin bitmap) tourne hors verrou pour ne jamais bloquer l'UI — et rien
- * ne lève jamais (un rendu raté rend `false`).
+ * Un seul appelant de `render` (le collecteur) ; `setSurface`/`release` viennent
+ * de l'UI. Seul le cliché est pris sous verrou, le rendu tourne hors verrou, et
+ * rien ne lève jamais (un rendu raté rend `false`).
  */
 class GlassesLiveDecoder(
     private val onVideoSize: (Int, Int) -> Unit = { _, _ -> },
@@ -226,10 +204,8 @@ class GlassesLiveDecoder(
      * direct vivant). Une frame de config codec rend `false` : elle prépare, sans image.
      */
     fun render(frame: GlassesFrame): Boolean {
-        // Cliché sous verrou, rendu hors verrou : `MediaCodec` (entrée 5 ms + sortie
-        // 33 ms) ne bloque plus l'UI qui pose sa surface ou libère le décodeur.
-        // `release` en cours de rendu : les appels codec lèvent, le `runCatching`
-        // jette le codec et rend `false` — le prochain rendu le recrée.
+        // Cliché sous verrou, rendu hors verrou : `MediaCodec` ne bloque jamais
+        // l'UI. `release` en cours de rendu : le `runCatching` jette et rend `false`.
         val target = synchronized(lock) { if (closed) null else surface } ?: return false
         if (frame.width <= 0 || frame.height <= 0 || frame.bytes.isEmpty()) return false
         return runCatching { renderLocked(target, frame) }.getOrElse { dropCodecLocked(); false }
@@ -283,10 +259,8 @@ class GlassesLiveDecoder(
     }
 
     /**
-     * Config H.265 (VPS/SPS/PPS) : mémorisée puis posée en `csd-0` à la configuration —
-     * beaucoup de décodeurs ignorent la config envoyée en buffer avec le drapeau, et ne
-     * sortent alors jamais rien. Une config nouvelle ne recrée le décodeur que si la taille
-     * change, ou si aucun codec ne vit (voir [needsCodecRebuild]).
+     * Config H.265 (VPS/SPS/PPS) : mémorisée en `csd-0` (les décodeurs ignorent
+     * souvent la config envoyée en buffer). Ne recrée que si la taille change.
      */
     private fun stashConfig(target: Surface, frame: GlassesFrame) {
         configSeen += 1
@@ -344,13 +318,9 @@ class GlassesLiveDecoder(
     }
 
     /**
-     * Vide les sorties vers la surface ; annonce la taille réelle quand le codec la donne.
-     *
-     * La sortie de l'accès courant n'existe qu'une fois ce décodage fini : sans attente, elle
-     * n'est libérée qu'à l'arrivée de l'accès suivant (une période image, ≈ 67 ms à 15 i/s).
-     * On attend donc [OUTPUT_WAIT_US] tant que rien n'est rendu, puis `0` : les sorties
-     * suivantes du même accès ne coûtent rien, et l'attente disparaît dès que la première
-     * image est sortie.
+     * Vide les sorties vers la surface (taille réelle annoncée au passage). Sans
+     * attente, la sortie de l'accès courant ne sort qu'à l'accès suivant (+67 ms
+     * à 15 i/s) : on attend [OUTPUT_WAIT_US] jusqu'à la première image, puis `0`.
      */
     private fun drain(decoder: MediaCodec): Boolean {
         val info = MediaCodec.BufferInfo()
@@ -466,12 +436,9 @@ class GlassesLiveDecoder(
 }
 
 /**
- * Clés basse latence d'un décodeur : pas de mise en file interne, cadence
- * annoncée à l'opérateur, priorité temps réel, aucun B-frame à réordonner.
- *
- * Chaque clé est posée dans son propre `runCatching` : une clé inconnue de
- * l'implémentation lève `IllegalArgumentException`, et sous un seul `runCatching`
- * elle ferait échouer la création entière du codec (écran noir, sans erreur).
+ * Clés basse latence : pas de file interne, cadence annoncée, priorité temps
+ * réel, aucun B-frame. Une clé par `runCatching` (une clé inconnue lève, et
+ * sous un seul bloc elle tuerait la création — écran noir, sans erreur).
  */
 internal fun applyDecoderLowLatencyKeys(format: MediaFormat, operatingRate: Int) {
     runCatching { format.setInteger(MediaFormat.KEY_LOW_LATENCY, 1) }
