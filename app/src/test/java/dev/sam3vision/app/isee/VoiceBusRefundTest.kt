@@ -93,12 +93,14 @@ class VoiceBusRefundTest {
     }
 
     @Test
-    fun `jet mot-guidage-en-cours = tour rendu`() {
+    fun `retenue pendant le mot = tour garde, parle a la fin`() {
         VoiceBus.post(OutdoorLevel.GPS_EVENT, "Left.")
         assertTrue(AntiRepeat.allow(AntiRepeat.KEY_FENCE, System.currentTimeMillis()))
-        VoiceBus.post(OutdoorLevel.FENCE, "Fence.", antiRepeatKey = AntiRepeat.KEY_FENCE)
+        assertTrue(VoiceBus.post(OutdoorLevel.FENCE, "Fence.", antiRepeatKey = AntiRepeat.KEY_FENCE))
         assertEquals(listOf("Left."), speaker.said)
-        assertTrue(AntiRepeat.allow(AntiRepeat.KEY_FENCE, System.currentTimeMillis()))
+        assertFalse(AntiRepeat.allow(AntiRepeat.KEY_FENCE, System.currentTimeMillis()))
+        VoiceBus.onSpeechIdle()
+        assertEquals(listOf("Left.", "Fence."), speaker.said)
     }
 
     @Test

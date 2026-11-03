@@ -181,7 +181,8 @@ class VoiceTickTest {
         assertFalse(VoiceTick.tick(1_500L))
         assertEquals(1, speaker.said.size)
 
-        // Fenêtre écoulée : le vœu toujours frais reparle.
+        // Fenêtre écoulée : le mot fini, le vœu toujours frais reparle.
+        VoiceBus.onSpeechIdle()
         VoiceTick.report(
             VoiceTick.SRC_FENCE,
             VoiceWish(OutdoorLevel.FENCE, "Grillage fermé devant vous.", AntiRepeat.KEY_FENCE),

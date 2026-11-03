@@ -154,10 +154,11 @@ class BusSpeakerWatchdogTest {
         val oldIdle = VoiceBus.onIdle
         try {
             VoiceBus.reset()
-            VoiceBus.speaker = BusSpeaker(
+            val bus = BusSpeaker(
                 backgroundScope, rig.player, rig.clips, rig.proximity,
                 sayTimeoutMs = 3_000L, nowMs = { testScheduler.currentTime },
             )
+            VoiceBus.speaker = bus
             try {
                 // Parole 1 : se fige dans le lecteur (annulation ignorée, mutex tenu).
                 VoiceBus.post(OutdoorLevel.HUMAN, "Left.", "guide_left")
@@ -167,8 +168,8 @@ class BusSpeakerWatchdogTest {
                 advanceTimeBy(3_500L)
                 runCurrent()
                 assertEquals(1, rig.sink.slices.size)
-                // Suivante (re-post identique, lecteur libre) : abandonne et PARLE.
-                VoiceBus.post(OutdoorLevel.HUMAN, "Left.", "guide_left")
+                // Suivante directe (le bus retient les re-posts) : abandonne et PARLE.
+                bus.say(OutdoorLevel.HUMAN, "Left.", "guide_left", emptyList())
                 runCurrent()
                 assertEquals(2, rig.sink.slices.size)
             } finally {
@@ -193,17 +194,20 @@ class BusSpeakerWatchdogTest {
         val oldIdle = VoiceBus.onIdle
         try {
             VoiceBus.reset()
-            VoiceBus.speaker = BusSpeaker(
+            val bus = BusSpeaker(
                 backgroundScope, rig.player, rig.clips, rig.proximity,
                 sayTimeoutMs = 3_000L, nowMs = { testScheduler.currentTime },
             )
+            VoiceBus.speaker = bus
             VoiceBus.onIdle = { released += true }
             try {
                 VoiceBus.post(OutdoorLevel.HUMAN, "Left.", "guide_left")
                 runCurrent()
                 advanceTimeBy(3_500L)
                 runCurrent()
-                VoiceBus.post(OutdoorLevel.HUMAN, "Left.", "guide_left")
+                // Paroles directes : le bus retient les re-posts, le speaker
+                // garde son secours (abandon du coincé, coupes tues).
+                bus.say(OutdoorLevel.HUMAN, "Left.", "guide_left", emptyList())
                 runCurrent()
                 assertEquals(2, rig.sink.slices.size)
                 advanceTimeBy(RELEASE_TIMEOUT_MS) // calme : superviseur rend le bus (25 s)
@@ -212,11 +216,11 @@ class BusSpeakerWatchdogTest {
                 rig.sink.stuck = false // lecteur réparé : la suivante parle
                 advanceTimeBy(3_500L)
                 runCurrent()
-                VoiceBus.post(OutdoorLevel.HUMAN, "Left.", "guide_left")
+                bus.say(OutdoorLevel.HUMAN, "Left.", "guide_left", emptyList())
                 runCurrent()
                 assertEquals(3, rig.sink.slices.size)
                 assertEquals(listOf("stop", "stop"), rig.playerEvents) // coincé : coupes tues
-                VoiceBus.post(OutdoorLevel.HUMAN, "Left.", "guide_left")
+                bus.say(OutdoorLevel.HUMAN, "Left.", "guide_left", emptyList())
                 runCurrent()
                 assertEquals(4, rig.sink.slices.size)
                 assertEquals(listOf("stop", "stop", "stop"), rig.playerEvents)
@@ -277,11 +281,14 @@ class BusSpeakerWatchdogTest {
     fun `contenu nouveau occupe — coupe et joue (preemption preservee)`() = runTest {
         val rig = Rig()
         rig.sink.hang = false
-        VoiceBus.speaker = BusSpeaker(backgroundScope, rig.player, rig.clips, rig.proximity, isBusy = { true })
+        val bus = BusSpeaker(backgroundScope, rig.player, rig.clips, rig.proximity, isBusy = { true })
+        VoiceBus.speaker = bus
 
         VoiceBus.post(OutdoorLevel.HUMAN, "Left.", "guide_left")
         runCurrent()
-        VoiceBus.post(OutdoorLevel.HUMAN, "Left.", clipId = null, clips = listOf("guide_left"))
+        // Parole directe (le bus, lui, retient au lieu de couper) : contenu
+        // nouveau + lecteur occupé = coupe et jeu (secours du speaker).
+        bus.say(OutdoorLevel.HUMAN, "Left.", clipId = null, clips = listOf("guide_left"))
         runCurrent()
 
         assertEquals(1, rig.sink.slices.size)

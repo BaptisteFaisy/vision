@@ -113,10 +113,12 @@ class GpsUncuttableTest {
     }
 
     @Test
-    fun `parole user coupe toujours le mot`() {
+    fun `parole user postee attend la fin du mot, seul le micro coupe`() {
         VoiceBus.post(OutdoorLevel.GPS_EVENT, "Left.")
         VoiceBus.post(OutdoorLevel.USER_SPEECH, "Stop.")
 
+        assertEquals(1, speaker.said.size)
+        VoiceBus.onSpeechIdle()
         assertEquals(2, speaker.said.size)
     }
 
@@ -158,7 +160,7 @@ class GpsUncuttableTest {
     )
 
     @Test
-    fun `frame tue pendant le mot, seul le mot est dit`() = runTest {
+    fun `frame retenue pendant le mot, seul le mot est dit`() = runTest {
         VoiceBus.post(OutdoorLevel.GPS_EVENT, "Left.")
         val guetteurs = rig()
 
@@ -166,7 +168,7 @@ class GpsUncuttableTest {
         obstacleFrame(etat(2, lecture("person", 100f, 3.5f)), { SpeechLanguage.Fr }, guetteurs)
         obstacleFrame(etat(3, lecture("person", 100f, 3.5f)), { SpeechLanguage.Fr }, guetteurs)
 
-        // Mot de guidage en cours : la frame est tuée, seul le mot est dit.
+        // Mot de guidage en cours : la frame est retenue, seul le mot est dit.
         assertEquals(1, speaker.said.size)
     }
 }

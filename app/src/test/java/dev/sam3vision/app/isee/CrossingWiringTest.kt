@@ -340,6 +340,7 @@ class CrossingWiringTest {
             runCurrent()
             CrossingLateralWatch.update(objects, 512, 1138, readings, null, LensSpec.Default, 200L, SpeechLanguage.En)
             runCurrent()
+            VoiceBus.onSpeechIdle() // fin du mot : l'annonce retenue se dit.
 
             assertTrue(
                 "annonce audible avec [direction]",
@@ -373,6 +374,7 @@ class CrossingWiringTest {
             runCurrent()
             CrossingLateralWatch.update(objects, 512, 1138, readings, null, LensSpec.Default, 200L, SpeechLanguage.En)
             runCurrent()
+            VoiceBus.onSpeechIdle() // fin du mot : l'annonce retenue se dit.
 
             assertTrue(
                 "annonce devant = clip Crosswalk",
@@ -410,6 +412,7 @@ class CrossingWiringTest {
             runCurrent()
             feed(objects, 200L)
             runCurrent()
+            VoiceBus.onSpeechIdle() // fin mot vue 1 : sinon vue 2 identique = doublon.
             // Dropout isolé + retour : ne reparle pas.
             feed(nobody, 400L)
             runCurrent()
@@ -422,10 +425,14 @@ class CrossingWiringTest {
             runCurrent()
             feed(nobody, 1200L)
             runCurrent()
+            // Fin du mot de la vue 1 : sinon l'annonce de la vue 2,
+            // identique, serait doublon du mot en cours.
+            VoiceBus.onSpeechIdle()
             feed(objects, 1400L)
             runCurrent()
             feed(objects, 1600L)
             runCurrent()
+            VoiceBus.onSpeechIdle() // fin du mot : l'annonce vue 2 se dit.
 
             val announces = speaker.calls.filter { it.second == "Left, 2 meters." }
             assertEquals("vue 1 + vue 2, dropout muet", 2, announces.size)
@@ -450,8 +457,10 @@ class CrossingWiringTest {
             val objects = listOf(obj("crosswalk", box))
             CrossingLateralWatch.update(objects, 512, 1138, emptyList(), null, LensSpec.Default, 0L, SpeechLanguage.En)
             runCurrent()
+            VoiceBus.onSpeechIdle() // fin alignement : l'annonce jetée en doublon se re-poste.
             CrossingLateralWatch.update(objects, 512, 1138, emptyList(), null, LensSpec.Default, 200L, SpeechLanguage.En)
             runCurrent()
+            VoiceBus.onSpeechIdle() // fin du mot : l'annonce retenue se dit.
 
             assertTrue(
                 "direction seule postée sans séquence (branche clip, existant)",

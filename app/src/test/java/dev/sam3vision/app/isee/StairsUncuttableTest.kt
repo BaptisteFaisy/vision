@@ -29,8 +29,9 @@ private class StairsFakeSpeaker : VoiceBusSpeaker {
  * amende l'ordre du matin, § 40) : des escaliers en cours (niveau 6)
  * vont au bout — tout le monde attend (niveau 0, humains, GPS,
  * grillages, bordures, chat, repli, Traversée) ; en retour les
- * escaliers coupent toute parole en cours. Seule la parole du user
- * passe devant. L'esquive parle dans le silence entre deux comptes.
+ * escaliers parlent premiers à la fin du mot en cours, sans le couper
+ * (ordre du 03/11). Seule la parole du user passe devant. L'esquive
+ * parle dans le silence entre deux comptes.
  */
 class StairsUncuttableTest {
 
@@ -91,22 +92,27 @@ class StairsUncuttableTest {
 
         VoiceBus.onSpeechIdle()
         VoiceBus.post(OutdoorLevel.FALLBACK, "Gauche.")
+        VoiceBus.onSpeechIdle()
         VoiceBus.post(OutdoorLevel.HUMAN, "Gauche.")
         assertEquals(3, speaker.said.size)
     }
 
     @Test
-    fun `escaliers coupent l humain et le chat en cours`() {
+    fun `escaliers attendent la fin de l humain et du chat`() {
         VoiceBus.post(OutdoorLevel.HUMAN, "Attention, personne.")
         VoiceBus.post(OutdoorLevel.STAIRS, "5 marches.")
 
+        assertEquals(1, speaker.said.size)
+        VoiceBus.onSpeechIdle()
         assertEquals(2, speaker.said.size)
 
         VoiceBus.reset()
         VoiceBus.chatSpeaking(true)
         VoiceBus.post(OutdoorLevel.STAIRS, "5 marches.")
-        assertEquals(3, speaker.said.size)
+        assertEquals(2, speaker.said.size)
         VoiceBus.chatSpeaking(false)
+        assertEquals(3, speaker.said.size)
+        assertEquals(OutdoorLevel.STAIRS, speaker.said[2].level)
     }
 
     @Test
@@ -121,9 +127,12 @@ class StairsUncuttableTest {
         VoiceBus.post(OutdoorLevel.HUMAN, "Gauche.")
         assertEquals(2, speaker.said.size)
 
-        // Compte suivant : il coupe l'esquive en cours.
+        // Compte suivant : il attend la fin de l'esquive, puis se dit.
         VoiceBus.post(OutdoorLevel.STAIRS, "4 marches.")
+        assertEquals(2, speaker.said.size)
+        VoiceBus.onSpeechIdle()
         assertEquals(3, speaker.said.size)
+        assertEquals(OutdoorLevel.STAIRS, speaker.said[2].level)
     }
 
     @Test
@@ -146,18 +155,22 @@ class StairsUncuttableTest {
     }
 
     @Test
-    fun `escaliers coupent le mot de guidage en cours`() {
-        // Ordre user du 02/11/2026 (top priorité sur « droite » / « gauche ») :
-        // le respect mutuel GPS est levé pour les escaliers, comme pour la bordure.
+    fun `escaliers attendent la fin du mot de guidage`() {
+        // Ordre user du 02/11/2026 (top priorité sur « droite » / « gauche »),
+        // sans coupe depuis le 03/11 : les escaliers parlent à la fin du mot.
         VoiceBus.post(OutdoorLevel.GPS_EVENT, "Left.")
         VoiceBus.post(OutdoorLevel.STAIRS, "Stairs 2 m.")
 
+        assertEquals(1, speaker.said.size)
+        VoiceBus.onSpeechIdle()
         assertEquals(2, speaker.said.size)
         assertEquals(StairsFakeSpeaker.Said(OutdoorLevel.STAIRS, "Stairs 2 m."), speaker.said[1])
 
         VoiceBus.reset()
         VoiceBus.post(OutdoorLevel.GPS_REMINDER, "Left.")
         VoiceBus.post(OutdoorLevel.STAIRS, "Stairs 1 m.")
+        assertEquals(3, speaker.said.size)
+        VoiceBus.onSpeechIdle()
         assertEquals(4, speaker.said.size)
     }
 

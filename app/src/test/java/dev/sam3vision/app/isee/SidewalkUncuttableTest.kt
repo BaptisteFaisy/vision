@@ -26,9 +26,10 @@ private class SidewalkFakeSpeaker : VoiceBusSpeaker {
 
 /**
  * Trottoir absolu (ordre user du 02/11/2026, VOIX-DANGER § 45) : l'annonce
- * trottoir (niveau 10) coupe toute parole en cours — escaliers et mot de
- * guidage compris — et va au bout, personne ne la coupe. Seule la parole
- * du user passe devant. Miroir de [StairsUncuttableTest], un cran au-dessus.
+ * trottoir (niveau 10) attend la fin de toute parole en cours — escaliers
+ * et mot de guidage compris, sans les couper (ordre du 03/11) — passe
+ * première, et va au bout, personne ne la déloge. Seule la parole du user
+ * passe devant. Miroir de [StairsUncuttableTest], un cran au-dessus.
  */
 class SidewalkUncuttableTest {
 
@@ -51,23 +52,30 @@ class SidewalkUncuttableTest {
     }
 
     @Test
-    fun `trottoir coupe l humain et la voiture en cours`() {
+    fun `trottoir attend la fin de l humain et de la voiture`() {
         VoiceBus.post(OutdoorLevel.HUMAN, "Gauche.")
         VoiceBus.post(OutdoorLevel.SIDEWALK, "Trottoir à gauche.")
 
+        assertEquals(1, speaker.said.size)
+        VoiceBus.onSpeechIdle()
         assertEquals(2, speaker.said.size)
 
         VoiceBus.reset()
         VoiceBus.post(OutdoorLevel.CAR_MOVING, "Car.")
         VoiceBus.post(OutdoorLevel.SIDEWALK, "Trottoir à gauche.")
+        assertEquals(3, speaker.said.size)
+        VoiceBus.onSpeechIdle()
         assertEquals(4, speaker.said.size)
     }
 
     @Test
-    fun `trottoir coupe les escaliers en cours`() {
+    fun `trottoir attend la fin des escaliers`() {
         VoiceBus.post(OutdoorLevel.STAIRS, "5 marches.")
         VoiceBus.post(OutdoorLevel.SIDEWALK, "Trottoir à gauche.")
 
+        assertEquals(1, speaker.said.size)
+
+        VoiceBus.onSpeechIdle()
         assertEquals(
             listOf(
                 SidewalkFakeSpeaker.Said(OutdoorLevel.STAIRS, "5 marches."),
@@ -78,25 +86,30 @@ class SidewalkUncuttableTest {
     }
 
     @Test
-    fun `trottoir coupe le mot de guidage en cours`() {
+    fun `trottoir attend la fin du mot de guidage`() {
         VoiceBus.post(OutdoorLevel.GPS_EVENT, "Left.")
         VoiceBus.post(OutdoorLevel.SIDEWALK, "Trottoir à gauche.")
 
+        assertEquals(1, speaker.said.size)
+        VoiceBus.onSpeechIdle()
         assertEquals(2, speaker.said.size)
 
         VoiceBus.reset()
         VoiceBus.post(OutdoorLevel.GPS_REMINDER, "Left.")
         VoiceBus.post(OutdoorLevel.SIDEWALK, "Trottoir à droite.")
+        assertEquals(3, speaker.said.size)
+        VoiceBus.onSpeechIdle()
         assertEquals(4, speaker.said.size)
     }
 
     @Test
-    fun `trottoir coupe le chat en cours`() {
+    fun `trottoir attend la fin du chat`() {
         VoiceBus.chatSpeaking(true)
         VoiceBus.post(OutdoorLevel.SIDEWALK, "Trottoir à gauche.")
 
-        assertEquals(1, speaker.said.size)
+        assertEquals(0, speaker.said.size)
         VoiceBus.chatSpeaking(false)
+        assertEquals(1, speaker.said.size)
     }
 
     @Test
@@ -132,7 +145,10 @@ class SidewalkUncuttableTest {
         VoiceBus.post(OutdoorLevel.SIDEWALK, "Trottoir à gauche.")
         VoiceBus.post(OutdoorLevel.SIDEWALK, "Trottoir à droite.")
 
+        assertEquals(1, speaker.said.size)
+        VoiceBus.onSpeechIdle()
         assertEquals(2, speaker.said.size)
+        assertEquals("Trottoir à droite.", speaker.said[1].text)
     }
 
     @Test
