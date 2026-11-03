@@ -53,6 +53,10 @@ internal fun BoxWithConstraintsScope.PortraitCamera(
 ) {
     if (open <= 0.001f && !ghost && state.glassesPhoto == null) return
     val focus = focusPull(open)
+    // Flou nul = netteté : `blur(0.dp)` est l'identité mais garde une passe
+    // hors-écran plein cadre à chaque frame — on ne la pose que pendant la
+    // mise au point (`focusPull` rend exactement 0 quand `open` vaut 1).
+    val blur = if (focus.blur > 0f) Modifier.blur(focus.blur.dp) else Modifier
     Box(
         Modifier
             .align(Alignment.TopCenter)
@@ -65,7 +69,7 @@ internal fun BoxWithConstraintsScope.PortraitCamera(
             Modifier
                 .fillMaxSize()
                 .graphicsLayer { scaleX = focus.scale; scaleY = focus.scale }
-                .blur(focus.blur.dp),
+                .then(blur),
         ) {
             StreetFeed(state, glue, probe, viewModel, showGlasses)
         }
@@ -149,19 +153,21 @@ private fun GlassesMasksScoped(probe: LiveProbe) {
  */
 @Composable
 private fun PictureFade(modifier: Modifier) {
-    val stops = remember {
+    // Les deux dégradés sont fixes : les reconstruire à chaque tick
+    // d'ouverture (un recompose par frame pendant 0,8 s) alloue pour rien.
+    val fade = remember {
         val n = 12
-        Array(n + 1) { i ->
+        val stops = Array(n + 1) { i ->
             val y = i / n.toFloat()
             y to Color.White.copy(alpha = 1f - pictureAlpha(y, 1f))
         }
+        Brush.verticalGradient(*stops)
     }
-    Box(modifier.background(Brush.verticalGradient(*stops)))
-    Box(
-        modifier.background(
-            Brush.verticalGradient(0f to Color(0x5C0B1220), 0.22f to Color.Transparent, 1f to Color.Transparent),
-        ),
-    )
+    val shade = remember {
+        Brush.verticalGradient(0f to Color(0x5C0B1220), 0.22f to Color.Transparent, 1f to Color.Transparent)
+    }
+    Box(modifier.background(fade))
+    Box(modifier.background(shade))
 }
 
 
