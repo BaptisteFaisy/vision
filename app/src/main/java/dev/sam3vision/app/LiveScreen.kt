@@ -43,7 +43,6 @@ import androidx.lifecycle.LifecycleEventObserver
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.compose.ui.viewinterop.AndroidView
-import dev.sam3vision.app.isee.CrossingOverlayLayer
 import dev.sam3vision.app.isee.FramePolicy
 import dev.sam3vision.app.isee.applySensorTuning
 import dev.sam3vision.app.live.LiveSensorControl
@@ -335,14 +334,8 @@ private fun LiveCameraStage(
         modifier = Modifier.fillMaxSize(),
     )
     LiveDistanceLayer(state.distanceLayer, followed = state.prompts.toSet())
-    // Feu piéton du mode Traversée : cadre + étiquette, posés comme les masques.
-    CrossingOverlayLayer(
-        active = state.traverseActive,
-        box = state.crossingBox,
-        state = state.crossing,
-        frameWidth = state.frame?.width ?: 0,
-        frameHeight = state.frame?.height ?: 0,
-    )
+    // Mode Traversée : plus de cadre rouge/vert sur le feu (ordre user du
+    // 03/11) — la vidéo reste celle d'avant, voix et pastille inchangées.
     // Repères reconnus : cadres jaunes + noms, et le premier en grand.
     LivePictoOverlay(state.pictoOverlay)
     LivePictoBig(state.pictoOverlay, pictoPng)

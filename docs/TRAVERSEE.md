@@ -34,9 +34,10 @@ Règle, dans cet ordre :
   (≤ 7 fois/s, `post` est `@Synchronized` ; A9 § 4.4). C'est cette protection — le
   ré-armement — qui remplace l'escalade de priorité : le cran 0 reste
   **sans producteur** (ordre user du 02/11/2026, voitures muettes dehors).
-- Le verdict vibre (`IseeHaptics.crossing`) et s'affiche (cadre VERT /
-  ROUGE sur le feu, étiquette `CROSS` / `DON'T CROSS`) — même vocabulaire
-  sur les deux surfaces, pas de cadre quand le mode est coupé ou sans feu.
+- Le verdict vibre (`IseeHaptics.crossing`) et s'affiche sur la pastille
+  du chip (`Crossing: GREEN/RED`) — plus de cadre rouge/vert sur la vidéo
+  (ordre user du 03/11/2026) : voix, vibration et pastille portent l'état
+  confirmé, la vidéo reste celle d'avant.
 
 ## 2. Ordre exclusif : verdict > humains > bordures
 

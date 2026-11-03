@@ -3,18 +3,15 @@ package dev.sam3vision.app.isee
 import dev.sam3vision.core.crossing.CrossingState
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertNotNull
-import org.junit.Assert.assertNull
-import org.junit.Assert.assertTrue
 import org.junit.Test
 
 /**
- * Mise en place du feu sur la vidéo : couleurs, étiquettes et géométrie.
- * Tout est pur, donc tout se vérifie sans appareil — c'est le seul moyen de
- * savoir où le cadre tombe quand l'image et la carte n'ont pas le même rapport.
+ * Pastille du chip et bandeau du scan : couleurs et géométrie.
+ * Tout est pur, donc tout se vérifie sans appareil.
  */
 class CrossingOverlayLayoutTest {
 
-    /** Compare un cadre au millième de pixel : le flottant ne doit pas faire le juge. */
+    /** Compare un rectangle au millième de pixel : le flottant ne doit pas faire le juge. */
     private fun assertMarker(marker: LightMarker?, left: Float, top: Float, right: Float, bottom: Float) {
         assertNotNull(marker)
         assertEquals(left, marker!!.left, 0.001f)
@@ -24,122 +21,16 @@ class CrossingOverlayLayoutTest {
     }
 
     @Test
-    fun `mode coupe ne dessine rien`() {
-        assertEquals("", crossingTag(false, CrossingState.Green))
+    fun `mode coupe - pastille grise`() {
         assertEquals(CROSSING_ACCENT_OFF, crossingAccent(false, null))
         assertEquals(CROSSING_ACCENT_OFF, crossingAccent(false, CrossingState.Red))
     }
 
     @Test
-    fun `chaque etat a sa couleur et son etiquette, binaire`() {
-        assertEquals("GREEN", crossingTag(true, CrossingState.Green))
-        assertEquals("RED", crossingTag(true, CrossingState.Red))
-        assertEquals("RED", crossingTag(true, null))
+    fun `chaque etat a sa couleur, binaire`() {
         assertEquals(CROSSING_ACCENT_GREEN, crossingAccent(true, CrossingState.Green))
         assertEquals(CROSSING_ACCENT_RED, crossingAccent(true, CrossingState.Red))
         assertEquals(CROSSING_ACCENT_RED, crossingAccent(true, null))
-    }
-
-    @Test
-    fun `l etiquette de la video dit la meme chose que la pastille de carte`() {
-        // Deux surfaces, un seul vocabulaire : si l'une dérive, l'utilisateur
-        // lit deux mots différents pour le même feu.
-        for (state in listOf(CrossingState.Green, CrossingState.Red)) {
-            val chip = crossingButtonLabel(true, state)
-            assertTrue("pastille « $chip » vs étiquette « ${crossingTag(true, state)} »",
-                chip.endsWith(crossingTag(true, state)))
-        }
-        assertEquals("Crossing: RED", crossingButtonLabel(true, null))
-        assertEquals("RED", crossingTag(true, null))
-    }
-
-    @Test
-    fun `sans boite ou boite invalide rien n est dessine`() {
-        assertNull(lightMarker(null, 100, 100, 400f, 400f))
-        assertNull(lightMarker(listOf(0.1f, 0.2f, 0.3f), 100, 100, 400f, 400f))
-        assertNull(lightMarker(listOf(0.1f, 0.2f, 0.3f, 0.4f), 0, 100, 400f, 400f))
-        assertNull(lightMarker(listOf(0.1f, 0.2f, 0.3f, 0.4f), 100, 100, 0f, 400f))
-    }
-
-    @Test
-    fun `un petit feu garde un marqueur minimal centre sur sa position`() {
-        // 2 x 2 px, centre (11, 11) : effacé avant, élargi au minimum maintenant.
-        // La position reste celle de la détection — seule la taille est relevée.
-        val half = MIN_MARKER_PX / 2f
-        assertMarker(
-            lightMarker(listOf(0.10f, 0.10f, 0.12f, 0.12f), 100, 100, 100f, 100f),
-            11f - half, 11f - half, 11f + half, 11f + half,
-        )
-    }
-
-    @Test
-    fun `un petit feu au bord garde un marqueur ramene dans la carte`() {
-        // Coin haut-gauche : le marqueur élargi est calé à (0, 0), pas coupé.
-        val marker = lightMarker(listOf(0f, 0f, 0.01f, 0.01f), 100, 100, 100f, 100f)
-        assertMarker(marker, 0f, 0f, MIN_MARKER_PX, MIN_MARKER_PX)
-    }
-
-    @Test
-    fun `un feu a moitie hors champ garde un marqueur cale au bord`() {
-        // Visible : x 95..100, y 40..60 — 5 px de large, élargi à 12 calé à droite.
-        val marker = lightMarker(listOf(0.95f, 0.4f, 1.2f, 0.6f), 100, 100, 100f, 100f)
-        assertMarker(marker, 100f - MIN_MARKER_PX, 50f - MIN_MARKER_PX / 2f, 100f, 50f + MIN_MARKER_PX / 2f)
-    }
-
-    @Test
-    fun `boite vide inversee hors champ ou NaN - toujours rien`() {
-        // Le marqueur minimal ne s'applique qu'à une détection réelle : sans
-        // détection, pas de marqueur — on ne montre jamais un feu imaginaire.
-        assertNull(lightMarker(listOf(0.3f, 0.3f, 0.3f, 0.5f), 100, 100, 100f, 100f))
-        assertNull(lightMarker(listOf(0.5f, 0.5f, 0.1f, 0.1f), 100, 100, 100f, 100f))
-        assertNull(lightMarker(listOf(1.2f, 0.1f, 1.5f, 0.5f), 100, 100, 100f, 100f))
-        assertNull(lightMarker(listOf(-0.5f, 0.1f, -0.2f, 0.5f), 100, 100, 100f, 100f))
-        assertNull(lightMarker(listOf(0.1f, Float.NaN, 0.3f, 0.4f), 100, 100, 100f, 100f))
-        assertNull(lightMarker(listOf(0.1f, 0.2f, Float.POSITIVE_INFINITY, 0.4f), 100, 100, 100f, 100f))
-    }
-
-    @Test
-    fun `cadre carre dans une carte carree tombe au pixel pres`() {
-        // Comparaison au millième : 0.6f * 100f vaut 60.000004 en flottant, et
-        // une égalité exacte sur des données de test ferait échouer le test pour
-        // une raison qui n'a rien à voir avec le cadrage.
-        assertMarker(lightMarker(listOf(0.1f, 0.2f, 0.5f, 0.6f), 100, 100, 100f, 100f), 10f, 20f, 50f, 60f)
-    }
-
-    @Test
-    fun `image panoramique recadree en carre garde le feu sous ses pixels`() {
-        // C'est le cas réel : la frame SAM fait 200x100, la carte est carrée, l'aperçu
-        // est en ContentScale.Crop — même transformation que les pastilles de distance.
-        val marker = lightMarker(listOf(0.25f, 0.25f, 0.75f, 0.75f), 200, 100, 400f, 400f)
-        assertMarker(marker, 0f, 100f, 400f, 300f)
-    }
-
-    @Test
-    fun `une boite qui deborde est ramenee dans la carte`() {
-        val marker = lightMarker(listOf(-0.2f, 0.1f, 0.4f, 0.5f), 100, 100, 100f, 100f)
-        assertNotNull(marker)
-        assertEquals(0f, marker!!.left, 0.001f)
-        assertEquals(40f, marker.right, 0.001f)
-    }
-
-    @Test
-    fun `etiquette au dessus quand il y a la place`() {
-        val r = tagRect(LightMarker(0f, 100f, 400f, 300f), tagWidth = 50f, tagHeight = 20f, boxWidth = 400f, boxHeight = 400f)
-        assertMarker(r, 0f, 76f, 50f, 96f)
-    }
-
-    @Test
-    fun `etiquette sous le cadre quand le feu touche le haut`() {
-        val r = tagRect(LightMarker(0f, 10f, 400f, 300f), tagWidth = 50f, tagHeight = 20f, boxWidth = 400f, boxHeight = 400f)
-        assertMarker(r, 0f, 304f, 50f, 324f)
-    }
-
-    @Test
-    fun `etiquette ramenee a droite et en bas`() {
-        val r = tagRect(LightMarker(380f, 390f, 400f, 400f), tagWidth = 100f, tagHeight = 20f, boxWidth = 400f, boxHeight = 400f)
-        assertEquals(300f, r.left, 0.001f)
-        assertEquals(400f, r.right, 0.001f)
-        assertEquals(366f, r.top, 0.001f)
     }
 
     @Test

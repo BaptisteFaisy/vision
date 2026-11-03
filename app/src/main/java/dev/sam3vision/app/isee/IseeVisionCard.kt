@@ -215,26 +215,17 @@ internal fun ProbeVideoRest(probe: LiveProbe) {
     LiveDistanceLayer(rest.distanceLayer, topInset = 0.dp, followed = followed, modifier = Modifier.fillMaxSize())
     SteeringLayer(rest.steering)
     ArbitratedInstruction(probe)
-    CrossingOnVideo(rest)
+    CrosswalkScanOnVideo(rest)
 }
 
 /**
- * Le feu sur la vidéo : couleur et boîte du dernier passage serveur — la
- * couleur est le dernier état **annoncé** (rouge par défaut), jamais une
- * lecture instantanée : voix, vibration et affichage parlent d'une seule
- * voix confirmée (ordre user du 31/10, certitude rouge/vert). Le scan
- * traversée s'y lit en miroir de la voix.
+ * Le scan traversée sur la vidéo, en miroir de la voix. Le cadre rouge/vert
+ * du feu n'est plus posé (ordre user du 03/11) : l'état confirmé reste
+ * annoncé par la voix, la vibration et la pastille du chip.
  */
 @Composable
-internal fun CrossingOnVideo(probe: LiveProbeState) {
+internal fun CrosswalkScanOnVideo(probe: LiveProbeState) {
     if (!probe.crossingActive) return
-    CrossingOverlayLayer(
-        active = true,
-        box = probe.crossingBox,
-        state = probe.crossing,
-        frameWidth = probe.width,
-        frameHeight = probe.height,
-    )
     CrosswalkScanBanner(probe.scanLines)
 }
 
