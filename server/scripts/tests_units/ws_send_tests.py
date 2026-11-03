@@ -124,6 +124,46 @@ def test_loop_closes_on_stuck_send(pump) -> None:
           elapsed < 2.0, f"{elapsed:.2f} s")
 
 
+def test_accept_failure_no_session() -> None:
+    """Handshake raté (pair parti avant accept) : retour propre, 0 session."""
+    from tests_units.ws_binary_tests import _live_fast_service
+    from test_units import check
+
+    service, api = _live_fast_service()
+
+    async def scenario():
+        async def receive():
+            return {"type": "websocket.disconnect", "code": 1000}
+
+        async def send(message):
+            if message["type"] == "websocket.accept":
+                raise RuntimeError("pair parti pendant le handshake")
+
+        scope = {"type": "websocket", "asgi": {"version": "3.0"}, "http_version": "1.1",
+                 "scheme": "ws", "path": "/live/ws", "raw_path": b"/live/ws",
+                 "query_string": b"", "root_path": "", "headers": [],
+                 "subprotocols": [], "client": ("test", 1), "server": ("test", 80),
+                 "app": api}
+        await api(scope, receive, send)
+
+    asyncio.run(scenario())
+    check("accept raté: retour propre (aucune exception)", True)
+    check("accept raté: 0 session comptée",
+          service.ws.get("sessions", 0) == 0, str(service.ws))
+
+
+def test_one_message_none_closes(pump) -> None:
+    """Réception KO (socket déjà fermé) : motif client, 0 inférence, 0 envoi."""
+    from test_units import check
+
+    service, socket = _Service(), _ScriptSocket([])
+    held, reason = asyncio.run(pump._one_message(service, socket, None, None, 8, 5.0))
+    check("socket fermé: motif client", held is None and reason == "client",
+          f"{held} {reason}")
+    check("socket fermé: GPU intact", service.calls == [], str(service.calls))
+    check("socket fermé: rien envoyé", socket.sent == [], str(socket.sent)[:80])
+
+
 def test_ws_send(_module) -> None:
     """Envois WS bornés : réponse, pong et fermeture rendent la session."""
     session = _fresh("ws_session")
@@ -134,3 +174,5 @@ def test_ws_send(_module) -> None:
     test_close_stuck_bounded(session)
     test_pong_stuck_returns_false(pump)
     test_loop_closes_on_stuck_send(pump)
+    test_accept_failure_no_session()
+    test_one_message_none_closes(pump)
