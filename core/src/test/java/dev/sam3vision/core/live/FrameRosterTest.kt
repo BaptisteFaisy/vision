@@ -3,6 +3,8 @@ package dev.sam3vision.core.live
 import dev.sam3vision.core.distance.DistanceReading
 import dev.sam3vision.core.model.LiveFrame
 import dev.sam3vision.core.model.SegObject
+import java.util.concurrent.ConcurrentLinkedQueue
+import java.util.concurrent.CountDownLatch
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertNull
 import org.junit.Assert.assertTrue
@@ -92,6 +94,35 @@ class FrameRosterTest {
         val truncated = listOf(1f, 2f)
         val placed = placedLabels(frame(listOf(obj("chien", truncated), obj("personne"))), emptyList())
         assertEquals(listOf("personne"), placed.map { it.label })
+    }
+
+    @Test
+    fun `des of concurrents sur l instance partagee ne plantent pas et restent exacts`() {
+        // Famille du crash `FrameLabels.of` (émulateur le 01/11) : la publication est
+        // sérialisée côté sonde, mais la classe elle-même doit tenir le partage — deux
+        // `of` entrelacés (clear/add sur l'ensemble réutilisé) jetaient
+        // `ArrayIndexOutOfBounds`. Chaque appel est atomique : son résultat ne contient
+        // que ses propres étiquettes, jamais celles d'un vol voisin.
+        val errors = ConcurrentLinkedQueue<Throwable>()
+        val start = CountDownLatch(1)
+        val threads = List(8) { t ->
+            Thread {
+                start.await()
+                try {
+                    repeat(300) { i ->
+                        val first = "t${t}a"
+                        val second = "t${t}b$i"
+                        val result = labels.of(listOf(obj(first), obj(second), obj(first)))
+                        if (result != listOf(first, second)) throw AssertionError("mélange : $result")
+                    }
+                } catch (e: Throwable) {
+                    errors.add(e)
+                }
+            }.also { it.start() }
+        }
+        start.countDown()
+        threads.forEach { it.join(60_000) }
+        assertTrue("plantage concurrent : ${errors.peek()}", errors.isEmpty())
     }
 
     private companion object {
