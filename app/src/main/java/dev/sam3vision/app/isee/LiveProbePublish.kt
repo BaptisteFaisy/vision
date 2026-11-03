@@ -109,6 +109,7 @@ internal fun LiveProbe.computeRest(
     val cross = if (crossingActive) crossingPatchOf(
         crossing, traverseVeto, true, frame, lens, jpegB64, at, speechLanguage,
         onCrop = cropLogger?.tap(), noLightGate = noLightGate,
+        motion = ProbeBackgroundMotion.lastMotion,
     ) else null
     // Traversée : le verdict parle au bus (niveau 100 = CrossingLevels.VERDICT),
     // la phrase parlée se tait (humains et bordures passent par le guetteur
