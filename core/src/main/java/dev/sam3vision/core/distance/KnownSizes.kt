@@ -26,9 +26,10 @@ import java.text.Normalizer
  * profondeur (`DepthReadings`) ou du plan de sol, jamais du sténopé (voir
  * [DEPTH_ONLY] et `StairConcepts`).
  *
- * Pas d'entrée bus, camion, moto, vélo, trottinette, borne, portail ni arbre
+ * Pas d'entrée camion, moto, vélo, trottinette, borne, portail ni arbre
  * (spec v4 : plus détectés) : un label mort reste **inconnu** — mieux vaut
- * ne rien afficher qu'un chiffre faux.
+ * ne rien afficher qu'un chiffre faux. « bus » restauré le 03/11 mais sans
+ * hauteur typique (voir [DEPTH_ONLY]).
  *
  * **Foule (P0 point 7)** : les concepts qui peuplent un trottoir ont chacun
  * leur entrée — enfant, poussette, fauteuil roulant, chien — avec leur
@@ -219,6 +220,9 @@ object KnownSizes {
         // jamais de sténopé dessus non plus).
         "pedestrian traffic light", "pedestrian signal head",
         "souvenir shop", "beanie", "socks", "keys",
+        // Bus restauré le 03/11 (ordre user) : pas de hauteur typique
+        // projetable (bus 3 m, minibus…), profondeur ou plan de sol.
+        "bus",
     )
 
     /**

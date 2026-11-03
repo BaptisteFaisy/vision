@@ -16,7 +16,8 @@ class LivePromptsNavigationTest {
             listOf(
                 "person", "car", "pedestrian traffic light", "curb", "sidewalk",
                 "crosswalk", "pole", "stairs", "fence", "wall", "barrier", "sign",
-                "street lamp", "animal", "trash can", "souvenir shop",
+                "street lamp", "animal", "trash can", "souvenir shop", "bus",
+                "van", "stroller", "dog", "child",
             ),
             LivePrompts.default,
         )
