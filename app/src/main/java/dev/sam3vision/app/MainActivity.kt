@@ -26,6 +26,7 @@ import dev.sam3vision.app.glasses.EXTRA_GLASSES_MOCK_CONNECT
 import dev.sam3vision.app.glasses.EXTRA_GLASSES_TALK
 import dev.sam3vision.app.glasses.GlassesController
 import dev.sam3vision.app.glasses.GlassesSessionLifecycle
+import dev.sam3vision.app.net.GlassesNetworkRoute
 import dev.sam3vision.app.glasses.hasLinkedDevice
 import dev.sam3vision.app.glasses.linkedStates
 import dev.sam3vision.app.glasses.shouldSwipeConnect
@@ -255,8 +256,11 @@ class MainActivity : ComponentActivity() {
         // premier plan à démarrer (app visible). Il survit ensuite à l'écran verrouillé.
         LockedMicBridge.arm(this)
         // Session lunettes : un démarrage du maintien refusé en fond (Android 12+)
-        // se rejoue ici, au premier plan.
-        if (glassesKeepAlive()) GlassesSessionLifecycle.startBackground(this)
+        // se rejoue ici, au premier plan — avec la route cellulaire du backend.
+        if (glassesKeepAlive()) {
+            GlassesSessionLifecycle.startBackground(this)
+            GlassesNetworkRoute.acquire(this)
+        }
         // Retour de l'app Meta AI : le flux d'enregistrement ne réémet pas
         // toujours, on relit l'état pour que le bloc Lunettes suive.
         glasses.refresh()

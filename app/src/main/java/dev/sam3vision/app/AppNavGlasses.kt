@@ -9,6 +9,7 @@ import dev.sam3vision.app.glasses.GlassesEvent
 import dev.sam3vision.app.glasses.GlassesSessionKeepAlive
 import dev.sam3vision.app.glasses.GlassesSessionLifecycle
 import dev.sam3vision.app.glasses.sessionControl
+import dev.sam3vision.app.net.GlassesNetworkRoute
 import dev.sam3vision.app.isee.IseeViewModel
 import dev.sam3vision.core.glasses.CaptureAction
 
@@ -31,8 +32,15 @@ internal fun GlassesBridge(glasses: GlassesController, isee: IseeViewModel, push
     // tombe. Au repos, le service s'efface.
     LaunchedEffect(glasses) {
         glasses.state.collect { state ->
-            if (GlassesSessionLifecycle.wantsBackground(state.phase)) GlassesSessionLifecycle.startBackground(context)
-            else GlassesSessionLifecycle.stopBackground(context)
+            // Même fenêtre que le maintien de fond : en session, le backend passe
+            // par le cellulaire si le Wi-Fi lunettes (sans internet) est le défaut.
+            if (GlassesSessionLifecycle.wantsBackground(state.phase)) {
+                GlassesSessionLifecycle.startBackground(context)
+                GlassesNetworkRoute.acquire(context)
+            } else {
+                GlassesSessionLifecycle.stopBackground(context)
+                GlassesNetworkRoute.release()
+            }
         }
     }
     // Bouton « Arrêter » de la notification : la session tombe pour de bon.
@@ -41,7 +49,10 @@ internal fun GlassesBridge(glasses: GlassesController, isee: IseeViewModel, push
     }
     // Composition détruite (activité finie) : le maintien ne survit pas à l'app.
     DisposableEffect(glasses) {
-        onDispose { GlassesSessionLifecycle.stopBackground(context) }
+        onDispose {
+            GlassesSessionLifecycle.stopBackground(context)
+            GlassesNetworkRoute.release()
+        }
     }
     LaunchedEffect(glasses) {
         // Ordre vocal « iSee » : iSee peut basculer la session des lunettes.
