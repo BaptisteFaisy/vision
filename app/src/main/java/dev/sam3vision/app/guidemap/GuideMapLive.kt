@@ -10,6 +10,7 @@ import androidx.compose.runtime.rememberUpdatedState
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
+import dev.sam3vision.app.navigation.VoiceNavTracker
 import dev.sam3vision.app.voicenav.MiniRouteMap
 import dev.sam3vision.app.voicenav.ROUTE_MAP_POLL_MS
 import dev.sam3vision.core.nav.GuidanceMapState
@@ -32,10 +33,20 @@ internal fun rememberGuidanceMapState(
     val state = remember { mutableStateOf<GuidanceMapState?>(null) }
     val currentUpdate by rememberUpdatedState(update)
     LaunchedEffect(snapshot) {
+        var lastSig: String? = null
         while (true) {
             val (route, fix) = runCatching { snapshot() }.getOrNull() ?: Pair(null, null)
-            state.value = guidanceMapStateOf(route, fix, currentUpdate)
+            val built = guidanceMapStateOf(route, fix, currentUpdate)
                 .takeIf { it.overlays.route.isNotEmpty() }
+            state.value = built
+            // Signature sans coordonnées (vie privée) : tranche données
+            // (position nulle) vs rendu (punaise invisible malgré tout).
+            val sig = "carte : trace=${built?.overlays?.route?.size ?: -1} " +
+                "pos=${built?.overlays?.position != null} cam=${built?.camera?.zoom?.toInt() ?: -1}"
+            if (sig != lastSig) {
+                lastSig = sig
+                android.util.Log.d(VoiceNavTracker.LOG_TAG, sig)
+            }
             delay(ROUTE_MAP_POLL_MS)
         }
     }
