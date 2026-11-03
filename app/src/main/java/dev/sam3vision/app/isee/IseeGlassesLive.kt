@@ -66,6 +66,8 @@ internal fun GlassesLive(modifier: Modifier) {
     AndroidView(
         factory = { context ->
             TextureView(context).apply {
+                // Coins du bloc : le contour natif arrondit la vue, le clip Compose ne le peut pas.
+                clipToIseeBlock()
                 // Le flux vidéo est opaque : on le déclare pour que la composition
                 // saute le blending du calque et sa passe de mélange avec le fond.
                 setOpaque(true)
