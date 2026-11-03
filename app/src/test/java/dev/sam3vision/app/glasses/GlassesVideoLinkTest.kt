@@ -1,5 +1,6 @@
 package dev.sam3vision.app.glasses
 
+import com.meta.wearable.dat.camera.types.VideoQuality
 import dev.sam3vision.core.live.LinkDrop
 import org.junit.After
 import org.junit.Assert.assertEquals
@@ -21,6 +22,7 @@ class GlassesVideoLinkTest {
     fun resetLink() {
         GlassesVideoLink.detachNotes()
         GlassesVideoLink.clear()
+        GlassesVideoLink.lastSessionDropRate = 0.0
     }
 
     @Test
@@ -202,6 +204,44 @@ class GlassesVideoLinkTest {
         assertEquals(0L, GlassesVideoLink.linkSamples)
         assertEquals(0L, GlassesVideoLink.linkDrops().sum())
         assertTrue(GlassesVideoLink.linkLine().endsWith("drops 0+0"))
+    }
+
+    @Test
+    fun `l arrêt du flux reporte le taux d abandon à la session suivante`() {
+        // Une frame mesurée + un abandon = 50 % : l'attache suivante replie en moyenne.
+        GlassesVideoLink.setStreaming(true)
+        val pushed = dated(arrivedAtNs = 1_000_000_000L)
+        GlassesVideoLink.push(pushed)
+        val seq = GlassesVideoLink.frames.value?.seq ?: 0L
+        GlassesVideoLink.noteRendered(seq, pushed, 1_010_000_000L, 1_018_000_000L)
+        GlassesVideoLink.markPixel(atNs = 1_026_000_000L)
+        GlassesVideoLink.markDrop(LinkDrop.CONFLATED)
+        GlassesVideoLink.setStreaming(false)
+        assertEquals(0.5, GlassesVideoLink.lastSessionDropRate, 0.0)
+        assertEquals(VideoQuality.MEDIUM, glassesVideoQuality(GlassesVideoLink.lastSessionDropRate))
+    }
+
+    @Test
+    fun `sans mesure l arrêt du flux garde l ancien report`() {
+        // Double arrêt, ouverture : des stats vides ne sont pas une mesure.
+        GlassesVideoLink.lastSessionDropRate = 0.25
+        GlassesVideoLink.setStreaming(false)
+        assertEquals(0.25, GlassesVideoLink.lastSessionDropRate, 0.0)
+    }
+
+    @Test
+    fun `une session parfaite remet le report à zéro`() {
+        // Le lien tenu remonte en haute à l'attache suivante, sans forçage.
+        GlassesVideoLink.lastSessionDropRate = 0.5
+        GlassesVideoLink.setStreaming(true)
+        val pushed = dated(arrivedAtNs = 1_000_000_000L)
+        GlassesVideoLink.push(pushed)
+        val seq = GlassesVideoLink.frames.value?.seq ?: 0L
+        GlassesVideoLink.noteRendered(seq, pushed, 1_010_000_000L, 1_018_000_000L)
+        GlassesVideoLink.markPixel(atNs = 1_026_000_000L)
+        GlassesVideoLink.setStreaming(false)
+        assertEquals(0.0, GlassesVideoLink.lastSessionDropRate, 0.0)
+        assertEquals(VideoQuality.HIGH, glassesVideoQuality(GlassesVideoLink.lastSessionDropRate))
     }
 
     private fun frame(bytes: ByteArray = byteArrayOf(1, 2, 3)) =
