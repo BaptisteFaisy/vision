@@ -54,42 +54,51 @@ internal fun LiveProbe.observeStairs(
     scope.launch(work) {
         state.collect { st ->
             if (stairsAnnounceMuted(st, placeMode)) return@collect
-            // Lectures d'abord (sens + heure par la boîte), libellés bruts en
-            // repli : un escalier nommé sans mesure reste un escalier.
-            val readings = st.distanceLayer?.readings.orEmpty()
-            val found = stairsFoundOf(st)
-            // Calibrage SAM : les frames suivantes ne comptent que dans la
-            // boîte de l'escalier retenu (effacée sinon : balayage entier).
-            StairCannyCount.setRoi(stairsRoiOf(found, st.width, st.height))
-            // Profondeur du marchement le plus proche : la dernière marche par
-            // profondeur (< 1 m) parle même quand le compteur est indisponible
-            // (caméra coupée, repli bitmap, compte périmé : 0 = non compté).
-            val stairsMeters = readings.filter { StairConcepts.isStairs(it.label) }
-                .mapNotNull { it.meters.takeIf { m -> m.isFinite() } }.minOrNull()
-            // Compte Canny frais de la caméra (0 = non compté) : il nourrit le
-            // compte à rebours de la montée (« Plus que N marches. »).
-            val stairsCount = StairCannyCount.lineCount()
-            val signal = if (found.detected) {
-                StairSignal(detected = true, confidence = 1f, lineCount = stairsCount, roiTop = 0, roiBottom = 0)
-            } else {
-                StairSignal.none()
-            }
-            val cue = watcher.onSignal(
-                signal, System.currentTimeMillis(), language(), found.direction, found.centerX, stairsMeters)
-            if (found.detected) {
-                android.util.Log.d(
-                    "sam3vision",
-                    "escaliers: n=$stairsCount ageMs=${StairCannyCount.countAgeMs()} m=$stairsMeters annonce=${cue?.phrase}",
-                )
-            }
-            cue ?: return@collect
-            VoiceTick.report(VoiceTick.SRC_STAIRS, VoiceWish(cue.level, cue.phrase, cue.antiRepeatKey, clips = cue.clips), System.currentTimeMillis())
-            if (AntiRepeat.allow(cue.antiRepeatKey, System.currentTimeMillis())) {
-                VoiceBus.post(cue.level, cue.phrase, antiRepeatKey = cue.antiRepeatKey, clips = cue.clips)
-            }
+            announceStairs(watcher, st, language)
         }
     }
     return watcher
+}
+
+/** Un état sonde → annonce escalier éventuelle (extrait d'`observeStairs`, garde 50 lignes). */
+private fun LiveProbe.announceStairs(
+    watcher: StairWatcher,
+    st: LiveProbeState,
+    language: () -> SpeechLanguage,
+) {
+    // Lectures d'abord (sens + heure par la boîte), libellés bruts en
+    // repli : un escalier nommé sans mesure reste un escalier.
+    val readings = st.distanceLayer?.readings.orEmpty()
+    val found = stairsFoundOf(st)
+    // Calibrage SAM : les frames suivantes ne comptent que dans la
+    // boîte de l'escalier retenu (effacée sinon : balayage entier).
+    StairCannyCount.setRoi(stairsRoiOf(found, st.width, st.height))
+    // Profondeur du marchement le plus proche : la dernière marche par
+    // profondeur (< 1 m) parle même quand le compteur est indisponible
+    // (caméra coupée, repli bitmap, compte périmé : 0 = non compté).
+    val stairsMeters = readings.filter { StairConcepts.isStairs(it.label) }
+        .mapNotNull { it.meters.takeIf { m -> m.isFinite() } }.minOrNull()
+    // Compte Canny frais de la caméra (0 = non compté) : il nourrit le
+    // compte à rebours de la montée (« Plus que N marches. »).
+    val stairsCount = StairCannyCount.lineCount()
+    val signal = if (found.detected) {
+        StairSignal(detected = true, confidence = 1f, lineCount = stairsCount, roiTop = 0, roiBottom = 0)
+    } else {
+        StairSignal.none()
+    }
+    val cue = watcher.onSignal(
+        signal, System.currentTimeMillis(), language(), found.direction, found.centerX, stairsMeters)
+    if (found.detected) {
+        android.util.Log.d(
+            "sam3vision",
+            "escaliers: n=$stairsCount ageMs=${StairCannyCount.countAgeMs()} m=$stairsMeters annonce=${cue?.phrase}",
+        )
+    }
+    cue ?: return
+    VoiceTick.report(VoiceTick.SRC_STAIRS, VoiceWish(cue.level, cue.phrase, cue.antiRepeatKey, clips = cue.clips), System.currentTimeMillis())
+    if (AntiRepeat.allow(cue.antiRepeatKey, System.currentTimeMillis())) {
+        VoiceBus.post(cue.level, cue.phrase, antiRepeatKey = cue.antiRepeatKey, clips = cue.clips)
+    }
 }
 
 /**
