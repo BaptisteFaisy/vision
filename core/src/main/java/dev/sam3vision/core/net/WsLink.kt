@@ -32,12 +32,22 @@ data class LinkBudget(
     val silenceMarginMs: Long = 5_000L,
 )
 
-/** Vue figée du lien : ce qu'un journal ou un test lit d'un coup. */
+/**
+ * Vue figée du lien : ce qu'un journal ou un test lit d'un coup.
+ *
+ * [lastHandshakeMs] = durée du dernier handshake accepté (`dial` → `101`), `null`
+ * sans `101` reçu ; [lastCloseCode] = dernier code observé (`1000` = propre, `≥ 1000` =
+ * code WS — `1001` idle, `1009` réponse trop grosse —, `< 1000` = HTTP du handshake
+ * refusé), `null` tant que rien n'a été observé. Les deux survivent aux échecs : c'est
+ * ce qui prouve la cause après coup (latence du handshake, motif de coupure, [attempts]).
+ */
 data class LinkSnapshot(
     val state: WsLinkState,
     val attempts: Int,
     val nextAttemptAtMs: Long,
     val iface: String?,
+    val lastHandshakeMs: Long? = null,
+    val lastCloseCode: Int? = null,
 )
 
 /**
@@ -66,6 +76,9 @@ class WsLink(
     private var nextAttemptAtMs = 0L
     private var iface: String? = null
     private var lastProofAtMs = clock()
+    private var connectStartMs = clock()
+    private var lastHandshakeMs: Long? = null
+    private var lastCloseCode: Int? = null
 
     /** État courant, sans collecte de flux. */
     val current: WsLinkState get() = _state.value
@@ -76,8 +89,9 @@ class WsLink(
     /** Date (horloge injectée) de la prochaine ouverture autorisée. */
     val nextAttempt: Long get() = nextAttemptAtMs
 
-    /** Vue figée : état, compteur, date de reprise, interface du dernier socket. */
-    fun snapshot(): LinkSnapshot = LinkSnapshot(_state.value, attempts, nextAttemptAtMs, iface)
+    /** Vue figée : état, compteur, date de reprise, interface, handshake, fermeture. */
+    fun snapshot(): LinkSnapshot =
+        LinkSnapshot(_state.value, attempts, nextAttemptAtMs, iface, lastHandshakeMs, lastCloseCode)
 
     /** Une ouverture est-elle due ? `false` = le backoff court encore, on n'ouvre pas. */
     fun canAttempt(): Boolean = clock() >= nextAttemptAtMs
@@ -89,9 +103,11 @@ class WsLink(
      * Handshake lancé : l'état le dit **avant** le `101`, pas seulement après — et le
      * watchdog repart de zéro (un socket neuf a son budget entier, même si le
      * précédent est mort muet). Compteur et backoff intacts : seul le `101` les remet.
+     * Le chrono du handshake part ici : [onOpen] en fera une durée mesurée.
      */
     fun startConnecting() {
         lastProofAtMs = clock()
+        connectStartMs = clock()
         _state.value = WsLinkState.Connecting
     }
 
@@ -101,16 +117,20 @@ class WsLink(
         attempts = 0
         nextAttemptAtMs = 0L
         lastProofAtMs = clock()
+        lastHandshakeMs = (clock() - connectStartMs).coerceAtLeast(0L)
         _state.value = WsLinkState.Open
     }
 
     /**
      * Échec d'une tentative (handshake refusé, socket fermé, silence, envoi refusé) :
      * `Degraded`, compteur incrémenté, date de reprise repoussée par le backoff.
+     * [closeCode] (voir [LinkSnapshot.lastCloseCode]) est retenu quand il est connu ;
+     * `null` = cause sans code (silence, refus d'envoi), le précédent survit.
      * Rend la date armée — c'est `nextAttemptAtMs`, jamais un minuteur séparé.
      */
-    fun onFailure(): Long {
+    fun onFailure(closeCode: Int? = null): Long {
         attempts += 1
+        if (closeCode != null) lastCloseCode = closeCode
         nextAttemptAtMs = clock() + delayFor(attempts)
         _state.value = WsLinkState.Degraded
         return nextAttemptAtMs
@@ -124,10 +144,12 @@ class WsLink(
 
     /**
      * Lien invalidé (interface changée, socket déclaré mort) : reprise **immédiate**,
-     * l'interface retenue devient celle du prochain socket.
+     * l'interface retenue devient celle du prochain socket. [closeCode] : comme
+     * [onFailure] — un idle `1001` n'est pas un échec mais reste un code observé.
      */
-    fun onInvalidate(iface: String?) {
+    fun onInvalidate(iface: String?, closeCode: Int? = null) {
         this.iface = iface
+        if (closeCode != null) lastCloseCode = closeCode
         nextAttemptAtMs = clock()
         _state.value = WsLinkState.Degraded
     }
@@ -162,6 +184,9 @@ class WsLink(
         nextAttemptAtMs = 0L
         iface = null
         lastProofAtMs = clock()
+        connectStartMs = clock()
+        lastHandshakeMs = null
+        lastCloseCode = null
         _state.value = WsLinkState.Closed
     }
 
@@ -227,6 +252,18 @@ class WsLinkPump(
     private companion object {
         const val PUMP_THREAD = "ws-ping"
     }
+}
+
+/**
+ * Code de fermeture observé (`null` = fermeture propre, `1000`) : anormal → code WS,
+ * handshake refusé → code HTTP (`< 1000`, jamais confondu avec un code WS), autre
+ * panne (radio, DNS, silence) → `null`, le précédent survit. Voir [LinkSnapshot].
+ */
+internal fun closeCodeOf(error: Throwable?): Int? = when (error) {
+    null -> NORMAL_CLOSE_CODE
+    is WsClosedAbnormally -> error.code
+    is WsHandshakeRefused -> error.code
+    else -> null
 }
 
 /**

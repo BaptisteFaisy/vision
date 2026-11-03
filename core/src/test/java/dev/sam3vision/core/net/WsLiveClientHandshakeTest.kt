@@ -173,4 +173,35 @@ class WsLiveClientHandshakeTest {
         assertTrue((error as ApiError.Network).message!!.contains("Settings"))
         assertEquals("aucun handshake dans le vide", 0, transport.opens)
     }
+
+    @Test
+    fun `le client retient handshake tentatives et code de fermeture`() = runBlocking {
+        var now = 0L
+        val link = WsLink(clock = { now })
+        val transport = HandshakeTransport()
+        val client = clientFor(transport, link)
+
+        val first = async { client.live("QQ==", listOf("person"), 640, 4) }
+        awaitOpens(transport, 1)
+        transport.fail(0, WsHandshakeRefused(404, null))
+        assertTrue(first.await().exceptionOrNull() is ApiError.Network)
+        assertEquals(1, client.linkSnapshot.attempts)
+        assertEquals("HTTP du refus, pas un code WS", 404, client.linkSnapshot.lastCloseCode)
+
+        val second = async { client.live("QQ==", listOf("person"), 640, 4) }
+        awaitOpens(transport, 2)
+        now += 230
+        transport.accept(1)
+        assertEquals(WsLinkState.Open, client.linkState.value)
+        assertEquals(0, client.linkSnapshot.attempts)
+        assertEquals(230L, client.linkSnapshot.lastHandshakeMs)
+        assertEquals("le refus survit au succès", 404, client.linkSnapshot.lastCloseCode)
+
+        transport.fail(1, WsClosedAbnormally(1001, "idle"))
+        assertTrue(second.await().exceptionOrNull() is ApiError.Network)
+        assertEquals("un idle n'est pas un échec", 0, link.attemptCount)
+        assertEquals(1001, client.linkSnapshot.lastCloseCode)
+        assertTrue("reprise immédiate après idle", link.canAttempt())
+        client.close()
+    }
 }

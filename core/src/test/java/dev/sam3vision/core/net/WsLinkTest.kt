@@ -152,4 +152,33 @@ class WsLinkTest {
         assertEquals(null, link.snapshot().iface)
         assertTrue(link.canAttempt())
     }
+
+    @Test
+    fun `le handshake se mesure de dial a 101`() {
+        val link = link()
+        assertEquals(null, link.snapshot().lastHandshakeMs)
+
+        link.startConnecting()
+        now += 230
+        link.onOpen("wifi")
+
+        assertEquals(230L, link.snapshot().lastHandshakeMs)
+    }
+
+    @Test
+    fun `le dernier code observe survit aux pannes sans code`() {
+        val link = link()
+        assertEquals(null, link.snapshot().lastCloseCode)
+
+        link.onFailure(1009)
+        assertEquals(1009, link.snapshot().lastCloseCode)
+        link.onFailure()
+        assertEquals("silence : le précédent survit", 1009, link.snapshot().lastCloseCode)
+        link.onInvalidate("cell", 1001)
+        assertEquals("un idle reste un code observé", 1001, link.snapshot().lastCloseCode)
+
+        link.reset()
+        assertEquals(null, link.snapshot().lastCloseCode)
+        assertEquals(null, link.snapshot().lastHandshakeMs)
+    }
 }

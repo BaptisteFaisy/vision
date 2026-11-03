@@ -426,5 +426,6 @@ Le client **doit** envoyer `{"id":0,"ping":1}` dès qu'il reste plus de 20 s san
 `GET /health` publie `ws` : `sessions`, `open`, `frames`, `errors`, `timeouts`,
 `degraded`, `close_idle`, `close_oversize`, `close_client`, `last_frame_age_s`,
 `active` (créneaux tenus), `threads` (calculs vivants), `abandoned`. Une ligne est écrite
-par ouverture (`ws: open …`) et par fermeture (`ws: close reason=… dur=… frames=…`).
+par ouverture (`ws: open …`) et par fermeture
+(`ws: close reason=… code=… dur=… frames=…`, même chiffre que `lastCloseCode` client).
 Sans ces compteurs, « pas de reprise automatique » n'était pas mesurable.
