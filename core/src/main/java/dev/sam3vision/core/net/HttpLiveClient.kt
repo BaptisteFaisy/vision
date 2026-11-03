@@ -6,6 +6,7 @@ import dev.sam3vision.core.model.LiveFrame
 import dev.sam3vision.core.model.LiveHealth
 import dev.sam3vision.core.model.MASK_ENCODING_BITS
 import dev.sam3vision.core.model.MASK_ENCODING_NONE
+import kotlinx.coroutines.delay
 import okhttp3.OkHttpClient
 
 /**
@@ -26,6 +27,9 @@ const val WAKE_TIMEOUT_SECONDS: Long = 180L
 
 /** User-Agent propre au flux live, identifiable côté backend. */
 internal const val LIVE_USER_AGENT = "$USER_AGENT live"
+
+/** Attente avant le 2e essai de `/health` (transitoire) : même barème que le LLM. */
+private const val HEALTH_RETRY_DELAY_MS = 1_500L
 
 /**
  * Client de réveil, dérivé du pool du direct : le handshake `wss://` réutilise le tunnel
@@ -64,6 +68,8 @@ class HttpLiveClient(
     private val binaryUpload: Boolean = false,
     /** Masques demandés (`mask_encoding`) ; `false` = boîtes et scores seuls (`none`). */
     private val masks: Boolean = true,
+    /** Attente avant le 2e essai de `/health` (transitoire) : injectée pour les tests. */
+    private val retryDelayMs: Long = HEALTH_RETRY_DELAY_MS,
 ) : LiveClient {
 
     /** Client effectif : exposé aux tests, qui prouvent le partage du pool. */
@@ -126,13 +132,25 @@ class HttpLiveClient(
         )
     }.then { bytes -> catchingResult { parseLiveFrameBytes(bytes) } }
 
+    /**
+     * Sonde + bouton de réveil : un échec transitoire (503 de boot, bascule de
+     * déploiement, hoquet réseau) est rejoué **une fois** — 2 appels au plus.
+     * GET idempotent : jamais une inférence rejouée, contrairement aux frames.
+     */
     override suspend fun health(): Result<LiveHealth> {
         endpointRefusal("endpoint direct", baseUrl, "/health")?.let { return Result.failure(it) }
-        // Construite dans `executeBuilt` : une URL malformée devient une erreur, pas un crash.
-        return wakeClient.executeBuilt { requestTo(baseUrl, "/health", userAgent = LIVE_USER_AGENT) }
+        val first = probeHealth()
+        val error = first.exceptionOrNull()
+        if (error == null || !error.isTransient) return first
+        delay(retryDelayMs)
+        return probeHealth()
+    }
+
+    /** Une tentative de sonde, URL construite dans `executeBuilt` (jamais de crash). */
+    private suspend fun probeHealth(): Result<LiveHealth> =
+        wakeClient.executeBuilt { requestTo(baseUrl, "/health", userAgent = LIVE_USER_AGENT) }
             .then { outcome -> outcome.requireSuccess() }
             .then { raw -> catchingResult { parseHealth(raw) } }
-    }
 }
 
 /**

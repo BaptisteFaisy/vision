@@ -200,14 +200,6 @@ private fun isUnknownModel(error: Throwable): Boolean =
         (error.body.contains("model_not_found", ignoreCase = true) ||
             error.body.contains("unknown model", ignoreCase = true))
 
-/** Échec qui mérite un nouvel essai : délai, cadence, ou panne côté fournisseur. */
-private val Throwable.isTransient: Boolean
-    get() = when (this) {
-        is ApiError.Timeout, is ApiError.RateLimited -> true
-        is ApiError.Http -> code >= 500
-        else -> false
-    }
-
 /**
  * Texte du message : chaîne (cas nominal) ou morceaux `[{"text": ...}]` recollés
  * (certains modèles multimodaux répondent en parties, pas en chaîne).

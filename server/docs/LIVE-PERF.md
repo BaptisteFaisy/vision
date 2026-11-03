@@ -157,7 +157,7 @@ Modal permet deux réglages distincts (docs/guide/region-selection) :
   Sans ça, même GPU européen = aller-retour Paris→Virginie→Europe. Fixable qu'au premier déploiement.
 
 Déploiement : `LIVE_APP_NAME=sam3-eu-a100 LIVE_GPU=A100-40GB LIVE_REGION=eu LIVE_ROUTING_REGION=eu-west
-modal deploy backend/live_app.py` → URL `https://baptiste-faisy--sam3-eu-a100-sam3live-web.eu-west.modal.run`.
+modal deploy backend/live_app.py` → URL `https://gaiamelie--sam3-eu-a100-sam3live-web.eu-west.modal.run`.
 `/health` confirme : `gpu=NVIDIA A100-SXM4-40GB, region=eu-west, cloud=GCP` (40 Go réelles, pas d'upgrade 80 Go).
 
 ### PC (France) vs mêmes protocoles us-east — street 640×258, 4 concepts, max 12
@@ -193,7 +193,7 @@ Session de test ≈ 9–10 min de GPU ≈ **0,36 $** (2,415 $/h). Garde : `KEEP=
 Ajout d'une route **WebSocket** sur la même app et le même conteneur (`live_app_fast.py` d'alors) :
 le pipeline GPU est **le même** (`Sam3Live._live_sync`, un seul verrou GPU), seul le transport change.
 
-- URL : `wss://baptiste-faisy--sam3-eu-a100-sam3live-web.eu-west.modal.run/live/ws`
+- URL : `wss://gaiamelie--sam3-eu-a100-sam3live-web.eu-west.modal.run/live/ws`
   (en local : `ws://<host>/live/ws`).
 - Entrée, un message **texte** JSON par frame — mêmes champs que `POST /live`, plus `id` :
   `{"id": 7, "image_b64": "...", "prompts": ["person", "door"], "max_objects": 4, "work_edge": 640}`
@@ -224,7 +224,7 @@ n'accélère pas le GPU, il retire la couche HTTP.
 ### Banc
 
 ```bash
-python3 scripts/bench_live_ws.py --url wss://baptiste-faisy--sam3-eu-a100-sam3live-web.eu-west.modal.run \
+python3 scripts/bench_live_ws.py --url wss://gaiamelie--sam3-eu-a100-sam3live-web.eu-west.modal.run \
     --image /tmp/frame.jpg --runs 6 --prompts person,door
 ```
 
