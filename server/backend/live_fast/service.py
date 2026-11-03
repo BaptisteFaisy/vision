@@ -465,9 +465,19 @@ class Sam3LiveService:
 
         @api.websocket("/live/ws")
         async def live_ws(websocket: WebSocket):
-            """Même pipeline que POST /live : un message texte JSON ou binaire (M1) par frame."""
-            await websocket.accept()
-            print("ws: accept /live/ws", flush=True)
+            """Même pipeline que POST /live : un message texte JSON ou binaire (M1) par frame.
+
+            Handshake gardé : un pair parti avant ``accept()`` rend 0 session
+            (log seul), pas une trace — et sa durée est loggée (sonde F3).
+            """
+            started = time.monotonic()
+            try:
+                await websocket.accept()
+            except Exception as exc:  # noqa: BLE001 — pair parti pendant le handshake
+                print(f"ws: accept impossible ({exc}), 0 session", flush=True)
+                return
+            took_ms = (time.monotonic() - started) * 1000
+            print(f"ws: accept /live/ws en {took_ms:.0f} ms", flush=True)
             await service._ws_loop(websocket)
 
         return api

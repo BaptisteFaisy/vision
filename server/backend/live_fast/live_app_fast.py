@@ -138,7 +138,7 @@ app = modal.App(APP_NAME)
     gpu=GPU_TYPE,
     region=REGION,
     routing_region=ROUTING,
-    timeout=3600,  # sessions longues saines ; les zombies meurent par idle-timeout 45 s
+    timeout=3600,  # sessions longues saines ; les zombies meurent par idle 1001 à 120 s
     startup_timeout=1200,  # torch.compile + warm-up au chargement : plus long que le simple load
     max_containers=1,      # UN SEUL GPU, JAMAIS DEUX
     min_containers=MIN_CONTAINERS,  # 0 = extinction après le bail ; 1 = warm pool (FAST_MIN_CONTAINERS)

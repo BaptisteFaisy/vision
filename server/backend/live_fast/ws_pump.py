@@ -407,8 +407,12 @@ async def _one_message(service, websocket, raw, depth_state, every,
     """Un message déjà reçu : ``(held, motif d'arrêt ou None)``.
 
     Ping → pong (le pair peut être parti : motif ``"client"``), cancel sans vol →
-    rien, frame → servie (``_serve_frame``).
+    rien, frame → servie (``_serve_frame``). ``None`` (socket déjà fermé, la
+    réception a levé) → motif ``"client"`` direct, sans 400 inutile.
     """
+    if raw is None:
+        print("ws: socket déjà fermé (réception KO), session fermée", flush=True)
+        return (None, "client")
     cls, _cid = classify(raw)
     if cls == "ping":
         if not await _pong(websocket, raw):
