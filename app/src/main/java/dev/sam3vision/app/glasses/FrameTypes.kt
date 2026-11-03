@@ -179,6 +179,32 @@ object YuvConverter {
 internal fun halfDimensions(width: Int, height: Int): Pair<Int, Int> =
     ((width + 1) / 2).coerceAtLeast(1) to ((height + 1) / 2).coerceAtLeast(1)
 
+/**
+ * Tampons réutilisés du pont lunettes : le décodeur H.265 sort ~1,4 Mo de YUV
+ * par frame 720p, et la conversion demi-résolution ~0,9 Mo d'ARGB — alloués à
+ * chaque frame, c'était ~25 Mo/s de garbage à 11 i/s, payés en pauses GC sur
+ * le poste `capt` (p95 121 ms, max 489 ms en recette 13c). Ici les tableaux ne
+ * repoussent que quand ils sont trop courts, jamais par frame. Usage séquentiel
+ * seul (comme le `MediaCodec` qu'ils servent, non réentrant) : un décodeur = un
+ * grattoir, et l'`ArgbImage` rendu est copié aussitôt (`createBitmap`, JPEG).
+ */
+internal class BufferScratch {
+    private var bytes = ByteArray(0)
+    private var ints = IntArray(0)
+
+    /** Tampon d'octets d'au moins [size] cases (repousse si trop court). */
+    fun bytes(size: Int): ByteArray {
+        if (bytes.size < size) bytes = ByteArray(size)
+        return bytes
+    }
+
+    /** Tampon d'entiers d'au moins [size] cases (repousse si trop court). */
+    fun ints(size: Int): IntArray {
+        if (ints.size < size) ints = IntArray(size)
+        return ints
+    }
+}
+
 /** Alignements de ligne testés par [inferYuv420Layout] (pixels). */
 private val ROW_ALIGNMENTS = intArrayOf(1, 2, 4, 8, 16, 32, 64, 128, 256)
 
