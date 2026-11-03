@@ -38,8 +38,10 @@ data class CurbSignal(
          * Signal des lectures affinées ([meters] sténopé ou profondeur, déjà
          * lissée) : un label [CurbConcepts] (bord, ou chemin/route en bord
          * incertain, confiance basse) dans le couloir ([PositionText.SIDE_EDGE]),
-         * bas de boîte en bande basse et distance sous le seuil. Le plus proche
-         * gagne. Boîte illisible ou dimensions nulles = ignoré, pas d'exception.
+         * bas de boîte en bande basse et distance sous le seuil — la montée
+         * ([CurbEdge.Up]) en face seule (bande « midi », voir [isFrontal]).
+         * Le plus proche gagne. Boîte illisible ou dimensions nulles = ignoré,
+         * pas d'exception.
          */
         fun of(readings: List<DistanceReading>, frameW: Int, frameH: Int): CurbSignal {
             if (frameW <= 0 || frameH <= 0) return none()
@@ -88,8 +90,17 @@ data class CurbSignal(
             } else {
                 CurbEdge.Up
             }
+            if (edge == CurbEdge.Up && !isFrontal(centerX)) return null
             return Hit(meters, centerX, edge, confidence, reading.label)
         }
+
+        /**
+         * Montée en face : la bande « midi » du cadran ([PositionText.clockHour]) —
+         * une montée à 11 h ou 1 h longe le pas, elle ne se monte pas (ordre user
+         * du 03/11/2026 : « curb up » en face uniquement, jamais à côté).
+         */
+        private fun isFrontal(centerX: Float): Boolean =
+            PositionText.clockHour(centerX) == 12
 
         /**
          * Plan (`sidewalk`…) : bord proche ou sol sous les pieds ? Montée = le
