@@ -263,4 +263,12 @@ class DictationOrderTest {
         assertNull(DictationOrders.parse("où étaient-elles"))
         assertNull(DictationOrders.parse("où étaient-elles ?"))
     }
+
+    @Test
+    fun `question Describe en conserve — jamais un ordre, part au llm`() {
+        // Miroir de DESCRIBE_PHOTO_QUESTION (app, bouton photo lunettes) : le
+        // routeur ne doit jamais la consommer, sinon le bouton reste muet.
+        assertNull(DictationOrders.parse("Describe this photo in detail."))
+        assertFalse(DictationOrders.isOrder("Describe this photo in detail."))
+    }
 }

@@ -28,6 +28,13 @@ internal fun acceptGlassesPhoto(current: IseeGlassesPhoto?, file: File): Boolean
 }
 
 /**
+ * Question en conserve du bouton « Describe » : posée au LLM avec la photo
+ * épinglée en contexte, comme une question dictée — même réponse parlée.
+ * En anglais (produit anglophone exclusif, voir `LlmPrompts`).
+ */
+internal const val DESCRIBE_PHOTO_QUESTION = "Describe this photo in detail."
+
+/**
  * Ligne de statut posée à l'arrivée d'une photo lunettes : seul l'appui court
  * (PHOTO) pose une photo, qui devient le contexte des questions dictées.
  * Pure : testée en JVM.
