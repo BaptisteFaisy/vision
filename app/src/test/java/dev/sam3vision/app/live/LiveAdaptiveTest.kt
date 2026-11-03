@@ -187,9 +187,9 @@ class LiveAdaptiveTest {
 
     @Test
     fun `politique terrain par defaut, expire a 300 ms et tient 3 par seconde`() {
-        assertEquals(KeyframeConfig.Field, LiveAdaptive(baseQuality = base).scheduler.config)
-
-        val paced = LiveAdaptive(baseQuality = base, scheduler = scheduler(KeyframeConfig.Field))
+        // Défaut du constructeur : l'expiration à 300 ms (la référence expirerait
+        // à 500 ms) prouve la politique terrain sans lire l'interne du scheduler.
+        val paced = LiveAdaptive(baseQuality = base)
         paced.configure(uploadEnabled = false, keyframesEnabled = true)
 
         assertTrue(paced.admit()) // STARTUP : première demande.

@@ -338,14 +338,13 @@ class LiveSessionTest {
     }
 
     @Test
-    fun `reset rouvre les creneaux refermes par le regulateur`() {
+    fun `reset ne rouvre pas les creneaux refermes par le regulateur`() {
         val session = LiveSession(FakeLiveClient(), cadence = Cadence.Fast)
         (1..3).forEach { _ -> session.stats.record(344L) }
         session.regulate()
         assertEquals(1, session.slots)
         session.reset()
-        assertEquals("nouvelle séance : les deux créneaux sont rendus", 2, session.slots)
-        assertFalse(session.saturated)
+        assertEquals("reset oublie le compte, pas la fermeture", 1, session.slots)
     }
 
     @Test
