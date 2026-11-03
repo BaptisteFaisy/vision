@@ -9,7 +9,6 @@ import com.meta.wearable.dat.camera.types.AudioCodec
 import com.meta.wearable.dat.camera.types.AudioSampleRate
 import com.meta.wearable.dat.camera.types.StreamState
 import com.meta.wearable.dat.camera.types.VideoFrame
-import com.meta.wearable.dat.camera.types.VideoQuality
 import com.meta.wearable.dat.core.session.DeviceSession
 import com.meta.wearable.dat.core.types.DeviceSessionError
 import android.os.SystemClock
@@ -126,9 +125,9 @@ internal class GlassesCamera(
         return RateRefusal(refusal, reason)
     }
 
-    /** Flux iSee : qualité haute (moyenne si la session précédente a saturé le lien), cadence [frameRate], H.265 (réglages commentés dans [glassesStreamConfiguration]). */
+    /** Flux iSee : qualité haute, cadence [frameRate], H.265 (réglages commentés dans [glassesStreamConfiguration]). */
     private fun configuration(choice: AudioChoice, frameRate: Int) =
-        glassesStreamConfiguration(choice.toCodec(), frameRate, GlassesVideoLink.lastSessionDropRate)
+        glassesStreamConfiguration(choice.toCodec(), frameRate)
 
     /** Format du plan → codec du SDK ; `null` = pas de piste audio demandée. */
     private fun AudioChoice.toCodec(): AudioCodec? {
@@ -150,13 +149,6 @@ internal class GlassesCamera(
         // doit pas passer pour elle — la mesure (`fpsSuffix`, `GlassesLink`) tranche ensuite.
         Log.i(TAG, "caméra attachée : $frameRate i/s acceptés")
         if (frameRate < GLASSES_FRAME_RATE) onNote(GlassesMessages.frameRateFallback(GLASSES_FRAME_RATE, frameRate))
-        // Repli qualité sur mesure : le lien de la session précédente saturait,
-        // l'attache est en moyenne — dit une fois, jamais muet (même motif que le repli de cadence).
-        val dropRate = GlassesVideoLink.lastSessionDropRate
-        if (glassesVideoQuality(dropRate) != VideoQuality.HIGH) {
-            Log.i(TAG, "caméra attachée en qualité moyenne (session précédente : ${(dropRate * 100).toInt()} % perdus)")
-            onNote(GlassesMessages.mediumQualityFallback(dropRate))
-        }
         // L'enregistreur sait, avant la première image, s'il doit attendre une piste son.
         recorder?.expectAudio(choice)
         val tap = if (choice.silent) {
