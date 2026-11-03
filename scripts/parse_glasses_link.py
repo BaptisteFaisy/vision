@@ -9,11 +9,11 @@ détaillées `TimingsText.link`, en microsecondes :
 plus les résumés `GlassesLink e2e … drops F+D` pour les pertes. Un poste non
 mesuré vaut `—` : la frame reste comptée, le poste est ignoré pour ce
 poste-là. Depuis l'échantillonnage à la source, la ligne détaillée ne sort
-qu'une fois sur 15 frames (~1 Hz) : les K premières **lignes** partent au
-warmup (`--skip`, défaut 1).
+qu'une fois sur 5 frames (~3 Hz à 15 i/s, pour nourrir la jointure E2E) :
+les K premières **lignes** partent au warmup (`--skip`, défaut 1).
 
 Statistiques de référence = ligne e2e 1 Hz (`GlassesLink e2e p50/p95/p99 …`) :
-60 s de dump ne donnent que ~60 lignes détaillées, insuffisant pour un p99
+60 s de dump ne donnent que ~180 lignes détaillées, insuffisant pour un p99
 stable. Le tableau par poste ci-dessous sert au diagnostic des étages, pas au
 verdict statistique.
 
@@ -40,9 +40,9 @@ LIGNE_RESUME_LINK = re.compile(r"GlassesLink e2e p50/p95/p99 \S+.*drops (\d+)\+(
 CIBLE_P95_LINK_US = 100_000
 WARN_P95_LINK_US = 70_000
 CRIT_P99_LINK_US = 150_000
-# Lignes détaillées jetées au warmup. La ligne ne sort plus qu'une fois sur 15
-# frames (15 i/s → 1 Hz) : une seule ligne (~1 s de flux) suffit après reset,
-# alors que 5 lignes jetteraient désormais 5 s de mesure utile.
+# Lignes détaillées jetées au warmup. La ligne ne sort plus qu'une fois sur 5
+# frames (15 i/s → ~3 Hz) : une seule ligne suffit après reset, alors que
+# 5 lignes jetteraient désormais ~2 s de mesure utile.
 WARMUP_DEFAUT = 1
 
 
