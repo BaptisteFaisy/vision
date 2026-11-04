@@ -28,7 +28,7 @@ internal fun BuildInfoBlock() {
         verticalArrangement = Arrangement.spacedBy(4.dp),
     ) {
         Text(
-            "Version ${BuildConfig.VERSION_NAME}",
+            "Version iSee ${BuildConfig.VERSION_NAME}",
             color = SettingsLight.text,
             fontSize = 13.sp,
             fontWeight = FontWeight.SemiBold,
