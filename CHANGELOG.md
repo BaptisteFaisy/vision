@@ -3,6 +3,23 @@
 Le journal part du 2026-10-26 après 19 h : le commit de départ, puis une entrée par fait
 livré et ses preuves (tâche, fichiers, chiffres) dans l'arbre.
 
+## 2026-11-04 — iSee : bloc caméra réduit à 60 % (70 % en guidage), la phrase respire (branche `isee-camera-60-texte`)
+
+- **Demande** : réduire un peu la hauteur caméra pour que le texte parlé —
+  iSee ou user selon qui parle — se voie entre la carte et la caméra
+  (ordre user du 04/11/2026). La barre fine est déjà partie avec #1135
+  (bord du bloc).
+- **Fait** :
+  - `core/iseedesign/IseePortrait.kt` : `PICTURE_SPEAKING_H` 0,625 → 0,60,
+    `PICTURE_GUIDING_H` 0,75 → 0,70 (`PICTURE_IDLE_H` 0,64 hors prod
+    inchangé) ; en-tête KDoc passé au bloc.
+  - `IseePortraitTest` : 0,60/0,70 figées, marge phrase ≥ 5 %.
+  - Commentaires `IseeScenePane`/`IseePortraitCamera` + §1
+    `docs/ISEE-DESIGN-PORTRAIT.md` à 60 %/70 %. Placement phrase/transcript
+    inchangé : `SceneOrbLayer` la pose déjà entre bloc et carte.
+- **Preuves** : gardes `check-isee-design` + `check-kotlin-limits` OK ;
+  CI PR #1138 verte (run 41749057834, `ci-core` + `ci-app`).
+
 ## 2026-11-04 — Direct : repli automatique WebSocket → POST /live (branche `feat/live-http-fallback`)
 
 - **Demande** : si iSee n'arrive pas à se connecter en WebSocket, basculer sur
