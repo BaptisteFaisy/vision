@@ -10,8 +10,10 @@ package dev.sam3vision.core.crossing
  * les frames (93 frames sur 93). Une boîte sans lampe lue doit donc tenir
  * [CONFIRM_FRAMES] frames de suite avant de compter.
  *
- * Une lampe lue compte tout de suite : un rouge vu reste un rouge. Un feu
- * confirmé garde l'asymétrie sûre : toute boîte qui revient reparle en une frame,
+ * Une lampe lue compte tout de suite : un rouge vu reste un rouge. Le repli
+ * haut-de-poteau passe ici comme les autres boîtes, avec sa vraie lecture : sur
+ * le terrain du 04/11, 9 rafales de doute sur 10 venaient de lui, sans aucune
+ * boîte SAM. Un feu confirmé garde l'asymétrie sûre : toute boîte qui revient reparle en une frame,
  * jusqu'à [FORGET_FRAMES] frames sans boîte ([LightEvidenceGate.ABSENT_REARM_FRAMES]).
  *
  * Pur Kotlin testé en JVM, aucune horloge.
