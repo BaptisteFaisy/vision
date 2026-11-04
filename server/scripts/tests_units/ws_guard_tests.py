@@ -145,19 +145,29 @@ def test_acquire_bounded(_module) -> None:
     check("acquire borne : pas de verrou -> True", guard.acquire(None) is True)
 
 
-def test_recv_binary_logged(_module) -> None:
-    """Réception : le binaire arrive intact, l'exception est imprimée."""
-    import contextlib
-    import io
-
-    from test_units import check
+def _recv_probe():
+    """Quatre réceptions scriptées : binaire, texte forme-Modal, binaire Modal, boom."""
 
     async def scenario():
+        import contextlib
+        import io
+
         pump = _fresh("ws_pump")
 
         class _Bin:
             async def receive(self):
                 return {"type": "websocket.receive", "bytes": b"\x00\x01bin"}
+
+        class _ModalText:
+            # Forme Modal : les DEUX clés, `bytes` à None — a tué des sessions.
+            async def receive(self):
+                return {"type": "websocket.receive", "text": '{"id": 3}',
+                        "bytes": None}
+
+        class _ModalBin:
+            async def receive(self):
+                return {"type": "websocket.receive", "text": None,
+                        "bytes": b"\x00\x01bin"}
 
         class _Boom:
             async def receive(self):
@@ -165,18 +175,38 @@ def test_recv_binary_logged(_module) -> None:
 
         out = io.StringIO()
         with contextlib.redirect_stdout(out):
-            kind_bin, raw_bin = await pump._recv_one(_Bin())
-            kind_boom, raw_boom = await pump._recv_one(_Boom())
-        return kind_bin, raw_bin, kind_boom, raw_boom, out.getvalue()
+            results = [await pump._recv_one(sock())
+                       for sock in (_Bin, _ModalText, _ModalBin, _Boom)]
+        return results, out.getvalue()
 
-    kind_bin, raw_bin, kind_boom, raw_boom, logs = asyncio.run(scenario())
+    return asyncio.run(scenario())
+
+
+def test_recv_binary_logged(_module) -> None:
+    """Réception : binaire intact, formes Modal livrées, journal présent."""
+    from test_units import check
+
+    results, logs = _recv_probe()
+    (kind_bin, raw_bin), (kind_txt, raw_txt), (kind_mbin, raw_mbin), _boom = results
     check("recv : binaire livre intact", (kind_bin, raw_bin) == ("msg", b"\x00\x01bin"),
           f"{kind_bin} {raw_bin!r}")
+    check("recv : forme Modal texte (bytes None) ne leve pas",
+          (kind_txt, raw_txt) == ("msg", '{"id": 3}'), f"{kind_txt} {raw_txt!r}")
+    check("recv : forme Modal binaire livre les octets",
+          (kind_mbin, raw_mbin) == ("msg", b"\x00\x01bin"), f"{kind_mbin} {raw_mbin!r}")
+    check("recv : message binaire journalise", "message binaire reçu (5 o)" in logs, logs[:120])
+
+
+def test_recv_error_logged(_module) -> None:
+    """Réception : l'exception transport est imprimée, connexion gardée."""
+    from test_units import check
+
+    results, logs = _recv_probe()
+    kind_boom, raw_boom = results[-1]
     check("recv : exception -> 400, connexion gardee", (kind_boom, raw_boom) == ("msg", None),
           f"{kind_boom} {raw_boom!r}")
     check("recv : exception imprimee avec son type", "receive() a levé ConnectionError" in logs,
           logs[:120])
-    check("recv : message binaire journalise", "message binaire reçu (5 o)" in logs, logs[:120])
 
 
 def test_ws_guard(_module) -> None:
@@ -192,4 +222,5 @@ def test_ws_guard(_module) -> None:
     test_post_guarded(_module)
     test_accept_bounded(_module)
     test_acquire_bounded(_module)
+    test_recv_error_logged(_module)
     test_recv_binary_logged(_module)

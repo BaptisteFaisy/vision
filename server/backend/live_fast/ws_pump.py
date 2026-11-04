@@ -48,9 +48,7 @@ WS_MAX_REPLY_BYTES = 4_000_000  # réponse plus grosse : dégradée, 1009 en der
 # Client parti pendant N : on laisse finir la réponse au plus ça, puis on rend le
 # créneau. Le thread d'inférence, lui, va au bout (un thread Python ne se tue pas).
 WS_ABANDON_SECONDS = 2.0
-# Ramassage du double-buffer (M1) : si le waiter (receive transport) ignore
-# l'annulation, la session restait « open » à vie au lieu de se fermer.
-WS_CANCEL_SECONDS = 5.0
+WS_CANCEL_SECONDS = 5.0  # ramassage (M1) : un waiter sourd ne parque plus la session
 # Vol borné à 2 (FIX-13, structurel : 1 inférence + 1 message tenu, pas de file).
 WS_MAX_IN_FLIGHT = 2
 
@@ -125,13 +123,15 @@ async def _recv_one(websocket) -> tuple:
     if message.get("type") == "websocket.disconnect":
         print(f"ws: disconnect client (code={message.get('code')} raison={message.get('reason')})", flush=True)
         return ("disconnect", None)
-    if "bytes" in message:
-        print(f"ws: message binaire reçu ({len(message['bytes'])} o)", flush=True)
-        return ("msg", message["bytes"])
-    if "text" in message:
-        return ("msg", message["text"])
-    print(f"ws: message inattendu (clés={sorted(message)})", flush=True)
-    return ("msg", None)
+    # Modal pose les DEUX clés (une à None) : tester la valeur (hotfix : len(None) tuait).
+    data = message.get("bytes")
+    if data is not None:
+        print(f"ws: message binaire reçu ({len(data)} o)", flush=True)
+        return ("msg", data)
+    text = message.get("text")
+    if text is None:
+        print(f"ws: message inattendu (clés={sorted(message)})", flush=True)
+    return ("msg", text)
 
 
 async def _recv_idle(websocket, idle_seconds) -> tuple:
