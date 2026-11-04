@@ -12,12 +12,14 @@ import dev.sam3vision.core.crossing.CrossingVerdictLight
 import dev.sam3vision.core.crossing.CrossingVerdictRule
 import dev.sam3vision.core.crossing.Evidence
 import dev.sam3vision.core.crossing.LightEvidenceGate
+import dev.sam3vision.core.crossing.LightGhostGate
 import dev.sam3vision.core.crossing.LightTemporalVote
 import dev.sam3vision.core.crossing.PedLampHold
 import dev.sam3vision.core.distance.DistanceReading
 import dev.sam3vision.core.model.Detection
 import dev.sam3vision.core.model.LiveFrame
 import dev.sam3vision.core.model.toDetections
+import dev.sam3vision.core.traverse.VehicleConcepts
 import dev.sam3vision.core.traverse.FrameMotion
 import dev.sam3vision.core.traverse.VehicleStateWatcher
 
@@ -98,6 +100,9 @@ class CrossingVerdictEngine(
     /** [atMs] du dernier mouvement voiture brut (`null` = aucun vu). */
     private var lastMovingAtMs: Long? = null
 
+    /** Boîtes de feu qui clignotent sans lampe, sur des passages sans feu. */
+    private val ghosts = LightGhostGate()
+
     /** Frames de suite sans preuve de verdict (ni vert ni rouge lu) : borne le silence. */
     private var unprovenFrames = 0
 
@@ -133,7 +138,7 @@ class CrossingVerdictEngine(
         onCrosswalk: Boolean = false,
         parked: (Detection) -> Boolean = { false },
     ): CrossingVerdictFrame {
-        val read = readLight(frame, jpegB64)
+        val read = withoutGhost(readLight(frame, jpegB64))
         val evidence = gate.onFrame(
             atMs = atMs,
             sawAnyLightBox = read.box != null,
@@ -167,8 +172,15 @@ class CrossingVerdictEngine(
         // la phrase, jamais avant elle.
         val haptic = if (!silent && cue != null && felt != verdict) overlay else null
         if (!silent && cue != null) felt = verdict
-        verdictProbeLine(read.box != null, evidence, light, recent, carVeto, verdict, silent)
+        verdictProbeLine(read.box != null, evidence, light, recent, carVeto, verdict, silent) { blockedProbeLine(frame, light, moving, recent, carVeto, parked) }
         return CrossingVerdictFrame(posts, verdict, light, moving, overlay, haptic, carVeto, recent)
+    }
+
+    /** Boîte fantôme ([LightGhostGate]) : la frame se lit comme une frame sans boîte. */
+    private fun withoutGhost(read: CrossingLight): CrossingLight {
+        val lampRead = read.redProven || read.state == CrossingState.Green
+        val real = ghosts.admits(read.box != null, lampRead)
+        return if (real || read.box == null) read else CrossingLight(null, CrossingState.Red)
     }
 
     /**
@@ -298,6 +310,7 @@ class CrossingVerdictEngine(
         gate.reset()
         vote.reset()
         hold.reset()
+        ghosts.reset()
         felt = null
         lastMovingAtMs = null
         unprovenFrames = 0
@@ -348,6 +361,30 @@ private const val TAG_MUTE = "VoiceMute"
 private var lastVerdictProbeMs = 0L
 
 /**
+ * Une ligne par frame bloquée : ce qui a tranché et les véhicules non prouvés
+ * garés (label, score, boîte), de quoi rejouer un faux « Don't cross. » vu sur le
+ * terrain. Debug seul, zéro effet sur la voix.
+ */
+private fun blockedProbeLine(
+    frame: LiveFrame,
+    light: CrossingVerdictLight,
+    moving: Boolean,
+    recent: Boolean,
+    veto: Boolean,
+    parked: (Detection) -> Boolean,
+) {
+    if (!BuildConfig.DEBUG) return
+    val vehicles = frame.objects.toDetections(frame.width, frame.height)
+        .filter { VehicleConcepts.isVehicle(it.label) }
+    val free = vehicles.filterNot(parked)
+        .joinToString(";") { "${it.label}/${(it.score * 100).toInt()}/${it.box.map(Float::toInt)}" }
+    android.util.Log.d(
+        "ISEE_CROSS",
+        "bloque feu=$light roule=$moving recent=$recent veto=$veto vehicules=${vehicles.size} libres=[$free]",
+    )
+}
+
+/**
  * Une ligne toutes les 2 s : les entrées du verdict — distingue « pas de feu
  * vu » (sans boîte, preuve `Absent`) de « feu vu puis perdu » (preuve
  * `Unknown`, ré-armement en cours) et « voiture qui bloque » (`veto` ou
@@ -361,8 +398,10 @@ private fun verdictProbeLine(
     veto: Boolean,
     verdict: CrossingVerdict,
     silent: Boolean,
+    onBlocked: () -> Unit,
 ) {
     if (!BuildConfig.DEBUG) return
+    if (verdict == CrossingVerdict.DontCross) onBlocked()
     val nowMs = System.currentTimeMillis()
     if (nowMs - lastVerdictProbeMs < 2000L) return
     lastVerdictProbeMs = nowMs

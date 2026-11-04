@@ -1,5 +1,6 @@
 package dev.sam3vision.app.isee
 
+import dev.sam3vision.core.crossing.CrossingPrompts
 import dev.sam3vision.core.crossing.CrossingState
 import dev.sam3vision.core.crossing.CrossingVerdict
 import dev.sam3vision.core.distance.DistanceReading
@@ -59,10 +60,14 @@ class CrossingSweepVideoTest {
         }
 
     /** Rejoue [name] dans le veto puis le moteur, dans l'ordre de `computeRest`. */
-    private fun replay(name: String, scene: (Long, LiveFrame) -> LiveFrame = { _, frame -> frame }): List<Step> {
+    private fun replay(
+        name: String,
+        light: (LiveFrame) -> CrossingLight = { CrossingLight(null, CrossingState.Red) },
+        scene: (Long, LiveFrame) -> LiveFrame = { _, frame -> frame },
+    ): List<Step> {
         val veto = TraverseVeto()
         val engine = CrossingVerdictEngine(
-            readLight = { _, _ -> CrossingLight(null, CrossingState.Red) },
+            readLight = { frame, _ -> light(frame) },
             poster = CrossingVerdictPoster { _, _, _ -> true },
         )
         return load(name).map { timed ->
@@ -121,9 +126,9 @@ class CrossingSweepVideoTest {
     fun `voiture qui roule pendant le balayage - Don't cross, dans les deux sens`() {
         for ((name, camera) in listOf(slow to 0.10f, fast to 0.20f)) {
             for (speed in listOf(-0.4f, -0.2f, -0.1f, 0.1f, 0.2f, 0.4f)) {
-                val steps = replay(name) { atMs, frame ->
+                val steps = replay(name, scene = { atMs, frame ->
                     if (atMs < 2_000L) frame else withCar(frame, 0.35f + speed * (atMs - 2_000L) / 1000f - sweep(atMs, camera))
-                }
+                })
                 val driving = steps.filter { it.atMs in 3_000L..4_000L }
                 assertTrue(driving.isNotEmpty())
                 assertTrue("$name à $speed", driving.all { it.verdict == CrossingVerdict.DontCross })
@@ -134,10 +139,10 @@ class CrossingSweepVideoTest {
     @Test
     fun `garee qui demarre en plein balayage - Don't cross en 1,2 s, comme camera posee`() {
         for ((name, camera) in listOf(fixed to 0f, slow to 0.10f, fast to 0.20f)) {
-            val steps = replay(name) { atMs, frame ->
+            val steps = replay(name, scene = { atMs, frame ->
                 val running = (atMs - 4_000L).coerceAtLeast(0L) / 1000f
                 withCar(frame, 0.35f + 0.125f * running * running - sweep(atMs, camera))
-            }
+            })
             val parked = steps.filter { it.atMs in 2_500L..3_900L }
             assertTrue("$name : garée", parked.all { it.verdict == CrossingVerdict.Cross })
             val first = steps.first { it.atMs >= 4_000L && it.verdict == CrossingVerdict.DontCross }
@@ -147,16 +152,44 @@ class CrossingSweepVideoTest {
 
     @Test
     fun `voiture qui passe, balayage lent - Don't cross tant qu elle est la`() {
-        val steps = replay("samsung-voiture-passe.json") { atMs, frame ->
+        val steps = replay("samsung-voiture-passe.json", scene = { atMs, frame ->
             val shift = sweep(atMs, 0.10f) * frame.width
             LiveFrame(frame.width, frame.height, 0L, frame.objects.map { item ->
                 val box = item.box
                 SegObject(item.label, item.score, listOf(box[0] + shift, box[1], box[2] + shift, box[3]).clamped(frame.width), "")
             })
-        }
+        })
         val passing = steps.filter { it.atMs in 1_000L..2_200L }
         assertTrue(passing.isNotEmpty())
         assertTrue(passing.all { it.verdict == CrossingVerdict.DontCross })
+    }
+
+    /** Boîte de feu de la frame, sans lampe lue : ce que le filtre voit d'un fantôme. */
+    private fun unlitLight(frame: LiveFrame): CrossingLight =
+        CrossingLight(CrossingPrompts.selectLightBoxes(frame.objects, frame.width, frame.height).firstOrNull(), CrossingState.Red, redProven = false)
+
+    @Test
+    fun `passage sans feu, boites fantomes - Cross tenu`() {
+        for (name in listOf(fixed, slow, fast)) {
+            val steps = replay(name, light = ::unlitLight).settled()
+            val crossing = steps.count { it.verdict == CrossingVerdict.Cross }
+            assertTrue("$name : $crossing frames sur ${steps.size}", crossing * 100 >= steps.size * 90)
+        }
+    }
+
+    @Test
+    fun `vrai feu sans lampe lue - Don't cross des la troisieme frame`() {
+        for (name in listOf("samsung-voiture-passe.json", "samsung-voiture-loin.json", "rue-arret-camera-lente.json")) {
+            val steps = replay(name, light = ::unlitLight)
+            assertEquals(name, emptyList<CrossingVerdict>(), steps.drop(2).map { it.verdict }.filter { it != CrossingVerdict.DontCross })
+        }
+    }
+
+    @Test
+    fun `lampe rouge lue - Don't cross des la premiere frame`() {
+        val steps = replay(fixed, light = { frame -> unlitLight(frame).copy(redProven = true) })
+        val first = steps.first { step -> step.atMs >= 5_000L }
+        assertEquals("boîte à 5 s, lampe lue : rouge immédiat", CrossingVerdict.DontCross, first.verdict)
     }
 
     private fun List<Float>.clamped(width: Int): List<Float> =
