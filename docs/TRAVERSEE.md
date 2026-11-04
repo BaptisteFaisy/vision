@@ -234,6 +234,12 @@ Terrain du 04/11, passage **sans aucun feu** (confirmé par le user), build
   donc le filtre. Sur le terrain suivant (`1.0.1929`, voitures garées, sans feu),
   9 rafales de doute sur 10 venaient de lui, sans aucune boîte SAM à moins de 7 s :
   121 frames bloquées sur 215. Il porte maintenant sa vraie lecture de rouge.
+- **Repli haut-de-poteau, lecture trop faible** : `hasRedLamp` se contente de 2 % de
+  pixels rouges. Terrain `1.0.1932`, sans feu (aucune des 22 lignes `sonde` n'en
+  affiche) : 84 frames `Red` et 110 `Unknown` sur 265 bloquées, jusqu'à 9 frames
+  rouges de suite. Seul, le repli doit tenir 15 frames (~1,5 s) pour créer un feu.
+  Une boîte SAM reste immédiate, un feu confirmé se prolonge par le repli, le vert
+  ne change pas, et une vraie lampe sur un poteau finit par bloquer (ordre du 31/10).
 - **Reste à mesurer** : les autres blocages de ce terrain (veto et mouvement), sur
   des frames dont les boîtes sautent d'un bout à l'autre de l'image en 100 ms. La
   ligne debug `ISEE_CROSS` les donne à chaque frame bloquée.

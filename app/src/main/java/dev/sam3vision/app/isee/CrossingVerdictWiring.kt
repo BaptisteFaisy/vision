@@ -172,14 +172,14 @@ class CrossingVerdictEngine(
         // la phrase, jamais avant elle.
         val haptic = if (!silent && cue != null && felt != verdict) overlay else null
         if (!silent && cue != null) felt = verdict
-        verdictProbeLine(read.box != null, evidence, light, recent, carVeto, verdict, silent) { blockedProbeLine(frame, light, moving, recent, carVeto, parked) }
+        verdictProbeLine(read.box != null, evidence, light, recent, carVeto, verdict, silent) { blockedProbeLine(frame, light, read.poleOnly, moving, recent, carVeto, parked) }
         return CrossingVerdictFrame(posts, verdict, light, moving, overlay, haptic, carVeto, recent)
     }
 
     /** Boîte fantôme ([LightGhostGate]) : la frame se lit comme une frame sans boîte. */
     private fun withoutGhost(read: CrossingLight): CrossingLight {
         val lampRead = read.redProven || read.state == CrossingState.Green
-        val real = ghosts.admits(read.box != null, lampRead)
+        val real = ghosts.admits(read.box != null, lampRead, poleOnly = read.poleOnly && read.state != CrossingState.Green)
         return if (real || read.box == null) read else CrossingLight(null, CrossingState.Red)
     }
 
@@ -368,6 +368,7 @@ private var lastVerdictProbeMs = 0L
 private fun blockedProbeLine(
     frame: LiveFrame,
     light: CrossingVerdictLight,
+    poleOnly: Boolean,
     moving: Boolean,
     recent: Boolean,
     veto: Boolean,
@@ -380,7 +381,7 @@ private fun blockedProbeLine(
         .joinToString(";") { "${it.label}/${(it.score * 100).toInt()}/${it.box.map(Float::toInt)}" }
     android.util.Log.d(
         "ISEE_CROSS",
-        "bloque feu=$light roule=$moving recent=$recent veto=$veto vehicules=${vehicles.size} libres=[$free]",
+        "bloque feu=$light poteau=$poleOnly roule=$moving recent=$recent veto=$veto vehicules=${vehicles.size} libres=[$free]",
     )
 }
 

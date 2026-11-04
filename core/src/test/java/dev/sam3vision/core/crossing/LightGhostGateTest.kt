@@ -53,4 +53,28 @@ class LightGhostGateTest {
         gate.reset()
         assertFalse(gate.admits(sawBox = true, lampRead = false))
     }
+
+    @Test
+    fun `repli poteau seul - un faux rouge de 9 frames ne fait pas un feu`() {
+        val gate = LightGhostGate()
+        repeat(3) {
+            repeat(9) { assertFalse(gate.admits(sawBox = true, lampRead = true, poleOnly = true)) }
+            assertFalse(gate.admits(sawBox = false, lampRead = false))
+        }
+    }
+
+    @Test
+    fun `repli poteau qui tient - une vraie lampe finit par bloquer`() {
+        val gate = LightGhostGate()
+        repeat(LightGhostGate.POLE_CONFIRM_FRAMES - 1) { assertFalse(gate.admits(sawBox = true, lampRead = true, poleOnly = true)) }
+        assertTrue(gate.admits(sawBox = true, lampRead = true, poleOnly = true))
+    }
+
+    @Test
+    fun `feu confirme par une boite SAM - le repli poteau le prolonge`() {
+        val gate = LightGhostGate()
+        gate.admits(sawBox = true, lampRead = true)
+        gate.admits(sawBox = false, lampRead = false)
+        assertTrue(gate.admits(sawBox = true, lampRead = true, poleOnly = true))
+    }
 }
