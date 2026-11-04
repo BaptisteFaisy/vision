@@ -128,7 +128,7 @@ interface SpeechClient {
 
 /**
  * Pictogramme (Meta Muse Image) : la photo JPEG d'un objet -> son picto PNG.
- * [hint] est le nom donné par l'aidant (`""` = objet principal centré).
+ * [hint] est le nom parlé (`""` = objet principal centré).
  * [Result.failure] avec une [ApiError] typée sur échec (clé, 402, réseau, parsing).
  */
 interface PictoImageClient {
