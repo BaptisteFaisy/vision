@@ -11,6 +11,22 @@ ramène déjà (label + boîte + masque). Une frame sans objet calibré n'affich
 Transport du direct : **WebSocket `/live/ws` uniquement** (`LIVE_WS_PATH`, `core/…/net/WsTransport.kt:35` ; voir `docs/TESTING.md`) — sans effet sur
 le calcul de distance, qui ne voit que la frame décodée.
 
+## Profondeur serveur : elle affine, elle ne contredit pas (04/11)
+
+Le serveur calcule une carte sur 8 et répète ses médianes **par rang** (`FAST_DEPTH_EVERY`,
+`attach_cached_medians`), alors que les objets sont triés par score : l'objet recevait la proximité
+d'un autre, et ces paires fausses calibraient toute la frame. Relevé sur le Samsung le 04/11 : une
+même personne lue 5 m puis 30 m d'une frame à l'autre, facteur médian 5 sous 4 m. Deux gardes côté
+téléphone, sans redéploiement :
+
+- `DepthCarry` reconnaît une frame répétée (mêmes valeurs au même rang) et rend à chaque objet la
+  proximité de son voisin de même nom dans la dernière vraie carte ; sans voisin, sténopé seul.
+- `DepthReadings.contradicts` : une boîte mesurée garde sa distance si la profondeur s'en écarte de
+  plus de `MAX_DISAGREEMENT` (1,5). Un repli bas-au-contact ne fait pas barrage.
+
+Reste à faire côté serveur : répéter par boîte plutôt que par rang. `TraversePipeline` lit encore
+`serverCloseness` directement, donc la traversée n'a pas `DepthCarry`.
+
 ## La mesure : sténopé sur hauteur réelle connue
 
 ```

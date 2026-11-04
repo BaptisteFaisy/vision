@@ -34,6 +34,9 @@ object DepthReadings {
      */
     const val MIN_ERODED_SIDE_PX = 4f
 
+    /** Écart (facteur) au-delà duquel la profondeur contredit une boîte mesurée : elle ne remplace plus. */
+    const val MAX_DISAGREEMENT = 1.5f
+
     fun boxCloseness(
         depth: DepthMap,
         box: List<Float>,
@@ -326,13 +329,23 @@ object DepthReadings {
         if (closeness != null && cal != null) {
             meters = toMeters(closeness, cal)
         }
-        if (meters != null) {
+        if (meters != null && !contradicts(meters, base)) {
             val id = base?.trackId ?: DistanceMeter.UNTRACKED_ID
             // La confiance du sténopé traverse : les mètres viennent de la profondeur,
             // calibrée par ces mêmes ancres — pas une certitude neuve.
             return DistanceReading(id, detection.label, meters, meters, detection.box, base?.confidence ?: 1f)
         }
         return base
+    }
+
+    /**
+     * Vrai si [meters] contredit une mesure directe de la boîte : la taille d'une boîte
+     * entière ne ment pas d'un facteur [MAX_DISAGREEMENT], une calibration si (5 m lus
+     * 30 m sur le Samsung, le 04/11). Un repli bas-au-contact ne juge rien : il biaise loin.
+     */
+    private fun contradicts(meters: Float, base: DistanceReading?): Boolean {
+        val direct = base?.takeUnless { it.cutFallback }?.meters?.takeIf { it.isFinite() && it > 0f } ?: return false
+        return maxOf(meters, direct) > MAX_DISAGREEMENT * minOf(meters, direct)
     }
 
     /** Proximité → mètres ; `null` si hors bornes (jamais borné déguisé, comme [Pinhole]). */

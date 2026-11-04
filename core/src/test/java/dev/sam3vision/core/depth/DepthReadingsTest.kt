@@ -4,6 +4,7 @@ import dev.sam3vision.core.distance.DistanceReading
 import dev.sam3vision.core.model.Detection
 import dev.sam3vision.core.model.SegObject
 import org.junit.Assert.assertEquals
+import org.junit.Assert.assertNotEquals
 import org.junit.Assert.assertFalse
 import org.junit.Assert.assertNull
 import org.junit.Assert.assertTrue
@@ -172,6 +173,45 @@ class DepthReadingsTest {
         val noise = SegObject("bruit", 0.3f, listOf(3f, 3f, 4f, 4f), "", depth = Float.NaN)
         val close = DepthReadings.serverCloseness(listOf(person, ghost, noise))
         assertEquals(mapOf(person.box to 0.8f), close)
+    }
+
+    @Test
+    fun `une calibration folle ne remplace plus une boite mesuree`() {
+        val near = Detection("personne", 0.9f, listOf(0f, 0f, 49f, 99f), 100, 100)
+        val far = Detection("personne", 0.9f, listOf(50f, 0f, 99f, 99f), 100, 100)
+        val pinhole = listOf(
+            DistanceReading(1, "personne", 5f, 5f, near.box),
+            DistanceReading(2, "personne", 30f, 30f, far.box),
+        )
+        val close = mapOf(near.box to 0.5f, far.box to 0.5f)
+        val out = DepthReadings.refineWithCloseness(listOf(near, far), pinhole, close)
+        assertEquals("5 m lus 17 m : la boîte reste", 5f, out[0].meters, 0.001f)
+    }
+
+    @Test
+    fun `la profondeur affine toujours quand elle reste dans la mesure`() {
+        val first = Detection("personne", 0.9f, listOf(0f, 0f, 49f, 99f), 100, 100)
+        val second = Detection("personne", 0.9f, listOf(50f, 0f, 99f, 99f), 100, 100)
+        val pinhole = listOf(
+            DistanceReading(1, "personne", 2f, 2f, first.box),
+            DistanceReading(2, "personne", 3f, 3f, second.box),
+        )
+        val close = mapOf(first.box to 0.8f, second.box to 0.5f)
+        val out = DepthReadings.refineWithCloseness(listOf(first, second), pinhole, close)
+        assertNotEquals(2f, out[0].meters, 0.001f)
+    }
+
+    @Test
+    fun `un repli bas au contact ne fait pas barrage a la profondeur`() {
+        val cut = Detection("personne", 0.9f, listOf(0f, 0f, 49f, 99f), 100, 100)
+        val anchor = Detection("personne", 0.9f, listOf(50f, 0f, 99f, 99f), 100, 100)
+        val pinhole = listOf(
+            DistanceReading(1, "personne", 10f, 10f, cut.box, cutFallback = true),
+            DistanceReading(2, "personne", 3f, 3f, anchor.box),
+        )
+        val close = mapOf(cut.box to 0.5f, anchor.box to 0.5f)
+        val out = DepthReadings.refineWithCloseness(listOf(cut, anchor), pinhole, close)
+        assertEquals(3f, out[0].meters, 0.01f)
     }
 
     @Test

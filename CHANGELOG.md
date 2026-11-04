@@ -10,6 +10,14 @@ livré et ses preuves (tâche, fichiers, chiffres) dans l'arbre.
 - **Fait** : `LightGhostGate` exige 3 frames de suite d'une boîte sans lampe lue. Une lampe lue compte tout de suite, un feu confirmé reparle en une frame. Ligne debug `ISEE_CROSS` à chaque frame bloquée.
 - **Preuves** : fantômes 2 frames au plus (scores 0,36 à 0,67), vrais feux 93 frames sur 93. `LightGhostGateTest`, `CrossingSweepVideoTest`, `docs/TRAVERSEE.md` § 21. Dans la rue : non mesuré. Les blocages `roule=true` du même terrain restent à expliquer.
 
+## 2026-11-04 — iSee : distances stables et plus de voix contraire pendant l'esquive (branche `fix/isee-ecart-stable`)
+
+- **Demande** : « cela n'esquive pas avec droite et gauche les obstacles, donc humain, barrière, poteau, murs » (ordre user du 04/11, après essai de `1.0.1928-e0690c8`).
+- **Constat sur le Samsung** (logcat 16:15, 56 s) : 29 changements de côté, un toutes les 0,8 s ; 21 entre deux voix différentes ; 158 mots de côté jetés dont 46 écrasés par l'alignement du passage. Une même personne lue 5 m puis 30 m d'une frame à l'autre, facteur médian 5 sous 4 m.
+- **Cause racine** : le serveur répète ses médianes de profondeur par rang (1 carte sur 8) alors que l'ordre des objets change ; le téléphone les prenait pour vraies et remplaçait le sténopé. L'écart de `ClearPath` se calcule sur ces mètres : le côté suivait le bruit.
+- **Fait** : `DepthCarry` rend chaque proximité à son objet, `DepthReadings.contradicts` garde la boîte mesurée au-delà d'un facteur 1,5, l'alignement du passage se tait pendant un ordre d'écart hors Traversée, le repli du guetteur suit la règle plein axe à droite. Aucune tenue de côté (ordre du 03/11). Journal `HazardVoice` : `juge=` donne le côté du chemin.
+- **Preuves** : `DepthCarryTest` (poteau à 8 m lu 1,5 m par rang, 8 m par boîte), `DepthReadingsTest`, `CrossingLateralTest`, `HazardWatchTest`. Pas de rejeu de bout en bout sur une vraie marche : aucune vidéo de marche capturée, le `logcat` n'a ni boîtes ni proximités. La preuve reste à faire en rue, `HazardVoice` dira si les mètres tiennent.
+
 ## 2026-11-04 — iSee : un seul juge de l'écart latéral (branche `fix/isee-ecart-obstacles`)
 
 - **Demande** : « il ne s'écarte pas bien des objets, donc murs, barrière, humain, poteau » (ordre user du 04/11).

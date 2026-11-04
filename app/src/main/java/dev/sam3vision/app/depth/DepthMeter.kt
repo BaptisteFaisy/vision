@@ -1,6 +1,7 @@
 package dev.sam3vision.app.depth
 
 import android.util.Log
+import dev.sam3vision.core.depth.DepthCarry
 import dev.sam3vision.core.depth.DepthReadings
 import dev.sam3vision.core.distance.DistanceReading
 import dev.sam3vision.core.model.LiveFrame
@@ -15,7 +16,7 @@ interface DepthMeter {
     /** Lectures affinées par la profondeur, ou le sténopé tel quel. */
     fun readingsFor(frame: LiveFrame, pinhole: List<DistanceReading>): List<DistanceReading>
 
-    /** Oublie tout état de séance (aucun aujourd'hui : la profondeur est celle de la frame). */
+    /** Oublie tout état de séance : la dernière carte de profondeur ne vaut plus. */
     fun reset()
 }
 
@@ -24,15 +25,17 @@ interface DepthMeter {
  * et chaque réponse porte la proximité de ses objets (`SegObject.depth`, 0..1,
  * grand = proche). Aucune inférence sur le téléphone — la carte monoculaire
  * (Depth Anything V2 Small) tourne sur le GPU Modal, une fois par 8 frames, et
- * le serveur répète ses médianes entre deux : `refineStatusWithCloseness` les
- * remet en mètres. Réponse sans médiane (backend sans modèle, ancien backend) :
+ * le serveur répète ses médianes entre deux, par rang : [DepthCarry] les rend à
+ * leur objet, `refineStatusWithCloseness` les remet en mètres. Réponse sans médiane (backend sans modèle, ancien backend) :
  * le sténopé passe tel quel, jamais d'erreur. Un objet DEPTH_ONLY resté sans
  * distance est journalisé (`Log.w`, cause incluse), jamais tu.
  */
 object ServerDepthMeter : DepthMeter {
+    private val carry = DepthCarry()
+
     override fun readingsFor(frame: LiveFrame, pinhole: List<DistanceReading>): List<DistanceReading> {
         return try {
-            val closeness = DepthReadings.serverCloseness(frame.objects)
+            val closeness = carry.onFrame(frame.objects, frame.width, frame.height)
             if (closeness.isEmpty()) {
                 pinhole
             } else {
@@ -51,5 +54,5 @@ object ServerDepthMeter : DepthMeter {
         }
     }
 
-    override fun reset() = Unit
+    override fun reset() = carry.reset()
 }

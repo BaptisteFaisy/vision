@@ -29,7 +29,7 @@ internal fun hazardVoiceLine(
     }
     return line.append("] signal=").append(signal.detected).append('/').append(signal.meters)
         .append("m/").append(signal.label).append("/cx=").append(signal.centerX)
-        .append(" phrase=").append(phrase)
+        .append(" juge=").append(signal.side).append(" phrase=").append(phrase)
         .toString()
 }
 
