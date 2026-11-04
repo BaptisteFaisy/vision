@@ -219,8 +219,8 @@ fun drainBackendPools() {
     runCatching { liveSharedClient.connectionPool.evictAll() }
 }
 
-/** Réponse HTTP brute. */
-internal data class HttpOutcome(val code: Int, val body: String)
+/** Réponse HTTP brute. [url] = requête source, pour nommer l'endpoint dans les erreurs. */
+internal data class HttpOutcome(val code: Int, val body: String, val url: String = "")
 
 /**
  * Corps JSON **non rejouable** : OkHttp ne relance jamais un POST dont le corps est déjà
@@ -355,7 +355,10 @@ private suspend fun <T> ioResult(block: () -> T): Result<T> =
  * la capture et le rendu.
  */
 internal suspend fun OkHttpClient.executeBuilt(build: () -> Request): Result<HttpOutcome> =
-    ioResult { newCall(build()).execute().use { HttpOutcome(it.code, it.body?.string().orEmpty()) } }
+    ioResult {
+        val request = build()
+        newCall(request).execute().use { HttpOutcome(it.code, it.body?.string().orEmpty(), request.url.toString()) }
+    }
 
 /** Exécute une requête déjà construite hors du thread principal. */
 internal suspend fun OkHttpClient.execute(request: Request): Result<HttpOutcome> =
@@ -417,7 +420,8 @@ internal suspend fun OkHttpClient.executeBytesBuilt(
     marks: WireMarks? = null,
     build: () -> Request,
 ): Result<ByteArray> = ioResult {
-    newCall(build()).execute().use { response ->
+    val request = build()
+    newCall(request).execute().use { response ->
         marks?.onHeaders()
         val bytes = response.body?.bytes() ?: ByteArray(0)
         marks?.onBody()
@@ -425,7 +429,7 @@ internal suspend fun OkHttpClient.executeBytesBuilt(
             bytes
         } else {
             // Levée ApiError : reprise telle quelle par ioResult.
-            throw httpError(response.code, bytes.toString(Charsets.UTF_8))
+            throw httpError(response.code, bytes.toString(Charsets.UTF_8)).withSource(request.url.toString())
         }
     }
 }
@@ -435,7 +439,7 @@ internal suspend fun OkHttpClient.executeBytes(request: Request): Result<ByteArr
 
 /** Vérifie un code 2xx, sinon renvoie l'erreur typée correspondante. */
 internal fun HttpOutcome.requireSuccess(): Result<String> =
-    if (code in 200..299) Result.success(body) else Result.failure(httpError(code, body))
+    if (code in 200..299) Result.success(body) else Result.failure(httpError(code, body).withSource(url))
 
 /** Enveloppe un bloc qui lève [ApiError] (ou autre) en `Result`. */
 internal inline fun <R> catchingResult(block: () -> R): Result<R> =

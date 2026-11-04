@@ -31,6 +31,19 @@ fun GpuRegionSettings(draft: Settings, gpu: GpuStatus, onChange: (Settings) -> U
             fontWeight = FontWeight.SemiBold,
         )
         RegionButtons(draft, onChange)
+        if (SamRegion.isStaleManualUrl(draft.samBaseUrl)) {
+            Text(
+                "Manual SAM URL — not a region preset, it overrides the choice above.",
+                color = SettingsLight.danger,
+                fontSize = 11.sp,
+            )
+            GlassButton(
+                label = "Use ${draft.samRegion.code} preset",
+                enabled = true,
+                primary = false,
+                onClick = { onChange(draft.copy(samBaseUrl = "")) },
+            )
+        }
         Text(
             gpuStatusLine(gpu),
             color = SettingsLight.text,

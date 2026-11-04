@@ -121,4 +121,25 @@ class SamRegionTest {
         )
         assertEquals(SamRegion.Us.presetBaseUrl, us)
     }
+
+    @Test
+    fun `une url manuelle hors preset est signalee perimee`() {
+        assertTrue(SamRegion.isStaleManualUrl("https://mon-serveur.test/live"))
+        assertTrue(SamRegion.isStaleManualUrl("  https://mon-serveur.test/live/  "))
+        assertFalse(SamRegion.isStaleManualUrl(""))
+        assertFalse(SamRegion.isStaleManualUrl("   "))
+        assertFalse(SamRegion.isStaleManualUrl(SamRegion.Eu.presetBaseUrl))
+        assertFalse(SamRegion.isStaleManualUrl(SamRegion.Us.presetBaseUrl))
+        assertFalse(SamRegion.isStaleManualUrl("https://baptiste-faisy--sam3-eu-a100-sam3live-web.eu-west.modal.run"))
+    }
+
+    @Test
+    fun `le diagnostic nomme le code region ou l hote`() {
+        assertEquals("EU", SamRegion.describeEndpoint(SamRegion.Eu.presetBaseUrl))
+        assertEquals("US", SamRegion.describeEndpoint("  ${SamRegion.Us.presetBaseUrl}/  "))
+        assertEquals("mon-serveur.test", SamRegion.describeEndpoint("https://mon-serveur.test/live"))
+        assertEquals("127.0.0.1:8080", SamRegion.describeEndpoint("http://127.0.0.1:8080/health"))
+        assertEquals("", SamRegion.describeEndpoint(""))
+        assertEquals("", SamRegion.describeEndpoint("   "))
+    }
 }

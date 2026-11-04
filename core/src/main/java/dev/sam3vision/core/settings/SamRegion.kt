@@ -63,6 +63,29 @@ enum class SamRegion(
             return entries.any { it.presetBaseUrl.trimEnd('/') == clean } ||
                 RETIRED_PRESETS.any { it.trimEnd('/') == clean }
         }
+
+        /**
+         * Vrai si [url] est une saisie manuelle qui ne suit aucun preset : elle ne migre
+         * jamais d'elle-même (ni changement de région, ni nouveau workspace) et gagne sur
+         * tout — une URL périmée ici appelle un backend mort alors qu'une carte tourne
+         * ailleurs. Les Réglages la signalent avec un retour au preset en un tap.
+         */
+        fun isStaleManualUrl(url: String): Boolean {
+            val clean = url.trim()
+            return clean.isNotEmpty() && !isPreset(clean)
+        }
+
+        /**
+         * Ce que le diagnostic nomme pour [url] : le code région (« EU », « US ») quand
+         * c'est un preset actuel, sinon l'hôte nu (une URL manuelle se reconnaît à son
+         * hôte, pas à un code). Vide quand il n'y a rien à nommer.
+         */
+        fun describeEndpoint(url: String): String {
+            val clean = url.trim().trimEnd('/')
+            if (clean.isEmpty()) return ""
+            entries.firstOrNull { it.presetBaseUrl.trimEnd('/') == clean }?.let { return it.code }
+            return clean.substringAfter("://").substringBefore("/").trim()
+        }
     }
 }
 
