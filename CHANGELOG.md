@@ -13,6 +13,31 @@ livré et ses preuves (tâche, fichiers, chiffres) dans l'arbre.
   - `GlassesController` : le collecteur d'erreurs passe par l'ouvreur (1 ligne, le dit reste identique).
 - **Preuves** : 8 tests JVM nouveaux (séquence 3×retrying→refus, cause nommée, écho non-écrasant, fatal rapide+établi, reset `open()`, texte avec/sans cause, fatalité) — **non lancés ici** (pas de toolchain sur le poste, r630 injoignable le 04/11/2026) : la CI de la PR les lancera. Garde `check-kotlin-limits` OK (contrôleur 499/500).
 - **Reste** : recette téléphone + `logcat -s GlassesChain` pour la cause racine du cut (piste : état DAT/Meta AI du Xiaomi).
+## 2026-11-04 — iSee : le passage piéton passe premier des annonces dehors (branche `crosswalk-prio-top`)
+
+- **Demande** : « le fait de dire passage piéton n'est pas assez prioritaire
+  dans l'ordre des choses dites » — le mettre tout en haut en mode normal,
+  pas en Traversée ; parole du user intacte (ordre user du 04/11/2026).
+- **Fait** :
+  - Échelle dehors : passage piéton 8 → **2**, premier des annonces ;
+    humains 3, rappel GPS 4, grillages/murs/barrières 5, bordures 6,
+    escaliers 7, poteaux/divers 8 (`OutdoorLevel`, niveaux core miroirs,
+    humain dedans 2 → 3 pour garder « même cran que dehors »).
+  - Comportement : le passage bat tous les niveaux de scène (frame +
+    bus) ; la parole du user (1) le tait toujours, tour rendu ;
+    Traversée (100-102) inchangée.
+  - Docs : `VOIX-DANGER` §§ 1-5 + §§ 35-46, `TRAVERSEE`, `RECETTE-RUE`,
+    `GUIDAGE-TOUT-DROIT`, `AGENTS.md` § 1 bis (registre § 9 et
+    `REVUE-V4` : instantanés datés, volontairement inchangés).
+- **Preuves** : gardes locales vertes (`check-kotlin-limits`,
+  `check-test-globals`, `check-isee-clips-en`, `check-isee-design`,
+  `check-voice-nav-doc`, `check-voicepack`, `check-masques`,
+  `check-ws-runbook`, `check-apk-keys`, `check-budget-derive`,
+  `scripts/test_scripts.sh` 230/230) ; nouveau `CrosswalkFirstTest`
+  (frame + bus + parole user) ; suite `:core` + `:app` : verdict CI
+  sur la PR (r630 injoignable le 04/11, Tailscale hors ligne — tests
+  non rejoués depuis ce poste).
+- **Reste** : écoute rue (ordre des phrases sur un vrai passage).
 
 ## 2026-11-04 — iSee : le passage piéton s'annonce à 4 m réels (branche `fix/crosswalk-annonce-4m`)
 

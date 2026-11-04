@@ -14,33 +14,33 @@ package dev.sam3vision.core.live
  *
  * Table de la spec (clé = durée) :
  * - `car-moving` = 4 s (niveau 0, voitures en mouvement < 20 m) ;
- * - `human-soft` = 2 s (niveau 2, humains) ;
- * - `human-imminent` = immédiat hors table (niveau 2, mot continu : dit toujours) ;
- * - `pole-avoid` = immédiat hors table (niveau 7, mot continu : dit toujours) ;
- * - `gps-reminder` = sans antirépétition (niveau 3, rappel aux 15 s de silence) ;
+ * - `human-soft` = 2 s (niveau 3, humains) ;
+ * - `human-imminent` = immédiat hors table (niveau 3, mot continu : dit toujours) ;
+ * - `pole-avoid` = immédiat hors table (niveau 8, mot continu : dit toujours) ;
+ * - `gps-reminder` = sans antirépétition (niveau 4, rappel aux 15 s de silence) ;
  * - `fence` = 4 s (trou de grillage — le doux dangers est supprimé, ordre user du 03/11) ;
- * - `fence-avoid` = immédiat hors table (niveau 4, mot continu clôture/barrière) ;
- * - `misc-avoid` = immédiat hors table (niveau 7, mot continu divers) ;
- * - `curb` = 2 s (niveau 5, bordures < 6 m) ;
- * - `curb-up` = immédiat hors table (niveau 5, boucle montée < 1 m) ;
- * - `stairs` = 2 s (niveau 6, escaliers : annonce, montée ; jalons :
+ * - `fence-avoid` = immédiat hors table (niveau 5, mot continu clôture/barrière) ;
+ * - `misc-avoid` = immédiat hors table (niveau 8, mot continu divers) ;
+ * - `curb` = 2 s (niveau 6, bordures < 6 m) ;
+ * - `curb-up` = immédiat hors table (niveau 6, boucle montée < 1 m) ;
+ * - `stairs` = 2 s (niveau 7, escaliers : annonce, montée ; jalons :
  *   `stairs:<palier>`, même durée, mémoire par palier) ;
- * - `stairs-count` = 1 s (niveau 6, compte des marches — ordre user du
+ * - `stairs-count` = 1 s (niveau 7, compte des marches — ordre user du
  *   02/11, VOIX-DANGER § 42) ;
  * - `pole` = 2 s (doux supprimé le 03/11, gardé pour compat de la table) ;
  * - `misc` = 2 s (doux supprimé le 03/11, gardé pour compat de la table) ;
- * - `crosswalk-announce` = 2 s (niveau 8, annonce du passage — le
+ * - `crosswalk-announce` = 2 s (niveau 2, annonce du passage — le
  *   « Devant » se répète toutes les 2 s hors Traversée, ordre user du
  *   02/11 ; les autres directions restent 1 fois par vue côté guetteur) ;
- * - `crosswalk-align` = au changement (niveau 8, alignement : pas de délai,
+ * - `crosswalk-align` = au changement (niveau 2, alignement : pas de délai,
  *   l'appelant n'appelle que quand l'alignement change) ;
- * - `crosswalk-arrival` = 1 fois (niveau 8, arrivée sur le passage) ;
+ * - `crosswalk-arrival` = 1 fois (niveau 2, arrivée sur le passage) ;
  * - `sidewalk` = 10 s (niveau 10, trottoirs) ;
  * - `verdict` = 2 s avec changement immédiat (traversée : le verdict
  *   nouveau parle tout de suite, voir les clés paramétrées ci-dessous).
  * - `find-found` = 2 s (dedans : trouvaille find, niveau 0 indoor).
  * - `door-wall` = 4 s (dedans : porte et murs, niveau 13).
- * GPS (niveaux 3, 11) et chat (niveau 9) : sans antirépétition — le chat
+ * GPS (niveaux 4, 11) et chat (niveau 9) : sans antirépétition — le chat
  * n'a pas de clé (reprise depuis la coupure, pas de redite).
  *
  * Clés paramétrées : `base:état` (ex. `verdict:cross`,
@@ -66,93 +66,93 @@ object AntiRepeat {
     /** Niveau 0 : voitures en mouvement < 20 m — 4 s entre deux annonces. */
     const val KEY_CAR_MOVING = "car-moving"
 
-    /** Niveau 2 : humains < 10 m (phrase + cadran + distance) — 2 s. */
+    /** Niveau 3 : humains < 10 m (phrase + cadran + distance) — 2 s. */
     const val KEY_HUMAN_SOFT = "human-soft"
 
     /**
-     * Niveau 2 : mot humain continu (0-15 m droit devant) — hors table,
+     * Niveau 3 : mot humain continu (0-15 m droit devant) — hors table,
      * toujours autorisé ([allow] ne mémorise rien pour cette clé).
      */
     const val KEY_HUMAN_IMMINENT = "human-imminent"
 
     /**
-     * Niveau 3 : rappel GPS (répète la dernière consigne + distance
+     * Niveau 4 : rappel GPS (répète la dernière consigne + distance
      * restante) — sans antirépétition, toujours autorisé.
      */
     const val KEY_GPS_REMINDER = "gps-reminder"
 
-    /** Niveau 4 : grillages + barrières < 6 m — 4 s (les murs disent `wall-avoid`, continu). */
+    /** Niveau 5 : grillages + barrières < 6 m — 4 s (les murs disent `wall-avoid`, continu). */
     const val KEY_FENCE = "fence"
 
-    /** Niveau 5 : bordures < 6 m — 2 s. */
+    /** Niveau 6 : bordures < 6 m — 2 s. */
     const val KEY_CURB = "curb"
 
     /**
-     * Niveau 5 : boucle « curb up » (montée < 1 m) — hors table, toujours
+     * Niveau 6 : boucle « curb up » (montée < 1 m) — hors table, toujours
      * autorisée ([allow] ne mémorise rien pour cette clé) : la cadence
      * vient du bus libre (`curbSpeaking`), pas d'un délai.
      */
     const val KEY_CURB_UP = "curb-up"
 
     /**
-     * Niveau 6 : escaliers (annonce, montée — le compte a sa clé) — 2 s.
+     * Niveau 7 : escaliers (annonce, montée — le compte a sa clé) — 2 s.
      * Jalons : clé paramétrée `stairs:<palier>` (2, 1, 0.5), même durée,
      * mémoire par palier (ils s'enchaînent en ~2 s à pied).
      */
     const val KEY_STAIRS = "stairs"
 
     /**
-     * Niveau 6 : compte des marches (« N marches. ») — 1 s (ordre user
+     * Niveau 7 : compte des marches (« N marches. ») — 1 s (ordre user
      * du 02/11). Clé paramétrée `stairs-count:<compte>` : le changement
      * parle aussitôt, le même compte attend 1 s.
      */
     const val KEY_STAIRS_COUNT = "stairs-count"
 
-    /** Niveau 7 : poteaux + mobilier vertical (lampadaire, panneau) < 6 m — 2 s. */
+    /** Niveau 8 : poteaux + mobilier vertical (lampadaire, panneau) < 6 m — 2 s. */
     const val KEY_POLE = "pole"
 
     /**
-     * Niveau 7 : mot poteau continu (0-15 m droit devant) — hors table,
+     * Niveau 8 : mot poteau continu (0-15 m droit devant) — hors table,
      * toujours autorisé ([allow] ne mémorise rien pour cette clé).
      */
     const val KEY_POLE_AVOID = "pole-avoid"
 
     /**
-     * Niveau 4 : mot mur continu (murs < 6 m dans le couloir) — hors table,
+     * Niveau 5 : mot mur continu (murs < 6 m dans le couloir) — hors table,
      * toujours autorisé ([allow] ne mémorise rien pour cette clé).
      */
     const val KEY_WALL_AVOID = "wall-avoid"
 
     /**
-     * Niveau 4 : mot continu clôture/barrière (< 6 m dans le couloir) — hors
+     * Niveau 5 : mot continu clôture/barrière (< 6 m dans le couloir) — hors
      * table, toujours autorisé (ordre user du 03/11 : esquive, plus de doux).
      */
     const val KEY_FENCE_AVOID = "fence-avoid"
 
     /**
-     * Niveau 7 : mot continu divers (mobilier, animal, poubelle… < 6 m dans
+     * Niveau 8 : mot continu divers (mobilier, animal, poubelle… < 6 m dans
      * le couloir) — hors table, toujours autorisé (ordre user du 03/11).
      */
     const val KEY_MISC_AVOID = "misc-avoid"
 
-    /** Niveau 7 : divers (animal, poubelle, souvenirs) < 6 m — 2 s. */
+    /** Niveau 8 : divers (animal, poubelle, souvenirs) < 6 m — 2 s. */
     const val KEY_MISC = "misc"
 
     /**
-     * Niveau 8 : annonce du passage piéton — 2 s (le « Devant » se répète
+     * Niveau 2 : annonce du passage piéton — 2 s (le « Devant » se répète
      * toutes les 2 s hors Traversée, ordre user du 02/11).
      */
     const val KEY_CROSSWALK_ANNOUNCE = "crosswalk-announce"
 
     /**
-     * Niveau 8 : alignement sur le passage — au changement (pas de délai :
+     * Niveau 2 : alignement sur le passage — au changement (pas de délai :
      * l'appelant n'appelle que quand l'alignement change, `crosswalk-align:état`
      * possible mais inutile puisque chaque appel passe).
      */
     const val KEY_CROSSWALK_ALIGN = "crosswalk-align"
 
     /**
-     * Niveau 8 : arrivée sur le passage — 1 fois (parle une fois, puis
+     * Niveau 2 : arrivée sur le passage — 1 fois (parle une fois, puis
      * silence jusqu'à [forget] ou [reset]).
      */
     const val KEY_CROSSWALK_ARRIVAL = "crosswalk-arrival"

@@ -19,7 +19,7 @@ import org.junit.Test
 import dev.sam3vision.core.speech.SpeechLanguage
 
 /**
- * La voix de la sonde (SPEC v4) : le stop part au bus niveau 4, les mots
+ * La voix de la sonde (SPEC v4) : le stop part au bus niveau 5, les mots
  * du guidage au repli 12 ; les émissions gardent l'arbitrage (répétition
  * douce identique en vol gardée, phrase fraîche dernier-gagnant, urgence
  * jamais annulée par une douce).
@@ -64,7 +64,7 @@ class ProbeWiringSpokenTest {
 
 
     @Test
-    fun `stop poste niveau 4 avec clip`() = runTest {
+    fun `stop poste niveau 5 avec clip`() = runTest {
         val scope = CoroutineScope(SupervisorJob() + StandardTestDispatcher(testScheduler))
         try {
             val probe = LiveProbe(scope = this, clock = { 0L }, background = StandardTestDispatcher(testScheduler))

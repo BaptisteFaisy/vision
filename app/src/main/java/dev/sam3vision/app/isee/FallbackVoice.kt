@@ -7,7 +7,7 @@ import dev.sam3vision.core.live.TwinLiteWord
  * Repli 12 (SPEC v4) : quand rien ne parle et que rien n'a parlé depuis
  * 300 ms, dit le mot de guidage courant (gauche, droite, tout droit — GPS +
  * obstacles). Les positions ne passent jamais ici (niveaux 2 et 7) ; le mot
- * stop non plus (niveau 4, blocage). Pur hors du bus, testé en JVM.
+ * stop non plus (niveau 5, blocage). Pur hors du bus, testé en JVM.
  */
 internal object FallbackVoice {
     /** Silence requis avant de parler (SPEC v4 : 300 ms). */

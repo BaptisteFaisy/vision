@@ -15,15 +15,16 @@ import dev.sam3vision.core.speech.IseeClipsEn
  * Échelle voix dehors SPEC v4 : 13 niveaux, le plus petit gagne —
  * l'écrasé n'est jamais redit sauf re-détecté actuel. 0 réservé (plus
  * aucun producteur dehors : les voitures ne parlent qu'en Traversée,
- * verdict 100 — ordre user du 02/11) ; 1 parole du user ; 2 humains
- * (< 10 m, phrase + cadran + distance, imminent 2 m ou moins = mot
- * immédiat) ; 3 rappel GPS (silence 15 s ou plus) ; 4 grillages, murs
- * et barrières (< 6 m) ; 5 bordures (< 6 m) ; 6 escaliers (jalons 2/1/0,5,
- * marches comptées) ; 7 poteaux, mobilier vertical et divers (< 6 m) ;
- * 8 passages piétons (annonce < 4 m) ; 9 réponses du chat ; 10 trottoirs ;
- * 11 manœuvres et événements GPS ; 12 repli (gauche, droite ou tout droit).
- * Les escaliers (6) coupent un mot de guidage en cours (11, 3), comme la
- * bordure (ordre user du 02/11/2026).
+ * verdict 100 — ordre user du 02/11) ; 1 parole du user ; 2 passages
+ * piétons (annonce < 4 m — premiers des annonces, ordre user du 04/11) ;
+ * 3 humains (< 10 m, phrase + cadran + distance, imminent 2 m ou moins =
+ * mot immédiat) ; 4 rappel GPS (silence 15 s ou plus) ; 5 grillages, murs
+ * et barrières (< 6 m) ; 6 bordures (< 6 m) ; 7 escaliers (jalons 2/1/0,5,
+ * marches comptées) ; 8 poteaux, mobilier vertical et divers (< 6 m) ;
+ * 9 réponses du chat ; 10 trottoirs ; 11 manœuvres et événements GPS ;
+ * 12 repli (gauche, droite ou tout droit). Les escaliers (7) coupent un
+ * mot de guidage en cours (11, 4), comme la bordure (ordre user du
+ * 02/11/2026).
  */
 object OutdoorLevel {
     /**
@@ -34,26 +35,26 @@ object OutdoorLevel {
     /** Parole du user : tait tout, seul le niveau 0 la coupe. */
     const val USER_SPEECH = 1
 
+    /** Passages piétons (annonce, alignement, arrivée) : premiers des annonces (ordre user du 04/11). */
+    const val CROSSWALK = 2
+
     /** Humains : phrase + cadran + distance, mot imminent immédiat. */
-    const val HUMAN = 2
+    const val HUMAN = 3
 
     /** Rappel GPS sur silence (dernière consigne + distance restante). */
-    const val GPS_REMINDER = 3
+    const val GPS_REMINDER = 4
 
     /** Grillages, murs et barrières. */
-    const val FENCE = 4
+    const val FENCE = 5
 
     /** Bordures. */
-    const val CURB = 5
+    const val CURB = 6
 
     /** Escaliers : jalons 2/1/0,5 + nombre de marches dit (coupent le guidage). */
-    const val STAIRS = 6
+    const val STAIRS = 7
 
     /** Poteaux, mobilier vertical (lampadaire, panneau) et divers. */
-    const val POLE = 7
-
-    /** Passages piétons (annonce, alignement, arrivée). */
-    const val CROSSWALK = 8
+    const val POLE = 8
 
     /** Réponses du chat (reprise depuis la coupure, seule file restante). */
     const val CHAT = 9
@@ -94,8 +95,8 @@ internal fun decideFrame(wishes: List<VoiceWish?>): VoiceWish? =
 
 /**
  * Vœu danger : transfère le niveau et la clé du guetteur ([HazardCue.level],
- * [HazardCue.antiRepeatKey] — personne 2, grillages/murs/barrières 4,
- * poteaux et divers 7, imminent déjà clé `human-imminent`) ; le mot imminent
+ * [HazardCue.antiRepeatKey] — personne 3, grillages/murs/barrières 5,
+ * poteaux et divers 8, imminent déjà clé `human-imminent`) ; le mot imminent
  * part en clip. En Traversée, la personne seule parle (niveau 101). Le doux
  * anglais part en séquence de clips ([DynamicClipChain.hazardWishClips],
  * objet + cadran, personne + distance) : sans elle, la porte GPS tait la
@@ -111,7 +112,7 @@ internal fun hazardWish(cue: HazardCue?, crossingActive: Boolean = false): Voice
 }
 
 /**
- * Vœu bordure : niveau 5 dehors, 102 en Traversée. Les anglaises à sens
+ * Vœu bordure : niveau 6 dehors, 102 en Traversée. Les anglaises à sens
  * connu (détection, compte à rebours : [DynamicClipChain.curbChain], sens
  * du signal + cadran lu dans la phrase) partent en séquence : sans elle,
  * la porte GPS tait la phrase (P1 silence — le texte, lui, est inchangé).
@@ -127,7 +128,7 @@ internal fun curbWish(cue: CurbCue?, crossingActive: Boolean = false): VoiceWish
 }
 
 /**
- * Vœu boucle « curb up » : niveau 5 dehors, clip [IseeClipsEn.CURB_UP]
+ * Vœu boucle « curb up » : niveau 6 dehors, clip [IseeClipsEn.CURB_UP]
  * (« Curb up. », pack anglais — zéro réseau, départ immédiat), clé
  * [AntiRepeat.KEY_CURB_UP] sans délai (la cadence vient du bus libre,
  * pas de la table). L'appelant ne poste que bus non tenu par une

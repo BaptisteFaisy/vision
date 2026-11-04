@@ -26,7 +26,7 @@ private class StairsFakeSpeaker : VoiceBusSpeaker {
 
 /**
  * Escaliers prioritaires (ordre user du 02/11/2026, VOIX-DANGER § 42 —
- * amende l'ordre du matin, § 40) : des escaliers en cours (niveau 6)
+ * amende l'ordre du matin, § 40) : des escaliers en cours (niveau 7)
  * vont au bout — tout le monde attend (niveau 0, humains, GPS,
  * grillages, bordures, chat, repli, Traversée) ; en retour les
  * escaliers parlent premiers à la fin du mot en cours, sans le couper
@@ -227,7 +227,7 @@ class StairsUncuttableTest {
         VoiceBus.onSpeechIdle()
 
         assertEquals(1, speaker.said.size)
-        // Le bus est rendu : le niveau 6 ne tait plus tout le monde.
+        // Le bus est rendu : le niveau 7 ne tait plus tout le monde.
         VoiceBus.post(OutdoorLevel.HUMAN, "Gauche.")
         assertEquals(2, speaker.said.size)
     }

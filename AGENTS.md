@@ -72,14 +72,15 @@ d'intégrer). Ce qui suit est un résumé opposable : en cas de conflit avec
 un doc pré-v4, la v4 gagne.
 
 - **Dehors 0-12** : 0 voitures en mouvement < 20 m (« Car. »/« Cars. »,
-  présence seule) ; 1 parole user (seul 0 la coupe) ; 2 humains < 10 m
-  (phrase + cadran + distance, ≤ 2 m = « Stop. » immédiat) ; 3 rappel GPS
-  (silence ≥ 15 s, consigne + distance restante) ; 4 grillages/murs/
-  barrières < 6 m ; 5 bordures < 6 m ; 6 escaliers (jalons 4/2/1 + marches
-  dites) ; 7 poteaux + mobilier + divers < 6 m ; 8 passages piétons < 6 m
-  (1 fois par vue / au changement / 1 fois) ; 9 chat (attente + reprise,
-  seule file) ; 10 trottoirs ; 11 GPS manœuvres ; 12 repli (silence
-  300 ms → gauche/droite/tout droit).
+  présence seule) ; 1 parole user (seul 0 la coupe) ; 2 passages piétons
+  < 4 m (1 fois par vue / au changement / 1 fois — premiers des annonces,
+  ordre user du 04/11) ; 3 humains < 10 m (phrase + cadran + distance,
+  ≤ 2 m = « Stop. » immédiat) ; 4 rappel GPS (silence ≥ 15 s, consigne +
+  distance restante) ; 5 grillages/murs/barrières < 6 m ; 6 bordures
+  < 6 m ; 7 escaliers (jalons 4/2/1 + marches dites) ; 8 poteaux +
+  mobilier + divers < 6 m ; 9 chat (attente + reprise, seule file) ;
+  10 trottoirs ; 11 GPS manœuvres ; 12 repli (silence 300 ms →
+  gauche/droite/tout droit).
 - **Écrasement** : le plus petit gagne, l'écrasé jamais redit sauf
   re-détecté actuel (chat : reprise).
 - **Traversée 100-102** : verdict (rouge ou voiture en mouvement =

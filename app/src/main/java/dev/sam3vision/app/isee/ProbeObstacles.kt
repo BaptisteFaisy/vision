@@ -64,7 +64,7 @@ internal fun LiveProbe.observeObstacles(
  * Une frame d'obstacles : les deux signaux relus dans l'état (lectures de
  * distance + dimensions, déjà publiées par frame), convertis en vœux
  * ([hazardWish], [curbWish] — mot d'évitement continu en clip immédiat,
- * humain niveau 2, poteau niveau 7 — et [curbUpWish] quand la boucle
+ * humain niveau 3, poteau niveau 8 — et [curbUpWish] quand la boucle
  * « curb up » est active, à la place du doux), arbitrés ([decideFrame])
  * puis proposés au bus ([offer]). `collect` séquentiel : une alerte
  * confirmée ne s'annule pas.

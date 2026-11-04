@@ -18,13 +18,13 @@ class IseeSpecV4LevelsTest {
     // Niveaux dehors.
     private val levelCarMoving = 0
     private val levelUserSpeech = 1
-    private val levelHuman = 2
-    private val levelGpsReminder = 3
-    private val levelFence = 4
-    private val levelCurb = 5
-    private val levelStairs = 6
-    private val levelPole = 7
-    private val levelCrosswalk = 8
+    private val levelCrosswalk = 2
+    private val levelHuman = 3
+    private val levelGpsReminder = 4
+    private val levelFence = 5
+    private val levelCurb = 6
+    private val levelStairs = 7
+    private val levelPole = 8
     private val levelChat = 9
     private val levelSidewalk = 10
     private val levelGpsManeuver = 11
@@ -66,17 +66,17 @@ class IseeSpecV4LevelsTest {
     }
 
     @Test
-    fun `niveau 2 = humains sous 10m, phrase plus cadran plus distance`() {
+    fun `niveau 3 = humains sous 10m, phrase plus cadran plus distance`() {
         val rangeM = 10
         val phrase = humanPhrase(clock = 9, meters = 4)
 
-        assertEquals(2, levelHuman)
+        assertEquals(3, levelHuman)
         assertEquals(10, rangeM)
         assertEquals("Person at 9 o'clock, 4 meters away.", phrase)
     }
 
     @Test
-    fun `niveau 2 = imminent a 2m ou moins, mot immediat`() {
+    fun `niveau 3 = imminent a 2m ou moins, mot immediat`() {
         assertTrue(isImminent(meters = 2))
         assertTrue(isImminent(meters = 1))
         assertFalse(isImminent(meters = 3))
@@ -84,8 +84,8 @@ class IseeSpecV4LevelsTest {
     }
 
     @Test
-    fun `niveau 3 = rappel GPS apres 15s de silence`() {
-        assertEquals(3, levelGpsReminder)
+    fun `niveau 4 = rappel GPS apres 15s de silence`() {
+        assertEquals(4, levelGpsReminder)
         assertEquals(15_000L, GPS_REMINDER_SILENCE_MS)
         assertTrue(reminderDue(silenceMs = 15_000L))
         assertFalse(reminderDue(silenceMs = 14_999L))
@@ -96,8 +96,8 @@ class IseeSpecV4LevelsTest {
     }
 
     @Test
-    fun `niveau 4 = grillages murs barrieres sous 6m`() {
-        assertEquals(4, levelFence)
+    fun `niveau 5 = grillages murs barrieres sous 6m`() {
+        assertEquals(5, levelFence)
         assertEquals(6, FENCE_RANGE_M)
         assertTrue(fenceLabels.contains("fence"))
         assertTrue(fenceLabels.contains("wall"))
@@ -105,21 +105,21 @@ class IseeSpecV4LevelsTest {
     }
 
     @Test
-    fun `niveau 5 = bordures sous 6m`() {
-        assertEquals(5, levelCurb)
+    fun `niveau 6 = bordures sous 6m`() {
+        assertEquals(6, levelCurb)
         assertEquals(6, CURB_RANGE_M)
     }
 
     @Test
-    fun `niveau 6 = escaliers jalons 4 2 1 et marches dites`() {
-        assertEquals(6, levelStairs)
+    fun `niveau 7 = escaliers jalons 4 2 1 et marches dites`() {
+        assertEquals(7, levelStairs)
         assertEquals(listOf(4, 2, 1), STAIR_MILESTONES_M)
         assertEquals("Stairs in 4 meters, 6 steps.", stairsPhrase(milestoneM = 4, steps = 6))
     }
 
     @Test
-    fun `niveau 7 = poteaux mobilier vertical divers sous 6m`() {
-        assertEquals(7, levelPole)
+    fun `niveau 8 = poteaux mobilier vertical divers sous 6m`() {
+        assertEquals(8, levelPole)
         assertEquals(6, POLE_RANGE_M)
         assertTrue(poleLabels.contains("pole"))
         assertTrue(poleLabels.contains("lamppost"))
@@ -129,8 +129,8 @@ class IseeSpecV4LevelsTest {
     }
 
     @Test
-    fun `niveau 8 = passages pietons sous 6m, annonce alignement arrivee`() {
-        assertEquals(8, levelCrosswalk)
+    fun `niveau 2 = passages pietons sous 6m, annonce alignement arrivee`() {
+        assertEquals(2, levelCrosswalk)
         assertEquals(6, CROSSWALK_RANGE_M)
         assertEquals(
             listOf("announce-once-per-view", "align-on-change", "arrival-once"),
