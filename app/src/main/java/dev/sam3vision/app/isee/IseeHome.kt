@@ -8,6 +8,7 @@ import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.ui.Modifier
+import dev.sam3vision.app.samEndpoint
 import dev.sam3vision.core.settings.Settings
 
 /**
@@ -41,5 +42,6 @@ fun IseeHome(viewModel: IseeViewModel, onOpenSettings: () -> Unit, settings: Set
         state = state,
         viewModel = viewModel,
         modifier = Modifier.fillMaxSize(),
+        prewarmEndpoint = settings.samEndpoint(),
     )
 }

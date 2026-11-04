@@ -338,7 +338,7 @@ internal fun LiveProbe.noteFailure(error: Throwable, timings: FrameTimings? = nu
  * de socket oisif à 60 s à fermer ici, et les `configure()` suivants ne réarment
  * plus le budget ([ProbeLink.markPaid]).
  */
-internal fun LiveProbe.goWarm() {
+internal fun LiveProbe.goWarm(endpoint: String = _state.value.endpoint) {
     // La première frame paie le démarrage du conteneur (mesuré : 17 s en WebSocket,
     // 40 s en HTTP) : la garder dans la moyenne afficherait « 17 192 ms » pour un lien
     // chaud à ~180 ms, et fausserait aussi le régulateur de créneaux.
@@ -348,7 +348,10 @@ internal fun LiveProbe.goWarm() {
     }
     warmed = true
     session?.useTimeoutMs(DEFAULT_TIMEOUT_SECONDS * 1000)
-    link.markPaid(_state.value.endpoint)
+    // Pré-réveil : l'état n'est pas encore configuré (endpoint vide), c'est
+    // l'URL du réveil qui paie le budget — sinon `configure` croirait la carte
+    // froide après un `/health` OK et parlerait « réveil » pour rien.
+    link.markPaid(endpoint)
     if (warming) {
         warming = false
         _state.update { it.copy(warming = false, timeoutSec = DEFAULT_TIMEOUT_SECONDS) }
