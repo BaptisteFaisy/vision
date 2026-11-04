@@ -57,7 +57,8 @@ class ClearPathTest {
     @Test
     fun `poteau plein axe passe a droite, le bruit du cadre ne change pas le cote`() {
         for (x in listOf(0.46f, 0.48f, 0.50f, 0.52f, 0.54f)) {
-            assertEquals("x=$x", GuidanceSide.Right, orderOf(box("pole", x - 0.01f, x + 0.01f, 3f))?.side)
+            val swaying = box("pole", x - 0.01f, x + 0.01f, 3f).copy(steadyX = 0.5f)
+            assertEquals("x=$x", GuidanceSide.Right, orderOf(swaying)?.side)
         }
     }
 

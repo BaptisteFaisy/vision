@@ -74,10 +74,13 @@ dans `LiveProbeState.clearView`, lue par `HazardSignal.steeredBy`.
   distance ni coupé par le bas ne compte pas. Une bordure ne se contourne pas.
   Bornée au trottoir, sauf si la borne renvoie vers une personne. Obstacle sans
   distance ou frame bouchée : trou de grillage, sinon le côté le moins encombré.
-- **Égalité** : à droite, sans mémoire (ordre user du 03/11). Elle vaut 15 % d'image
-  de différence entre les deux trous (corps à ±7,5 % de l'axe, le balancement de la
-  marche vaut 0,077 au 90e centile, soit ±0,75 m à 10 m). La droite doit avoir de
-  quoi passer : sinon le plus grand trou gagne.
+- **Égalité** : à droite, sans tenue de côté (ordre user du 03/11), si les deux trous
+  sont à 6 % d'image près (corps à ±3 % de l'axe) et que la droite a de quoi passer.
+- **Balancement** : il s'efface dans la mesure, pas dans la décision. Le côté est
+  recalculé à chaque frame sur le centre moyen de la piste, sur 1 s (`steadyX`,
+  `ClearPath.axisX`). Essai Samsung du 04/11 : changements de côté 15 → 4 sur 176
+  frames, sans marge. Une marge de 15 % sans ce lissage disait droite vers un
+  obstacle décalé à droite.
 - **Mur longé** (`ClearPath.isRail`) : objet long, boîte qui sort du cadre sur un
   côté sans franchir l'axe. Son bord intérieur est un point de fuite : seule sa
   distance au bord du cadre le situe. Il ne parle que sous 0,5 m. S'il franchit

@@ -27,15 +27,16 @@ data class GapRoom(val left: Float, val right: Float) {
  * Vaut pour tout ce qui barre le chemin : personnes, murs, poteaux, barrières. Une bordure
  * ne se contourne pas, un mur longé ferme son côté à sa distance latérale ([railSpan]).
  *
- * Sans mémoire (ordre user du 03/11) : le côté suit la frame, et l'égalité [TIE] absorbe
- * le balancement de la marche, 0,077 d'image au 90e centile relevé au Samsung, soit ±0,75 m
- * à 10 m : de loin, un petit décalage passe pour plein axe et se corrige en approchant,
- * plutôt que de faire osciller le côté. Pur, testé en JVM.
+ * Pas de tenue (ordre user du 03/11) : le côté est recalculé à chaque frame. Le balancement
+ * de la marche (0,087 d'image au 90e centile au Samsung) s'efface dans la mesure, par le
+ * centre moyen de chaque piste ([ClearPath.axisX]). L'égalité [TIE] reste donc étroite :
+ * à 15 %, elle disait droite vers un obstacle décalé à droite (plainte user du 04/11).
+ * Pur, testé en JVM.
  */
 internal object WidestGap {
 
-    /** Écart de place sous lequel les côtés se valent : un corps à ±7,5 % de l'axe est plein axe. */
-    const val TIE = 0.15f
+    /** Écart de place sous lequel les côtés se valent : un corps à ±3 % de l'axe est plein axe. */
+    const val TIE = 0.06f
 
     /** Profondeur (m) derrière l'obstacle au-delà de laquelle rien ne décide du côté. */
     const val BEHIND_M = 2f
@@ -70,7 +71,8 @@ internal object WidestGap {
         val perX = lateralPerX(depth, halfTangent)
         val half = bodyHalfM(label, perX) / perX
         val pad = PeoplePath.BODY_HALF_WIDTH_M / perX
-        return Span((label.centerX - half - pad).coerceAtLeast(0f), (label.centerX + half + pad).coerceAtMost(1f))
+        val center = ClearPath.axisX(label)
+        return Span((center - half - pad).coerceAtLeast(0f), (center + half + pad).coerceAtMost(1f))
     }
 
     /**

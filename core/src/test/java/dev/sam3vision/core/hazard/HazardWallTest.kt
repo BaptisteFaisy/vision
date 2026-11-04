@@ -120,8 +120,8 @@ class HazardSteeredTest {
     fun `plein axe a droite, un pour cent du cadre ne change pas le cote`() {
         assertEquals(SteeringCap.Right, HazardText.avoidSide(0.50f))
         assertEquals(SteeringCap.Right, HazardText.avoidSide(0.51f))
-        assertEquals(SteeringCap.Right, HazardText.avoidSide(0.54f))
-        assertEquals(SteeringCap.Left, HazardText.avoidSide(0.60f))
+        assertEquals(SteeringCap.Right, HazardText.avoidSide(0.52f))
+        assertEquals(SteeringCap.Left, HazardText.avoidSide(0.55f))
     }
 
     @Test

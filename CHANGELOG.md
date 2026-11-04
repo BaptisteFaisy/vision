@@ -17,6 +17,13 @@ livré et ses preuves (tâche, fichiers, chiffres) dans l'arbre.
 - **Fait** : `LightGhostGate` exige 3 frames de suite d'une boîte sans lampe lue. Une lampe lue compte tout de suite, un feu confirmé reparle en une frame. Ligne debug `ISEE_CROSS` à chaque frame bloquée.
 - **Preuves** : fantômes 2 frames au plus (scores 0,36 à 0,67), vrais feux 93 frames sur 93. `LightGhostGateTest`, `CrossingSweepVideoTest`, `docs/TRAVERSEE.md` § 21. Dans la rue : non mesuré. Les blocages `roule=true` du même terrain restent à expliquer.
 
+## 2026-11-04 — iSee : plus de biais à droite, la gauche quand elle est meilleure (branche `fix/isee-ecart-gauche`)
+
+- **Demande** : « il dit beaucoup trop right alors que parfois c'est mieux de passer par la gauche » (ordre user du 04/11, essai de `1.0.1932-654814b`).
+- **Cause racine** : la marge d'égalité de 15 % d'image tranchait toujours à droite. Elle servait à absorber le balancement, mais elle avalait aussi les vrais décalages : de loin, un obstacle à droite laisse presque autant de place des deux côtés.
+- **Fait** : le balancement s'efface dans la mesure, pas dans la décision : `PersonTracker` donne le centre moyen de la piste sur 1 s (`steadyX`), `ClearPath` et `WidestGap` le lisent. Le côté reste recalculé à chaque frame, sans tenue (ordre du 03/11). La marge passe à 6 %.
+- **Preuves** : part des mots du bon côté, marche simulée à 5 Hz, version du téléphone contre patch : poteau à droite 7 % → 76 %, personne à droite 28 % → 90 %, poteau à gauche 100 % → 98 %. Rejeu des centres réels du Samsung : changements de côté 15 → 4 sur 176 frames. Contacts 5 → 6 à 5 Hz, 6 → 3 à 1,5 Hz ; passages sous 0,25 m 11 → 13 et 16 → 8. Pas encore de preuve en rue.
+
 ## 2026-11-04 — iSee : guider vers le plus grand espace libre, dès 10 m (branche `fix/isee-ecart-axe`)
 
 - **Demande** : « ça n'esquive pas bien les humains, peut-être un système d'historique », puis « il doit guider vers l'endroit où il y a le plus d'espace libre », « avec tous les obstacles, donc murs, poteaux, barrière », « il faut que ça s'active dès que l'obstacle est à 10 m ou moins » (ordres user du 04/11).

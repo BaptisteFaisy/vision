@@ -54,6 +54,22 @@ class AvoidanceWalkTest {
         }
     }
 
+    /** Part des mots de côté de [sceneId] qui disent [side], à 5 Hz. */
+    private fun shareOf(stats: List<SceneStats>, sceneId: String, side: Int): Double {
+        val said = stats.first { it.scene.id == sceneId }.runs.flatMap { run -> run.said.mapNotNull { it.side } }
+        return said.count { it == side }.toDouble() / said.size.coerceAtLeast(1)
+    }
+
+    @Test
+    fun `un obstacle decale fait passer de l autre cote, pas toujours a droite`() {
+        val stats = WalkReport.playAll(WalkReport.RATES_HZ.first())
+        val shares = OFFSET_SCENES.map { (id, side) -> "$id=" + walkFmt(shareOf(stats, id, side), 2) }
+        println("bon côté : $shares")
+        for ((id, side) in OFFSET_SCENES) {
+            assertTrue("$id : ${shareOf(stats, id, side)} du bon côté", shareOf(stats, id, side) >= MIN_GOOD_SIDE)
+        }
+    }
+
     @Test
     fun `la vraie mesure retrouve la distance projetee`() {
         assertEquals(52.8f, camera.hfovDeg, 0.1f)
@@ -118,6 +134,12 @@ class AvoidanceWalkTest {
 
         /** Barrières et mur de face : la sortie est évidente, aucun contact. */
         val FRONTAL_SCENES = setOf("S7", "S8", "S9")
+
+        /** Scènes à obstacle décalé et côté ouvert (-1 gauche, +1 droite). */
+        val OFFSET_SCENES = listOf("S2" to 1, "S3" to -1, "S5" to -1, "S7" to -1, "S8" to 1)
+
+        /** Part minimale de mots du côté ouvert. */
+        const val MIN_GOOD_SIDE = 0.5
 
         /** Dérive tolérée le long d'un mur à 0,55 m d'épaule (m) : rien n'y écarte le marcheur. */
         const val MAX_WALL_DRIFT_M = 0.3

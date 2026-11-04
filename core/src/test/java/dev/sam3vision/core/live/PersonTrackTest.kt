@@ -27,6 +27,19 @@ class PersonTrackTest {
     )
 
     @Test
+    fun `le centre moyen efface le balancement sur une seconde`() {
+        val tracker = PersonTracker()
+        val first = tracker.onFrame(0L, listOf(label(0.45f, 4f))).single()
+        tracker.onFrame(200L, listOf(label(0.55f, 4f)))
+        val third = tracker.onFrame(400L, listOf(label(0.50f, 4f))).single()
+        val later = tracker.onFrame(1_500L, listOf(label(0.60f, 4f))).single()
+
+        assertNull("une vue ne moyenne rien", first.label.steadyX)
+        assertEquals(0.50f, third.label.steadyX!!, 0.001f)
+        assertNull("la fenêtre oublie ce qui a plus d'une seconde", later.label.steadyX)
+    }
+
+    @Test
     fun `la fermeture dit le temps de mesures qu elle couvre`() {
         val tracker = PersonTracker()
         val first = tracker.onFrame(0L, listOf(label(0.5f, 4.0f))).single()
