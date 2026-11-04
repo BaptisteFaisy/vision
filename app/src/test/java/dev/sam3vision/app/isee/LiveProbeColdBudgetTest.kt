@@ -76,6 +76,7 @@ class LiveProbeColdBudgetTest {
         assertEquals(ProbeLinkKind.Warm, probe.state.value.link.kind)
         assertNull(probe.state.value.error)
 
+        probe.link.onSent(t0 + 100) // envoi sans réponse : le seul cas où le silence se dit.
         probe.publishLink(t0 + LINK_SILENCE_MS + 1_200)
 
         val silent = probe.state.value

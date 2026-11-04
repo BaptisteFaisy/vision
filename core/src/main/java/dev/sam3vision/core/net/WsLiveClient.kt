@@ -198,6 +198,8 @@ class WsLiveClient(
 
     /** Vrai quand les frames partent en POST /live — l'UI dit « HTTP » au lieu de « KO ». */
     val httpFallbackActive: Boolean get() = synchronized(lock) { httpFallback.active }
+    /** Jambe empruntée par les frames ([legOf]) : lue par la sonde à chaque publication. */
+    val leg: String get() = synchronized(lock) { legOf(httpFallback.active, binaryWs && !binaryRefused) }
 
     /**
      * État du lien, **observable** : `Open` = socket vivant, `Degraded` = coupure connue et
@@ -481,5 +483,4 @@ class WsLiveClient(
         runCatching { transport.close() }
         synchronized(lock) { openLocked() }
     }
-
 }

@@ -147,6 +147,15 @@ data class LiveProbeState(
     val skippedFrames: Long = 0,
     /** Délai de la session active, en secondes (60 froid, 10 chaud ; 0 = aucune session). */
     val timeoutSec: Long = 0,
+    /**
+     * Veto nuit/noir en cours : les frames ne partent ni à SAM ni au picto — la
+     * notice le dit ([LOW_LIGHT_PHRASE]), jamais « link silent » (rien n'est envoyé).
+     */
+    val dark: Boolean = false,
+    /** Frames vetoées par la garde nuit/noir depuis le début : comptées, jamais silencieuses. */
+    val lowLightVetoes: Long = 0,
+    /** Jambe empruntée par les frames (`binary`, `text` ou `http`) : "" avant la 1re publication. */
+    val leg: String = "",
 ) {
     /** Rien à afficher : ni frame analysée, ni erreur. */
     val idle: Boolean get() = frames == 0 && error == null

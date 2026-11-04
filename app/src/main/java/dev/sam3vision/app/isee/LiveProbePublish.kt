@@ -84,6 +84,7 @@ internal suspend fun LiveProbe.publishPixels(
             fps = rate.rate,
             pixelSeq = current.pixelSeq + 1,
             transport = transportLabel(active),
+            leg = active.leg,
             error = null,
         )
     }

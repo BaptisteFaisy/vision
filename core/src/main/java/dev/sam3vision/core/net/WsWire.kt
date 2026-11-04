@@ -35,6 +35,18 @@ internal const val ERROR_MARK = "\"error\""
 /** Fermeture idle serveur (120 s sans message applicatif) : reprise sans backoff (§9). */
 internal const val IDLE_CLOSE_CODE = 1001
 
+/** Jambes du direct ([WsLiveClient.leg]) : POST, WS binaire M1 ou WS JSON (repli). */
+internal const val LEG_HTTP = "http"
+internal const val LEG_BINARY = "binary"
+internal const val LEG_TEXT = "text"
+
+/** Jambe empruntée par une frame : le repli POST prime, sinon binaire ou texte. */
+internal fun legOf(httpFallback: Boolean, binary: Boolean): String = when {
+    httpFallback -> LEG_HTTP
+    binary -> LEG_BINARY
+    else -> LEG_TEXT
+}
+
 /** Annulation one-way (FIX-8) : le serveur annule l'inférence abandonnée, sans répondre. */
 internal fun cancelMessage(id: Int): String = "{\"id\":$id,\"cancel\":true}"
 

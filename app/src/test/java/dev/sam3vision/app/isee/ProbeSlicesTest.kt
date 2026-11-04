@@ -77,12 +77,13 @@ class ProbeSlicesTest {
     }
 
     @Test
-    fun `cle notice, frames erreur reveil, rien d autre`() {
+    fun `cle notice, frames erreur reveil veto, rien d autre`() {
         val base = LiveProbeState()
         assertEquals("l'écriture #1 ne touche pas la notice", noticeKeyOf(base), noticeKeyOf(base.copy(pixelSeq = 1)))
         assertTrue("frames change la notice", noticeKeyOf(base.copy(frames = 1)) != noticeKeyOf(base))
         assertTrue("l'erreur change la notice", noticeKeyOf(base.copy(error = "GPU waking up")) != noticeKeyOf(base))
         assertTrue("le réveil change la notice", noticeKeyOf(base.copy(warming = true)) != noticeKeyOf(base))
+        assertTrue("le veto nuit change la notice", noticeKeyOf(base.copy(dark = true)) != noticeKeyOf(base))
         assertEquals("le battement ne touche pas la notice",
             noticeKeyOf(base),
             noticeKeyOf(base.copy(pulse = GuidancePulse(atMs = 1L, ageMs = 0L, stale = false, word = GuidanceWord.Straight, side = null, shiftMeters = null, nearestMeters = null))))
@@ -168,10 +169,10 @@ class ProbeSlicesTest {
     private fun assertNoticesFollowFrames(notices: List<ProbeNoticeKey>) {
         assertEquals("notice : frames 1..2, une fois chacun, jamais les pixels",
             listOf(
-                ProbeNoticeKey(frames = 0, error = null, warming = true),
-                ProbeNoticeKey(frames = 0, error = null, warming = false),
-                ProbeNoticeKey(frames = 1, error = null, warming = false),
-                ProbeNoticeKey(frames = 2, error = null, warming = false),
+                ProbeNoticeKey(frames = 0, error = null, warming = true, dark = false),
+                ProbeNoticeKey(frames = 0, error = null, warming = false, dark = false),
+                ProbeNoticeKey(frames = 1, error = null, warming = false, dark = false),
+                ProbeNoticeKey(frames = 2, error = null, warming = false, dark = false),
             ),
             notices)
     }
