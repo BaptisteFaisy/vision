@@ -1,4 +1,4 @@
-"""Passage suggéré par le serveur : le couloir est-il bouché par une personne ?
+"""Passage suggéré par le serveur : le couloir est-il bouché ?
 
 Chaque réponse ``/live`` (HTTP et WebSocket) porte ``passage`` : la décision
 gauche/droite calculée **côté SAM**, sur les boîtes segmentées — le téléphone
@@ -7,14 +7,14 @@ déployé antérieur ne renvoie pas ce champ : le client rebascule alors sur sa
 décision locale (``Guidance.decide``), sans changer de voix.
 
 Règle (miroir documenté de ``Guidance`` côté client, adaptée aux pixels) :
-une personne dont le centre horizontal est dans la bande centrale bouche le
-couloir ; le côté conseillé est le moins encombré (moins de personnes, sinon
-la plus proche la plus loin — hauteur de boîte, proxy de proximité —, sinon
-l'opposé du décalage de l'obstacle, sinon la gauche). Le serveur ne connaît
-ni focale ni distance métrique : les naines de moins de ``MIN_HEIGHT_RATIO``
-de la hauteur d'image (≃ au-delà de 60 m au sténopé, miroir de
-``Pinhole.MAX_METERS``) sont ignorées, et le décalage chiffré reste calculé
-sur le téléphone.
+un bloqueur (personne, barrière, poteau) dont le centre horizontal est dans
+la bande centrale bouche le couloir ; le côté conseillé est le moins
+encombré (moins de bloqueurs, sinon le plus proche le plus loin — hauteur
+de boîte, proxy de proximité —, sinon l'opposé du décalage de l'obstacle,
+sinon la gauche). Le serveur ne connaît ni focale ni distance métrique :
+les nains de moins de ``MIN_HEIGHT_RATIO`` de la hauteur d'image (≃ au-delà
+de 60 m au sténopé, miroir de ``Pinhole.MAX_METERS``) sont ignorés, et le
+décalage chiffré reste calculé sur le téléphone.
 
 Pur Python (stdlib + ``concepts``) : testé sans GPU ni poids par
 ``scripts/test_units.py`` (``live_fast_tests.test_passage``). Fichier vendored :
@@ -42,12 +42,23 @@ PERSONS = frozenset({
     "pedestrian", "pedestrians", "boy", "boys", "girl", "girls",
 })
 
+# Statiques qui bouchent comme une personne (barrière, poteau), sur le même
+# canonique : miroir de ``StaticAvoidance.isStaticObstacle`` (client).
+STATICS = frozenset({"barrier", "pole"})
+
 
 def is_person(label: object) -> bool:
     """Vrai si [label] désigne une personne (FR/EN, casse et accents tolérés)."""
     if not isinstance(label, str) or not label.strip():
         return False
     return model_concept(label) in PERSONS
+
+
+def is_blocker(label: object) -> bool:
+    """Vrai si [label] bouche le couloir : personne, barrière ou poteau."""
+    if not isinstance(label, str) or not label.strip():
+        return False
+    return model_concept(label) in PERSONS | STATICS
 
 
 def _box(item: object) -> list | None:
@@ -66,13 +77,13 @@ def _box(item: object) -> list | None:
     return coords
 
 
-def _persons(objects: object, width: int, height: int) -> list[dict]:
-    """Personnes exploitables : centre normalisé + hauteur en pixels."""
+def _blockers(objects: object, width: int, height: int) -> list[dict]:
+    """Bloqueurs exploitables : centre normalisé + hauteur en pixels."""
     if not isinstance(objects, list) or width <= 0 or height <= 0:
         return []
     found = []
     for item in objects:
-        if not isinstance(item, dict) or not is_person(item.get("label")):
+        if not isinstance(item, dict) or not is_blocker(item.get("label")):
             continue
         box = _box(item)
         if box is None:
@@ -90,10 +101,10 @@ def _persons(objects: object, width: int, height: int) -> list[dict]:
     return found
 
 
-def _freer_side(persons: list[dict], obstacle: dict) -> str:
+def _freer_side(blockers: list[dict], obstacle: dict) -> str:
     """Côté le moins encombré : effectif, proximité, décalage, gauche."""
-    left = [p for p in persons if p["center_x"] < SIDE_EDGE]
-    right = [p for p in persons if p["center_x"] > 1.0 - SIDE_EDGE]
+    left = [p for p in blockers if p["center_x"] < SIDE_EDGE]
+    right = [p for p in blockers if p["center_x"] > 1.0 - SIDE_EDGE]
     if len(left) != len(right):
         return "left" if len(left) < len(right) else "right"
     nearest_left = max([p["height_px"] for p in left], default=0.0)
@@ -114,8 +125,8 @@ def suggest_passage(objects: object, width: int, height: int) -> dict:
     invalides ou objets illisibles : voie libre — le serveur ne devine jamais
     un passage (le client garde sa décision locale en repli).
     """
-    persons = _persons(objects, width, height)
-    blocking = [p for p in persons if SIDE_EDGE <= p["center_x"] <= 1.0 - SIDE_EDGE]
+    blockers = _blockers(objects, width, height)
+    blocking = [p for p in blockers if SIDE_EDGE <= p["center_x"] <= 1.0 - SIDE_EDGE]
     if not blocking:
         return {"blocked": False, "side": None, "label": None, "box": None, "score": None}
     obstacle = min(
@@ -124,7 +135,7 @@ def suggest_passage(objects: object, width: int, height: int) -> dict:
     )
     return {
         "blocked": True,
-        "side": _freer_side(persons, obstacle),
+        "side": _freer_side(blockers, obstacle),
         "label": obstacle["label"],
         "box": obstacle["box"],
         "score": obstacle["score"],
