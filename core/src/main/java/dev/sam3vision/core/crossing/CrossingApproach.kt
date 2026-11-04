@@ -6,10 +6,12 @@ import dev.sam3vision.core.speech.SpeechLanguage
 /**
  * Guetteur d'annonce du passage piéton (SPEC v4, niveau 8, couche 1/3) :
  * [CONFIRM_FRAMES] frames de suite avec un passage en vue parlent une fois
- * (« Gauche, 2 mètres »), à 6 m ou moins ([ANNOUNCE_METERS], mesurés ; sans
- * mesure, la direction seule parle), puis silence jusqu'à la prochaine
- * disparition (changement seul). Doux, comme l'arrivée : l'appelant parle
- * via `say` (`urgent = false`), jamais en clip.
+ * (« Gauche, 2 mètres »), à 4 m ou moins ([ANNOUNCE_METERS], **distance du
+ * bord proche** : le sol d'abord, la profondeur en repli — voir
+ * [CrossingDistance.bestMeters] ; sans mesure, la direction seule parle),
+ * puis silence jusqu'à la prochaine disparition (changement seul). Doux,
+ * comme l'arrivée : l'appelant parle via `say` (`urgent = false`), jamais en
+ * clip.
  *
  * La phrase localise ([CrossingText.approach], « passage » implicite) :
  * direction (gauche / devant / droite, [CrossingGuidance.directionOf]) puis
@@ -66,7 +68,7 @@ class CrossingApproachWatcher(
         }
         val measured = meters?.takeIf { it.isFinite() && it > 0f }
         if (measured != null && measured > ANNOUNCE_METERS) {
-            // Encore loin : l'annonce attend l'entrée dans les 6 m (compte
+            // Encore loin : l'annonce attend l'entrée dans les 4 m (compte
             // remis à zéro, annonce déjà dite gardée — dite une fois par vue).
             hits = 0
             return null
@@ -115,8 +117,13 @@ class CrossingApproachWatcher(
         /** Frames avec passage de suite avant l'annonce (miroir de l'arrivée). */
         const val CONFIRM_FRAMES = 2
 
-        /** Au-delà (mètres mesurés), le passage se tait : dit 6 m à l'avance (SPEC v4 : < 6 m). */
-        const val ANNOUNCE_METERS = 6.0f
+        /**
+         * Au-delà (mètres mesurés du **bord proche**), le passage se tait :
+         * dit à 4 m à l'avance. Ordre user du 04/11/2026 (« annonce plus tôt,
+         * dès qu'il y en a un à 4 m ») — la mesure elle-même passant au sol
+         * d'abord, c'est 4 m réels à marcher, plus la médiane du masque.
+         */
+        const val ANNOUNCE_METERS = 4.0f
 
         /**
          * « Devant » redit toutes les 2 s tant que le passage reste devant
@@ -125,7 +132,7 @@ class CrossingApproachWatcher(
          */
         const val REPEAT_AHEAD_MS = 2_000L
 
-        /** Niveau VoiceBus v4 : passages piétons (< 6 m, 3 couches). */
+        /** Niveau VoiceBus v4 : passages piétons (annonce < 4 m, 3 couches). */
         const val LEVEL = 8
 
         /** Clé AntiRepeat v4 : annonce du passage (2 s, répétition du « devant »). */

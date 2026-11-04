@@ -78,7 +78,7 @@ object IseeClipsEn {
     const val KEEPSAKE = "keepsake"
     const val KEEPSAKE_TEXT = "Keepsake."
 
-    // Niveau 8 : passage piéton < 6 m (annonce + alignement + arrivée).
+    // Niveau 8 : passage piéton < 4 m (annonce) / < 6 m (alignement + arrivée).
     const val CROSSWALK_ALIGNED = "crosswalk_aligned"
     const val CROSSWALK_ALIGNED_TEXT = "Aligned with the crosswalk."
     const val CROSSWALK_ARRIVED = "cross_arrived"

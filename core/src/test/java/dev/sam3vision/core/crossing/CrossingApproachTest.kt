@@ -38,38 +38,38 @@ class CrossingApproachTest {
     }
 
     @Test
-    fun `seuil d annonce a 6 m, ordre user`() {
-        assertEquals(6.0f, CrossingApproachWatcher.ANNOUNCE_METERS, 0f)
+    fun `seuil d annonce a 4 m, ordre user du 04 11`() {
+        assertEquals(4.0f, CrossingApproachWatcher.ANNOUNCE_METERS, 0f)
     }
 
     @Test
-    fun `au-dela de 6 m mesures, silence meme apres confirmation`() {
+    fun `au-dela de 4 m mesures, silence meme apres confirmation`() {
         val watcher = CrossingApproachWatcher()
         repeat(4) {
-            assertNull(watcher.onFrame(0.10f, 10.0f, SpeechLanguage.Fr))
+            assertNull(watcher.onFrame(0.10f, 4.1f, SpeechLanguage.Fr))
         }
         assertNull(watcher.lastPhrase)
     }
 
     @Test
-    fun `a 6 m, borne incluse, l annonce parle`() {
+    fun `a 4 m, borne incluse, l annonce parle`() {
         val watcher = CrossingApproachWatcher()
-        assertNull(watcher.onFrame(0.10f, 6.0f, SpeechLanguage.Fr))
+        assertNull(watcher.onFrame(0.10f, 4.0f, SpeechLanguage.Fr))
         assertEquals(
-            "Gauche, 6 mètres.",
-            watcher.onFrame(0.10f, 6.0f, SpeechLanguage.Fr),
+            "Gauche, 4 mètres.",
+            watcher.onFrame(0.10f, 4.0f, SpeechLanguage.Fr),
         )
     }
 
     @Test
-    fun `loin puis proche, l annonce parle a l entree dans les 6 m`() {
+    fun `loin puis proche, l annonce parle a l entree dans les 4 m`() {
         val watcher = CrossingApproachWatcher()
         assertNull(watcher.onFrame(0.10f, 12.0f, SpeechLanguage.Fr))
         assertNull(watcher.onFrame(0.10f, 12.0f, SpeechLanguage.Fr))
-        assertNull(watcher.onFrame(0.50f, 5.0f, SpeechLanguage.Fr))
+        assertNull(watcher.onFrame(0.50f, 3.0f, SpeechLanguage.Fr))
         assertEquals(
-            "Devant, 5 mètres.",
-            watcher.onFrame(0.50f, 5.0f, SpeechLanguage.Fr),
+            "Devant, 3 mètres.",
+            watcher.onFrame(0.50f, 3.0f, SpeechLanguage.Fr),
         )
     }
 
@@ -145,15 +145,15 @@ class CrossingApproachTest {
     @Test
     fun `direction nouvelle se reconfirme puis se redit`() {
         val watcher = CrossingApproachWatcher()
-        watcher.onFrame(0.10f, 5.0f, SpeechLanguage.Fr)
+        watcher.onFrame(0.10f, 4.0f, SpeechLanguage.Fr)
         assertEquals(
-            "Gauche, 5 mètres.",
-            watcher.onFrame(0.10f, 5.0f, SpeechLanguage.Fr),
+            "Gauche, 4 mètres.",
+            watcher.onFrame(0.10f, 4.0f, SpeechLanguage.Fr),
         )
-        assertNull("nouvelle direction : 1re frame silencieuse", watcher.onFrame(0.50f, 4.0f, SpeechLanguage.Fr))
+        assertNull("nouvelle direction : 1re frame silencieuse", watcher.onFrame(0.50f, 3.0f, SpeechLanguage.Fr))
         assertEquals(
-            "Devant, 4 mètres.",
-            watcher.onFrame(0.50f, 4.0f, SpeechLanguage.Fr),
+            "Devant, 3 mètres.",
+            watcher.onFrame(0.50f, 3.0f, SpeechLanguage.Fr),
         )
     }
 

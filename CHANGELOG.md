@@ -3,6 +3,31 @@
 Le journal part du 2026-10-26 après 19 h : le commit de départ, puis une entrée par fait
 livré et ses preuves (tâche, fichiers, chiffres) dans l'arbre.
 
+## 2026-11-04 — iSee : le passage piéton s'annonce à 4 m réels (branche `fix/crosswalk-annonce-4m`)
+
+- **Demande** : « je veux qu'il m'annonce plus tôt les passages piétons, donc
+  dès qu'il y en a un à 4 m » (ordre user du 04/11/2026).
+- **Cause racine** : l'annonce était gatée sur la **profondeur serveur**, médiane
+  du masque — donc le *milieu* du passage, 1 à 4 m plus loin que son bord.
+  À 4 m réels, la profondeur lisait 6-9 m : le gate à 6 m étouffait l'annonce
+  jusqu'à ~2 m, voire jusqu'à l'arrivée.
+- **Fait** :
+  - `CrossingDistance.bestMeters` : **sol d'abord** (ligne des pieds = bord
+    proche, la distance qu'il reste à marcher), profondeur en repli ;
+    `crossingMetersOf` (app) suit le même ordre.
+  - `CrossingApproachWatcher.ANNOUNCE_METERS` : 6 m → **4 m** (bord proche).
+    Les deux autres couches (alignement au changement, arrivée 1 fois) ne
+    changent pas ; sans mesure, la direction seule parle (jamais de chiffre
+    deviné).
+  - Docs : `VOIX-DANGER` § 8, `TRAVERSEE` § 5, `RECETTE-RUE`.
+- **Preuves** : `:core` + `:app` **6 059 tests, 0 échec** ; gardes
+  `check-kotlin-limits` (CrossingWiring 499/500), `check-isee-clips-en`,
+  `check-isee-design`, `check-voice-nav-doc`, `check-test-globals`,
+  `check-voicepack`, `scripts/test_scripts.sh` (230/230) OK.
+  Nouveau test de bout en bout : profondeur 9 m + sol 3,8 m → « Devant,
+  4 mètres. » (la médiane seule aurait tu l'annonce).
+- **Reste** : recette téléphone (parole mesurée sur un vrai passage).
+
 ## 2026-11-04 — iSee : arrivée sans écran, calcul sans finding ni boule (branche `isee-sans-arrivee-ni-finding`)
 
 - **Demande** : supprimer la page d'arrivée (« Arrival », résumé,

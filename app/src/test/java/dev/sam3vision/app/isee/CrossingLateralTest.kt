@@ -38,15 +38,36 @@ class CrossingLateralTest {
     }
 
     @Test
-    fun `distance profondeur d abord, jamais stenope`() {
+    fun `distance du bord proche au sol d abord, jamais stenope`() {
+        // Ordre user du 04/11/2026 : la profondeur serveur est la médiane du
+        // masque (le milieu du passage), le sol la ligne des pieds (son bord).
         val box = listOf(156f, 700f, 356f, 1100f)
         val readings = listOf(reading("crosswalk", 2.0f, box))
-        val meters = crossingMetersOf(box, readings, CameraPose.Default, 516f, 569f, 1138)
-        assertEquals(2.0f, meters!!, 0f)
+        val ground = crossingMetersOf(box, readings, CameraPose.Default, 516f, 569f, 1138)
+        assertEquals(1.46f, ground!!, 0.05f)
+        assertEquals(
+            "profondeur en repli sans pose",
+            2.0f,
+            crossingMetersOf(box, readings, null, 516f, 569f, 1138)!!,
+            0f,
+        )
     }
 
     @Test
-    fun `distance sol en repli, nulle sans rien`() {
+    fun `bord proche a 4 m et mediane a 9 m, l annonce parle a 4 m`() {
+        val box = listOf(156f, 500f, 356f, 772f)
+        val readings = listOf(reading("crosswalk", 9.0f, box))
+        val meters = crossingMetersOf(box, readings, CameraPose.Default, 516f, 569f, 1138)!!
+        assertEquals(3.81f, meters, 0.05f)
+        // Le gate de 4 m est franchi : sans la bascule sol-d'abord, la médiane
+        // à 9 m aurait tu l'annonce jusqu'à ~2 m réels.
+        val approach = CrossingApproachWatcher()
+        assertNull(approach.onFrame(0.5f, meters, SpeechLanguage.Fr))
+        assertEquals("Devant, 4 mètres.", approach.onFrame(0.5f, meters, SpeechLanguage.Fr))
+    }
+
+    @Test
+    fun `distance sol seule, nulle sans rien`() {
         val box = listOf(156f, 700f, 356f, 1100f)
         val ground = crossingMetersOf(box, emptyList(), CameraPose.Default, 516f, 569f, 1138)
         assertNotNull(ground)

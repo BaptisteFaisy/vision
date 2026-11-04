@@ -269,9 +269,10 @@ internal fun crossingCenterXOf(objects: List<SegObject>, width: Int): Float? {
 }
 
 /**
- * Distance courte du passage : profondeur calibrée de [readings] pour [box]
- * d'abord, plan de sol ([pose]) ensuite, `null` si aucun ne mesure. Jamais de
- * sténopé (`crosswalk` DEPTH_ONLY).
+ * Distance courte du passage : plan de sol ([pose], ligne des pieds = bord
+ * proche, la distance qu'il reste à marcher) d'abord, profondeur calibrée de
+ * [readings] en repli (médiane du masque = milieu, plus loin que le bord),
+ * `null` si aucun ne mesure. Jamais de sténopé (`crosswalk` DEPTH_ONLY).
  */
 internal fun crossingMetersOf(
     box: List<Float>,
@@ -281,16 +282,15 @@ internal fun crossingMetersOf(
     principalY: Float,
     imageH: Int,
 ): Float? {
-    val depth = crosswalkDepthMeters(readings, box)
     val ground = if (box.size >= 4 && pose != null) {
         CrossingDistance.groundMeters(box[3], pose, focalPx, principalY, imageH)
     } else null
-    return CrossingDistance.bestMeters(depth, ground)
+    return CrossingDistance.bestMeters(crosswalkDepthMeters(readings, box), ground)
 }
 
 /**
  * Distances des passages d'une frame pour le guidage latéral : une mesure
- * par objet ([crossingMetersOf], profondeur puis sol), `null` sans mesure.
+ * par objet ([crossingMetersOf], sol puis profondeur), `null` sans mesure.
  * Le tri proche/loin part dans [CrossingOffer.seesNearCrosswalk].
  */
 internal fun crossingOfferMeters(
@@ -389,7 +389,7 @@ internal object CrossingLateralWatch {
 /**
  * Alimente le guidage latéral depuis la sonde : hors traversée le mot et
  * l'arrivée suivent chaque frame publiée ; en traversée ils ne suivent que
- * passage proche (≤ 6 m mesurés ou boîte prouvée sous les pieds,
+ * passage proche (≤ 6 m au bord proche ou boîte prouvée sous les pieds,
  * [CrossingOffer.seesNearCrosswalk] — fail-closed) : à moins de 6 m en face,
  * l'user s'aligne à la voix (« Gauche. », « Droite. », « Tout droit. »,
  * « Sur le passage. »), le feu et le veto gardant la priorité du son (mots
