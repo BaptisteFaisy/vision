@@ -162,6 +162,8 @@ class WsLiveClient(
         // Porte réseau **avant** d'enregistrer l'attente : hors ligne connu ou backoff en
         // cours ⇒ refus local, aucun handshake, aucune entrée en vol à nettoyer.
         synchronized(lock) { admitLocked() }?.let { return Result.failure(it) }
+        // Panne muette : sonde `/health` bornée au lieu d'une pleine frame (WsLink).
+        if (!link.mutedProbe(http)) return Result.failure(ApiError.Network(WS_RECONNECTING))
         val reply = CompletableDeferred<String>()
         val opened = synchronized(lock) {
             // L'attente est enregistrée **avant** l'ouverture : une connexion refusée peut
@@ -318,8 +320,8 @@ class WsLiveClient(
             webSocketUrl(baseUrl, LIVE_WS_PATH),
             { text -> onText(text) },
             { error -> onClosed(error, gen) },
-            // `101` : la reprise aboutit ICI — `open()` est optimiste (OkHttp rend
-            // `true` avant), y remettre le compteur à zéro tuait le backoff.
+            // `101` : socket ouvert, compteur intact (raz à la 1ʳᵉ réponse seulement).
+            // Le remettre ici rebattait à zéro face à un serveur muet, en boucle.
             { onSocketOpen(gen) },
         )
         if (!opened) {
@@ -441,7 +443,7 @@ class WsLiveClient(
         failPending(error?.let(::wsCloseError) ?: ApiError.Network(WS_CLOSED))
     }
 
-    /** `101` de [gen] : reprise aboutie — raz compteur/backoff, sauf `101` tardif. */
+    /** `101` de [gen] : socket ouvert — le compteur survit (raz à la 1ʳᵉ réponse). */
     private fun onSocketOpen(gen: Int) {
         synchronized(lock) {
             if (connected && gen == socketGen) link.onOpen(net.iface)

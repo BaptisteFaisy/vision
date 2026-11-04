@@ -252,4 +252,54 @@ class WsLiveClientResilienceTest {
         assertEquals("le réseau injecté est bien celui du client", 0, transport.opens)
         client.close()
     }
+
+    @Test
+    fun `en panne muette une sonde malade refuse sans handshake`() = runBlocking {
+        var now = 0L
+        val link = WsLink(clock = { now })
+        val transport = LinkTransport()
+        val http = RecordingLiveClient(healthAnswer = { Result.failure(ApiError.Network("sonde malade")) })
+        val client = WsLiveClient(base, transport, 1_000, http, binaryWs = false, keepAlive = null, link = link, httpFallback = WsHttpFallback(probeEvery = 1))
+
+        repeat(8) {
+            now += 70_000
+            link.onFailure()
+        }
+        now += 40_000 // au-delà de la fenêtre muette (32 s + jitter)
+
+        val refused = client.live("QQ==", listOf("person"), 640, 4).exceptionOrNull()
+        assertTrue("attendu Network, obtenu $refused", refused is ApiError.Network)
+        assertTrue("même texte que le refus de backoff", refused?.message.orEmpty().contains("reconnexion"))
+        assertEquals("une seule sonde", 1, http.healthCalls)
+        assertEquals("aucun handshake en panne muette", 0, transport.opens)
+        assertEquals(9, link.attemptCount)
+
+        val again = client.live("QQ==", listOf("person"), 640, 4).exceptionOrNull()
+        assertTrue(again is ApiError.Network)
+        assertEquals("pas de 2ᵉ sonde dans la fenêtre", 1, http.healthCalls)
+        client.close()
+    }
+
+    @Test
+    fun `en panne muette une sonde saine relance une vraie frame`() = runBlocking {
+        var now = 0L
+        val link = WsLink(clock = { now })
+        val transport = LinkTransport().apply { answering = true }
+        val http = RecordingLiveClient()
+        val client = WsLiveClient(base, transport, 1_000, http, binaryWs = false, keepAlive = null, link = link, httpFallback = WsHttpFallback(probeEvery = 1))
+
+        repeat(8) {
+            now += 70_000
+            link.onFailure()
+        }
+        now += 40_000 // au-delà de la fenêtre muette (32 s + jitter)
+
+        client.live("QQ==", listOf("person"), 640, 4).getOrThrow()
+
+        assertEquals("une seule sonde avant la reprise", 1, http.healthCalls)
+        assertEquals("un seul handshake", 1, transport.opens)
+        assertEquals(0, link.attemptCount)
+        assertFalse(link.muteAccepted)
+        client.close()
+    }
 }

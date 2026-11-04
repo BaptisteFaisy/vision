@@ -15,6 +15,7 @@ internal val SAMPLE_HEALTH = LiveHealth(ok = true, model = "sam3.1", device = "c
  */
 internal class RecordingLiveClient(
     private val frames: (String) -> Result<LiveFrame> = { Result.success(SAMPLE_FRAME) },
+    private val healthAnswer: () -> Result<LiveHealth> = { Result.success(SAMPLE_HEALTH) },
 ) : LiveClient {
 
     var liveCalls = 0
@@ -41,7 +42,7 @@ internal class RecordingLiveClient(
 
     override suspend fun health(): Result<LiveHealth> {
         healthCalls++
-        return Result.success(SAMPLE_HEALTH)
+        return healthAnswer()
     }
 
     override fun close() {

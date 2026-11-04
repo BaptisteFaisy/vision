@@ -302,9 +302,11 @@ class WsLiveClientTest {
         assertEquals("handshake de reprise immédiat, en fond", 2, opens)
         assertTrue("le socket de reprise est déjà ouvert", client.isConnected)
 
+        // Le `101` de la reprise ne remet plus le compteur : au 2ᵉ timeout consécutif
+        // sans réponse, le backoff (500 ms) retient la réouverture au lieu de mitrailler.
         assertTrue(client.live("QQ==", listOf("person"), 640, 4).exceptionOrNull() is ApiError.Timeout)
-        assertEquals("chaque timeout rouvre aussitôt", 3, opens)
-        assertTrue(client.isConnected)
+        assertEquals("backoff armé, pas de réouverture immédiate", 2, opens)
+        assertFalse(client.isConnected)
     }
 
     /** Client dont les deux lectures du chemin WebSocket sont comptées. */
