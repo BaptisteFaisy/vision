@@ -38,7 +38,7 @@ class HazardWatchTest {
         assertEquals("Gauche.", cue!!.phrase)
         assertTrue(cue.urgent)
         assertEquals(HazardKind.BARRIER, cue.kind)
-        assertEquals(4, cue.level)
+        assertEquals(5, cue.level)
         assertEquals("fence-avoid", cue.antiRepeatKey)
         assertEquals(0.8f, cue.meters!!, 0.001f)
     }
@@ -410,7 +410,7 @@ class HazardWatchTest {
         assertTrue(cue.urgent)
         assertEquals(HazardKind.POLE, cue.kind)
         assertNull(cue.safetyPhrase)
-        assertEquals(7, cue.level)
+        assertEquals(8, cue.level)
         assertEquals("pole-avoid", cue.antiRepeatKey)
     }
 
@@ -474,7 +474,7 @@ class HazardWatchTest {
         assertEquals("Gauche.", cue!!.phrase)
         assertTrue(cue.urgent)
         assertEquals(HazardKind.PERSON, cue.kind)
-        assertEquals(2, cue.level)
+        assertEquals(3, cue.level)
         assertEquals("human-imminent", cue.antiRepeatKey)
     }
 
@@ -488,7 +488,7 @@ class HazardWatchTest {
         assertEquals("Droite.", cue!!.phrase)
         assertTrue(cue.urgent)
         assertEquals(HazardKind.OTHER, cue.kind)
-        assertEquals(7, cue.level)
+        assertEquals(8, cue.level)
         assertEquals("misc-avoid", cue.antiRepeatKey)
         assertNull(cue.safetyPhrase)
     }

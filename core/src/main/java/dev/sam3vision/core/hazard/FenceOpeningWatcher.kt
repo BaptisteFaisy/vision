@@ -22,7 +22,7 @@ data class FenceOpeningCue(
 
 /**
  * Lissage temporel du [FenceOpeningSignal] (SPEC v4 : grillages à moins de
- * 6 m, niveau 4, silence 4 s), miroir de `HazardWatcher` : un
+ * 6 m, niveau 5, silence 4 s), miroir de `HazardWatcher` : un
  * positif isolé ne parle pas, il faut [confirmFrames] positifs consécutifs
  * (l'état annoncé est le dernier), puis silence pendant [cooldownMs].
  *

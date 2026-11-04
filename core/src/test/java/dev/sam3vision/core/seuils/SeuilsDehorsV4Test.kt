@@ -67,7 +67,7 @@ class SeuilsDehorsV4Test {
         val cue = watcher.onSignal(signal, 1_000L, En)
 
         assertEquals("Right.", cue!!.phrase)
-        assertEquals(2, cue.level)
+        assertEquals(3, cue.level)
         assertEquals("human-imminent", cue.antiRepeatKey)
         assertTrue(cue.urgent)
     }
@@ -87,7 +87,7 @@ class SeuilsDehorsV4Test {
 
         assertEquals("Left.", cue!!.phrase)
         assertTrue(cue.urgent)
-        assertEquals(2, cue.level)
+        assertEquals(3, cue.level)
         assertEquals("human-imminent", cue.antiRepeatKey)
         assertNull(watcher.onSignal(left, 1_100L, En))
         assertNotNull(watcher.onSignal(left, 1_400L, En))
@@ -105,7 +105,7 @@ class SeuilsDehorsV4Test {
         val cue = watcher.onSignal(signal, 1_300L, En)
 
         assertEquals("Right.", cue!!.phrase)
-        assertEquals(2, cue.level)
+        assertEquals(3, cue.level)
         assertEquals("human-imminent", cue.antiRepeatKey)
         assertTrue(cue.urgent)
     }
@@ -120,7 +120,7 @@ class SeuilsDehorsV4Test {
             val cue = watcher.onSignal(signal, 1_000L, En)
             assertNotNull("label $label", cue)
             assertEquals("label $label", "Right.", cue!!.phrase)
-            assertEquals("label $label", 4, cue.level)
+            assertEquals("label $label", 5, cue.level)
             assertEquals("label $label", "fence-avoid", cue.antiRepeatKey)
             assertTrue("label $label", cue.urgent)
         }
@@ -131,7 +131,7 @@ class SeuilsDehorsV4Test {
             val cue = watcher.onSignal(signal, 1_000L, En)
             assertNotNull("label $label", cue)
             assertEquals("label $label", "Right.", cue!!.phrase)
-            assertEquals("label $label", 4, cue.level)
+            assertEquals("label $label", 5, cue.level)
             assertEquals("label $label", "wall-avoid", cue.antiRepeatKey)
             assertTrue("label $label", cue.urgent)
         }
@@ -162,7 +162,7 @@ class SeuilsDehorsV4Test {
         assertEquals("Right.", watcher.onSignal(signal, 1_300L, En)!!.phrase)
         val cue = watcher.onSignal(signal, 5_200L, En)
         assertEquals("Right.", cue!!.phrase)
-        assertEquals(4, cue.level)
+        assertEquals(5, cue.level)
         assertEquals("fence-avoid", cue.antiRepeatKey)
         assertTrue(cue.urgent)
     }
@@ -179,7 +179,7 @@ class SeuilsDehorsV4Test {
         val cue = watcher.onSignal(signal, 1_000L, En)
 
         assertEquals("Right.", cue!!.phrase)
-        assertEquals(7, cue.level)
+        assertEquals(8, cue.level)
         assertEquals("pole-avoid", cue.antiRepeatKey)
         assertTrue(cue.urgent)
     }
@@ -193,7 +193,7 @@ class SeuilsDehorsV4Test {
             val cue = watcher.onSignal(signal, 1_000L, En)
             assertNotNull("label $label", cue)
             assertEquals("label $label", "Right.", cue!!.phrase)
-            assertEquals("label $label", 7, cue.level)
+            assertEquals("label $label", 8, cue.level)
             assertEquals("label $label", "misc-avoid", cue.antiRepeatKey)
             assertTrue("label $label", cue.urgent)
         }
@@ -213,22 +213,22 @@ class SeuilsDehorsV4Test {
 
     @Test
     fun `routage niveaux et cles par label`() {
-        assertEquals(2, HazardConcepts.levelOf("person"))
-        assertEquals(2, HazardConcepts.levelOf("child"))
-        assertEquals(2, HazardConcepts.levelOf("dog"))
-        assertEquals(2, HazardConcepts.levelOf("stroller"))
-        assertEquals(4, HazardConcepts.levelOf("fence"))
-        assertEquals(4, HazardConcepts.levelOf("wall"))
-        assertEquals(4, HazardConcepts.levelOf("mur"))
-        assertEquals(4, HazardConcepts.levelOf("barrier"))
-        assertEquals(7, HazardConcepts.levelOf("pole"))
-        assertEquals(7, HazardConcepts.levelOf("sign"))
-        assertEquals(7, HazardConcepts.levelOf("street lamp"))
-        assertEquals(7, HazardConcepts.levelOf("scooter"))
-        assertEquals(7, HazardConcepts.levelOf("animal"))
-        assertEquals(7, HazardConcepts.levelOf("trash can"))
-        assertEquals(7, HazardConcepts.levelOf("souvenir shop"))
-        assertEquals(7, HazardConcepts.levelOf("trampoline"))
+        assertEquals(3, HazardConcepts.levelOf("person"))
+        assertEquals(3, HazardConcepts.levelOf("child"))
+        assertEquals(3, HazardConcepts.levelOf("dog"))
+        assertEquals(3, HazardConcepts.levelOf("stroller"))
+        assertEquals(5, HazardConcepts.levelOf("fence"))
+        assertEquals(5, HazardConcepts.levelOf("wall"))
+        assertEquals(5, HazardConcepts.levelOf("mur"))
+        assertEquals(5, HazardConcepts.levelOf("barrier"))
+        assertEquals(8, HazardConcepts.levelOf("pole"))
+        assertEquals(8, HazardConcepts.levelOf("sign"))
+        assertEquals(8, HazardConcepts.levelOf("street lamp"))
+        assertEquals(8, HazardConcepts.levelOf("scooter"))
+        assertEquals(8, HazardConcepts.levelOf("animal"))
+        assertEquals(8, HazardConcepts.levelOf("trash can"))
+        assertEquals(8, HazardConcepts.levelOf("souvenir shop"))
+        assertEquals(8, HazardConcepts.levelOf("trampoline"))
         assertEquals("human-imminent", HazardWatcher.KEY_HUMAN_IMMINENT)
         assertEquals("fence-avoid", HazardWatcher.KEY_FENCE_AVOID)
         assertEquals("misc-avoid", HazardWatcher.KEY_MISC_AVOID)
@@ -245,7 +245,7 @@ class SeuilsDehorsV4Test {
         val cue = watcher.onSignal(signal, 1_100L, En)
 
         assertEquals("Curb detected.", cue!!.phrase)
-        assertEquals(5, cue.level)
+        assertEquals(6, cue.level)
         assertEquals("curb", cue.antiRepeatKey)
     }
 
@@ -288,7 +288,7 @@ class SeuilsDehorsV4Test {
         val cue = watcher.onSignal(signal, 1_200L, En, StairDirection.Up, 0.2f)
 
         assertEquals("Stairs up.", cue!!.phrase)
-        assertEquals(6, cue.level)
+        assertEquals(7, cue.level)
         assertEquals("stairs", cue.antiRepeatKey)
     }
 
@@ -345,7 +345,7 @@ class SeuilsDehorsV4Test {
         val cue = watcher.onSignal(signal, 1_100L, En)
 
         assertEquals("Fence closed ahead.", cue!!.phrase)
-        assertEquals(4, cue.level)
+        assertEquals(5, cue.level)
         assertEquals("fence", cue.antiRepeatKey)
     }
 
@@ -376,7 +376,7 @@ class SeuilsDehorsV4Test {
         assertNull(far.onFrame(0.5f, 4.5f, En))
         assertNull(far.onFrame(0.5f, 4.5f, En))
         assertNull(far.onFrame(0.5f, 4.5f, En))
-        assertEquals(8, CrossingApproachWatcher.LEVEL)
+        assertEquals(2, CrossingApproachWatcher.LEVEL)
         assertEquals("crosswalk-announce", CrossingApproachWatcher.KEY_ANNOUNCE)
     }
 
