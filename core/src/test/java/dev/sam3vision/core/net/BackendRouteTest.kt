@@ -146,4 +146,28 @@ class BackendRouteTest {
         BackendRoute.clear()
         drainBackendPools()
     }
+
+    @Test
+    fun `reimposer une fabrique fraiche re-bumpe (piege getSocketFactory)`() {
+        // `Network.getSocketFactory()` alloue un objet neuf à chaque appel :
+        // l'identité ne prouve jamais « même réseau ». Verrouille le contrat
+        // qui impose le garde par clé réseau côté plateforme.
+        BackendRoute.install(CountingFactory())
+        val version = BackendRoute.version
+
+        assertTrue(BackendRoute.install(CountingFactory()))
+
+        assertEquals(version + 1, BackendRoute.version)
+    }
+
+    @Test
+    fun `meme reseau cellulaire deja impose = pas de reimposition`() {
+        // Clés = `Network.toString()` (netId) : un rappel répété pour le même
+        // réseau ne doit ni réimposer ni vider les pools (le drain tue le WS).
+        assertTrue(sameCellularRouteInstalled(routeActive = true, installedKey = "109", currentKey = "109"))
+        assertFalse(sameCellularRouteInstalled(routeActive = true, installedKey = "109", currentKey = "110"))
+        assertFalse(sameCellularRouteInstalled(routeActive = false, installedKey = "109", currentKey = "109"))
+        assertFalse(sameCellularRouteInstalled(routeActive = true, installedKey = null, currentKey = "109"))
+        assertFalse(sameCellularRouteInstalled(routeActive = true, installedKey = "109", currentKey = null))
+    }
 }
