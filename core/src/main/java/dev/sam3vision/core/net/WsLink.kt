@@ -88,6 +88,7 @@ class WsLink(
     private var nextAttemptAtMs = 0L
     private var iface: String? = null
     private var lastProofAtMs = clock()
+    private var lastFrameProofAtMs: Long? = null
     private var connectStartMs = clock()
     private var lastHandshakeMs: Long? = null
     private var lastCloseCode: Int? = null
@@ -129,6 +130,7 @@ class WsLink(
      */
     fun startConnecting() {
         lastProofAtMs = clock()
+        lastFrameProofAtMs = null
         connectStartMs = clock()
         _state.value = WsLinkState.Connecting
     }
@@ -193,6 +195,22 @@ class WsLink(
         lastProofAtMs = clock()
     }
 
+    /**
+     * Preuve par une réponse **corrélée** (une frame servie, pas un pong) : le
+     * socket prouve qu'il sert, pas seulement qu'il vit. [frameProvenWithin] s'en
+     * sert pour épargner un socket vivant au timeout d'une frame lente.
+     */
+    fun markFrameProof() {
+        markProof()
+        lastFrameProofAtMs = clock()
+    }
+
+    /** Une frame a-t-elle été répondue sur ce socket dans les [windowMs] écoulées ? */
+    fun frameProvenWithin(windowMs: Long): Boolean {
+        val proven = lastFrameProofAtMs ?: return false
+        return clock() - proven <= windowMs
+    }
+
     /** Millisecondes écoulées sans aucune preuve de vie. */
     fun silentForMs(): Long = (clock() - lastProofAtMs).coerceAtLeast(0L)
 
@@ -215,6 +233,7 @@ class WsLink(
         nextAttemptAtMs = 0L
         iface = null
         lastProofAtMs = clock()
+        lastFrameProofAtMs = null
         connectStartMs = clock()
         lastHandshakeMs = null
         lastCloseCode = null
