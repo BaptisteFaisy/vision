@@ -203,8 +203,8 @@ private fun GlassesProbeLayer(
 }
 
 /**
- * La boule et la phrase en cours. En guidage caméra ouverte, la boule
- * s'efface entre la rue et la carte mais la phrase d'iSee reste affichée
+ * La boule et la phrase en cours. En guidage, caméra ouverte ou non, la
+ * boule s'efface mais la phrase d'iSee reste affichée
  * en direct ; quand le user parle, son transcript prend le milieu. Extrait pour garder
  * `PortraitScene` sous le plafond de 50 lignes.
  */
@@ -223,10 +223,13 @@ private fun BoxWithConstraintsScope.SceneOrbLayer(
         with(density) {
             SpokenLine(currentCaption(state, position), fromUser, (geo.orbY - geo.orbR).toDp(), compact = open > 0.5f)
         }
-    } else if (hideGuidanceOrb(navState, open > 0.5f)) {
-        // Boule effacée : la phrase d'iSee reste entre la rue agrandie et la carte.
+    } else if (hideGuidanceOrb(navState)) {
+        // Boule effacée : la phrase reste sous la rue agrandie ; sans caméra elle prend
+        // la place de la boule (sous elle, une phrase longue passerait sous la carte).
+        val camera = open > 0.5f
         with(density) {
-            SpokenLine(currentCaption(state, position), fromUser, geo.pictureH.toDp() + 8.dp, compact = true)
+            val top = if (camera) geo.pictureH.toDp() + 8.dp else (geo.orbY - geo.orbR).toDp()
+            SpokenLine(currentCaption(state, position), fromUser, top, compact = camera)
         }
     } else {
         OrbClockLayer(view.scene, geo, open)

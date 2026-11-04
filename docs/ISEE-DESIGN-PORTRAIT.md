@@ -29,8 +29,7 @@
   repli en dégradés en dessous. **Aucun pixel sur la boule, aucun satellite.**
 - **Caméra = un bloc comme la carte** (`IseePortraitCamera`) : elle occupe
   60 % du haut quand elle est affichée (la taille parole,
-  `PICTURE_SPEAKING_H`), 70 % en guidage (`PICTURE_GUIDING_H`, la boule
-  s'efface entre le bloc et la carte, la phrase reste), avec les mêmes bords
+  `PICTURE_SPEAKING_H`), 70 % en guidage (`PICTURE_GUIDING_H`), avec les mêmes bords
   que la map — arrondi 16 dp (`IseeBlockShape`), même ombre portée, marges
   latérales 16 dp (`IseeBlockSide`), coins natifs rognés
   (`View.clipToIseeBlock`). Le haut du bloc commence **sous le bandeau
@@ -42,6 +41,9 @@
   devient nette (`focusPull`) ; un **voile haut** garde la pastille lisible.
   Elle reste visible **tant qu'une capture est vivante** (`captureLive`),
   quel que soit l'état (tenir le micro sous vidéo ne la cache pas).
+- **Carte active = pas de boule**, caméra ouverte ou fermée (demande user
+  2026-11-04, `hideGuidanceOrb`) : la phrase reste, sous le bloc caméra ou à
+  la place de la boule sans caméra.
 - **La boule respire** (respiration + ombre de contact). Au repos : centrée à
   40 % de la hauteur (`REST_Y`), rayon 33,5 % de la largeur (`REST_R`).
   Caméra ouverte : elle rétrécit et reste **entièrement sous l'image** (sauf en guidage,
