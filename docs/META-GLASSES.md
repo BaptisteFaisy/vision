@@ -148,6 +148,9 @@ Règles de cycle de vie, toutes dans `GlassesController` :
   `0xc001` côté lunettes) se rejoue seule, espacée 1/3/5 s, 3 fois au plus
   (`isQuickDeath`, `GlassesSessionOpener.settled`) ; passé ce budget, le refus
   se dit avec le geste qui répare (force-restart), pas un « restart » générique.
+  Depuis le 04/11/2026, les essais nomment la cause sue et les erreurs
+  déterministes (mise à jour DAT/SDK, DWA indisponible) se disent sans essai
+  (`sessionErrorIsFatal`, `GlassesSessionOpener.onSessionError`).
 - Un seul **attachement** à la fois (mutex) : `STARTED` répété et autorisation caméra
   accordée entre-temps ne doublent plus l'attache.
 - `disconnect()` annule l'ouverture en cours, repasse à `IDLE` d'abord (les portes
