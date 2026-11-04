@@ -20,11 +20,12 @@ testRunner = "1.7.0"
 junit = "4.13.2"
 jump3r = "1.0.4"
 json = "20240303"
-# Runtime DAT réellement installé sur les Ray-Ban Meta : 1.0.0.0.0 (mesuré le 27/10/2026,
-# Meta AI → Paramètres → Informations sur l'application). Le SDK 1.0.1 exige 1.0.1.1.0 :
-# la session s'ouvre puis les lunettes la coupent aussitôt (« Your glasses need an update »,
-# START_ERROR_DAT_APP_ON_THE_GLASSES_UPDATE_REQUIRED, absent du SDK 1.0.0). Garde : DatPinTest.
-mwdat = "1.0.0"
+# Runtime DAT servi aux Ray-Ban Meta : 1.0.1.x depuis la vague Meta AI 296 + mise à jour
+# sécurité obligatoire du 29/10/2026 (avec le SDK 1.0.0, les lunettes coupent chaque session
+# pendant le handshake — SESSION_ENDED_BY_DEVICE sans jamais STARTED, mesuré le 04/11/2026).
+# Le pin suit le runtime : 1.0.0 allait avec le runtime 1.0.0.0.0 (27/10/2026).
+# Garde : DatPinTest.
+mwdat = "1.0.1"
 guava = "33.3.1-android"
 
 [libraries]
