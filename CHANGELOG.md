@@ -3,6 +3,22 @@
 Le journal part du 2026-10-26 après 19 h : le commit de départ, puis une entrée par fait
 livré et ses preuves (tâche, fichiers, chiffres) dans l'arbre.
 
+## 2026-11-04 — iSee : phrase sans label locuteur, puces lieu et Traversée en rangée (branche `isee-puces-ligne-sans-label`)
+
+- **Demande** : supprimer « ISEE »/« YOU » au-dessus du texte parlé ; sur
+  la caméra, mettre la puce lieu à gauche de la puce Traversée
+  (ordre user du 04/11/2026).
+- **Fait** :
+  - `isee/IseeSpokenLine.kt` : `Text` locuteur supprimé (la couleur de
+    la phrase suffit : bleu user, ambre iSee) ; champ modèle `label`
+    conservé (tests `IseeSceneTest`/`IseeRenderTest` inchangés).
+  - `isee/IseePortraitCamera.kt` : `ModeToggles` en `Row` haut-centre
+    (lieu à gauche, Traversée à droite, 8 dp) ; `CrossingChip` et
+    `PlaceModeChip` sans receveur `BoxScope` (non utilisé).
+  - `docs/ISEE-DESIGN-PORTRAIT.md` : phrase sans label.
+- **Preuves** : gardes `check-isee-design` + `check-kotlin-limits` OK ;
+  CI PR #1144 verte (run 41755033893, `ci-core` + `ci-app`).
+
 ## 2026-11-04 — iSee : carte légèrement abaissée, ombre sans toucher les boutons (branche `isee-map-plus-bas`)
 
 - **Demande** : baisser un peu la carte sur l'écran iSee, l'ombre sous la
