@@ -13,7 +13,7 @@ class WsLegTest {
     private val base = "https://sam.example"
 
     private fun client(
-        binaryWs: Boolean = true,
+        binaryWs: Boolean = false,
         httpFallback: WsHttpFallback = WsHttpFallback(),
     ) = WsLiveClient(
         base,
@@ -33,8 +33,8 @@ class WsLegTest {
     }
 
     @Test
-    fun `le client part en binaire et suit useBinaryWs`() {
-        val ws = client()
+    fun `le client part en texte et suit useBinaryWs`() {
+        val ws = client(binaryWs = true)
 
         assertEquals("binary", ws.leg)
         ws.useBinaryWs(false)
@@ -46,7 +46,7 @@ class WsLegTest {
     @Test
     fun `le repli http colle la jambe http`() {
         val fallback = WsHttpFallback()
-        val ws = client(httpFallback = fallback)
+        val ws = client(binaryWs = true, httpFallback = fallback)
 
         assertEquals("binary", ws.leg)
         fallback.onWsFailed()
@@ -57,7 +57,8 @@ class WsLegTest {
 
     @Test
     fun `la session lit la jambe du client, http sans socket`() {
-        assertEquals("binary", LiveSession(client(), clock = { 0L }).leg)
+        assertEquals("texte par défaut", "text", LiveSession(client(), clock = { 0L }).leg)
+        assertEquals("binary", LiveSession(client(binaryWs = true), clock = { 0L }).leg)
         assertEquals("http", LiveSession(RecordingLiveClient(), clock = { 0L }).leg)
     }
 }

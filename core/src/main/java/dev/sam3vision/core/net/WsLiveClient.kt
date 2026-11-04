@@ -76,7 +76,7 @@ class WsLiveClient(
     private var pump: WsLinkPump? = null
 
     /** Jambe WS : état + annonces ([WsLeg], verrou du client tenu par l'appelant). */
-    private val leg = WsLeg(binaryWs, onBinaryChange)
+    private val wsLeg = WsLeg(binaryWs, onBinaryChange)
 
     override suspend fun live(
         jpegB64: String,
@@ -85,7 +85,7 @@ class WsLiveClient(
         maxObjects: Int,
     ): Result<LiveFrame> {
         val id = synchronized(lock) { ++nextId }
-        val binary = synchronized(lock) { leg.sendLeg() }
+        val binary = synchronized(lock) { wsLeg.sendLeg() }
         // Message (~28 Ko) assemblé hors verrou : `onText` (même lock) ne doit pas attendre.
         val sender: () -> Boolean
         if (binary) {
@@ -111,7 +111,7 @@ class WsLiveClient(
     ): Result<LiveFrame> {
         if (jpeg.isEmpty()) return Result.failure(ApiError.BadResponse(WS_BAD_IMAGE))
         val id = synchronized(lock) { ++nextId }
-        val binary = synchronized(lock) { leg.sendLeg() }
+        val binary = synchronized(lock) { wsLeg.sendLeg() }
         val sender: () -> Boolean
         if (binary) {
             val bytes = binaryFrame(id, jpeg, prompts, workEdge, maxObjects, maskFormat, maskEdge, withDepth, masks)
@@ -201,7 +201,7 @@ class WsLiveClient(
     /** Vrai quand les frames partent en POST /live — l'UI dit « HTTP » au lieu de « KO ». */
     val httpFallbackActive: Boolean get() = synchronized(lock) { httpFallback.active }
     /** Jambe empruntée par les frames ([legOf]) : lue par la sonde à chaque publication. */
-    val leg: String get() = synchronized(lock) { legOf(httpFallback.active, binaryWs && !binaryRefused) }
+    val leg: String get() = synchronized(lock) { legOf(httpFallback.active, wsLeg.isBinary) }
 
     /**
      * État du lien, **observable** : `Open` = socket vivant, `Degraded` = coupure connue et
@@ -253,7 +253,7 @@ class WsLiveClient(
 
     /** Jambe imposée par le bit `ws_binary` du `/health` (FIX-4). `false` = JSON direct. */
     fun useBinaryWs(binary: Boolean) {
-        synchronized(lock) { leg.use(binary) }
+        synchronized(lock) { wsLeg.use(binary) }
     }
 
     /** Le WebSocket ne sert pas au health : un seul appel `/health`, celui du client HTTP. */
@@ -389,7 +389,7 @@ class WsLiveClient(
     /** Orphelin `{"id":-1,"error":…}` : serveur sans WS binaire → repli JSON (sous [lock]). */
     private fun noteBinaryRefused(id: Int, text: String) {
         if (id != UNKNOWN_WS_ID || ERROR_MARK !in text) return
-        leg.refuse()
+        wsLeg.refuse()
         pending.values.firstOrNull { it.binary }?.reply?.completeExceptionally(FallbackToJson)
     }
 
@@ -422,8 +422,8 @@ class WsLiveClient(
         val killedBinary = synchronized(lock) {
             val unexpected = link.current != WsLinkState.Closed &&
                 !(error is WsClosedAbnormally && error.code == IDLE_CLOSE_CODE)
-            val kill = unexpected && leg.isBinary && pending.values.any { it.binary }
-            if (kill) leg.refuse()
+            val kill = unexpected && wsLeg.isBinary && pending.values.any { it.binary }
+            if (kill) wsLeg.refuse()
             kill
         }
         if (killedBinary) {
