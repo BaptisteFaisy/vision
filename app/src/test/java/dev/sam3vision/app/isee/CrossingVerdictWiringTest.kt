@@ -436,4 +436,34 @@ class CrossingVerdictWiringTest {
         assertEquals(listOf("Don't cross.", "Cross."), posted.map { it.text })
         assertEquals(CrossingVerdict.Cross, out.verdict)
     }
+
+    @Test
+    fun `sans feu, un mouvement recent interdit encore pendant 2 s`() {
+        // Ordre user du 04/11 : sans feu, « Cross. » exige 2 s sans voiture
+        // en mouvement — un mouvement à t bloque jusqu'à t+2000 (exclu).
+        val engine = engine(CrossingLight(null, CrossingState.Red))
+        engine.warm(3)
+        engine.onFrame(frame(car(box = listOf(100f, 100f, 200f, 200f))), emptyList(), "", 0L)
+        engine.onFrame(frame(car(box = listOf(90f, 90f, 210f, 210f))), emptyList(), "", 200L)
+        val moved = engine.onFrame(
+            frame(car(box = listOf(80f, 80f, 220f, 220f))), emptyList(), "", 400L,
+        )
+        assertTrue("croissance répétée : brut vrai", moved.carMoving)
+        assertTrue(moved.carMovingRecent)
+        assertEquals(CrossingVerdictLight.Absent, moved.light)
+        assertEquals(CrossingVerdict.DontCross, moved.verdict)
+        // Voiture figée, mais dernier mouvement à 400 : 1 999 encore dedans.
+        val calm = engine.onFrame(
+            frame(car(box = listOf(80f, 80f, 220f, 220f))), emptyList(), "", 1_999L,
+        )
+        assertFalse("voiture figée : brut faux", calm.carMoving)
+        assertTrue("fenêtre 2 s : tranche encore", calm.carMovingRecent)
+        assertEquals(CrossingVerdict.DontCross, calm.verdict)
+        // Fenêtre écoulée (2 400 − 400 = 2 000) : « Cross. ».
+        val free = engine.onFrame(
+            frame(car(box = listOf(80f, 80f, 220f, 220f))), emptyList(), "", 2_400L,
+        )
+        assertFalse(free.carMovingRecent)
+        assertEquals(CrossingVerdict.Cross, free.verdict)
+    }
 }

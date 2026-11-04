@@ -33,6 +33,8 @@ internal data class ProbeRest(
     val placed: List<PlacedLabel>,
     val cross: CrossingPatch?,
     val phrase: String?,
+    /** Frame du moteur verdict (`null` hors Traversée : l'écran garde l'ancien état). */
+    val verdict: CrossingVerdictFrame? = null,
 )
 
 /**
@@ -117,12 +119,12 @@ internal fun LiveProbe.computeRest(
     // obstacles, 101/102). Le veto trafic de la même frame lui est passé :
     // voiture proche/en approche ⇒ jamais « Cross. » (le feu vert ne suffit
     // plus). Le fond juge les pistes voitures : un pan sur une garée ne bloque pas.
-    if (crossingActive) {
+    val verdictFrame = if (crossingActive) {
         verdictEngine.onFrame(
             frame, readings, jpegB64, at, motion = ProbeBackgroundMotion.lastMotion,
             carVeto = cross?.veto == true,
         )
-    }
+    } else null
     val phrase = phraseOf(placed, readings, frame, at, speechLanguage,
         lens.widthFovDeg(frame.width, frame.height))
     feedCrossingLateral(crossingActive, frame.objects, frame.width, frame.height, readings, distances.effectivePose(), lens, at, speechLanguage)
@@ -131,7 +133,7 @@ internal fun LiveProbe.computeRest(
     // Compteur de marches : le masque exact borne les frames suivantes (repli boîte sinon).
     StairCannyCount.setMaskPlane(stairsMaskPlaneOf(frame.objects, frame.width, frame.height, grays))
     muteProbeLine(frame, readings, phrase)
-    return ProbeRest(rawDetections, readings, placed, cross, phrase)
+    return ProbeRest(rawDetections, readings, placed, cross, phrase, verdictFrame)
 }
 
 /**
@@ -183,7 +185,11 @@ internal fun LiveProbe.publishRest(active: LiveSession, frame: LiveFrame, rest: 
             steering = steeringCueOf(),
             samPassage = frame.passage,
             detour = if (_state.value.crossingActive) false else voice.detour,
-            crossing = rest.cross?.state ?: current.crossing, crossingBox = rest.cross?.box,
+            // L'écran lit le verdict parlé (pastille, chip, bandeau) : une seule
+            // décision, plus de « Cross. » affiché pendant « Don't cross. ».
+            crossing = rest.verdict?.overlay ?: rest.cross?.state ?: current.crossing,
+            crossingBox = rest.cross?.box,
+            crossingVerdict = rest.verdict?.verdict,
             traversePhase = rest.cross?.phase,
             scanLines = CrosswalkScanWatch.display(speechLanguage),
             motion = ProbeBackgroundMotion.lastDebug,

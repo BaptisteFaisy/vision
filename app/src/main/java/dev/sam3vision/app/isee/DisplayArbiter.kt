@@ -9,6 +9,7 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.graphics.Color
 import dev.sam3vision.core.crossing.CrossingLevels
 import dev.sam3vision.core.crossing.CrossingLightDue
+import dev.sam3vision.core.crossing.CrossingVerdict
 import dev.sam3vision.core.crossing.CrossingVerdictText
 import dev.sam3vision.core.live.GuidanceHeartbeat
 import dev.sam3vision.core.live.GuidanceInstruction
@@ -162,12 +163,13 @@ internal fun stairsDisplayText(crossingActive: Boolean, found: StairLabelSignal,
 
 /**
  * Texte verdict : « Cross. » (littéral du clip, anglais comme la voix) quand
- * [TraversePhase.TRAVERSER] autorise ; `null` sinon — le refus ne s'affiche
- * plus, la voix seule dit « Don't cross. » (ordre user du 03/11). Pur, testé
- * en JVM.
+ * le verdict parlé autorise ; `null` sinon — le refus ne s'affiche plus, la
+ * voix seule dit « Don't cross. » (ordre user du 03/11). Lit le verdict, pas
+ * la phase prudente : l'écran et la voix partagent une seule décision (ordre
+ * user du 04/11). Pur, testé en JVM.
  */
-internal fun verdictDisplayText(crossingActive: Boolean, phase: TraversePhase?): String? {
-    if (!crossingActive || phase != TraversePhase.TRAVERSER) return null
+internal fun verdictDisplayText(crossingActive: Boolean, verdict: CrossingVerdict?): String? {
+    if (!crossingActive || verdict != CrossingVerdict.Cross) return null
     return CrossingVerdictText.CROSS
 }
 
@@ -189,7 +191,7 @@ internal fun displayInputsOf(rest: LiveProbeState, verdictProofAtMs: Long?, lang
     DisplayInputs(
         vehicleText = vehicleDisplayText(rest.crossingActive, rest.traversePhase, language),
         stairsText = stairsDisplayText(rest.crossingActive, stairsFoundOf(rest), language),
-        verdictText = verdictDisplayText(rest.crossingActive, rest.traversePhase),
+        verdictText = verdictDisplayText(rest.crossingActive, rest.crossingVerdict),
         verdictProofAtMs = verdictProofAtMs?.takeIf { rest.crossingActive },
         directionText = directionDisplayText(rest.pulse, language),
     )

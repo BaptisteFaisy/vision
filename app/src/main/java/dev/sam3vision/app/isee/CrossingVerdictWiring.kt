@@ -40,9 +40,9 @@ internal fun busVerdictEngine(): CrossingVerdictEngine = CrossingVerdictEngine(
 
 /**
  * Frame traversée (SPEC v4) : [posts] ordonnés (verdict 0, humains 101,
- * bordures 102), [verdict] et ses entrées ([light], [carMoving], [carVeto]),
- * [overlay] (l'état rouge-vert affiché et vibré) et [haptic] (l'état à vibrer,
- * `null` hors front — la répétition des 3 s ne vibre pas).
+ * bordures 102), [verdict] et ses entrées ([light], [carMovingRecent],
+ * [carVeto]), [overlay] (l'état rouge-vert affiché et vibré) et [haptic]
+ * (l'état à vibrer, `null` hors front — la répétition des 3 s ne vibre pas).
  */
 data class CrossingVerdictFrame(
     val posts: List<CrossingPost>,
@@ -53,6 +53,8 @@ data class CrossingVerdictFrame(
     val haptic: CrossingState?,
     /** Veto trafic de la frame (voiture proche/en approche, bus, camion, moto). */
     val carVeto: Boolean = false,
+    /** Mouvement qui a tranché (brut de la frame ou fenêtre 2 s). */
+    val carMovingRecent: Boolean = false,
 )
 
 /**
@@ -88,6 +90,9 @@ class CrossingVerdictEngine(
 ) {
     /** Dernier verdict vibré (`null` = aucun : le premier verdict parlé vibre). */
     private var felt: CrossingVerdict? = null
+
+    /** [atMs] du dernier mouvement voiture brut (`null` = aucun vu). */
+    private var lastMovingAtMs: Long? = null
 
     /** Frames de suite sans preuve de verdict (ni vert ni rouge lu) : borne le silence. */
     private var unprovenFrames = 0
@@ -131,7 +136,8 @@ class CrossingVerdictEngine(
         val carReadings = readings.filter { CrossingVerdictRule.isCarLabel(it.label) }
         cars.update(carDetections, carReadings, atMs, motion = motion)
         val moving = cars.movingThisFrame
-        val verdict = CrossingVerdictRule.decide(light, moving, carVeto)
+        val recent = recentMoving(moving, atMs)
+        val verdict = CrossingVerdictRule.decide(light, recent, carVeto)
         val cue = announcer.onFrame(atMs, verdict)
         // Sans preuve on ne PRONONCE rien (pas de « Don't cross. » puis
         // « Cross. » 100 ms plus tard) — mais le silence est BORNÉ (D3/D4).
@@ -148,8 +154,19 @@ class CrossingVerdictEngine(
         // la phrase, jamais avant elle.
         val haptic = if (!silent && cue != null && felt != verdict) overlay else null
         if (!silent && cue != null) felt = verdict
-        verdictProbeLine(read.box != null, evidence, light, moving, carVeto, verdict, silent)
-        return CrossingVerdictFrame(posts, verdict, light, moving, overlay, haptic, carVeto)
+        verdictProbeLine(read.box != null, evidence, light, recent, carVeto, verdict, silent)
+        return CrossingVerdictFrame(posts, verdict, light, moving, overlay, haptic, carVeto, recent)
+    }
+
+    /**
+     * Mouvement qui tranche : le brut de la frame, ou tout mouvement vu dans
+     * la fenêtre ([MOVING_WINDOW_MS]) — sans feu, « Cross. » exige 2 s de
+     * calme (ordre user du 04/11). Seule la branche sans-feu change : le vert
+     * l'ignore (vert = Cross), le rouge/inconnu et le veto tranchent avant.
+     */
+    private fun recentMoving(moving: Boolean, atMs: Long): Boolean {
+        if (moving) lastMovingAtMs = atMs
+        return moving || lastMovingAtMs?.let { atMs - it < MOVING_WINDOW_MS } == true
     }
 
     /**
@@ -266,8 +283,14 @@ class CrossingVerdictEngine(
         gate.reset()
         vote.reset()
         felt = null
+        lastMovingAtMs = null
         unprovenFrames = 0
         unprovenSinceMs = null
+    }
+
+    companion object {
+        /** Fenêtre « voiture en mouvement » du sans-feu : 2 s (ordre user du 04/11). */
+        const val MOVING_WINDOW_MS = 2_000L
     }
 }
 
