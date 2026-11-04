@@ -7,15 +7,20 @@ import org.junit.Test
 class PictoSizesTest {
 
     @Test
-    fun `le defaut est M, 27 pour cent de la largeur`() {
-        assertEquals(PictoSize.M, PictoSize.DEFAULT)
-        assertEquals(0.27f, PictoSize.DEFAULT.fraction, 1e-6f)
+    fun `le defaut est XXL, 54 pour cent de la largeur`() {
+        assertEquals(PictoSize.XXL, PictoSize.DEFAULT)
+        assertEquals(0.54f, PictoSize.DEFAULT.fraction, 1e-6f)
     }
 
     @Test
-    fun `le panel couvre XS a XL dans l'ordre`() {
+    fun `le defaut vaut le double de M`() {
+        assertEquals(2 * PictoSize.M.fraction, PictoSize.DEFAULT.fraction, 1e-6f)
+    }
+
+    @Test
+    fun `le panel couvre XS a XXL dans l'ordre`() {
         assertEquals(
-            listOf(0.14f, 0.20f, 0.27f, 0.35f, 0.45f),
+            listOf(0.14f, 0.20f, 0.27f, 0.35f, 0.45f, 0.54f),
             PictoSize.entries.map { it.fraction },
         )
     }

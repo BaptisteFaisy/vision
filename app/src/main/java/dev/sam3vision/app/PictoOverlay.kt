@@ -28,6 +28,7 @@ import androidx.compose.ui.graphics.ImageBitmap
 import androidx.compose.ui.graphics.Shadow
 import androidx.compose.ui.graphics.asImageBitmap
 import androidx.compose.ui.graphics.drawscope.Stroke
+import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.text.TextStyle
 import androidx.compose.ui.text.drawText
 import androidx.compose.ui.text.font.FontWeight
@@ -85,8 +86,8 @@ fun pictoRects(hits: List<PictoHit>, width: Int, height: Int, transform: CropTra
         )
     }
 
-/** Taille du pictogramme affiché en grand : lisible d'un coup d'œil, sans manger l'écran. */
-private val BIG_PICTO_SIZE = 176.dp
+/** Taille du pictogramme affiché en grand : le double (352 dp, ordre user), pivote de 90° vers la droite. */
+private val BIG_PICTO_SIZE = 352.dp
 
 /**
  * Le premier objet vu, en grand sous les bandeaux : son dessin + son nom,
@@ -120,7 +121,7 @@ fun LivePictoBig(layer: PictoOverlay?, pngOf: (String) -> ByteArray?) {
                 .padding(12.dp),
             horizontalAlignment = Alignment.CenterHorizontally,
         ) {
-            bitmap?.let { Image(it, contentDescription = hit.label, modifier = Modifier.size(BIG_PICTO_SIZE)) }
+            bitmap?.let { Image(it, contentDescription = hit.label, modifier = Modifier.size(BIG_PICTO_SIZE).graphicsLayer { rotationZ = 90f }) }
             Text(hit.label, color = Color.Yellow, fontSize = 22.sp, fontWeight = FontWeight.Bold)
         }
     }

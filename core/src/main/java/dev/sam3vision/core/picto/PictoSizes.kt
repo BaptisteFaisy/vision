@@ -1,7 +1,7 @@
 package dev.sam3vision.core.picto
 
 /**
- * Panel des tailles d'affichage des pictogrammes : cinq tailles fixes,
+ * Panel des tailles d'affichage des pictogrammes : six tailles fixes,
  * carrées, en fraction de la largeur de la carte caméra — jamais la taille
  * du rectangle reconnu, qui varie avec la distance et le cadreur.
  *
@@ -14,9 +14,11 @@ package dev.sam3vision.core.picto
  * | M      | 27 %        | 292 px   | 15,2 %        |
  * | L      | 35 %        | 378 px   | 19,7 %        |
  * | XL     | 45 %        | 486 px   | 25,3 %        |
+ * | XXL    | 54 %        | 583 px   | 30,4 %        |
  *
- * [DEFAULT] (M) : lisible d'un coup d'œil sans manger la scène, et deux
- * pictos M tiennent côte à côte sur la largeur. Pur et testé en JVM.
+ * [DEFAULT] (XXL) : le double de M (ordre user du 04/11/2026), lisible d'un
+ * coup d'œil ; deux pictos XXL ne tiennent plus côte à côte. Pur et testé
+ * en JVM.
  */
 enum class PictoSize(val fraction: Float) {
     XS(0.14f),
@@ -24,11 +26,12 @@ enum class PictoSize(val fraction: Float) {
     M(0.27f),
     L(0.35f),
     XL(0.45f),
+    XXL(0.54f),
     ;
 
     companion object {
-        /** Taille affichée : M pour tous les pictos, sans exception. */
-        val DEFAULT: PictoSize = M
+        /** Taille affichée : XXL (le double de M) pour tous les pictos, sans exception. */
+        val DEFAULT: PictoSize = XXL
     }
 }
 
