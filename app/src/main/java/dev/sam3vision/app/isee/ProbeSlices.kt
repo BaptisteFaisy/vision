@@ -7,6 +7,7 @@ import androidx.compose.runtime.getValue
 import androidx.compose.runtime.remember
 import dev.sam3vision.app.DistanceLayer
 import dev.sam3vision.core.crossing.CrossingState
+import dev.sam3vision.core.crossing.CrossingVerdict
 import dev.sam3vision.core.live.GuidancePulse
 import dev.sam3vision.core.live.SteeringCue
 import dev.sam3vision.core.traverse.TraversePhase
@@ -71,6 +72,7 @@ internal data class ProbeRestKey(
     val crossing: CrossingState?,
     val crossingBox: List<Float>?,
     val traversePhase: TraversePhase?,
+    val crossingVerdict: CrossingVerdict?,
     val scanLines: CrosswalkScanLines?,
 )
 
@@ -86,6 +88,7 @@ internal fun restKeyOf(s: LiveProbeState): ProbeRestKey =
         crossing = s.crossing,
         crossingBox = s.crossingBox,
         traversePhase = s.traversePhase,
+        crossingVerdict = s.crossingVerdict,
         scanLines = s.scanLines,
     )
 

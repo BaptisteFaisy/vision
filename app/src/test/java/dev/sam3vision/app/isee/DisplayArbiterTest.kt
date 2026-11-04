@@ -1,5 +1,6 @@
 package dev.sam3vision.app.isee
 
+import dev.sam3vision.core.crossing.CrossingVerdict
 import dev.sam3vision.core.live.GuidancePulse
 import dev.sam3vision.core.live.GuidanceWord
 import dev.sam3vision.core.speech.SpeechLanguage
@@ -159,13 +160,25 @@ class DisplayArbiterTest {
     }
 
     @Test
-    fun `texte verdict - seul traverser s'affiche, le refus se tait`() {
-        assertEquals("Cross.", verdictDisplayText(true, TraversePhase.TRAVERSER))
-        assertNull(verdictDisplayText(true, TraversePhase.ATTENDRE))
-        assertNull(verdictDisplayText(true, TraversePhase.PRET))
-        assertNull(verdictDisplayText(true, TraversePhase.ALERTE))
+    fun `texte verdict - seul cross parle s'affiche, le refus se tait`() {
+        assertEquals("Cross.", verdictDisplayText(true, CrossingVerdict.Cross))
+        assertNull(verdictDisplayText(true, CrossingVerdict.DontCross))
         assertNull(verdictDisplayText(true, null))
-        assertNull(verdictDisplayText(false, TraversePhase.TRAVERSER))
+        assertNull(verdictDisplayText(false, CrossingVerdict.Cross))
+    }
+
+    @Test
+    fun `texte verdict - phase traverser mais voix refuse, rien a l'ecran`() {
+        // Non-régression 04/11 : l'écran lisait la phase prudente (TRAVERSER)
+        // pendant que la voix disait « Don't cross. » — il lit le verdict.
+        val rest = LiveProbeState(
+            crossingActive = true,
+            traversePhase = TraversePhase.TRAVERSER,
+            crossingVerdict = CrossingVerdict.DontCross,
+        )
+        assertNull(displayInputsOf(rest, 9_500L, SpeechLanguage.En).verdictText)
+        val ok = rest.copy(crossingVerdict = CrossingVerdict.Cross)
+        assertEquals("Cross.", displayInputsOf(ok, 9_500L, SpeechLanguage.En).verdictText)
     }
 
     @Test

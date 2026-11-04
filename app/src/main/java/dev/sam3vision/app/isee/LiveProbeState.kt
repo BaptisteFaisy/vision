@@ -110,6 +110,12 @@ data class LiveProbeState(
      */
     val traversePhase: dev.sam3vision.core.traverse.TraversePhase? = null,
     /**
+     * Verdict parlé de la traversée (`null` = mode coupé ou rien de publié
+     * encore) : l'écran (bandeau « Cross. », pastille, chip) lit la même
+     * décision que la voix (ordre user du 04/11).
+     */
+    val crossingVerdict: dev.sam3vision.core.crossing.CrossingVerdict? = null,
+    /**
      * Lignes du scan traversée (`null` = inactif : rien à l'écran) : consigne
      * ou constat en cours + constats latéraux déjà rendus, lus sur la vidéo
      * ([CrosswalkScanBanner]). Publiées avec la phrase, dans la même écriture.
