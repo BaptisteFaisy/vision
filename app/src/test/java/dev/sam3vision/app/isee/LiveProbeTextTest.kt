@@ -5,7 +5,10 @@ import dev.sam3vision.core.live.FrameTimings
 import dev.sam3vision.core.distance.DistanceReading
 import dev.sam3vision.core.distance.DistanceText
 import dev.sam3vision.core.net.ApiError
+import dev.sam3vision.core.net.BackendRoute
 import dev.sam3vision.core.net.WS_LINK_PREFIX
+import java.net.UnknownHostException
+import javax.net.SocketFactory
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
 import org.junit.Assert.assertTrue
@@ -240,6 +243,27 @@ class LiveProbeTextTest {
         assertEquals(
             "SAM GPU off — ask b to turn it on",
             probeFailureText(ApiError.BackendStopped()),
+        )
+    }
+
+    @Test
+    fun `l'echec DNS en bascule lunettes dit handover au lieu du brut`() {
+        BackendRoute.install(SocketFactory.getDefault())
+        try {
+            assertEquals(
+                HANDOVER_LINE,
+                probeFailureText(ApiError.Network("unknown host", cause = UnknownHostException("dns mort"))),
+            )
+        } finally {
+            BackendRoute.clear()
+        }
+    }
+
+    @Test
+    fun `l'echec DNS hors bascule remonte brut`() {
+        assertEquals(
+            "unknown host",
+            probeFailureText(ApiError.Network("unknown host", cause = UnknownHostException("dns mort"))),
         )
     }
 

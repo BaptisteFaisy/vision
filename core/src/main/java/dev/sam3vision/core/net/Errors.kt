@@ -1,6 +1,7 @@
 package dev.sam3vision.core.net
 
 import dev.sam3vision.core.settings.SamRegion
+import java.net.UnknownHostException
 
 /**
  * Erreurs réseau typées, avec un message directement affichable dans l'UI.
@@ -85,3 +86,14 @@ val Throwable.isTransient: Boolean
         is ApiError.Http -> code >= 500
         else -> false
     }
+
+/**
+ * Échec DNS pendant la bascule lunettes → cellulaire ([BackendRoute.active]) :
+ * le Wi-Fi des lunettes (sans internet) est devenu la route par défaut et le
+ * DNS système a suivi cette route morte (`UnknownHostException`, prouvé au
+ * logcat x14). Le DNS n'a rien envoyé : un seul nouvel essai est gratuit
+ * (zéro inférence rejouée) et laisse le temps à la route de s'installer.
+ * Hors session lunettes, toujours faux : politique de retry inchangée.
+ */
+fun isHandoverTransient(error: Throwable): Boolean =
+    BackendRoute.active && error is ApiError.Network && error.cause is UnknownHostException
