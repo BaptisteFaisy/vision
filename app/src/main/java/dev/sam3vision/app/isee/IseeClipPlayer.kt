@@ -17,8 +17,8 @@ interface ClipSink {
     /** Joue un clip en tranche ([sliceMs], 700 ms voix) : vitesse adaptée, pitch conservé. */
     suspend fun playSlice(file: File, sliceMs: Long): Result<Unit>
 
-    /** Joue une tranche et suspend jusqu'à sa fin (phrases composées). */
-    suspend fun playQueued(bytes: ByteArray): Result<PlaybackEnd>
+    /** Joue une tranche et suspend jusqu'à sa fin ([sliceMs] : vitesse adaptée, comme les tranches). */
+    suspend fun playQueued(bytes: ByteArray, sliceMs: Long? = null): Result<PlaybackEnd>
 
     /** Coupe la lecture en cours. */
     fun stop()
@@ -67,13 +67,16 @@ class IseeClipPlayer(
      * meters. ») : vrai si la phrase complète est partie. Faux, sans rien
      * jouer, si un clip est inconnu ou manquant ; faux aussi si une tranche
      * est coupée ou refusée (les tranches déjà jouées restent entendues).
+     * [sliceMs] non nul : atomes joints en une lecture tranchée (zéro blanc
+     * entre atomes, vitesse adaptée — le compte escaliers).
      */
-    suspend fun speakSequence(clipIds: List<String>, urgent: Boolean): Boolean {
+    suspend fun speakSequence(clipIds: List<String>, urgent: Boolean, sliceMs: Long? = null): Boolean {
         if (clipIds.isEmpty()) return false
         val texts = clipIds.map { IseeClipsEn.all[it] ?: return false }
         val files = clipIds.map { clipFile(it) ?: return false }
         if (urgent) sink.stop()
         onSpeaking(texts.joinToString(" "))
+        if (sliceMs != null) return speakJoined(files, sliceMs)
         for (file in files) {
             val end = sink.playQueued(file.readBytes())
                 .getOrElse {
@@ -84,6 +87,25 @@ class IseeClipPlayer(
                 onSpeaking("")
                 return false
             }
+        }
+        return true
+    }
+
+    /**
+     * Chaîne jointe : les MP3 concaténés (les lecteurs resynchronisent aux
+     * frontières) partent en une lecture tranchée — aucun redémarrage entre
+     * atomes. Faux si coupée ou refusée (silence signalé).
+     */
+    private suspend fun speakJoined(files: List<File>, sliceMs: Long): Boolean {
+        val joined = files.map { it.readBytes() }.reduce { acc, bytes -> acc + bytes }
+        val end = sink.playQueued(joined, sliceMs)
+            .getOrElse {
+                onSpeaking("")
+                return false
+            }
+        if (end != PlaybackEnd.Done) {
+            onSpeaking("")
+            return false
         }
         return true
     }

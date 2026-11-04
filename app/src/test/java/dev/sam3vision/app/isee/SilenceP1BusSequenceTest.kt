@@ -44,7 +44,7 @@ class SilenceP1BusSequenceTest {
             return Result.success(Unit)
         }
 
-        override suspend fun playQueued(bytes: ByteArray): Result<PlaybackEnd> {
+        override suspend fun playQueued(bytes: ByteArray, sliceMs: Long?): Result<PlaybackEnd> {
             queued += 1
             return Result.success(PlaybackEnd.Done)
         }

@@ -114,3 +114,14 @@ Deux pièges mesurés sur ce clip : `-30dB` mange la syllabe douce « walk »
 `stop_periods=-1` continue dans le mot. Un `--regenerate` restaure la
 version lente : repasser la recette (fichier < 0,95 s) et la garde avant de
 commiter.
+
+Le compte escaliers (« 1 step. » / « N steps. », chaînes `StairChain`,
+ordre user du 04/11) tient le même budget 500 ms, joué joint : les 23
+atomes `c_*` sont trimmés avec la recette ci-dessus, plus
+`-id3v2_version 0 -write_id3v1 0` (joints en un seul MP3 au runtime — aucun
+tag au milieu du flux), puis joués en une lecture tranchée 500 ms
+(`STAIR_COUNT_SLICE_MS`, vitesse adaptée jusqu'à ×3, compte à rebours
+« N steps left. » exclu : trop long joint, il enchaîne comme avant).
+Garde : `COUNT_CHAINS` dans `tools/check-isee-clips-en.py` — chaque paire
+tient 0,5 s au plafond de tranche (paire la plus longue « seventeen
+steps » : 1,46 s joints → 488 ms à ×2,93, relevé du 04/11/2026).

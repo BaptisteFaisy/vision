@@ -33,7 +33,7 @@ class Fix5SyncFailureReleasesBusTest {
     private object UnusedSink : ClipSink {
         override suspend fun playFile(file: File): Result<Unit> = error("inattendu")
         override suspend fun playSlice(file: File, sliceMs: Long): Result<Unit> = error("inattendu")
-        override suspend fun playQueued(bytes: ByteArray): Result<PlaybackEnd> = error("inattendu")
+        override suspend fun playQueued(bytes: ByteArray, sliceMs: Long?): Result<PlaybackEnd> = error("inattendu")
         override fun stop() = Unit
     }
 

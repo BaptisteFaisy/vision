@@ -2,12 +2,14 @@ package dev.sam3vision.app.isee
 
 import dev.sam3vision.app.BuildConfig
 import dev.sam3vision.app.SIDEWALK_SLICE_MS
+import dev.sam3vision.app.STAIR_COUNT_SLICE_MS
 import dev.sam3vision.app.SpeechPlayer
 import dev.sam3vision.app.VOICE_SLICE_MS
 import dev.sam3vision.app.safety.CrashGuard
 import dev.sam3vision.app.safety.redactSecrets
 import dev.sam3vision.core.crossing.CrossingLevels
 import dev.sam3vision.core.speech.IseeClipsEn
+import dev.sam3vision.core.stairs.StairChain
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Job
@@ -68,6 +70,14 @@ internal fun sliceMsForLevel(level: Int): Long? = when (level) {
 }
 
 /**
+ * Tranche d'une chaîne : le compte escaliers (« 1 step. » / « N steps. »,
+ * atomes trimmés) part joint en 500 ms ; toute autre chaîne enchaîne
+ * comme avant (`null`). Pur, testé en JVM.
+ */
+internal fun countSliceMs(clips: List<String>): Long? =
+    STAIR_COUNT_SLICE_MS.takeIf { StairChain.isCountChain(clips) }
+
+/**
  * Porte-parole du [VoiceBus] : le câblage applicatif (une seule implémentation,
  * posée au démarrage — voir le câblage du ViewModel). [idle] vrai = le lecteur
  * partagé est libre ; [say] parle (en coroutine — le bus ne suspend jamais ;
@@ -91,7 +101,7 @@ interface VoiceBusSpeaker {
 internal class SpeechPlayerClipSink(private val player: SpeechPlayer) : ClipSink {
     override suspend fun playFile(file: File): Result<Unit> = player.playFile(file)
     override suspend fun playSlice(file: File, sliceMs: Long): Result<Unit> = player.playSliceFile(file, sliceMs)
-    override suspend fun playQueued(bytes: ByteArray) = player.playQueued(bytes)
+    override suspend fun playQueued(bytes: ByteArray, sliceMs: Long?) = player.playQueued(bytes, sliceMs)
     override fun stop() = player.stop()
 }
 
@@ -418,7 +428,7 @@ internal class BusSpeaker(
     private suspend fun speakGuarded(level: Int, text: String, clipId: String?, clips: List<String>, current: Long): Boolean {
         return try {
             if (clips.isNotEmpty()) {
-                val seqOk = this@BusSpeaker.clips.speakSequence(clips, urgent = true)
+                val seqOk = this@BusSpeaker.clips.speakSequence(clips, urgent = true, sliceMs = countSliceMs(clips))
                 if (BuildConfig.DEBUG) android.util.Log.d(TAG_MUTE, "bus-seq level=$level ok=$seqOk n=${clips.size}")
                 if (current == generation) VoiceBus.onSpeechIdle()
                 seqOk

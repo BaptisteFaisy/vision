@@ -27,4 +27,15 @@ object StairChain {
         val number = IseeClipsEn.cardinal(remaining) ?: return emptyList()
         return listOf(number, IseeClipsEn.C_STEPS_LEFT)
     }
+
+    /**
+     * Vrai si [clips] est une chaîne du compte ([countClips], « 1 step. » /
+     * « N steps. ») : la seule jouée jointe en tranche 500 ms (atomes
+     * trimmés, garde paires) — le compte à rebours enchaîne comme avant.
+     */
+    fun isCountChain(clips: List<String>): Boolean {
+        if (clips.size != 2) return false
+        val n = clips[0].removePrefix("c_").toIntOrNull() ?: return false
+        return clips == countClips(n, SpeechLanguage.En)
+    }
 }
