@@ -46,20 +46,15 @@ class IseeGuidanceMapTest {
     }
 
     @Test
-    fun `en guidage camera ouverte, la boule s'efface entre la rue et la carte`() {
-        assertTrue(hideGuidanceOrb(guiding, true))
+    fun `carte active, la boule s'efface quelle que soit la camera`() {
+        assertTrue(hideGuidanceOrb(guiding))
     }
 
     @Test
-    fun `en guidage camera fermee, la boule reste au milieu`() {
-        assertFalse(hideGuidanceOrb(guiding, false))
-    }
-
-    @Test
-    fun `hors guidage, la camera ne cache jamais la boule`() {
-        assertFalse(hideGuidanceOrb(VoiceNavUiState.Idle, true))
-        assertFalse(hideGuidanceOrb(VoiceNavUiState.Confirming("la gare", null, true, null), true))
-        assertFalse(hideGuidanceOrb(VoiceNavUiState.Arrived("la gare", null), true))
+    fun `sans carte active, la boule n'est jamais effacee par cette regle`() {
+        assertFalse(hideGuidanceOrb(VoiceNavUiState.Idle))
+        assertFalse(hideGuidanceOrb(VoiceNavUiState.Confirming("la gare", null, true, null)))
+        assertFalse(hideGuidanceOrb(VoiceNavUiState.Arrived("la gare", null)))
     }
 
     @Test

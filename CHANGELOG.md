@@ -3,6 +3,14 @@
 Le journal part du 2026-10-26 après 19 h : le commit de départ, puis une entrée par fait
 livré et ses preuves (tâche, fichiers, chiffres) dans l'arbre.
 
+## 2026-11-04 — iSee : carte active sans boule, ordre GPS du direct qui aboutit (branche `fix/isee-gps-carte-bulle`)
+
+- **Demande** : « quand je donne une location en mode gps il n'affiche pas la map alors qu'il devrait et quand la map est active il devrait pas afficher donc la bulle isee » (ordre user du 04/11).
+- **Cause racine, carte absente** : `NavOrderEffect` exécutait l'ordre dans `LaunchedEffect(request)` ; `consume()` change cette clé, l'effet s'annulait lui-même en plein calcul. L'annulation était avalée en `adresse introuvable (LeftCompositionCancellationException)` puis `moteur indisponible` : repos, pas de carte, à chaque ordre du direct.
+- **Cause racine, boule** : `hideGuidanceOrb` n'effaçait la boule que caméra ouverte.
+- **Fait** : l'ordre part dans le scope du ViewModel, comme toute dictée ; carte active = pas de boule, caméra ouverte ou fermée ; sans caméra la phrase prend la place de la boule (dessous, une phrase longue passait sous la carte) ; `docs/ISEE-DESIGN-PORTRAIT.md`.
+- **Preuves** : `isee-sim`, position simulée à Paris, caméra fermée. `master` 7cbc7e28 : `--es voice 'mode GPS musee du Louvre'` finit en `moteur indisponible`, `--es destination` montre boule et carte ensemble. Branche : le même ordre donne `moteur démarré`, `carte : trace=75 pos=true`, carte seule à l'écran. `IseeGuidanceMapTest` (8) et `LiveNavOrdersTest` (5) verts.
+
 ## 2026-11-04 — iSee : le picto ne meurt plus à 60 s (branche `fix/picto-120s`)
 
 - **Cause racine** : `MetaImageClient` héritait du plafond global de 60 s ; une génération lente mourait en `backend unreachable: timeout`, facturée quand même côté serveur.

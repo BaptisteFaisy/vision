@@ -22,8 +22,8 @@ import dev.sam3vision.core.nav.NavRoute
 /**
  * Le guidage GPS sur l'accueil iSee, sous la caméra et tout en bas de
  * l'écran : carte réduite seule (tracé + position, repli schéma si les
- * tuiles échouent), sans texte ni chiffres. Caméra ouverte, la boule
- * s'efface entre la rue et la carte ([hideGuidanceOrb]) et la phrase
+ * tuiles échouent), sans texte ni chiffres. Carte active, la boule
+ * s'efface, caméra ouverte ou non ([hideGuidanceOrb]), et la phrase
  * d'iSee garde sa place — sauf quand le user parle : son transcript
  * prend le milieu ([showGuidanceTranscript]).
  * La caméra et la sonde continuent (évitement préservé). L'arrêt
@@ -54,8 +54,8 @@ internal fun IseeGuidanceBlock(
 /**
  * Tout en bas de l'écran : la navigation quand elle a un objectif (calcul
  * d'itinéraire, ou guidage avec carte suivie), sinon la boule et la
- * phrase ([orb]). Pendant le guidage, caméra ouverte, la boule s'efface
- * entre le bloc caméra et la carte (la phrase reste, le transcript du
+ * phrase ([orb]). Pendant le guidage, la boule s'efface, caméra ouverte
+ * ou non (la phrase reste, le transcript du
  * user la remplace quand il parle) : voir [hideGuidanceOrb] et
  * [showGuidanceTranscript]. Le choix vit ici (état de session observé)
  * pour garder `PortraitScene` sous le plafond de 50 lignes. La barre du
@@ -83,22 +83,22 @@ internal fun BoxWithConstraintsScope.SceneGuidanceLayer(
 
 /**
  * Le guidage recouvre-t-il la scène (calcul d'itinéraire ou carte suivie) :
- * la carte prend le bas de l'écran et la barre du bas s'efface. Caméra
- * ouverte, la boule s'efface aussi ([hideGuidanceOrb]). Pure : même état,
+ * la carte prend le bas de l'écran et la barre du bas s'efface. Carte
+ * active, la boule s'efface aussi ([hideGuidanceOrb]). Pure : même état,
  * même réponse, testée sur JVM.
  */
 internal fun isGuidanceOverlay(navState: VoiceNavUiState): Boolean =
     navState is VoiceNavUiState.Guiding || navState is VoiceNavUiState.Confirming
 
 /**
- * En guidage, la boule s'efface-t-elle entre la rue et la carte : oui
- * quand la caméra est ouverte (le bloc caméra prend le haut, la phrase reste), non
- * sinon (sans caméra, la boule reste au milieu). Le transcript du user
- * garde sa place ([showGuidanceTranscript]). Pure : même état, même
- * réponse, testée sur JVM.
+ * La boule s'efface-t-elle : oui dès que la carte est active, caméra
+ * ouverte ou fermée (demande user 2026-11-04 : jamais de bulle avec la
+ * carte). La phrase reste, le transcript du user garde sa place
+ * ([showGuidanceTranscript]). Pure : même état, même réponse, testée
+ * sur JVM.
  */
-internal fun hideGuidanceOrb(navState: VoiceNavUiState, cameraOpen: Boolean): Boolean =
-    navState is VoiceNavUiState.Guiding && cameraOpen
+internal fun hideGuidanceOrb(navState: VoiceNavUiState): Boolean =
+    navState is VoiceNavUiState.Guiding
 
 /**
  * En guidage (caméra en haut, carte en bas), le transcript du user prend-il

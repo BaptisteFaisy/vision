@@ -17,9 +17,11 @@ import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
+import androidx.lifecycle.viewModelScope
 import androidx.lifecycle.viewmodel.compose.viewModel
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
+import kotlinx.coroutines.launch
 import dev.sam3vision.app.glasses.GlassesController
 import dev.sam3vision.core.settings.CaregiverRole
 import dev.sam3vision.core.settings.Settings
@@ -145,13 +147,15 @@ private fun BenchRequestEffect(push: (Route) -> Unit) {
  * confirmation, carte, modes et traversée y vivent, pas sur le direct.
  * Sans ce retour, « aller gare Montparnasse » dit sur le direct ouvrait la
  * confirmation sans jamais la montrer. Ordre non traité → on reste où on est.
+ * L'ordre part dans le scope du ViewModel, comme toute dictée : `consume()`
+ * change la clé de l'effet, qui l'annulerait sinon en plein calcul d'itinéraire.
  */
 @Composable
 private fun NavOrderEffect(isee: IseeViewModel, home: () -> Unit) {
     val request by NavOrderRequest.pending.collectAsState()
     LaunchedEffect(request) {
         val transcript = NavOrderRequest.consume() ?: return@LaunchedEffect
-        if (isee.acceptNavOrder(transcript)) home()
+        isee.viewModelScope.launch { if (isee.acceptNavOrder(transcript)) home() }
     }
 }
 
