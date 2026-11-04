@@ -17,6 +17,9 @@ internal val IseeBlockSide: Dp = 16.dp
 /** Marge du bloc caméra sous le bandeau système (ou sous le haut de l'écran). */
 internal val IseeBlockTopGap: Dp = 8.dp
 
+/** Le bas du bloc remonte de 4 dp : le direct descend très légèrement moins bas (demande user 2026-11-04). */
+internal val IseeBlockBottomGap: Dp = 4.dp
+
 /**
  * Haut du bloc caméra : sous le bandeau système ([statusBarTop]) plus la
  * marge. Sans ce décalage, l'aperçu natif (dessiné après le canevas Compose)
@@ -25,10 +28,11 @@ internal val IseeBlockTopGap: Dp = 8.dp
 internal fun cameraBlockTop(statusBarTop: Dp): Dp = statusBarTop + IseeBlockTopGap
 
 /**
- * Hauteur du bloc caméra : le décalage du haut est absorbé ici, le bas du
- * bloc ne bouge pas (boule, phrase et carte gardent leurs places).
+ * Hauteur du bloc caméra : le décalage du haut est absorbé ici, et le bas
+ * remonte de [IseeBlockBottomGap] (boule, phrase et carte gardent leurs
+ * places, le jour sous le bloc grandit à peine).
  */
-internal fun cameraBlockHeight(height: Dp, statusBarTop: Dp): Dp = height - statusBarTop
+internal fun cameraBlockHeight(height: Dp, statusBarTop: Dp): Dp = height - statusBarTop - IseeBlockBottomGap
 
 /**
  * Arrondit une surface Android aux coins des blocs iSee : le clip Compose ne rogne
