@@ -67,12 +67,13 @@ Même motif que les sections voisines (`SettingsScreen.kt` : brouillon + `onSave
 ## Navigation vocale in-app (Valhalla)
 
 Depuis le 31/10, `app/.../voicenav/` démarre directement : dictée →
-`VoiceNavSession.onVoiceTranscript` → chargement (« Finding the best
-route », boule iSee en rotation rapide) → guidage moteur, sans question
-ni bouton (`autoStartOnVoice = true` câblé par `IseeVoiceNav`). L'écran
-de confirmation (`autoStartOnVoice = false`) subsiste comme API
-historique pour les tests de session (`VoiceNavSessionTest`) ; aucun
-chemin produit ne l'ouvre. Si le moteur ne peut pas démarrer (adresse,
+`VoiceNavSession.onVoiceTranscript` → chargement (destination seule,
+sans animation ni phrase d'attente depuis le 04/11) → guidage moteur,
+sans question ni bouton (`autoStartOnVoice = true` câblé par
+`IseeVoiceNav`). L'écran de confirmation (`autoStartOnVoice = false`)
+subsiste comme API historique pour les tests de session
+(`VoiceNavSessionTest`) ; aucun chemin produit ne l'ouvre. Si le moteur
+ne peut pas démarrer (adresse,
 GPS, réseau, itinéraire), repos + annonce « I can't open the guidance » :
 aucun repli externe, iSee n'ouvre jamais Google Maps.
 

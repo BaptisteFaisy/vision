@@ -20,17 +20,19 @@ import dev.sam3vision.app.speechClient
 import dev.sam3vision.core.settings.Settings
 
 /**
- * Écran navigation de la pile : arrivée seule, pilotée par l'état
- * ([VoiceNavUiState]). La confirmation et le guidage vivent sur l'accueil
- * iSee (caméra + carte dessous) ; leurs branches ne sont ici que transitoires.
+ * Écran navigation de la pile, piloté par l'état ([VoiceNavUiState]).
+ * Il ne sert plus qu'au débogage adb : la confirmation et le guidage
+ * vivent sur l'accueil iSee (caméra + carte dessous), et l'arrivée ne
+ * pousse plus aucun écran (demande user 2026-11-04 — annonce vocale
+ * seule, état refermé aussitôt par `AppNav`).
  *
  * - boutons via [VoiceNavViewModel] (le composable ne gère aucune coroutine) ;
  * - dictée sur place en guidage ([VoiceNavHoldButton], même moteur que
  *   l'accueil iSee) : destination ou ordre stop — tout l'écran est
  *   faisable à la voix, sans retour ;
- * - quitter l'écran (retour) = annuler la confirmation ou refermer
- *   l'arrivée — le guidage n'a plus d'écran (il vit sur l'accueil) et
- *   s'arrête par son bouton ou par « arrête le guidage » ;
+ * - quitter l'écran (retour) = annuler la confirmation — le guidage
+ *   n'a plus d'écran (il vit sur l'accueil) et s'arrête par son bouton
+ *   ou par « arrête le guidage » ;
  * - mise en fond (home, verrouillage) en guidage = maintien via le service
  *   W1 ([GuidanceLifecycle]) ; au retour, l'écran reprend sur l'état intact.
  * - proche : position + trajet publiés tant que l'écran est affiché
@@ -109,17 +111,10 @@ private fun VoiceNavScreen(
             settings = settings,
             onHoldTranscript = { nav.session().onVoiceTranscript(it) },
         )
-        // « Nouvelle destination » remet la session au repos (la dictée est à
-        // portée, contrat d'état de VoiceNavSession) ; « Fermer » referme
-        // l'arrivée puis rend l'accueil iSee (guide utilisateur, §3 Arriver).
-        is VoiceNavUiState.Arrived -> ArrivedScreen(
-            state = current,
-            onNewDestination = { nav.session().dismissArrived() },
-            onClose = {
-                nav.session().dismissArrived()
-                isee.dismissVoiceNav()
-            },
-        )
+        // Arrivée : plus aucun écran (demande user 2026-11-04) — `AppNav`
+        // referme l'état aussitôt (moteur coupé, annonce gardée). Branche
+        // de sûreté (débogage adb) : vide, refermée par le même effet.
+        is VoiceNavUiState.Arrived -> Box(Modifier.fillMaxSize())
     }
 }
 

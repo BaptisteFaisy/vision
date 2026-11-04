@@ -301,7 +301,7 @@ le script jetable n'est pas versionné.
 - **tap** (34) : AnnouncementPlayerTest 2, TapConfigTest 4, TapMachineTest 8, TapPhotoFallbackTest 8, TapReleaseTest 2, TapSessionTest 6, TapZonesTest 4
 - **traverse** (25) : TraverseClipStoreTest 4, TraverseWiringTest 21
 - **vm** (39) : AppAnalysisTest 9, AppChatTest 6, AppDiagnosticsTest 10, AppImageLoaderTest 4, AppScreenStateTest 3, AppVoiceTest 7
-- **voicenav** (106) : GpsDestinationMemoryTest 5, GuidanceLifecycleTest 4, GuidanceNotificationTextTest 5, OffRouteBannerTest 2, PeriodicVoiceTest 2, RouteLoadingSpinTest 3, RouteMapSnapshotTest 3, ValhallaRouteLoaderTest 13, VoiceNavEngineDriverTest 4, VoiceNavHoldTest 14, VoiceNavSessionArrivedTest 6, VoiceNavSessionAutoStartTest 9, VoiceNavSessionTest 28, VoiceNavSessionWiringTest 8
+- **voicenav** (103) : GpsDestinationMemoryTest 5, GuidanceLifecycleTest 4, GuidanceNotificationTextTest 5, OffRouteBannerTest 2, PeriodicVoiceTest 2, RouteMapSnapshotTest 3, ValhallaRouteLoaderTest 13, VoiceNavEngineDriverTest 4, VoiceNavHoldTest 14, VoiceNavSessionArrivedTest 6, VoiceNavSessionAutoStartTest 9, VoiceNavSessionTest 28, VoiceNavSessionWiringTest 8
 
 
 ## 7. Gardes et limites connues

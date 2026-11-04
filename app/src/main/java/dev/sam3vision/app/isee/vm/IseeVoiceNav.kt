@@ -121,8 +121,8 @@ class IseeVoiceNav(
                 setGuidance(true)
             },
             // Départ direct : la destination dictée lance le moteur sans
-            // question ni bouton (autoStartOnVoice=true) — la boule tourne
-            // pendant le calcul, puis le guidage parle.
+            // question ni bouton (autoStartOnVoice=true) — la destination
+            // s'affiche pendant le calcul, puis le guidage parle.
             autoStartOnVoice = true,
             // Guidage actif : la destination reste en mémoire pour le LLM.
             onActiveDestination = GpsDestinationMemory::remember,

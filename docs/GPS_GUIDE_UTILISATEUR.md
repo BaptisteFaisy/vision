@@ -34,12 +34,12 @@ aucun suivi) — c'est la ligne d'état des Réglages qui le dit.
 ## 2. Voir (les écrans)
 
 - **Calcul** (sur l'accueil, depuis le 31/10) : la dictée part
-  directement — « Finding the best route », boule iSee en rotation
-  rapide, sans destination affichée, ni boutons, ni question vocale.
-  L'appui long reste une question libre et le tap la vidéo. Si le
-  moteur ne peut pas démarrer (adresse, GPS, réseau, itinéraire) :
-  retour au repos + annonce « I can't open the guidance », jamais
-  Google Maps.
+  directement — destination seule, sans animation ni phrase d'attente
+  (ni « Finding », ni boule qui tourne, depuis le 04/11), ni boutons,
+  ni question vocale. L'appui long reste une question libre et le tap
+  la vidéo. Si le moteur ne peut pas démarrer (adresse, GPS, réseau,
+  itinéraire) : retour au repos + annonce « I can't open the
+  guidance », jamais Google Maps.
 - **Guidage** : sur l'accueil iSee, sous la caméra — carte (tracé +
   position), prochaine instruction, distances restantes, bouton
   « Arrêter le guidage », dictée « arrête le guidage ». Le guidage est
@@ -53,9 +53,10 @@ aucun suivi) — c'est la ligne d'état des Réglages qui le dit.
 
 ## 3. Arriver
 
-Annonce d'arrivée + écran « Arrivée à destination » (destination, résumé
-du trajet) : « Nouvelle destination » (retour à la dictée) ou « Fermer »
-(retour à l'accueil iSee). Le moteur est coupé, la session est au repos.
+Annonce d'arrivée seule, sans écran (depuis le 04/11, demande user :
+la page « Arrivée à destination » n'existe plus). Le moteur est coupé,
+la session est au repos ; on reste sur l'accueil iSee, une nouvelle
+destination se redicte directement.
 
 ## 4. Réglages (section Navigation — guidage GPS)
 

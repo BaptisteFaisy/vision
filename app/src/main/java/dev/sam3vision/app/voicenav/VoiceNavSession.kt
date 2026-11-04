@@ -33,10 +33,9 @@ val UnavailableRouteLoader: RouteLoader = {
  * Écrans de la navigation vocale : repos, confirmation (adresse + résumé),
  * guidage actif (instruction, distances, progression), arrivée.
  *
- * Contrat d'état (lot reprise-fond) : la route ajoute la branche
- * `is VoiceNavUiState.Arrived -> ArrivedScreen(state, onNewDestination,
- * onClose)` — `onClose` appelle `session().dismissArrived()`, sans détour
- * par le ViewModel.
+ * Contrat d'état : l'arrivée ne pousse plus aucun écran (demande user
+ * 2026-11-04) — `AppNav` appelle `session().dismissArrived()` aussitôt
+ * (moteur coupé, annonce vocale gardée).
  */
 sealed interface VoiceNavUiState {
     data object Idle : VoiceNavUiState
@@ -97,8 +96,9 @@ sealed interface VoiceNavUiState {
  *   d'indisponibilité ; hors [Confirming]
  *   (dont [Arrived]) → rien ;
  * - [onGuidanceUpdate] : l'intégrateur pousse l'état du moteur ; arrivée
- *   signalée → écran [Arrived] + annonce « Arrivée à destination » (unique :
- *   un second `arrived` est ignoré, on n'est plus en [Guiding]) ;
+ *   signalée → état [Arrived] + annonce « Arrivée à destination » (unique :
+ *   un second `arrived` est ignoré, on n'est plus en [Guiding]) ; aucun
+ *   écran (demande user 2026-11-04), `AppNav` referme aussitôt.
  *   [dismissArrived] referme l'arrivée vers le repos (le pilote coupe le
  *   moteur à ce moment-là, pas à l'arrivée).
  * - [onActiveDestination] : la destination guidée, republiée à chaque
@@ -209,8 +209,8 @@ class VoiceNavSession(
     }
 
     /**
-     * Démarrage direct : l'état de chargement s'affiche aussitôt (la boule
-     * tourne pendant le calcul), le résumé est chargé d'abord (l'état
+     * Démarrage direct : l'état de chargement s'affiche aussitôt (la
+     * destination seule, sans animation), le résumé est chargé d'abord (l'état
      * initial affiche ses totaux, jamais des zéros), puis le moteur
      * embarqué démarre — sans lui, repos + annonce d'indisponibilité,
      * jamais d'app externe. **Aucune annonce ici** en cas de succès : le
