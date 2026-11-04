@@ -32,7 +32,10 @@
   s'efface entre le bloc et la carte, la phrase reste), avec les mêmes bords
   que la map — arrondi 16 dp (`IseeBlockShape`), même ombre portée, marges
   latérales 16 dp (`IseeBlockSide`), coins natifs rognés
-  (`View.clipToIseeBlock`). Le bord du bloc remplace le trait de séparation.
+  (`View.clipToIseeBlock`). Le haut du bloc commence **sous le bandeau
+  système** blanc (marge 8 dp, `cameraBlockTop`) : l'aperçu natif recouvrirait
+  sinon le bandeau et ses icônes. Le bord du bloc remplace le trait de
+  séparation.
   À l'ouverture elle arrive **floue et agrandie** (×1,05, flou max 24) puis
   devient nette (`focusPull`) ; un **voile haut** garde la pastille lisible.
   Elle reste visible **tant qu'une capture est vivante** (`captureLive`),
