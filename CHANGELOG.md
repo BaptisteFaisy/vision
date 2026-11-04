@@ -3,6 +3,25 @@
 Le journal part du 2026-10-26 après 19 h : le commit de départ, puis une entrée par fait
 livré et ses preuves (tâche, fichiers, chiffres) dans l'arbre.
 
+## 2026-11-04 — iSee : arrivée sans écran, calcul sans finding ni boule (branche `isee-sans-arrivee-ni-finding`)
+
+- **Demande** : supprimer la page d'arrivée (« Arrival », résumé,
+  « New destination »/« Close ») ; supprimer « Finding the best route »
+  et la boule qui tourne pendant le calcul (ordre user du 04/11/2026).
+- **Fait** :
+  - `AppNav` : plus de poussée vers l'écran GPS à l'arrivée,
+    `dismissArrived()` aussitôt (moteur coupé, annonce vocale gardée —
+    voix MP3 indépendante du pilote) ; `ArrivedScreen.kt` supprimé,
+    branche `Arrived` vidée (sûreté adb).
+  - `RouteLoadingBlock` : destination seule + erreur gardée (plus
+    de boule, plus de « Finding ») ; `RouteLoadingSpinTest` supprimé
+    (sujet disparu) ; commentaires et § guide/docs (`GPS_GUIDE`,
+    `NAVIGATION`, `RECETTE-NAVIGATION-VOCALE`, inventaire `TESTING`)
+    mis à jour. États session et suites `VoiceNavSession*` inchangés.
+- **Preuves** : gardes `check-isee-design`, `check-kotlin-limits` et
+  `check-voice-nav-doc` OK ; CI PR #1148 verte (run 41760187757,
+  `ci-core` + `ci-app`).
+
 ## 2026-11-04 — iSee : pastille rejointe aux puces lieu et Traversée en rangée (branche `isee-rangee-3-puces`)
 
 - **Demande** : mettre les badges d'état (pastille), lieu et Traversée sur
