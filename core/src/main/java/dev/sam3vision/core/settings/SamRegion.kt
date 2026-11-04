@@ -68,11 +68,16 @@ enum class SamRegion(
 
 /**
  * Endpoint SAM réellement appelé, dans cet ordre : saisie manuelle (hors preset) →
- * URL injectée au build pour cette région → preset de la région choisie.
+ * URL injectée au build pour cette région (hors preset elle aussi : un preset cuit
+ * au build migre vers le preset vivant) → preset de la région choisie.
  */
 fun Settings.resolveSamEndpoint(buildEu: String = "", buildUs: String = ""): String {
     val manual = samBaseUrl.trim()
     if (manual.isNotEmpty() && !SamRegion.isPreset(manual)) return manual
-    val injected = if (samRegion == SamRegion.Us) buildUs else buildEu
-    return injected.trim().ifBlank { samRegion.presetBaseUrl }
+    val injected = (if (samRegion == SamRegion.Us) buildUs else buildEu).trim()
+    // Un preset cuit au build (sam.base.url périmé, ex. baptiste-faisy) n'est pas
+    // un choix manuel : il migre vers le preset vivant de la région, comme les
+    // presets hérités des Réglages (404 « invalid function call » vu le 04/11).
+    if (injected.isNotEmpty() && !SamRegion.isPreset(injected)) return injected
+    return samRegion.presetBaseUrl
 }
