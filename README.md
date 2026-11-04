@@ -361,7 +361,12 @@ Details (constants, budgets, thresholds) are in `docs/PERF.md`; recipes in
 `docs/TESTING.md`. The guards are green on this tree; Gradle tests are the only ones not
 replayed by the census (`docs/TESTING.md` §2 gives the recipe).
 
-## Crossing: what is measured now (02–04/11/2026)
+## Crossing: two different measurements (02–03/11/2026)
+
+Two test families exist and must not be mixed: **crop classification** (does the
+gate read this crop as red/green?) and the **end-to-end video benchmark** (what
+verdict does the whole pipeline emit over 146k consecutive frames?). Both are
+reported below.
 
 The earlier claim — *"`PedLightGate` says green 1 time out of 6 true green signals"* —
 was measured on **29/10** with `ELONGATION_MIN = 1.5`. That constant is **1.0 since
@@ -369,7 +374,7 @@ was measured on **29/10** with `ELONGATION_MIN = 1.5`. That constant is **1.0 si
 `GREEN_MIN_WIDTH_FRACTION = 0.04`. The 1/6 figure is **obsolete** and must not be
 quoted as current.
 
-Current measured state (`docs/MESURES-FEU-ROUGE-VERT.md`, `docs/MESURES-FEU-TEMPOREL.md`):
+### A. Crop classification (`docs/MESURES-FEU-ROUGE-VERT.md`, `docs/MESURES-FEU-TEMPOREL.md`)
 
 | Test set | Result | Date |
 |---|---|---|
@@ -386,6 +391,36 @@ pedestrian-only prompt filter are part of the contract. SAM itself: generic prom
 `pedestrian traffic light` finds **87.5 % (14/16)** of signals; a state prompt drops to
 12.5 %, so state prompts are a cross-check, never the detector
 (`docs/MESURES-SAM3-FEUX.md`). End-to-end cost: **0.71 s/image** for four prompts.
+
+### B. End-to-end video benchmark — AVANT (03/11/2026)
+
+Protocol (`BENCHMARK-FEUX-AVANT-APRES.md`, on the workstation, not yet versioned):
+**58 Samsung 4K60 videos** from 02/11, 15:01–16:15, **146,569 frames**, every frame
+sent at 60 fps, JPEG **q85 / 640 px**, 4 light wordings, `max_objects=16`,
+`work_edge=640`, dedicated Modal app (`max_containers=10`, `max_inputs=1`), code
+`fb2497db`.
+
+| Metric | AVANT baseline |
+|---|---|
+| Videos / frames | **58/58**, **146,569** |
+| Frames with a light detected | **144,117 = 98.3 %** |
+| Red / green verdicts | **126,829 (88.0 % of lit frames)** / **17,288** |
+| No light | **2,452 = 1.7 % of all frames** |
+| Errors | **0** |
+| Server latency p50/p95 | **46 / 53 ms** |
+| Client latency p50/p95 | **146.7 / 180.3 ms** |
+| Flicker (R↔V flips per 1000 frames) | **25.9** |
+| Run cost | ~56 min at 10 lanes, ~**$13** (+ ~$4 rerun of 7 videos) |
+
+**APRÈS has not been run yet.** The verdict rule is fixed in advance: *better* =
+flicker down **without** `avec_feu` down; *worse* = the inverse, or any error.
+
+**This benchmark has no ground truth.** It reports descriptive rates, not precision or
+recall. It is also **optimistic versus the phone**: 640/q85 instead of 320/q55,
+`work_edge=640` instead of 512→320, 16 objects instead of 32, 4 prompts instead of 16
+concepts, no masks and no depth. Verdicts are raw (no temporal smoothing); production
+adds the 3-of-5 vote. Flicker has two proven mechanisms: `best_pick` alternating
+between two lights, and the colour gate flipping at ±4 px of framing.
 
 Known limits, stated rather than hidden: a crop that mixes both lamps is "wait"; two
 fully visible lights of ambiguous shape are resolved by the stream, not by one frame;
@@ -421,9 +456,9 @@ failed 14 times with no retry. `RoutedDns` + a single handover retry fixes it
 |---|---|---|
 | Samsung end-to-end | **229 ms mean, 379 max**, N=2166 | 31/10, `parse_isee_lat.py` |
 | Redmi end-to-end | **343 ms mean, 722 max**, N=323 | 01/11, `parse_isee_lat.py` |
-| Server SAM | p50 **46 ms**, p95 **53 ms** | 03/11, 58 videos / 146,569 frames |
-| Client pipeline | p50 **147 ms**, p95 **180 ms** | 03/11, same campaign |
-| R/V flips | **25.9 per 1000 frames** | 03/11, same campaign |
+| Server SAM (benchmark AVANT) | p50 **46 ms**, p95 **53 ms** | 03/11, 58 videos / 146,569 frames |
+| Client pipeline (benchmark AVANT) | p50 **146.7 ms**, p95 **180.3 ms** | 03/11, same campaign |
+| R/V flips (benchmark AVANT) | **25.9 per 1000 frames** | 03/11, same campaign |
 | GPU A100-40GB EU | **$2.415/h**, ~$0.02 per boot | tariff, not re-checked |
 
 The product target is **300 ms mean / 500 ms max**. It is held on the Samsung
