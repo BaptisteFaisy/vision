@@ -44,7 +44,7 @@ private class FaultySink : ClipSink {
         return Result.success(Unit)
     }
 
-    override suspend fun playQueued(bytes: ByteArray): Result<PlaybackEnd> {
+    override suspend fun playQueued(bytes: ByteArray, sliceMs: Long?): Result<PlaybackEnd> {
         note()
         return Result.success(PlaybackEnd.Done)
     }

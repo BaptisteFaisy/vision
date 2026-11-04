@@ -2,6 +2,8 @@ package dev.sam3vision.core.stairs
 
 import dev.sam3vision.core.speech.SpeechLanguage
 import org.junit.Assert.assertEquals
+import org.junit.Assert.assertFalse
+import org.junit.Assert.assertTrue
 import org.junit.Test
 
 /**
@@ -37,5 +39,19 @@ class StairChainTest {
         assertEquals(emptyList<String>(), StairChain.countdownClips(1, SpeechLanguage.En))
         assertEquals(emptyList<String>(), StairChain.countdownClips(21, SpeechLanguage.En))
         assertEquals(emptyList<String>(), StairChain.countdownClips(5, SpeechLanguage.Fr))
+    }
+
+    @Test
+    fun `chaine du compte reconnue, le reste non`() {
+        assertTrue(StairChain.isCountChain(listOf("c_5", "c_steps")))
+        assertTrue(StairChain.isCountChain(listOf("c_1", "c_step")))
+        assertTrue(StairChain.isCountChain(listOf("c_20", "c_steps")))
+        assertFalse(StairChain.isCountChain(listOf("c_5", "c_steps_left")))
+        assertFalse(StairChain.isCountChain(listOf("c_1", "c_steps")))
+        assertFalse(StairChain.isCountChain(listOf("c_0", "c_steps")))
+        assertFalse(StairChain.isCountChain(listOf("c_21", "c_steps")))
+        assertFalse(StairChain.isCountChain(listOf("c_5")))
+        assertFalse(StairChain.isCountChain(listOf("human_person", "clock_3")))
+        assertFalse(StairChain.isCountChain(emptyList()))
     }
 }

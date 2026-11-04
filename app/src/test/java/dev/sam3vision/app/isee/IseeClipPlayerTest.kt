@@ -23,6 +23,7 @@ class IseeClipPlayerTest {
     ) : ClipSink {
         val playedFiles = mutableListOf<String>()
         val playedSlices = mutableListOf<ByteArray>()
+        val queuedSlicesMs = mutableListOf<Long?>()
         var stops = 0
 
         override suspend fun playFile(file: File): Result<Unit> {
@@ -35,8 +36,9 @@ class IseeClipPlayerTest {
             return this.file
         }
 
-        override suspend fun playQueued(bytes: ByteArray): Result<PlaybackEnd> {
+        override suspend fun playQueued(bytes: ByteArray, sliceMs: Long?): Result<PlaybackEnd> {
             playedSlices += bytes
+            queuedSlicesMs += sliceMs
             return queued
         }
 
@@ -169,5 +171,34 @@ class IseeClipPlayerTest {
         assertFalse(played)
         assertEquals(1, sink.playedSlices.size)
         assertEquals(listOf("Found. Keys.", ""), spoken)
+    }
+
+    @Test
+    fun `sequence tranchee, atomes joints en une lecture`() = runTest {
+        val sink = FakeSink()
+        val spoken = mutableListOf<String>()
+
+        val played = player(sink, spoken = spoken)
+            .speakSequence(listOf("c_5", "c_steps"), urgent = true, sliceMs = 500L)
+
+        assertTrue(played)
+        assertEquals(1, sink.playedSlices.size)
+        assertTrue("faux-mp3faux-mp3".toByteArray().contentEquals(sink.playedSlices.single()))
+        assertEquals(listOf(500L), sink.queuedSlicesMs)
+        assertEquals(listOf("five steps"), spoken)
+        assertEquals(1, sink.stops)
+    }
+
+    @Test
+    fun `sequence tranchee coupee, faux et silence signale`() = runTest {
+        val sink = FakeSink(queued = Result.success(PlaybackEnd.Stopped))
+        val spoken = mutableListOf<String>()
+
+        val played = player(sink, spoken = spoken)
+            .speakSequence(listOf("c_5", "c_steps"), urgent = false, sliceMs = 500L)
+
+        assertFalse(played)
+        assertEquals(1, sink.playedSlices.size)
+        assertEquals(listOf("five steps", ""), spoken)
     }
 }

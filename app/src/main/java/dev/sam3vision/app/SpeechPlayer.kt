@@ -22,6 +22,9 @@ internal const val VOICE_SLICE_MS = 700L
 /** Tranche trottoir : l'annonce absolue tient en moins de 500 ms (ordre user du 02/11, § 46). */
 internal const val SIDEWALK_SLICE_MS = 500L
 
+/** Tranche compte escaliers : « N steps. » joint tient en 500 ms (ordre user du 04/11). */
+internal const val STAIR_COUNT_SLICE_MS = 500L
+
 /** Plafond d'accélération d'une tranche (pitch conservé ; au-delà, refus plateforme possible). */
 internal const val MAX_SLICE_RATE = 3f
 
@@ -187,13 +190,14 @@ class SpeechPlayer(
         launchPlay({ writeCache(bytes) }, onComplete, onPlaybackError, sliceMs)
     }
 
-    suspend fun playQueued(bytes: ByteArray): Result<PlaybackEnd> {
+    suspend fun playQueued(bytes: ByteArray, sliceMs: Long? = null): Result<PlaybackEnd> {
         val gate = CompletableDeferred<Result<PlaybackEnd>>()
         withContext(Dispatchers.IO) {
             launchPlay(
                 files = { writeCache(bytes) },
                 onDone = { gate.complete(Result.success(PlaybackEnd.Done)) },
                 onError = { message -> gate.complete(Result.failure(IllegalStateException(message))) },
+                sliceMs = sliceMs,
                 afterStop = { waiter = gate },
                 onSyncFailure = { cause, file -> failQueued(gate, cause, file) },
             )

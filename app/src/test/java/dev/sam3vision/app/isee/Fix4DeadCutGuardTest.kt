@@ -24,7 +24,7 @@ class Fix4DeadCutGuardTest {
 
         override suspend fun playSlice(file: File, sliceMs: Long): Result<Unit> = Result.success(Unit)
 
-        override suspend fun playQueued(bytes: ByteArray): Result<PlaybackEnd> =
+        override suspend fun playQueued(bytes: ByteArray, sliceMs: Long?): Result<PlaybackEnd> =
             Result.success(PlaybackEnd.Done)
 
         override fun stop() {

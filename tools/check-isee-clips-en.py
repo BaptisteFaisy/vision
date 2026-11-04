@@ -12,6 +12,8 @@ Vérifie, sans clé ni réseau (runnable en CI) :
 5. assets/vp_voice.txt désigne la voix par défaut de l'app (LAURE_VOICE_ID) ;
 6. les clips à durée contrainte ([DURATIONS]) tiennent leur budget joué
    à vitesse de base (durée MP3 lue en stdlib, sans ffprobe).
+7. les paires du compte escaliers ([COUNT_CHAINS]) tiennent [CHAIN_BUDGET]
+   jouées jointes au plafond de tranche ([MAX_SLICE_RATE]).
 
 Usage : python3 tools/check-isee-clips-en.py [--allow-missing]
 """
@@ -33,6 +35,14 @@ ID_RE = re.compile(r"^[a-z0-9_]+$")
 # user du 02/11, moins de 500 ms à l'oreille (§ 46 : trim seul, le lecteur
 # accélère déjà ×1,9, jamais d'atempo stocké).
 DURATIONS = {"crosswalk": 0.5}
+
+# Paires du compte escaliers (StairChain.countClips : « 1 step. », « N
+# steps. »), jouées jointes en tranche 500 ms (STAIR_COUNT_SLICE_MS,
+# ordre user du 04/11) : chaque paire doit tenir [CHAIN_BUDGET] au
+# plafond de tranche ([max_slice_rate]) — un trim trop gras casse le
+# budget en silence sinon (régénérer puis rogner, voir docs/VOICEPACK.md).
+COUNT_CHAINS = [("c_1", "c_step")] + [(f"c_{n}", "c_steps") for n in range(2, 21)]
+CHAIN_BUDGET = 0.5
 
 
 def repo_root() -> str:
@@ -164,6 +174,40 @@ def check_durations(root: str, problems: list) -> None:
                             "voir docs/VOICEPACK.md)")
 
 
+def max_slice_rate(root: str) -> float | None:
+    """Plafond d'accélération d'une tranche (MAX_SLICE_RATE, SpeechPlayer.kt)."""
+    player = os.path.join(
+        root, "app/src/main/java/dev/sam3vision/app/SpeechPlayer.kt")
+    try:
+        with open(player, encoding="utf-8") as fh:
+            mat = re.search(r"MAX_SLICE_RATE\s*=\s*([0-9.]+)f", fh.read())
+    except OSError:
+        return None
+    return float(mat.group(1)) if mat else None
+
+
+def check_chains(root: str, problems: list) -> None:
+    """Les paires de [COUNT_CHAINS] tiennent [CHAIN_BUDGET] jouées jointes
+    au plafond de tranche (absent = check_mp3)."""
+    rate = max_slice_rate(root)
+    if not rate:
+        problems.append("MAX_SLICE_RATE illisible dans SpeechPlayer.kt")
+        return
+    for first, second in COUNT_CHAINS:
+        paths = [os.path.join(root, "app/src/main/res/raw", f"vp_{cid}_en.mp3")
+                 for cid in (first, second)]
+        if not all(os.path.isfile(p) and os.path.getsize(p) for p in paths):
+            continue
+        seconds = [mp3_duration(p) for p in paths]
+        if any(s is None for s in seconds):
+            problems.append(f"{first}+{second}: paire illisible")
+        elif sum(seconds) / rate >= CHAIN_BUDGET:
+            problems.append(f"{first}+{second}: paire jouée "
+                            f"{sum(seconds) / rate:.2f} s à ×{rate:g} "
+                            f"(budget {CHAIN_BUDGET:.1f} s : régénérer puis rogner, "
+                            "voir docs/VOICEPACK.md)")
+
+
 def check_voice(root: str, allow_missing: bool, problems: list) -> None:
     """vp_voice.txt désigne la voix par défaut (LAURE_VOICE_ID)."""
     settings = os.path.join(
@@ -199,6 +243,7 @@ def failures(root: str, allow_missing: bool) -> list:
     check_mp3([c["id"] for c in clips + reuse],
               root, allow_missing, problems)
     check_durations(root, problems)
+    check_chains(root, problems)
     check_voice(root, allow_missing, problems)
     return problems
 

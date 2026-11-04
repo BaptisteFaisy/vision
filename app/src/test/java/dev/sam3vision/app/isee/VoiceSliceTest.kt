@@ -58,25 +58,20 @@ class VoiceSliceTest {
     }
 
     @Test
+    fun `tranche compte 500 ms, le reste sans tranche`() {
+        assertEquals(500L, dev.sam3vision.app.STAIR_COUNT_SLICE_MS)
+        assertEquals(500L, countSliceMs(listOf("c_5", "c_steps")))
+        assertEquals(500L, countSliceMs(listOf("c_1", "c_step")))
+        assertEquals(null, countSliceMs(listOf("c_5", "c_steps_left")))
+        assertEquals(null, countSliceMs(listOf("human_person", "clock_3")))
+        assertEquals(null, countSliceMs(listOf("car")))
+        assertEquals(null, countSliceMs(emptyList()))
+    }
+
+    @Test
     fun `bus tranche les clips, verdict dit entier`() = runTest {
         val sink = SliceSink()
-        val speaker = BusSpeaker(
-            scope = backgroundScope,
-            player = SpeechPlayer(Files.createTempDirectory("tranche").toFile()),
-            clips = IseeClipPlayer(
-                clips = VoicePack(
-                    filesDir = Files.createTempDirectory("tranche-pack").toFile(),
-                    packVoiceId = { "voix-test" },
-                    bundledClip = { "faux-mp3".toByteArray() },
-                ),
-                voiceId = { "voix-test" },
-                sink = sink,
-            ),
-            proximity = ProximityVoice(
-                player = SpeechPlayer(Files.createTempDirectory("tranche-vox").toFile()),
-                settings = { dev.sam3vision.core.settings.Settings.Default },
-            ),
-        )
+        val speaker = speaker(sink)
 
         speaker.say(OutdoorLevel.CAR_MOVING, "Car.", "car", emptyList())
         speaker.say(CrossingLevels.VERDICT, "Cross.", "verdict_cross", emptyList())
@@ -89,23 +84,7 @@ class VoiceSliceTest {
     @Test
     fun `bus lit le trottoir en 500 ms, le reste en 700 ms`() = runTest {
         val sink = SliceSink()
-        val speaker = BusSpeaker(
-            scope = backgroundScope,
-            player = SpeechPlayer(Files.createTempDirectory("tranche500").toFile()),
-            clips = IseeClipPlayer(
-                clips = VoicePack(
-                    filesDir = Files.createTempDirectory("tranche500-pack").toFile(),
-                    packVoiceId = { "voix-test" },
-                    bundledClip = { "faux-mp3".toByteArray() },
-                ),
-                voiceId = { "voix-test" },
-                sink = sink,
-            ),
-            proximity = ProximityVoice(
-                player = SpeechPlayer(Files.createTempDirectory("tranche500-vox").toFile()),
-                settings = { dev.sam3vision.core.settings.Settings.Default },
-            ),
-        )
+        val speaker = speaker(sink)
 
         speaker.say(OutdoorLevel.SIDEWALK, "Car.", "car", emptyList())
         speaker.say(OutdoorLevel.HUMAN, "Car.", "car", emptyList())
@@ -114,11 +93,49 @@ class VoiceSliceTest {
         assertEquals(listOf(500L, 700L), sink.slicedMs)
     }
 
+    @Test
+    fun `bus joint le compte escaliers en 500 ms, le reste enchaine`() = runTest {
+        val sink = SliceSink()
+        val speaker = speaker(sink)
+
+        speaker.say(OutdoorLevel.STAIRS, "5 steps.", null, listOf("c_5", "c_steps"))
+        speaker.say(OutdoorLevel.STAIRS, "5 steps left.", null, listOf("c_5", "c_steps_left"))
+        runCurrent()
+
+        assertEquals(listOf(500L, null, null), sink.queuedMs)
+        assertEquals(3, sink.queuedBytes.size)
+        val atom = "faux-mp3".toByteArray().size
+        assertEquals(2 * atom, sink.queuedBytes[0].size)
+        assertEquals(atom, sink.queuedBytes[1].size)
+        assertEquals(atom, sink.queuedBytes[2].size)
+    }
+
+    /** Porte-parole sur puits faux (clips « faux-mp3 », proximité muette). */
+    private fun kotlinx.coroutines.test.TestScope.speaker(sink: SliceSink) = BusSpeaker(
+        scope = backgroundScope,
+        player = SpeechPlayer(Files.createTempDirectory("tranche").toFile()),
+        clips = IseeClipPlayer(
+            clips = VoicePack(
+                filesDir = Files.createTempDirectory("tranche-pack").toFile(),
+                packVoiceId = { "voix-test" },
+                bundledClip = { "faux-mp3".toByteArray() },
+            ),
+            voiceId = { "voix-test" },
+            sink = sink,
+        ),
+        proximity = ProximityVoice(
+            player = SpeechPlayer(Files.createTempDirectory("tranche-vox").toFile()),
+            settings = { dev.sam3vision.core.settings.Settings.Default },
+        ),
+    )
+
     /** Puits faux : distingue lecture simple et lecture en tranche (durées capturées). */
     private class SliceSink : ClipSink {
         val plain = mutableListOf<String>()
         val sliced = mutableListOf<String>()
         val slicedMs = mutableListOf<Long>()
+        val queuedBytes = mutableListOf<ByteArray>()
+        val queuedMs = mutableListOf<Long?>()
 
         override suspend fun playFile(file: File): Result<Unit> {
             plain += file.nameWithoutExtension
@@ -131,8 +148,11 @@ class VoiceSliceTest {
             return Result.success(Unit)
         }
 
-        override suspend fun playQueued(bytes: ByteArray) =
-            Result.success(dev.sam3vision.app.PlaybackEnd.Done)
+        override suspend fun playQueued(bytes: ByteArray, sliceMs: Long?) =
+            Result.success(dev.sam3vision.app.PlaybackEnd.Done).also {
+                queuedBytes += bytes
+                queuedMs += sliceMs
+            }
 
         override fun stop() = Unit
     }
