@@ -245,6 +245,8 @@ class PeoplePathRobustnessTest {
         for (label in labels) {
             val depth = label.meters
             if (depth == null || !depth.isFinite() || depth <= 0f || depth > Guidance.RANGE_METERS) continue
+            // Un mur longé se situe par sa distance latérale, pas par sa boîte.
+            if (ClearPath.isRail(label)) continue
             val attendu = if (PersonLabels.isBody(label.label)) {
                 PeoplePath.MIN_CLEARANCE_M
             } else {

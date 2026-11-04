@@ -4,6 +4,7 @@ import android.graphics.Bitmap
 import dev.sam3vision.app.DistanceLayer
 import dev.sam3vision.app.TRANSPORT_WS
 import dev.sam3vision.core.distance.DistanceReading
+import dev.sam3vision.core.live.ClearView
 import dev.sam3vision.core.live.FrameTimings
 import dev.sam3vision.core.live.GuidancePulse
 import dev.sam3vision.core.live.OutageStep
@@ -60,6 +61,8 @@ data class LiveProbeState(
      */
     val pixelSeq: Int = 0,
     val distanceLayer: DistanceLayer? = null,
+    /** Chemin de la frame ([ClearPath]) : le guetteur y lit le côté et l'ordre d'écart. */
+    val clearView: ClearView? = null,
     /** Détections SAM confirmées de la dernière frame, mesurées ou non : la voix y voit ce que l'écran montre. */
     val samDetections: List<Detection> = emptyList(),
     val spoken: String? = null,

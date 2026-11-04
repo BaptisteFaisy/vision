@@ -86,7 +86,7 @@ class LiveProbeGuidanceTest {
         fake.respond("C", frame(listOf(personne())))
         advanceUntilIdle()
 
-        assertEquals("left.", probe.state.value.spoken)
+        assertEquals("right.", probe.state.value.spoken)
     }
 
     @Test
@@ -109,7 +109,7 @@ class LiveProbeGuidanceTest {
         fake.respond("C", frame(listOf(personne())))
         advanceUntilIdle()
 
-        assertEquals("left.", probe.state.value.spoken)
+        assertEquals("right.", probe.state.value.spoken)
         assertFalse(probe.state.value.spokenUrgent)
     }
 
@@ -125,7 +125,7 @@ class LiveProbeGuidanceTest {
         fake.respond("B", frame(listOf(gobelet())))
         advanceUntilIdle()
 
-        assertEquals("left.", probe.state.value.spoken)
+        assertEquals("right.", probe.state.value.spoken)
         assertFalse(probe.state.value.spokenUrgent)
     }
 
@@ -142,8 +142,8 @@ class LiveProbeGuidanceTest {
         advanceUntilIdle()
 
         // Frame portrait 512×1138 : l'axe x porte le champ vertical (~52,8°),
-        // pas 67° — le décalage chiffré passe de 1,5 m à 1,0 m, la voix reste « left. ».
-        assertEquals("left.", probe.state.value.spoken)
+        // pas 67° — le décalage chiffré passe de 1,5 m à 1,0 m, la voix reste « right. ».
+        assertEquals("right.", probe.state.value.spoken)
         assertEquals(1.0f, probe.voice.lastDecision?.shiftMeters!!, 0.001f)
     }
 

@@ -118,11 +118,11 @@ class GuidanceObstaclesTest {
         val decision = out.decision
         assertTrue(decision.blocked)
         assertEquals("mur", decision.obstacle!!.label)
-        assertEquals(GuidanceSide.Left, decision.side)
-        assertEquals(GuidanceWord.Left, Guidance.word(decision))
-        assertEquals("Left.", Guidance.phrase(decision))
-        assertEquals("Left.", Guidance.phrase(decision, SpeechLanguage.En))
-        assertEquals("w|left", Guidance.key(decision))
+        assertEquals(GuidanceSide.Right, decision.side)
+        assertEquals(GuidanceWord.Right, Guidance.word(decision))
+        assertEquals("Right.", Guidance.phrase(decision))
+        assertEquals("Right.", Guidance.phrase(decision, SpeechLanguage.En))
+        assertEquals("w|right", Guidance.key(decision))
         assertNull(decision.shiftMeters)
     }
 
@@ -133,7 +133,7 @@ class GuidanceObstaclesTest {
         assertEquals(3f, out.readings.single().meters, 0.02f)
         assertTrue(out.decision.blocked)
         assertEquals(1f, out.decision.shiftMeters!!, 0.001f)
-        assertEquals("Left.", Guidance.phrase(out.decision))
+        assertEquals("Right.", Guidance.phrase(out.decision))
     }
 
     @Test
@@ -152,13 +152,13 @@ class GuidanceObstaclesTest {
     }
 
     @Test
-    fun `petit objet à 0,5 m mesuré au sténopé contourne a gauche`() {
+    fun `petit objet à 0,5 m mesuré au sténopé contourne a droite`() {
         val out = pinholeChain(frameOf(seg("chat", boxFor("chat", 0.5f))))
 
         assertEquals(0.5f, out.readings.single().meters, 0.02f)
         assertTrue(out.decision.blocked)
-        assertEquals(GuidanceWord.Left, Guidance.word(out.decision))
-        assertEquals("Left.", Guidance.phrase(out.decision))
+        assertEquals(GuidanceWord.Right, Guidance.word(out.decision))
+        assertEquals("Right.", Guidance.phrase(out.decision))
     }
 
     @Test
@@ -186,7 +186,7 @@ class GuidanceObstaclesTest {
 
             assertTrue("lecture $label", out.readings.isEmpty())
             assertTrue("bloqué $label", out.decision.blocked)
-            assertEquals(GuidanceWord.Left, Guidance.word(out.decision))
+            assertEquals(GuidanceWord.Right, Guidance.word(out.decision))
             assertNull("décalage $label", out.decision.shiftMeters)
         }
     }
@@ -204,7 +204,7 @@ class GuidanceObstaclesTest {
 
         assertTrue(out.readings.isEmpty())
         assertTrue(out.decision.blocked)
-        assertEquals("Left.", Guidance.phrase(out.decision))
+        assertEquals("Right.", Guidance.phrase(out.decision))
     }
 
     @Test
@@ -249,9 +249,10 @@ class GuidanceObstaclesTest {
         val wallBox = listOf(0f, 0f, WIDTH.toFloat(), HEIGHT.toFloat())
         val cut = pinholeChain(frameOf(seg("mur", wallBox))).placed
 
-        assertEquals("left.", announcer.onFrame(0L, cut))
+        assertEquals("right.", announcer.onFrame(0L, cut))
         assertNull(announcer.onFrame(100L, cut))
-        assertEquals("right.", announcer.onFrame(200L, depthWallStop().placed))
+        assertNull(announcer.onFrame(200L, depthWallStop().placed))
+        assertEquals("right.", announcer.onFrame(2_000L, depthWallStop().placed))
     }
 
     companion object {

@@ -26,12 +26,12 @@ class PeoplePathTest {
         PlacedLabel(label, (x0 + x1) / 2f, 0.5f, meters, x0, x1)
 
     @Test
-    fun `personne pile en face on passe a gauche a 1 metre`() {
+    fun `personne pile en face on passe a droite a 1 metre`() {
         val path = PeoplePath.plan(listOf(placed("personne", 0.5f, 2f)))!!
 
         assertTrue(path.fits)
-        assertEquals(GuidanceSide.Left, path.side)
-        assertEquals(0.028f, path.headingX, 0.02f)
+        assertEquals(GuidanceSide.Right, path.side)
+        assertEquals(0.972f, path.headingX, 0.02f)
         assertEquals(1.0f, path.clearanceM, 0.02f)
     }
 
@@ -73,7 +73,7 @@ class PeoplePathTest {
         val path = PeoplePath.plan(listOf(boxed("personne", 0.4f, 0.6f, 2f)))!!
 
         assertTrue(path.fits)
-        assertEquals(0.022f, path.headingX, 0.02f)
+        assertEquals(0.978f, path.headingX, 0.02f)
         assertEquals(1.0f, path.clearanceM, 0.02f)
     }
 
@@ -93,7 +93,7 @@ class PeoplePathTest {
 
         assertTrue(path.fits)
         assertEquals(GuidanceSide.Left, path.side)
-        assertEquals(0.456f, path.headingX, 0.02f)
+        assertEquals(0.172f, path.headingX, 0.02f)
     }
 
     @Test
@@ -117,8 +117,8 @@ class PeoplePathTest {
         val decision = Guidance.decide(labels)
 
         assertTrue(decision.blocked)
-        assertEquals(GuidanceSide.Left, decision.side)
-        assertEquals("Gauche.", Guidance.phrase(decision, SpeechLanguage.Fr))
+        assertEquals(GuidanceSide.Right, decision.side)
+        assertEquals("Droite.", Guidance.phrase(decision, SpeechLanguage.Fr))
     }
 
     /** Écart vrai du cap [x] aux corps VRAIS (scène non bruitée, épaules 0,25 m). */
@@ -132,8 +132,8 @@ class PeoplePathTest {
         val path = PeoplePath.plan(listOf(placed("personne", 0.5f, 2.2f)))!!
 
         assertTrue(path.fits)
-        assertEquals(GuidanceSide.Left, path.side)
-        assertEquals(0.071f, path.headingX, 0.005f)
+        assertEquals(GuidanceSide.Right, path.side)
+        assertEquals(0.929f, path.headingX, 0.005f)
         assertEquals(0.89f, vraieClearance(listOf(placed("personne", 0.5f, 2f)), path.headingX), 0.01f)
     }
 
@@ -141,7 +141,7 @@ class PeoplePathTest {
     fun `bruit +30 pourcent personne centree clearance 0,71`() {
         val path = PeoplePath.plan(listOf(placed("personne", 0.5f, 2.6f)))!!
 
-        assertEquals(0.137f, path.headingX, 0.005f)
+        assertEquals(0.863f, path.headingX, 0.005f)
         assertEquals(0.71f, vraieClearance(listOf(placed("personne", 0.5f, 2f)), path.headingX), 0.01f)
     }
 
@@ -161,11 +161,11 @@ class PeoplePathTest {
     }
 
     @Test
-    fun `bruit combine +30 pourcent et centre personne centree clearance 0,63`() {
+    fun `bruit combine +30 pourcent et centre personne centree clearance 0,79`() {
         val path = PeoplePath.plan(listOf(placed("personne", 0.53f, 2.6f)))!!
 
-        assertEquals(0.167f, path.headingX, 0.005f)
-        assertEquals(0.63f, vraieClearance(listOf(placed("personne", 0.5f, 2f)), path.headingX), 0.01f)
+        assertEquals(0.893f, path.headingX, 0.005f)
+        assertEquals(0.79f, vraieClearance(listOf(placed("personne", 0.5f, 2f)), path.headingX), 0.01f)
     }
 
     @Test

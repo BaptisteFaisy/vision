@@ -5,6 +5,7 @@ import dev.sam3vision.core.curb.CurbSignal
 import dev.sam3vision.core.curb.CurbTier
 import dev.sam3vision.core.curb.CurbUpLoop
 import dev.sam3vision.core.curb.CurbWatcher
+import dev.sam3vision.core.distance.DistanceReading
 import dev.sam3vision.core.hazard.HazardKind
 import dev.sam3vision.core.hazard.HazardSignal
 import dev.sam3vision.core.hazard.HazardWatcher
@@ -61,6 +62,21 @@ internal fun LiveProbe.observeObstacles(
 }
 
 /**
+ * Signal danger de la frame, guidé par le chemin ([HazardSignal.steeredBy]) :
+ * dehors hors Traversée seulement — le verdict et la personne parlent seuls en
+ * Traversée, dedans la personne garde son mot, sans couloir à tenir.
+ */
+private fun hazardSignalOf(
+    st: LiveProbeState,
+    readings: List<DistanceReading>,
+    place: PictoPlaceMode,
+): HazardSignal {
+    val signal = HazardSignal.of(readings, st.width, st.height)
+    if (st.crossingActive || place == PictoPlaceMode.DEDANS) return signal
+    return signal.steeredBy(st.clearView)
+}
+
+/**
  * Une frame d'obstacles : les deux signaux relus dans l'état (lectures de
  * distance + dimensions, déjà publiées par frame), convertis en vœux
  * ([hazardWish], [curbWish] — mot d'évitement continu en clip immédiat,
@@ -82,7 +98,7 @@ internal fun obstacleFrame(
     val curbCue = if (st.crossingActive && curbSignal.tier != CurbTier.NEAR) null
     else watchers.curb.onSignal(curbSignal, nowMs, lang)?.takeIf { shouldSpeakCurb(it, st.crossingActive) }
     if (BuildConfig.DEBUG) android.util.Log.d("CurbVoice", curbVoiceLine(readings, curbSignal, curbCue?.phrase, st.crossingActive))
-    val hazardSignal = HazardSignal.of(readings, st.width, st.height)
+    val hazardSignal = hazardSignalOf(st, readings, placeMode())
     val hazardCue = watchers.hazard.onSignal(hazardSignal, nowMs, lang)
     if (BuildConfig.DEBUG) android.util.Log.d("HazardVoice", hazardVoiceLine(readings, hazardSignal, hazardCue?.phrase))
     // Dedans : seule la personne parle (cran 3, le même que dehors) —

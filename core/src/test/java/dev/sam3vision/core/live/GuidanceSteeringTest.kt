@@ -84,8 +84,8 @@ class GuidanceSteeringTest {
     fun `cap droit le passage reprend le cote V1`() {
         val decision = Guidance.decide(listOf(placed("personne", 0.5f)))
 
-        assertEquals(GuidanceSide.Left, decision.side)
-        assertEquals(SteeringCap.Left, decision.passage)
+        assertEquals(GuidanceSide.Right, decision.side)
+        assertEquals(SteeringCap.Right, decision.passage)
     }
 
     @Test
@@ -135,7 +135,7 @@ class GuidanceSteeringTest {
         val decision = Guidance.decide(labels, SteeringCap.Straight)
 
         assertTrue(decision.blocked)
-        assertEquals(GuidanceSide.Left, decision.side)
+        assertEquals(GuidanceSide.Right, decision.side)
     }
 
     @Test

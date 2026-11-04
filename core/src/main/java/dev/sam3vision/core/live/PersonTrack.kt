@@ -247,13 +247,17 @@ class PersonTracker(
         val closing = track.closing
         return TrackedLabel(
             trackId = track.id,
-            label = label.copy(trackId = track.id, closingMps = closing),
+            label = label.copy(trackId = track.id, closingMps = closing, closingSpanMs = spanOf(track.samples)),
             meters = meters,
             closingMps = closing,
             ttcS = Timing.ttcSeconds(meters, closing),
             ageFrames = (frameIndex - track.firstFrame + 1L).toInt(),
         )
     }
+
+    /** Temps couvert par [samples] (ms), 0 avant deux mesures. */
+    private fun spanOf(samples: List<Sample>): Long =
+        if (samples.size < 2) 0L else samples.last().atMs - samples.first().atMs
 
     /** Piste vivante : ce qu'il faut pour apparier la frame suivante et la dater. */
     private class Track(val id: Int, val firstFrame: Long) {

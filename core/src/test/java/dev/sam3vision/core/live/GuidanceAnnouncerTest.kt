@@ -39,7 +39,7 @@ class GuidanceAnnouncerTest {
 
         assertEquals("Straight.", announcer.onFrame(0L, libre))
         // le danger arrive 1 s après : voix TwinLite aussitôt, pas de stabilité ni de délai
-        assertEquals("left.", announcer.onFrame(1_000L, listOf(personne(2f))))
+        assertEquals("right.", announcer.onFrame(1_000L, listOf(personne(2f))))
         // même mot : nouveauté, silence
         assertNull(announcer.onFrame(1_200L, listOf(personne(2f))))
     }
@@ -48,7 +48,7 @@ class GuidanceAnnouncerTest {
     fun `retour au libre parle aussitot`() {
         val announcer = GuidanceAnnouncer(cooldownMs = 4_000L)
 
-        assertEquals("left.", announcer.onFrame(0L, listOf(personne(2f))))
+        assertEquals("right.", announcer.onFrame(0L, listOf(personne(2f))))
         assertNull(announcer.onFrame(200L, listOf(personne(2f))))
         // le couloir se dégage aussitôt : le mot change, parlé sans délai
         assertEquals("Straight.", announcer.onFrame(400L, libre))
@@ -108,7 +108,7 @@ class GuidanceAnnouncerTest {
         val decision = announcer.lastDecision
         assertTrue("décision attendue", decision != null)
         assertEquals(true, decision?.blocked)
-        assertEquals(SteeringCap.Left, decision?.passage)
+        assertEquals(SteeringCap.Right, decision?.passage)
     }
 
     @Test
@@ -116,7 +116,7 @@ class GuidanceAnnouncerTest {
         val announcer = GuidanceAnnouncer(cooldownMs = 4_000L)
         fun proche(meters: Float) = PlacedLabel("personne", 0.5f, 0.5f, meters)
 
-        assertEquals("left.", announcer.onFrame(0L, listOf(proche(0.4f))))
+        assertEquals("right.", announcer.onFrame(0L, listOf(proche(0.4f))))
         // même mot : rien de neuf
         assertNull(announcer.onFrame(200L, listOf(proche(0.45f))))
     }
@@ -136,7 +136,7 @@ class GuidanceAnnouncerTest {
         val announcer = GuidanceAnnouncer(cooldownMs = 4_000L)
         fun matiere() = PlacedLabel("mur", 0.5f, 0.5f, null)
 
-        assertEquals("left.", announcer.onFrame(0L, listOf(matiere())))
+        assertEquals("right.", announcer.onFrame(0L, listOf(matiere())))
         assertNull(announcer.onFrame(200L, listOf(matiere())))
     }
 
@@ -221,9 +221,9 @@ class GuidanceAnnouncerTest {
         // Timing.URGENT_TTC_S (1,2 s), donc seule la cadence de redite
         // gouverne — la version à 250 ms de ce test parlait à chaque frame
         // depuis que l'urgence hors cadence existe (comportement voulu).
-        announcer.onFrame(0L, listOf(personneDroite(3.0f)))
-        announcer.onFrame(400L, listOf(personneDroite(2.6f)))
-        assertEquals("Left.", announcer.onFrame(800L, listOf(personneDroite(2.0f))))
+        assertEquals("Left.", announcer.onFrame(0L, listOf(personneDroite(3.0f))))
+        assertNull(announcer.onFrame(400L, listOf(personneDroite(2.6f))))
+        assertNull(announcer.onFrame(800L, listOf(personneDroite(2.0f))))
         assertNull(announcer.onFrame(1_200L, listOf(personneDroite(1.6f))))
         assertNull(announcer.onFrame(1_600L, listOf(personneDroite(1.3f))))
     }
@@ -260,12 +260,13 @@ class GuidanceAnnouncerTest {
             PlacedLabel("personne", 0.8f, 0.5f, meters),
         )
 
+        // Deux personnes, une de chaque côté : l'ordre sort dès la première frame
+        // au lieu de se taire (muet 90-94 % avant ce patch), et la redite le garde.
         assertTrue("guidage dès la première frame", announcer.onFrame(0L, foule(2.5f)) != null)
         announcer.onFrame(400L, foule(2.1f))
-        // Deux personnes, une de chaque côté : le décalage conseille le côté
-        // le plus large au lieu de se taire (muet 90-94 % avant ce patch).
-        assertTrue("le décalage parle en foule", announcer.onFrame(800L, foule(1.7f)) != null)
+        announcer.onFrame(800L, foule(1.7f))
         assertTrue("un côté conseillé", announcer.lastNudge != null)
+        assertTrue("la redite reparle en foule", announcer.onFrame(2_000L, foule(1.5f)) != null)
     }
 
     @Test
@@ -273,9 +274,9 @@ class GuidanceAnnouncerTest {
         val announcer = GuidanceAnnouncer()
         val trottoirEtroit = FreeSpace(leftM = 0.2f, rightM = 2f)
 
-        announcer.onFrame(0L, listOf(personneDroite(3.0f)), SpeechLanguage.Fr)
-        announcer.onFrame(250L, listOf(personneDroite(2.6f)), SpeechLanguage.Fr)
-        val phrase = announcer.onFrame(500L, listOf(personneDroite(2.2f)), SpeechLanguage.Fr, free = trottoirEtroit)
+        val phrase = announcer.onFrame(0L, listOf(personneDroite(3.0f)), SpeechLanguage.Fr, free = trottoirEtroit)
+        announcer.onFrame(250L, listOf(personneDroite(2.6f)), SpeechLanguage.Fr, free = trottoirEtroit)
+        announcer.onFrame(500L, listOf(personneDroite(2.2f)), SpeechLanguage.Fr, free = trottoirEtroit)
 
         // Pas de clip « serrez » au catalogue : la phrase reste le mot de côté…
         assertEquals("Gauche.", phrase)
@@ -323,11 +324,11 @@ class GuidanceAnnouncerTest {
         val announcer = GuidanceAnnouncer(cooldownMs = 4_000L)
         val bloque = listOf(personne(2f))
 
-        assertEquals("left.", announcer.onFrame(0L, bloque))
+        assertEquals("right.", announcer.onFrame(0L, bloque))
         assertNull(announcer.onFrame(200L, bloque))
         assertEquals("Straight.", announcer.onFrame(400L, libre))
         assertNull(announcer.onFrame(600L, libre))
-        assertEquals("left.", announcer.onFrame(800L, bloque))
+        assertEquals("right.", announcer.onFrame(800L, bloque))
         assertNull(announcer.onFrame(1_000L, bloque))
     }
 
@@ -336,7 +337,7 @@ class GuidanceAnnouncerTest {
         val announcer = GuidanceAnnouncer(cooldownMs = 4_000L)
 
         // bouché à 2 m : le côté parle seul
-        assertEquals("left.", announcer.onFrame(0L, listOf(personne(2f))))
+        assertEquals("right.", announcer.onFrame(0L, listOf(personne(2f))))
         // contact ensuite : même côté, rien de neuf
         assertNull(announcer.onFrame(200L, listOf(personne(0.4f))))
         assertNull(announcer.onFrame(400L, listOf(personne(0.4f))))
@@ -347,7 +348,7 @@ class GuidanceAnnouncerTest {
         val announcer = GuidanceAnnouncer(cooldownMs = 4_000L)
 
         assertEquals(
-            "left.",
+            "right.",
             announcer.onFrame(0L, listOf(personne(0.4f)), SpeechLanguage.En),
         )
         assertNull(announcer.onFrame(200L, listOf(personne(0.45f)), SpeechLanguage.En))
@@ -364,20 +365,20 @@ class GuidanceAnnouncerTest {
     }
 
     @Test
-    fun `passage SAM libre tait un couloir localement bouche`() {
+    fun `passage SAM libre ne tait jamais un couloir localement bouche`() {
         val announcer = GuidanceAnnouncer()
         val sam = Passage(blocked = false)
 
-        assertEquals("Straight.", announcer.onFrame(0L, listOf(personne(2f)), samPassage = sam))
+        assertEquals("right.", announcer.onFrame(0L, listOf(personne(2f)), samPassage = sam))
     }
 
     @Test
-    fun `passage SAM bouche avec mesure proche dit le cote`() {
+    fun `passage SAM bouche ne change pas le cote local proche`() {
         val announcer = GuidanceAnnouncer()
         val sam = Passage(blocked = true, side = "left", label = "person")
 
         assertEquals(
-            "left.",
+            "right.",
             announcer.onFrame(0L, listOf(personne(0.4f)), samPassage = sam),
         )
     }
@@ -396,7 +397,7 @@ class GuidanceAnnouncerTest {
         val bloque = listOf(personne(2f))
 
         assertEquals("Straight.", announcer.onFrame(0L, libre))
-        assertEquals("left.", announcer.onFrame(1_000L, bloque))
+        assertEquals("right.", announcer.onFrame(1_000L, bloque))
         assertEquals("Straight.", announcer.onFrame(2_000L, libre))
         assertNull(announcer.onFrame(3_999L, libre))
         assertEquals("Straight.", announcer.onFrame(4_000L, libre))
@@ -411,11 +412,11 @@ class GuidanceAnnouncerTest {
     }
 
     @Test
-    fun `passage SAM bouche sans cote passe a gauche`() {
+    fun `passage SAM bouche sans cote suit le chemin local`() {
         val announcer = GuidanceAnnouncer()
         val sam = Passage(blocked = true)
 
-        assertEquals("left.", announcer.onFrame(0L, listOf(personne(2f)), samPassage = sam))
+        assertEquals("right.", announcer.onFrame(0L, listOf(personne(2f)), samPassage = sam))
     }
 
     @Test
@@ -436,8 +437,8 @@ class GuidanceAnnouncerTest {
         val announcer = GuidanceAnnouncer()
         val bloque = listOf(personne(2f))
 
-        assertEquals("left.", announcer.onFrame(0L, bloque))
-        assertEquals("left.", announcer.onFrame(2_000L, bloque))
+        assertEquals("right.", announcer.onFrame(0L, bloque))
+        assertEquals("right.", announcer.onFrame(2_000L, bloque))
         // Contact latéral : plus de stop (ordre user du 31/10 — on se faufile, on
         // ne s'arrête pas devant un obstacle). Le contact se contourne côté
         // dégagé à 1 m (pas vers la personne), et la direction se redit
@@ -463,12 +464,12 @@ class GuidanceAnnouncerTest {
     }
 
     @Test
-    fun `passage SAM garde son cote si l autre ne degage pas`() {
+    fun `passage SAM ne reprend pas la main sur un bouche local`() {
         val announcer = GuidanceAnnouncer()
         val sam = Passage(blocked = true, side = "left", label = "person")
         val centre = listOf(PlacedLabel("personne", 0.5f, 0.5f, 1f))
 
-        assertEquals("left.", announcer.onFrame(0L, centre, samPassage = sam))
+        assertEquals("right.", announcer.onFrame(0L, centre, samPassage = sam))
     }
 
     @Test

@@ -118,22 +118,17 @@ object Guidance {
      * sur lesquels on marche (la bordure,
      * elle, reste un obstacle), ni une enseigne sous laquelle on passe.
      * Ni le côté ni le passage ne mènent vers une personne quand l'autre
-     * côté est libre ([freerSide], [bestPassage] : veto personne). Cap droit :
+     * côté est libre ([GuidanceExit], [bestPassage] : veto personne). Cap droit :
      * à égalité, on passe à l'opposé du décalage de l'obstacle (pilier
-     * légèrement à gauche ⇒ on passe à droite) ; pile au centre ⇒ à gauche.
+     * légèrement à gauche ⇒ on passe à droite) ; plein axe ⇒ à droite.
      * Cap latéral : le passage est le plus libre des deux autres secteurs,
      * le centre en premier à égalité — on y marche droit, c'est le plus
      * naturel.
      *
-     * Cap droit : le côté conseillé vient du chemin optimal ([PeoplePath.plan]) —
-     * le cap hors des bandes interdites le plus proche de tout droit — quand il
-     * existe et tient ([PeoplePath.fits]) ; sinon, repli sur le côté le moins
-     * encombré ([freerSide], ancien comportement : géométrie incomplète, voie
-     * sans issue, ou aucun obstacle à portée). Trou de grillage ([holeSide],
-     * localisé par l'appelant) : sur ce repli seul, on part vers le trou
-     * quand il garantit 1 m à toute personne ([PeoplePath.clearsSide]) —
-     * sinon l'évitement générique s'applique (l'humain prime toujours :
-     * jamais vers quelqu'un). Bordure au contact, cap droit,
+     * Cap droit : le côté conseillé vient de [GuidanceExit] — le chemin optimal
+     * quand il existe, sinon le trou de grillage ([holeSide], localisé par
+     * l'appelant, sauf humain à moins de 1 m), sinon le côté le moins encombré.
+     * Bordure au contact, cap droit,
      * + obstacle mesuré au contact (≤ [CONTACT_METERS]) = stop ([contactStop],
      * audit 31/10 : on ne monte pas une bordure dans un obstacle) ; [curbEdge]
      * porte le sens connu du bord (`null` = incertain).
@@ -172,13 +167,7 @@ object Guidance {
         )
         if (cap == SteeringCap.Straight) {
             contactStopDecision(blocking, cap, hfovDeg, curbContact, curbEdge)?.let { return it }
-            val path = PeoplePath.plan(cleaned, range, hfovDeg)
-            val computed = if (path != null && path.fits) {
-                path.side
-            } else {
-                holeOrFreer(cleaned, obstacle, holeSide, range, hfovDeg)
-            }
-            val side = GuidanceBounds.boundedSide(computed, free)
+            val side = GuidanceExit.side(cleaned, obstacle, holeSide, range, hfovDeg, free)
             val shift = shiftOf(obstacle.meters, STRAIGHT_HALF_CORRIDOR, hfovDeg)
             return GuidanceDecision(
                 true, obstacle, side, cap, side.toCap(),
@@ -261,8 +250,7 @@ object Guidance {
      */
     fun word(decision: GuidanceDecision): GuidanceWord {
         if (decision.contactStop) return GuidanceWord.Stop
-        val obstacle = decision.obstacle
-        if (!decision.blocked || obstacle == null) return GuidanceWord.fromCap(decision.cap)
+        if (!decision.blocked) return GuidanceWord.fromCap(decision.cap)
         if (decision.cap == SteeringCap.Straight) {
             return GuidanceWord.fromSide(decision.side ?: GuidanceSide.Left)
         }
@@ -316,16 +304,22 @@ object Guidance {
      * sur la bande centrale — on ne devine jamais un passage.
      */
     private fun rayBlocks(label: PlacedLabel, hfovDeg: Float): Boolean {
+        val halfTangent = LensSpec.halfTangent(hfovDeg)
+        if (ClearPath.isRail(label)) return railBlocks(label, halfTangent)
         val x0 = label.x0
         val x1 = label.x1
         val depth = label.meters?.takeIf { it.isFinite() && it > 0f }
+            ?: ClearPath.UNSEEN_DEPTH_M.takeIf { label.cutBottom }
         if (x0 == null || x1 == null || !x0.isFinite() || !x1.isFinite() || depth == null) {
             return inCorridor(label.centerX, SteeringCap.Straight)
         }
-        val halfTangent = LensSpec.halfTangent(hfovDeg)
         val halfWidth = (RAY_HALF_WIDTH_M / (2f * depth * halfTangent)).coerceIn(0f, 0.5f)
         return minOf(x0, x1) <= 0.5f + halfWidth && maxOf(x0, x1) >= 0.5f - halfWidth
     }
+
+    /** Mur longé : son point de fuite touche le trait, seul l'écart mesuré compte. */
+    private fun railBlocks(label: PlacedLabel, halfTangent: Float): Boolean =
+        ClearPath.railLateralM(label, halfTangent)?.let { it < ClearPath.RAIL_CLEARANCE_M } == true
 
     /** Couloir marché selon le cap : moitié visée, ou bande centrale pour tout droit. */
     private fun inCorridor(centerX: Float, cap: SteeringCap): Boolean = when (cap) {
@@ -369,56 +363,6 @@ object Guidance {
     private fun nearRank(label: PlacedLabel): Float {
         val meters = label.meters
         return if (meters == null || !meters.isFinite()) 0f else meters
-    }
-
-    /**
-     * Repli quand le chemin optimal échoue : vers le trou ([holeSide]) quand
-     * il garantit 1 m à toute personne ([PeoplePath.clearsSide]), sinon le
-     * côté le moins encombré ([freerSide]) — l'évitement des humains prime
-     * sur le trou, toujours.
-     */
-    private fun holeOrFreer(
-        labels: List<PlacedLabel>,
-        obstacle: PlacedLabel,
-        holeSide: GuidanceSide?,
-        rangeMeters: Float,
-        hfovDeg: Float,
-    ): GuidanceSide {
-        if (holeSide != null && PeoplePath.clearsSide(labels, holeSide, rangeMeters, hfovDeg)) return holeSide
-        return freerSide(labels, obstacle, rangeMeters, hfovDeg)
-    }
-
-    /**
-     * Côté le moins encombré : 1 m garantis d'abord (un seul côté dégagé :
-     * lui), sinon sans corps (on ne contourne jamais vers quelqu'un),
-     * sinon moins d'objets, sinon obstacle le plus loin, sinon décalage. À
-     * égalité de corps des deux côtés, l'ancien départage s'applique :
-     * dans une foule on se faufile, on ne s'arrête pas.
-     */
-    private fun freerSide(
-        labels: List<PlacedLabel>,
-        obstacle: PlacedLabel,
-        rangeMeters: Float,
-        hfovDeg: Float,
-    ): GuidanceSide {
-        val leftOk = PeoplePath.clearsSide(labels, GuidanceSide.Left, rangeMeters, hfovDeg)
-        val rightOk = PeoplePath.clearsSide(labels, GuidanceSide.Right, rangeMeters, hfovDeg)
-        if (leftOk != rightOk) return if (leftOk) GuidanceSide.Left else GuidanceSide.Right
-        val edge = PositionText.SIDE_EDGE
-        val left = labels.filter { it.centerX < edge && inRange(it, rangeMeters) }
-        val right = labels.filter { it.centerX > 1f - edge && inRange(it, rangeMeters) }
-        val leftPeople = left.count { PersonLabels.isBody(it.label) }
-        val rightPeople = right.count { PersonLabels.isBody(it.label) }
-        if (leftPeople != rightPeople) {
-            return if (leftPeople < rightPeople) GuidanceSide.Left else GuidanceSide.Right
-        }
-        if (left.size != right.size) return if (left.size < right.size) GuidanceSide.Left else GuidanceSide.Right
-        val leftClear = nearestKnown(left) ?: 0f
-        val rightClear = nearestKnown(right) ?: 0f
-        if (leftClear != rightClear) {
-            return if (leftClear > rightClear) GuidanceSide.Left else GuidanceSide.Right
-        }
-        return if (obstacle.centerX < 0.5f) GuidanceSide.Right else GuidanceSide.Left
     }
 
     /**
@@ -483,10 +427,6 @@ object Guidance {
             SteeringCap.Right -> centerX > 1f - edge
         }
     }
-
-    /** Distance du plus proche objet mesuré du côté, `null` si aucun n'est mesuré. */
-    private fun nearestKnown(labels: List<PlacedLabel>): Float? =
-        labels.mapNotNull { it.meters?.takeIf { meters -> meters.isFinite() } }.minOrNull()
 
     /** Sortie V1 (gauche/droite) vue comme cap, pour le chemin publié. */
     private fun GuidanceSide.toCap(): SteeringCap = when (this) {

@@ -47,8 +47,10 @@ que le serveur envoie du PNG, le repli boîte s'applique — passer le direct en
 **Bornes de plausibilité** (`Pinhole`) : rien sous **0,3 m** (`MIN_METERS`),
 rien au-delà de **60 m** (`MAX_METERS`), rien pour une boîte de moins de **4 px** de haut (`MIN_BOX_PX`). Hors bornes ⇒ pas d'affichage.
 
-**Objet coupé par le bord haut ou bas ⇒ pas de distance** (`Pinhole.isVerticallyCut`, marge de **2 px**).
-Constat de recette sur téléphone (non rejoué ici) : une couette segmentée à tort en « personne », collée
+**Objet coupé par le bord bas ⇒ pas de distance ; coupé par le haut ⇒ plan de sol seul, obstacles parlés
+uniquement** (`Pinhole.isCutTop`/`isCutBottom`, marge de **2 px**). La hauteur de boîte ne mesure plus l'objet,
+mais son pied reste dans l'image : un poteau plus haut que le cadre garde sa distance (04/11). Sol, bordure et
+passage restent refusés. Constat de recette sur téléphone (non rejoué ici) : une couette segmentée à tort en « personne », collée
 aux deux bords, sortait à **31 m** — la boîte ne mesurait plus la hauteur réelle. Les bords gauche/droite
 restent acceptés : seule la hauteur porte la mesure.
 
@@ -120,7 +122,7 @@ d'ingénierie, pas mesure. Causes d'erreur et leur sort :
 - **hauteur réelle supposée** : un enfant mesuré comme « personne » (1,70 m) sort deux fois trop loin ;
   atténué par les entrées de posture (« personne assise » 1,25 m, « cycliste » 1,75 m) quand le concept
   suivi porte la posture, et par la tolérance par classe qui dé-pèse les classes floues dans la fusion ;
-- **objet coupé** par un bord haut/bas : écarté (il n'affiche rien) ;
+- **objet coupé** en bas : écarté (il n'affiche rien) ; en haut : plan de sol seul, obstacles parlés uniquement ;
 - **objet masqué** par un autre : écarté (`Occlusion`) ;
 - **objet penché ou allongé** (chaise vue de dessus, table basse) : la boîte ne mesure plus la hauteur réelle.
 
