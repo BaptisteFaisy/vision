@@ -18,10 +18,17 @@ class WsHttpFallbackHysteresisTest {
 
     private val base = "https://sam.example"
 
-    /** Transport flappant : une ouverture sur deux refuse, chaque envoi répond. */
-    private class AlternatingOpenTransport : WsTransport {
-        var opens = 0
+    /**
+     * Transport flappant : un envoi sur deux est refusé (socket mort, comme un
+     * flappant réel), les autres répondent. L'alternance est au niveau envoi, pas
+     * ouverture : un socket ouvert le reste entre deux frames, alterner l'ouverture
+     * seule ne flapperait pas — et refermer après chaque succès armerait le backoff
+     * du lien (test dépendant de l'horloge). Le refus d'envoi invalide sans backoff :
+     * déterministe, même chemin [FallbackToHttp] que les vraies coupures.
+     */
+    private class FlappingSendTransport : WsTransport {
         val sent = mutableListOf<String>()
+        var served = 0
         private var onText: ((String) -> Unit)? = null
 
         override fun open(
@@ -31,8 +38,6 @@ class WsHttpFallbackHysteresisTest {
             onOpen: () -> Unit,
             headers: Map<String, String>,
         ): Boolean {
-            opens += 1
-            if (opens % 2 == 1) return false
             this.onText = onText
             onOpen()
             return true
@@ -40,6 +45,8 @@ class WsHttpFallbackHysteresisTest {
 
         override fun send(text: String): Boolean {
             sent += text
+            if (sent.size % 2 == 1) return false
+            served += 1
             onText?.invoke(NetContract.frameReply(JSONObject(text).getInt("id")))
             return true
         }
@@ -154,7 +161,7 @@ class WsHttpFallbackHysteresisTest {
 
     @Test
     fun `T7 - le client ne clignote pas sur un WS flappant`() = runBlocking {
-        val transport = AlternatingOpenTransport()
+        val transport = FlappingSendTransport()
         val http = RecordingLiveClient()
         val fallback = WsHttpFallback(probeEvery = 1)
         val client = WsLiveClient(base, transport, 1_000, http, binaryWs = false, httpFallback = fallback)
@@ -166,9 +173,10 @@ class WsHttpFallbackHysteresisTest {
         }
 
         assertEquals("3 échecs : 3 POST", 3, http.liveCalls)
-        assertEquals("3 succès : 3 envois WS", 3, transport.sent.size)
+        assertEquals("3 succès WS entrelacés", 3, transport.served)
         assertEquals(1, fallback.stickCount)
         assertEquals("jamais décollé", 0, fallback.unstickCount)
+        assertEquals("dernier succès en confirmation", 1, fallback.snapshot().wsServed)
         client.close()
     }
 }
