@@ -6,6 +6,7 @@ import android.net.Network
 import android.net.NetworkCapabilities
 import dev.sam3vision.core.net.BackendRoute
 import dev.sam3vision.core.net.NetworkState
+import dev.sam3vision.core.net.netIfaceKey
 
 /**
  * Ce que le téléphone sait du réseau, poussé au client du direct (`:core` ne sonde rien :
@@ -16,9 +17,9 @@ import dev.sam3vision.core.net.NetworkState
  * perte n'était découverte qu'au délai expiré de la frame suivante (10 s, 60 s à froid).
  *
  * Le suivi est **événementiel** (`registerDefaultNetworkCallback`) : pas de réveil
- * périodique, pas de batterie dépensée. `iface` ne change qu'entre deux interfaces
- * réellement différentes, ce qui suffit au client pour déclarer mort-né le socket de
- * l'ancienne et rouvrir sur la nouvelle.
+ * périodique, pas de batterie dépensée. `iface` ne change qu'entre deux réseaux
+ * réellement différents (transport + netId), ce qui suffit au client pour déclarer
+ * mort-né le socket de l'ancien et rouvrir sur le nouveau.
  *
  * Lecture sans verrou : deux champs `@Volatile`, écrits par le callback système (thread
  * binder) et lus par la boucle de frames (thread réseau). Aucune allocation, aucun await.
@@ -53,7 +54,7 @@ class AndroidNetworkState(context: Context) : NetworkState {
                 override fun onAvailable(network: Network) = readNow(cm)
 
                 override fun onCapabilitiesChanged(network: Network, caps: NetworkCapabilities) {
-                    note(caps)
+                    note(network, caps)
                 }
 
                 override fun onLost(network: Network) {
@@ -75,11 +76,11 @@ class AndroidNetworkState(context: Context) : NetworkState {
             ifaceName = null
             return
         }
-        note(cm.getNetworkCapabilities(network))
+        note(network, cm.getNetworkCapabilities(network))
     }
 
-    /** Traduit les capacités en (disponible, nom d'interface stable). */
-    private fun note(caps: NetworkCapabilities?) {
+    /** Traduit le réseau et ses capacités en (disponible, clé de réseau stable). */
+    private fun note(network: Network, caps: NetworkCapabilities?) {
         if (caps == null) {
             online = false
             ifaceName = null
@@ -90,10 +91,10 @@ class AndroidNetworkState(context: Context) : NetworkState {
         // frames parfaitement possibles. Un portail captif se manifestera par des échecs
         // réels, que la veille de panne annonce.
         online = caps.hasCapability(NetworkCapabilities.NET_CAPABILITY_INTERNET)
-        ifaceName = ifaceOf(caps)
+        ifaceName = netIfaceKey(ifaceOf(caps), network.toString())
     }
 
-    /** Nom d'interface : deux réseaux de même transport restent la même route. */
+    /** Transport du réseau : la clé complète ajoute le netId ([netIfaceKey]). */
     private fun ifaceOf(caps: NetworkCapabilities): String = when {
         caps.hasTransport(NetworkCapabilities.TRANSPORT_VPN) -> IFACE_VPN
         caps.hasTransport(NetworkCapabilities.TRANSPORT_WIFI) -> IFACE_WIFI

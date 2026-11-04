@@ -55,6 +55,8 @@ class WsLiveClient(
     private val link: WsLink = WsLink(),
     /** Repli HTTP collant + re-sonde WS (injecté : les tests règlent la sonde). */
     private val httpFallback: WsHttpFallback = WsHttpFallback(),
+    /** Pools HTTP purgés quand le socket est jeté (injecté : les tests comptent). */
+    private val onSocketDiscarded: () -> Unit = { drainBackendPools() },
 ) : LiveClient {
 
     private val lock = Any()
@@ -348,10 +350,11 @@ class WsLiveClient(
         return null
     }
 
-    /** Hors ligne / interface changée : le socket est mort-né, on le jette pour de bon. */
+    /** Hors ligne / réseau changé : socket mort-né jeté, pools HTTP purgés avec. */
     private fun discardSocketLocked(reason: String): ApiError {
         dropSocketLocked(ApiError.Network(reason))
         runCatching { transport.close() }
+        runCatching { onSocketDiscarded() }
         return ApiError.Network(reason)
     }
 
