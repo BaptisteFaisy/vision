@@ -64,6 +64,10 @@ data class ProbeLinkState(
  * de mode : il est dû au premier appel d'un endpoint, puis plus jamais tant que le
  * conteneur répond — [reset] (arrêt du direct, carte éteinte) ou [wakeStaleMs] sans
  * réponse le rendent de nouveau dû. Horloge injectée : testable en JVM sans dormir.
+ *
+ * Confins multi-fils : caméra (envois), fond réseau (completions, 2 vols) et UI
+ * (réessai, guidage) touchent ces champs — toutes les méthodes sont `@Synchronized`
+ * (même moniteur, réentrance OK), sans appel bloquant sous le verrou.
  */
 internal class ProbeLink(
     private val now: () -> Long = { System.currentTimeMillis() },
@@ -93,6 +97,7 @@ internal class ProbeLink(
      * Guidage GPS en cours, injecté par le ViewModel : une coupure de vision n'est alors pas
      * une impasse (le GPS guide encore), et la voix le dit différemment.
      */
+    @Volatile
     var guidanceActive: () -> Boolean = { false }
 
     /** Veille de panne : un mot par palier et par épisode ([OutageStep]). */
@@ -103,30 +108,51 @@ internal class ProbeLink(
      * saine ou non : à 2-5 images par seconde, c'est plus fin qu'un minuteur et ça ne coûte
      * rien quand tout va bien.
      */
+    @Synchronized
     fun outageStep(nowMs: Long, healthy: Boolean): OutageStep? =
         outage.onTick(nowMs, healthy, warmed = answeredAtMs != null, degradedAvailable = guidanceActive())
 
     /** Échecs consécutifs depuis la dernière réponse aboutie. */
     var consecutiveFailures = 0
-        private set
+        @get:Synchronized private set
 
     /** Reprises : réponses abouties qui ont suivi au moins un échec. */
     var reconnects = 0
-        private set
+        @get:Synchronized private set
+
+    /**
+     * Séquence du dernier vol soldé (-1 = aucun) : un vol plus ancien qui se
+     * termine après ([staleCompletion]) ne repose ni erreur ni panne (fantôme
+     * du double-vol : le KO d'hier écrasait le OK d'aujourd'hui).
+     */
+    private var settledFrameSeq = -1L
+
+    /** Vrai si le vol [frameSeq] s'est terminé après un vol plus récent (-1 = legacy). */
+    @Synchronized
+    fun staleCompletion(frameSeq: Long): Boolean = frameSeq >= 0 && frameSeq < settledFrameSeq
+
+    /** Solde le vol [frameSeq] : le filigrane ne recule jamais. */
+    @Synchronized
+    fun markSettled(frameSeq: Long) {
+        if (frameSeq > settledFrameSeq) settledFrameSeq = frameSeq
+    }
 
     /**
      * Le budget froid (60 s) est-il dû pour [endpoint] ? Une fois par réveil : un
      * réglage, une bascule de mode ou un `begin()` en séance ne le réarment pas.
      */
+    @Synchronized
     fun coldDue(endpoint: String, nowMs: Long = now()): Boolean =
         endpoint.isNotBlank() && (paidEndpoint != endpoint || nowMs - paidAtMs > wakeStaleMs)
 
     /** Arme le budget froid de ce réveil (l'appelant pose alors le délai de 60 s). */
+    @Synchronized
     fun armCold() {
         coldArmed = true
     }
 
     /** Le budget froid vient d'être payé : la première réponse est arrivée. */
+    @Synchronized
     fun markPaid(endpoint: String, nowMs: Long = now()) {
         coldArmed = false
         if (endpoint.isBlank()) return
@@ -135,6 +161,7 @@ internal class ProbeLink(
     }
 
     /** Réponse aboutie : le lien respire, les échecs consécutifs sont soldés. */
+    @Synchronized
     fun onAnswer(nowMs: Long = now()) {
         if (consecutiveFailures > 0) reconnects += 1
         consecutiveFailures = 0
@@ -143,9 +170,11 @@ internal class ProbeLink(
     }
 
     /** Échec d'une frame : rend le nouveau compte d'échecs consécutifs. */
+    @Synchronized
     fun onFailure(): Int = ++consecutiveFailures
 
     /** Envoi d'une frame : le prochain silence parlera de CET envoi resté sans réponse. */
+    @Synchronized
     fun onSent(nowMs: Long = now()) {
         sentAtMs = nowMs
     }
@@ -155,6 +184,7 @@ internal class ProbeLink(
      * le second, trop tôt, est refusé sans toucher ni session ni réveil. Horloge qui
      * recule : on réessaie (comme le throttle du journal, jamais de blocage).
      */
+    @Synchronized
     fun retryDue(nowMs: Long = now()): Boolean {
         if (nowMs >= lastRetryMs && nowMs - lastRetryMs < RETRY_COOLDOWN_MS) return false
         lastRetryMs = nowMs
@@ -162,6 +192,7 @@ internal class ProbeLink(
     }
 
     /** Arrêt du direct (carte éteinte) : le réveil suivant repayera le budget froid. */
+    @Synchronized
     fun reset() {
         answeredAtMs = null
         sentAtMs = null
@@ -172,6 +203,7 @@ internal class ProbeLink(
         written = null
         consecutiveFailures = 0
         reconnects = 0
+        settledFrameSeq = -1L
         outage.reset()
     }
 
@@ -180,6 +212,7 @@ internal class ProbeLink(
      * repartent de zéro avec la nouvelle session — mais le budget froid reste
      * payé (FIX-19 : une bascule de mode ne réarme pas 60 s).
      */
+    @Synchronized
     fun resetForReconfigure() {
         answeredAtMs = null
         sentAtMs = null
@@ -187,10 +220,12 @@ internal class ProbeLink(
         written = null
         consecutiveFailures = 0
         reconnects = 0
+        settledFrameSeq = -1L
         outage.reset()
     }
 
     /** L'état du lien à cet instant (pur : ni écriture, ni compteur touché). */
+    @Synchronized
     fun snapshot(nowMs: Long = now()): ProbeLinkState {
         val at = answeredAtMs
         val sent = sentAtMs
@@ -207,6 +242,7 @@ internal class ProbeLink(
     }
 
     /** Retient [state] comme déjà écrit : le prochain [tick] ne le redira pas. */
+    @Synchronized
     fun remember(state: ProbeLinkState) {
         written = state
     }
@@ -216,6 +252,7 @@ internal class ProbeLink(
      * compteur change, ou une seconde de silence vient de s'écouler. Une frame à
      * 30 fps n'écrit donc pas 30 fois l'état du lien ; `force` impose la réécriture.
      */
+    @Synchronized
     fun tick(nowMs: Long = now(), force: Boolean = false): ProbeLinkState? {
         val next = snapshot(nowMs)
         val prev = written
@@ -250,8 +287,13 @@ internal fun LiveProbe.publishLink(nowMs: Long = System.currentTimeMillis(), for
     _state.update { it.copy(error = linkErrorOf(it.error, next), link = next) }
 }
 
-/** Réponse aboutie : le lien respire et l'erreur de silence retombe. */
-internal fun LiveProbe.noteAnswer(nowMs: Long = System.currentTimeMillis()) {
+/**
+ * Réponse aboutie : le lien respire et l'erreur de silence retombe. Un vol soldé
+ * après un vol plus récent ([frameSeq]) est périmé : ignoré, il ne solde rien.
+ */
+internal fun LiveProbe.noteAnswer(nowMs: Long = System.currentTimeMillis(), frameSeq: Long = -1L) {
+    if (link.staleCompletion(frameSeq)) return
+    link.markSettled(frameSeq)
     link.onAnswer(nowMs)
     publishLink(nowMs, force = true)
     // Le lien répond de nouveau : un épisode de panne se termine (la voix dit « Back
@@ -263,8 +305,11 @@ internal fun LiveProbe.noteAnswer(nowMs: Long = System.currentTimeMillis()) {
 /**
  * Échec d'une frame : compteurs, état du lien, et **une seule** ligne de log par
  * seconde ([LiveLatencyLog.failure]) — un lien coupé écrivait un `Log.w` par frame.
+ * Un vol périmé (soldé après un vol plus récent) ne compte ni ne s'affiche.
  */
-internal fun LiveProbe.noteFailure(error: Throwable, timings: FrameTimings? = null) {
+internal fun LiveProbe.noteFailure(error: Throwable, timings: FrameTimings? = null, frameSeq: Long = -1L) {
+    if (link.staleCompletion(frameSeq)) return
+    link.markSettled(frameSeq)
     val nowMs = System.currentTimeMillis()
     val failures = link.onFailure()
     val next = link.snapshot(nowMs)
@@ -355,4 +400,18 @@ internal fun outageLineOf(state: LiveProbeState, nowMs: Long = System.currentTim
     val step = state.outage ?: return null
     if (step == OutageStep.BACK && nowMs - state.outageAtMs > BACK_LINE_MS) return null
     return step.word().line
+}
+
+/** Grâce anti-clignotement du bandeau de panne : une ligne fraîchement effacée est tenue ce délai. */
+internal const val OUTAGE_GRACE_MS = 2_000L
+
+/**
+ * Ligne de panne tenue : [line] fraîche prime toujours ; sinon la dernière ligne
+ * non nulle ([held]) est tenue pendant la grâce ([heldAtMs] + [BACK_LINE_MS] +
+ * [OUTAGE_GRACE_MS]), puis rendue. Pure, testée en JVM.
+ */
+internal fun heldOutageLine(line: String?, held: String?, heldAtMs: Long, nowMs: Long): String? {
+    if (line != null) return line
+    if (held == null || nowMs - heldAtMs > BACK_LINE_MS + OUTAGE_GRACE_MS) return null
+    return held
 }

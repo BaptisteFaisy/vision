@@ -195,6 +195,97 @@ class LiveProbeLinkTest {
         assertEquals("aucun réveil sans session", healthBefore, fake.healthCalls)
     }
 
+    @Test
+    fun `compteurs coherents sous acces concurrents`() {
+        val link = ProbeLink()
+        val threads = List(4) {
+            Thread {
+                repeat(250) {
+                    link.onFailure()
+                    link.snapshot(10_000)
+                    link.tick(10_000)
+                }
+            }.also(Thread::start)
+        }
+        threads.forEach(Thread::join)
+
+        assertEquals("aucun incrément perdu", 1_000, link.consecutiveFailures)
+    }
+
+    @Test
+    fun `retryDue borne sous concurrence, un seul gagne`() {
+        val link = ProbeLink()
+        val wins = java.util.concurrent.atomic.AtomicInteger(0)
+        val threads = List(8) {
+            Thread { if (link.retryDue(50_000)) wins.incrementAndGet() }.also(Thread::start)
+        }
+        threads.forEach(Thread::join)
+
+        assertEquals("un seul essai par fenêtre", 1, wins.get())
+    }
+
+    @Test
+    fun `KO plus vieux que le dernier solde est perime`() = runTest {
+        val (probe, _) = probeHarness(this)
+        probe.link.markSettled(5)
+
+        probe.noteFailure(ApiError.Network("boom"), frameSeq = 3)
+
+        assertEquals("le fantôme ne compte pas", 0, probe.link.consecutiveFailures)
+        assertNull("le fantôme ne s'affiche pas", probe.state.value.error)
+    }
+
+    @Test
+    fun `KO plus recent passe`() = runTest {
+        val (probe, _) = probeHarness(this)
+        probe.link.markSettled(3)
+
+        probe.noteFailure(ApiError.Network("boom"), frameSeq = 5)
+
+        assertEquals(1, probe.link.consecutiveFailures)
+        assertEquals("boom", probe.state.value.error)
+    }
+
+    @Test
+    fun `frameSeq legacy passe toujours`() = runTest {
+        val (probe, _) = probeHarness(this)
+        probe.link.markSettled(9)
+
+        probe.noteFailure(ApiError.Network("boom"))
+
+        assertEquals("défaut -1 = pas d'ordre", 1, probe.link.consecutiveFailures)
+    }
+
+    @Test
+    fun `OK perime ne solde rien`() = runTest {
+        val (probe, _) = probeHarness(this)
+        probe.link.markSettled(5)
+        probe.link.onFailure()
+        probe.link.onFailure()
+
+        probe.noteAnswer(frameSeq = 3)
+
+        assertEquals("les échecs survivent", 2, probe.link.consecutiveFailures)
+    }
+
+    @Test
+    fun `reset efface le filigrane de sequence`() {
+        val link = ProbeLink()
+        link.markSettled(9)
+
+        link.reset()
+
+        assertFalse(link.staleCompletion(3))
+    }
+
+    @Test
+    fun `heldOutageLine tient la ligne en grace puis la rend`() {
+        assertEquals("fraîche prime", "a", heldOutageLine("a", "b", 0L, 1_000L))
+        assertEquals("tenue en grâce", "b", heldOutageLine(null, "b", 0L, BACK_LINE_MS + OUTAGE_GRACE_MS))
+        assertNull("expirée", heldOutageLine(null, "b", 0L, BACK_LINE_MS + OUTAGE_GRACE_MS + 1))
+        assertNull("rien sans tenue", heldOutageLine(null, null, 0L, 1_000L))
+    }
+
     private companion object {
         const val ENDPOINT = "https://sam.test"
         const val AUTRE = "https://autre.test"

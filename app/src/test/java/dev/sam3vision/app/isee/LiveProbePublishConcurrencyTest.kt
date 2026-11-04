@@ -3,6 +3,7 @@ package dev.sam3vision.app.isee
 import dev.sam3vision.core.model.LiveFrame
 import dev.sam3vision.core.model.MASK_ENCODING_NONE
 import dev.sam3vision.core.model.SegObject
+import dev.sam3vision.core.net.ApiError
 import java.util.concurrent.ConcurrentLinkedQueue
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.CoroutineExceptionHandler
@@ -13,6 +14,8 @@ import kotlinx.coroutines.cancel
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.runBlocking
 import kotlinx.coroutines.withTimeout
+import org.junit.Assert.assertFalse
+import org.junit.Assert.assertNull
 import org.junit.Assert.assertTrue
 import org.junit.Test
 
@@ -99,5 +102,64 @@ class LiveProbePublishConcurrencyTest {
             delay(20)
         }
         return cond()
+    }
+
+    @Test
+    fun `un KO perime apres un OK frais ne repose ni erreur ni panne`() {
+        val errors = ConcurrentLinkedQueue<Throwable>()
+        val handler = CoroutineExceptionHandler { _, e ->
+            if (e is CancellationException) return@CoroutineExceptionHandler
+            errors.add(e)
+        }
+        val scope = CoroutineScope(Dispatchers.Default + SupervisorJob() + handler)
+        try {
+            val fake = ProbeTestClient(mutableListOf())
+            val probe = LiveProbe(
+                scope = scope,
+                clock = { 0L },
+                background = Dispatchers.Default,
+                clientFor = { _, _, _ -> fake },
+            )
+            probe.configure(PROBE_TEST_ENDPOINT)
+            probe.begin()
+            probe.adaptive.configure(uploadEnabled = false, keyframesEnabled = false)
+            var joue = false
+            runBlocking {
+                withTimeout(120_000) {
+                    repeat(30) { cycle ->
+                        if (joue) return@repeat
+                        val baseSent = fake.sent
+                        probe.onFrame("A$cycle")
+                        probe.onFrame("B$cycle")
+                        if (!attendre { fake.sent >= baseSent + 2 }) {
+                            if (fake.sent == baseSent + 1) {
+                                // Un seul admis : A (émis en premier), sinon B — solder
+                                // libère le créneau pour les cycles suivants.
+                                try {
+                                    fake.respond("A$cycle", frame())
+                                } catch (_: IllegalStateException) {
+                                    fake.respond("B$cycle", frame())
+                                }
+                            }
+                            return@repeat
+                        }
+                        val baseFrames = probe.state.value.frames
+                        fake.respond("B$cycle", frame())
+                        if (!attendre { probe.state.value.frames >= baseFrames + 1 }) return@repeat
+                        fake.fail("A$cycle", ApiError.Network("boom"))
+                        joue = true
+                    }
+                    assertTrue("aucune paire admise", joue)
+                    assertFalse("le KO périmé ne compte pas",
+                        attendre { probe.state.value.link.consecutiveFailures > 0 })
+                }
+            }
+            assertTrue("plantage concurrent : ${errors.peek()}", errors.isEmpty())
+            assertNull("le KO périmé ne s'affiche pas", probe.state.value.error)
+            assertNull("le KO périmé n'arme pas la panne", probe.state.value.outage)
+        } finally {
+            scope.cancel()
+            seanceVide()
+        }
     }
 }

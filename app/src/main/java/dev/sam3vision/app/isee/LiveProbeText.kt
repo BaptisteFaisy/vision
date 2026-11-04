@@ -4,6 +4,7 @@ import dev.sam3vision.core.live.TimingsText
 import java.util.Locale
 import dev.sam3vision.core.distance.DistanceReading
 import dev.sam3vision.core.distance.DistanceText
+import dev.sam3vision.core.net.isLinkRefusal
 import dev.sam3vision.core.net.isTransient
 
 /** Longueur maximale d'un endpoint affiché : au-delà, le milieu est coupé. */
@@ -110,9 +111,12 @@ fun shortEndpoint(endpoint: String): String {
  *
  * L'erreur passe **avant** la garde `frames > 0` : un lien muet doit se dire même après
  * la première frame (audit C3 — sinon on marche avec des masques figés crus à jour).
+ * Hystérésis : le tout premier échec isolé (`failures == 1`) est masqué une frame —
+ * un hoquet ne flash plus ; dès le 2e, ou sans compteur (erreur de configuration),
+ * l'erreur se dit.
  */
 fun liveProbeNotice(state: LiveProbeState): String? {
-    state.error?.let { return it }
+    state.error?.let { if (state.link.consecutiveFailures != 1) return it }
     if (state.link.silent) return silenceNotice(state.link.lastAnswerAgeMs)
     if (state.frames > 0) return null
     if (state.warming && state.timeoutSec > 0) return "waking the SAM GPU… (up to ${state.timeoutSec} s)"
@@ -135,12 +139,14 @@ fun silenceNotice(ageMs: Long): String = "$SILENCE_PREFIX ${ageMs / 1_000} s —
  *   endormi (~30 s de réveil), la frame suivante réessaie d'elle-même.
  *
  * Tout échec transitoire ([isTransient] : délai, cadence, 5xx) prend ces lignes —
- * un hoquet isolé ne flash plus « HTTP error 500… » à l'écran. Le reste remonte
- * brut, dont « SAM GPU off — ask b to turn it on », qui demande une vraie
- * action, pas un nouvel essai.
+ * un hoquet isolé ne flash plus « HTTP error 500… » à l'écran. Les refus locaux
+ * du lien ([isLinkRefusal] : reconnexion, hors-ligne, silence — aucun handshake
+ * tenté) prennent les mêmes lignes : l'escalade reste portée par les compteurs
+ * et la veille de panne. Le reste remonte brut, dont « SAM GPU off — ask b to
+ * turn it on », qui demande une vraie action, pas un nouvel essai.
  */
 fun probeFailureText(error: Throwable, link: ProbeLinkState = ProbeLinkState()): String = when {
-    !error.isTransient -> error.message ?: "SAM call failed"
+    !error.isTransient && !isLinkRefusal(error) -> error.message ?: "SAM call failed"
     link.silent -> silenceNotice(link.lastAnswerAgeMs)
     link.kind == ProbeLinkKind.Warm -> "slow answer — retrying on the next frame"
     else -> "GPU waking up… (retrying on the next frame)"

@@ -66,6 +66,15 @@ internal class ProbeTestClient(private val journal: MutableList<String>) : LiveC
         slot.complete(Result.success(frame))
     }
 
+    /** Livre l'échec de [jpeg] : le pendant de [respond] pour les completions KO. */
+    fun fail(jpeg: String, error: Throwable) {
+        val slot = synchronized(lock) {
+            waiting.remove(jpeg) ?: error("aucune frame « $jpeg » en attente")
+        }
+        synchronized(lock) { journal += "echec $jpeg" }
+        slot.complete(Result.failure(error))
+    }
+
     /** Appels `/health` (réveil explicite) reçus par le faux client. */
     var healthCalls = 0
 
