@@ -1,5 +1,7 @@
 package dev.sam3vision.core.net
 
+import java.io.InterruptedIOException
+import java.net.SocketTimeoutException
 import java.net.UnknownHostException
 import javax.net.ssl.SSLHandshakeException
 import org.junit.Assert.assertEquals
@@ -86,5 +88,31 @@ class HttpErrorTest {
         val error = httpError(404, "modal-http: invalid function call\n" + "x".repeat(100_000))
 
         assertTrue("attendu BackendStopped, obtenu $error", error is ApiError.BackendStopped)
+    }
+
+    /**
+     * Incident Samsung du 04/11/2026 : le log ne disait que « Timeout backend
+     * unreachable: timeout », sans dire lecture ou connexion ni avec quel détail —
+     * la cause transport était avalée. Elle est désormais gardée (le journal
+     * l'affiche en « + Cause message ») et le timeout reste transient.
+     */
+    @Test
+    fun `un timeout socket garde sa cause transport`() {
+        val cause = SocketTimeoutException("timeout")
+        val error = cause.toApiError()
+
+        assertTrue("attendu Timeout, obtenu $error", error is ApiError.Timeout)
+        assertSame(cause, error.cause)
+        assertTrue("un timeout reste retentable", error.isTransient)
+    }
+
+    @Test
+    fun `un timeout interrompu garde sa cause transport`() {
+        val cause = InterruptedIOException("interrupted")
+        val error = cause.toApiError()
+
+        assertTrue("attendu Timeout, obtenu $error", error is ApiError.Timeout)
+        assertSame(cause, error.cause)
+        assertTrue("un timeout reste retentable", error.isTransient)
     }
 }

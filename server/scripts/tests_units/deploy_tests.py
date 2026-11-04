@@ -29,3 +29,21 @@ def test_deploy_pin(_module) -> None:
     check("déploiement : défaut code eu / eu-west",
           app.REGION == "eu" and app.ROUTING == "eu-west",
           f"{app.REGION!r} / {app.ROUTING!r}")
+
+
+def test_deploy_slots(_module) -> None:
+    """Huit slots déployés : 2 clients live + transitoires + zombies (04/11/2026).
+
+    Une session WS tient son slot toute sa vie : à 4 slots, 2 clients live et
+    leurs POST/health/handshakes saturent le conteneur et Modal parque les
+    nouvelles connexions au proxy sans fin (ni 429, ni réponse — timeouts côté
+    client alors que le conteneur sert l'autre client en 200). La carte reste
+    unique (max_containers=1 + verrou GPU), seuls les créneaux d'entrée grandissent.
+    """
+    from test_units import BACKEND_DIR, check
+
+    src = (BACKEND_DIR / "live_fast" / "live_app_fast.py").read_text(encoding="utf-8")
+    check("déploiement : huit slots par conteneur",
+          "@modal.concurrent(max_inputs=8)" in src, "décorateur absent ou valeur changée")
+    check("déploiement : une seule carte",
+          "max_containers=1" in src, "garde GPU unique absente")
