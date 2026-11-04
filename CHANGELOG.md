@@ -9,6 +9,12 @@ livré et ses preuves (tâche, fichiers, chiffres) dans l'arbre.
 - **Cause racine** : les téléphones installés avant gaiamelie gardent en réglage l'ancien défaut Valhalla `baptiste-faisy--…`. Ce workspace est désactivé : tout `/route` répond 404 `workspace … is disabled`, donc ni guidage ni carte. La bascule du défaut n'avait migré que SAM : `seedRouteBaseUrl` ne comble que le vide, `healRoute` ne réparait que les URL mal formées.
 - **Fait** : `healRoute` rend au build toute URL de ce workspace ; une URL saisie ailleurs reste conservée.
 - **Preuves** : logcat Redmi `HTTP error 404: modal-http: workspace ac-3lgJFhzO8zTGDFvgAszRD4 is disabled`, message identique en appelant l'ancienne URL, 200 sur gaiamelie ; `RouteSeedTest` (ancien défaut remplacé, saisie manuelle gardée). Une installation neuve passait : l'émulateur ne montrait pas le défaut.
+## 2026-11-04 — iSee : « Cross. » devant des garées même en balayant (branche `fix/voiture-garee-traversee`)
+
+- **Demande** : « il me détecte des voitures garées comme en mouvement », « même si je balaye cela me dise cross et si une voiture bouge don't cross », léger.
+- **Cause racine** : `ParkedProof` mesurait la dérive dans l'image, sans retirer le mouvement du téléphone, et `BlockMotionSource` se tait sur un balayage lent. Une garée balayée à 0,1 image/s n'était jamais prouvée.
+- **Fait** : `AnchorMotion` lit le mouvement de la caméra sur les objets fixes rendus par SAM, sans capteur ni pixel. `ParkedProof` juge dans le repère de la rue, garde 5 s une preuve sortie du cadre, et une preuve non rejugée expire après 1 s. Sous balayage, un tau périmé ne tient plus le veto ; une boîte coupée dont le bord libre suit la caméra ne compte plus comme croissance.
+- **Preuves** : vidéo Samsung `20261104_101016` recadrée, 39 frames, sans feu : « Cross. » 25 → 39 à la main, 13 → 37 à 0,10 image/s, 3 → 37 à 0,20 image/s, « en mouvement » à zéro. Voitures ajoutées à ±0,1, 0,2 et 0,4 image/s pendant le balayage : « Don't cross. » sur toutes les frames. Garée qui démarre : 1,2 s, balayage ou non. `docs/TRAVERSEE.md` § 20. Dans la rue : non mesuré.
 
 ## 2026-11-04 — iSee : la puce de lieu et les prompts disent le même monde (branche `fix/lieu-relance-dehors`)
 

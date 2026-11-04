@@ -84,6 +84,8 @@ Branchement :
 > **PÉRIMÉ sur master (02/11)** : `GyroCompensation.kt` et `GyroSource.kt`
 > supprimés, câblage `FUSION P4` retiré de `TraverseWiring.kt` sur ordre user —
 > la décision est 100 % visuelle. Section gardée pour mémoire.
+> Le balayage lent se lit sur les objets fixes de SAM : `AnchorMotion`, voir
+> `docs/TRAVERSEE.md` § 20.
 
 Principe : le bloc-matching global sature en pan rapide (recherche ±16 px,
 modèle sans rotation) ; le vecteur de rotation du téléphone mesure le pan

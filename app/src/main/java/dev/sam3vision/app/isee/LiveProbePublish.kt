@@ -129,7 +129,7 @@ internal fun LiveProbe.computeRest(
     // plus). Le fond juge les pistes voitures : un pan sur une garée ne bloque pas.
     val verdictFrame = if (crossingActive) {
         verdictEngine.onFrame(
-            frame, readings, jpegB64, at, motion = ProbeBackgroundMotion.lastMotion,
+            frame, readings, jpegB64, at, motion = traverseVeto.cameraMotion ?: ProbeBackgroundMotion.lastMotion,
             carVeto = cross?.veto == true, onCrosswalk = onWalk, parked = traverseVeto::isParked,
         )
     } else null

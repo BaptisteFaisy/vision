@@ -35,6 +35,13 @@ import kotlin.math.hypot
  * pan rapide prouvé (`panning`, voir [PAN_SPEED]), rien n'est prouvable — une
  * boîte fixe dans l'image peut y suivre la caméra — et la mémoire repart de zéro.
  *
+ * Quand les repères fixes disent le mouvement de la caméra ([AnchorMotion]), les
+ * vues se jugent dans le repère de la rue : une garée balayée ne dérive plus, une
+ * voiture qui roule garde sa vitesse même si la caméra la suit. Sans repères, les
+ * vues restent en repère image, comme avant. Une preuve sortie du cadre par le
+ * balayage reste en mémoire [MEMORY_MS] à sa place dans la rue ; le véhicule qui
+ * y revient la reprend pour [HOLD_MS], le temps d'être rejugé sur sa fenêtre.
+ *
  * Pur Kotlin testé en JVM, aucune horloge implicite.
  */
 class ParkedProof {
@@ -47,15 +54,28 @@ class ParkedProof {
 
     /** Véhicule suivi : dernière boîte, dernière vue, vues gardées, preuve et statut de morceau. */
     private class Track(var last: Box, var lastSeenMs: Long) {
+        /** Dernière boîte entière : à la sortie du cadre, [last] n'est plus qu'un morceau. */
+        var whole = last
         val samples = ArrayDeque<Sample>()
         var parked = false
         var fragment = false
+        var judgedMs = -1L
     }
+
+    /** Vrai si le cadre coupe au moins un bord. */
+    private val Cut.any: Boolean get() = left || top || right || bottom
 
     /** Véhicule physique d'une frame : label et boîte les mieux notés, toutes ses boîtes SAM. */
     private class Seen(val label: String, val box: Box, val cut: Cut, val members: MutableList<List<Float>>)
 
     private val tracks = ArrayList<Track>()
+
+    /** Caméra cumulée depuis le dernier oubli (fractions d'image) : image − rue. */
+    private var cameraX = 0f
+    private var cameraY = 0f
+
+    /** Vrai si la frame courante sait où est la caméra : le repère de la rue vaut. */
+    private var located = false
 
     /** Boîtes SAM (pixels) prouvées garées à la dernière frame. */
     @Volatile
@@ -69,28 +89,36 @@ class ParkedProof {
     fun reset() {
         tracks.clear()
         parkedBoxes = emptySet()
+        cameraX = 0f
+        cameraY = 0f
     }
 
     /**
      * Avance d'une frame datée de [atMs] : [detections] nourrit les pistes,
-     * [panning] (pan rapide prouvé par le fond) efface toute preuve. Sans date
-     * ([atMs] < 0), rien n'est prouvé.
+     * [panning] (pan rapide prouvé par le fond) efface toute preuve, [camera]
+     * (repères fixes, `null` sans accord) ramène les vues dans le repère de la
+     * rue. Sans date ([atMs] < 0), rien n'est prouvé.
      */
     @Synchronized
-    fun update(detections: List<Detection>, atMs: Long, panning: Boolean = false) {
+    fun update(detections: List<Detection>, atMs: Long, panning: Boolean = false, camera: CameraStep? = null) {
         if (atMs < 0L || panning) {
             reset()
             return
+        }
+        located = camera != null
+        camera?.let {
+            cameraX += it.dx
+            cameraY += it.dy
         }
         val claimed = HashSet<Track>()
         val judged = vehiclesOf(detections).sortedByDescending { it.box.area }.map { vehicle ->
             val track = trackOf(vehicle, atMs, claimed)
             claimed += track
             feed(track, vehicle, atMs)
-            track.parked = judge(track)
+            track.parked = judge(track, atMs)
             vehicle to track
         }
-        tracks.removeAll { atMs - it.lastSeenMs > STALE_MS }
+        tracks.removeAll { !isKept(it, atMs) }
         val proven = judged.filter { (_, track) -> track.parked }.map { (vehicle, _) -> vehicle.box }
         judged.forEach { (vehicle, track) -> track.fragment = isFragment(vehicle, track, proven) }
         parkedBoxes = judged
@@ -170,7 +198,7 @@ class ParkedProof {
         if (detection.width <= 0 || detection.height <= 0) return null
         val width = detection.width.toFloat()
         val height = detection.height.toFloat()
-        return Box(pixels.x1 / width, pixels.y1 / height, pixels.x2 / width, pixels.y2 / height)
+        return Box(pixels.x1 / width, pixels.y1 / height, pixels.x2 / width, pixels.y2 / height).translated(-cameraX, -cameraY)
     }
 
     /** Bords de [detection] collés au cadre, à [EDGE_PX] près. */
@@ -190,16 +218,31 @@ class ParkedProof {
      * repartait de zéro dès que SAM rendait une boîte décalée sur une frame.
      */
     private fun trackOf(vehicle: Seen, atMs: Long, claimed: Set<Track>): Track {
-        val close = tracks.filter {
-            it !in claimed && atMs - it.lastSeenMs <= STALE_MS && it.last.iou(vehicle.box) >= CONTINUITY_IOU
-        }
-        return close.filterNot { it.fragment }.ifEmpty { close }.maxByOrNull { it.last.iou(vehicle.box) }
+        val close = tracks.filter { it !in claimed && isKept(it, atMs) && fitOf(it, vehicle) >= CONTINUITY_IOU }
+        return close.filterNot { it.fragment }.ifEmpty { close }.maxByOrNull { fitOf(it, vehicle) }
             ?: Track(vehicle.box, atMs).also { tracks += it }
+    }
+
+    /** Piste vivante, ou preuve gardée à sa place tant que le repère de la rue vaut. */
+    private fun isKept(track: Track, atMs: Long): Boolean =
+        atMs - track.lastSeenMs <= if (track.parked && located) MEMORY_MS else STALE_MS
+
+    /**
+     * Recouvrement de [vehicle] et de la piste. Un véhicule que le cadre coupe,
+     * tout entier dans une preuve, est ce véhicule qui rentre : l'IoU d'un
+     * morceau contre sa boîte entière ne le dirait pas.
+     */
+    private fun fitOf(track: Track, vehicle: Seen): Float {
+        val iou = track.last.iou(vehicle.box)
+        if (iou >= CONTINUITY_IOU || !track.parked || !located || !vehicle.cut.any) return iou
+        return if (overlap(vehicle.box, track.whole) >= vehicle.box.area * RETURN_INSIDE_MIN) CONTINUITY_IOU else iou
     }
 
     /** Ajoute la vue à la fenêtre et purge ce qui en sort. */
     private fun feed(track: Track, vehicle: Seen, atMs: Long) {
+        if (track.parked && located && atMs - track.lastSeenMs > WINDOW_MS) track.judgedMs = atMs
         track.last = vehicle.box
+        if (!vehicle.cut.any) track.whole = vehicle.box
         track.lastSeenMs = atMs
         track.samples.addLast(Sample(atMs, vehicle.box, vehicle.cut))
         while (atMs - track.samples.first().atMs > SIZE_WINDOW_MS) track.samples.removeFirst()
@@ -208,12 +251,15 @@ class ParkedProof {
     /**
      * Verdict de la piste. Fenêtre trop courte : la preuve reste ce qu'elle
      * était (un trou de détection ne la casse pas, une piste jeune ne l'acquiert
-     * pas). Sinon la dérive récente et la taille tranchent, la dérive
-     * s'élargissant une fois la preuve acquise (hystérésis).
+     * pas), mais [HOLD_MS] au plus : sous 3 ips, rien ne la rejugerait et une
+     * voiture qui démarre resterait exemptée. Sinon la dérive récente et la
+     * taille tranchent, la dérive s'élargissant une fois la preuve acquise
+     * (hystérésis).
      */
-    private fun judge(track: Track): Boolean {
+    private fun judge(track: Track, atMs: Long): Boolean {
         val recent = recentOf(track)
-        if (!isJudgeable(recent)) return track.parked
+        if (!isJudgeable(recent)) return track.parked && atMs - track.judgedMs <= HOLD_MS
+        track.judgedMs = atMs
         val speed = speedOf(recent) ?: return false
         val limit = if (track.parked) RELEASE_SPEED else PROOF_SPEED
         return speed <= limit && steadySize(track.samples)
@@ -281,6 +327,15 @@ class ParkedProof {
 
         /** Mémoire de la taille (ms) : assez longue pour qu'une approche lente y sorte du bruit. */
         const val SIZE_WINDOW_MS = 3_000L
+
+        /** Durée de vie d'une preuve sans fenêtre jugeable (ms) : elle n'exempte pas sans être revue. */
+        const val HOLD_MS = 1_000L
+
+        /** Mémoire d'une preuve hors du cadre (ms) : un aller-retour de balayage. */
+        const val MEMORY_MS = 5_000L
+
+        /** Part d'un véhicule coupé qui doit tenir dans la preuve pour la reprendre. */
+        const val RETURN_INSIDE_MIN = 0.7f
 
         /** Vues minimales dans la fenêtre : en dessous, la cadence ne prouve rien. */
         const val MIN_SAMPLES = 4

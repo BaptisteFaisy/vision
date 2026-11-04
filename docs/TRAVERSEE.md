@@ -77,9 +77,9 @@ qui **précède** le verdict (plus petit nombre = plus forte priorité, donc
   du verdict est nourri par frame en Traversée, `LiveProbePublish.computeRest`) ;
   position : cadence SAM. Hystérésis gardée côté voix (le verdict ne bégaye pas).
 - Mouvement voiture : suivi client (association IoU, vitesse lissée,
-  ego-motion fond + gyro) — une boîte qui suit la caméra (pan sur une
-  voiture garée) n'est pas un mouvement. Une voiture **prouvée garée**
-  (§ 19) sort du veto et du mouvement.
+  ego-motion visuel : repères fixes § 20, fond à défaut) — une boîte qui suit
+  la caméra (pan sur une voiture garée) n'est pas un mouvement. Une voiture
+  **prouvée garée** (§ 19) sort du veto et du mouvement.
 
 ## 5. Proposition du mode (niveau 2)
 
@@ -173,3 +173,41 @@ voiture, alors qu'une voiture garée doit laisser dire « Cross. ».
   (crops réels) et `CrossingParkedVideoTest` (vidéos réelles dans le vrai moteur :
   garées → « Cross. », voiture qui passe ou traverse au loin → « Don't cross. »).
   Fixtures : `app/src/test/resources/real-motion/samsung-*.json`.
+
+## 20. Balayage : « Cross. » même si le téléphone bouge (04/11)
+
+Ordre user : « même si je balaye cela me dise cross et si une voiture bouge don't
+cross », léger. Après le § 19, un simple balayage faisait dire « Don't cross. »
+devant des garées.
+
+- **Cause** : `ParkedProof` mesurait la dérive dans l'image. À 0,1 image/s (~4°/s),
+  une garée dépasse le seuil de preuve, et `BlockMotionSource` se tait à cette
+  vitesse. Le label `car` passait aussi « en mouvement » par le latéral brut.
+- **Fait** : `AnchorMotion` (`:core`) lit le mouvement de la caméra sur les objets
+  fixes que SAM rend déjà (poteau, panneau, feu, mur, bordure…) : médiane des
+  bords libres, 3 repères d'accord au moins. Aucun capteur (décision 100 %
+  visuelle, gyro retiré le 02/11), aucun pixel. `ParkedProof` juge alors dans le
+  repère de la rue, et le veto comme le verdict reçoivent ce mouvement à la place
+  du fond (`TraverseVeto.cameraMotion`).
+- **Mesure** (vidéo Samsung `20261104_101016` recadrée, 20 prompts, sans feu,
+  39 frames après la preuve) : « Cross. » 25 → 39 téléphone à la main, 13 → 37 à
+  0,10 image/s, 3 → 37 à 0,20 image/s ; « en mouvement » tombe à zéro.
+- **Sûreté** : un véhicule, ou un objet posé sur un véhicule, n'est jamais un
+  repère : une file qui roule ne passe pas pour un balayage. Sans accord en
+  largeur, tout retombe sur le brut d'avant. Une voiture qui roule garde sa
+  vitesse dans le repère de la rue, même filmée en la suivant. Une preuve sans
+  fenêtre jugeable expire après 1 s (sous 3 ips, rien ne la rejugeait).
+- **Sortie du cadre** : une preuve reste 5 s à sa place dans la rue tant que les
+  repères tiennent ; le véhicule qui y revient la reprend pour 1 s, le temps
+  d'être rejugé. Une boîte coupée qui grandit ne bloque pas si son bord libre
+  suit la caméra ; une voiture qui entre plus vite garde son veto.
+- **Limites assumées** : une voiture jamais vue qui entre dans le cadre dit
+  « Don't cross. » jusqu'à sa preuve (600 ms). En marchant, rien ne change : la
+  parallaxe n'a pas de repère commun. Une voiture sous ~0,07 image/s dans la rue
+  (0,5 m/s à 10 m) lit comme garée, comme au § 19. Sous balayage, une voiture très
+  rapide peut laisser une frame sans veto quand ses boîtes ne se recouvrent plus
+  (déjà vrai avant ce correctif).
+- **Preuves** : `AnchorMotionTest`, `ParkedProofTest`, `TraverseVetoParkedTest`,
+  `CrossingSweepVideoTest`. Fixtures `real-motion/samsung-balayage-*.json`. Sur
+  `rue-arret-*.json`, des taxis à l'arrêt filmés par une caméra qui tourne : le
+  mouvement mesuré est celui du balayage injecté, à ±0,002 image près.
