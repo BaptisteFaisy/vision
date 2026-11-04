@@ -23,6 +23,9 @@ internal const val LINK_WAKE_STALE_MS = 300_000L
 /** Préfixe du texte de silence : il se remplace au lieu de s'empiler dans l'état. */
 internal const val SILENCE_PREFIX = "no reply for"
 
+/** Délai minimum entre deux essais manuels : marteler « Réessayer » ne martèle pas le serveur. */
+internal const val RETRY_COOLDOWN_MS = 5_000L
+
 /** Ce que la sonde peut affirmer de son lien à un instant donné. */
 enum class ProbeLinkKind {
     /** Aucune session, ou rien tenté : on n'affirme rien. */
@@ -31,10 +34,10 @@ enum class ProbeLinkKind {
     /** Budget froid armé, aucune réponse encore : « le GPU se réveille » est vrai. */
     Cold,
 
-    /** Une réponse aboutie il y a moins de [LINK_SILENCE_MS] : le lien vit. */
+    /** Le lien vit — ou vivait : sans envoi resté sans réponse, son âge ne l'accuse pas. */
     Warm,
 
-    /** Plus de [LINK_SILENCE_MS] sans réponse : on parle du lien, plus du GPU. */
+    /** Plus de [LINK_SILENCE_MS] sans réponse **à un envoi** : on parle du lien, plus du GPU. */
     Silent,
 }
 
@@ -69,6 +72,12 @@ internal class ProbeLink(
 ) {
     /** Instant de la dernière réponse aboutie (`null` = aucune encore sur ce réveil). */
     private var answeredAtMs: Long? = null
+
+    /** Instant du dernier envoi (`null` = rien envoyé sur ce réveil) : le silence exige un envoi sans réponse. */
+    private var sentAtMs: Long? = null
+
+    /** Instant du dernier essai manuel (`retryNow`) : le suivant attend [RETRY_COOLDOWN_MS]. */
+    private var lastRetryMs = 0L
 
     /** Endpoint dont le budget froid a été payé, et quand. */
     private var paidEndpoint: String? = null
@@ -136,9 +145,27 @@ internal class ProbeLink(
     /** Échec d'une frame : rend le nouveau compte d'échecs consécutifs. */
     fun onFailure(): Int = ++consecutiveFailures
 
+    /** Envoi d'une frame : le prochain silence parlera de CET envoi resté sans réponse. */
+    fun onSent(nowMs: Long = now()) {
+        sentAtMs = nowMs
+    }
+
+    /**
+     * Nouvel essai manuel dû ? Borné : un appui « Réessayer » toutes les 5 s suffit —
+     * le second, trop tôt, est refusé sans toucher ni session ni réveil. Horloge qui
+     * recule : on réessaie (comme le throttle du journal, jamais de blocage).
+     */
+    fun retryDue(nowMs: Long = now()): Boolean {
+        if (nowMs >= lastRetryMs && nowMs - lastRetryMs < RETRY_COOLDOWN_MS) return false
+        lastRetryMs = nowMs
+        return true
+    }
+
     /** Arrêt du direct (carte éteinte) : le réveil suivant repayera le budget froid. */
     fun reset() {
         answeredAtMs = null
+        sentAtMs = null
+        lastRetryMs = 0L
         paidEndpoint = null
         paidAtMs = 0L
         coldArmed = false
@@ -151,10 +178,14 @@ internal class ProbeLink(
     /** L'état du lien à cet instant (pur : ni écriture, ni compteur touché). */
     fun snapshot(nowMs: Long = now()): ProbeLinkState {
         val at = answeredAtMs
+        val sent = sentAtMs
         val age = at?.let { (nowMs - it).coerceAtLeast(0L) } ?: 0L
+        // Silence juste : un envoi resté sans réponse — veto nuit ou porte fermée,
+        // rien ne part, et le lien n'est pas accusé.
+        val outstanding = sent != null && (at == null || sent > at)
         val kind = when {
             at == null -> if (coldArmed) ProbeLinkKind.Cold else ProbeLinkKind.Idle
-            age > silenceMs -> ProbeLinkKind.Silent
+            age > silenceMs && outstanding -> ProbeLinkKind.Silent
             else -> ProbeLinkKind.Warm
         }
         return ProbeLinkState(kind, age, consecutiveFailures, reconnects)
@@ -239,6 +270,20 @@ internal fun LiveProbe.noteFailure(error: Throwable, timings: FrameTimings? = nu
 }
 
 /**
+ * Veto nuit/noir : la frame ne part ni à SAM ni au picto — comptée, et dite à
+ * l'UI ([liveProbeNotice]) au lieu d'un silence réseau qui mentirait (rien n'est envoyé).
+ */
+internal fun LiveProbe.noteLowLight() {
+    _state.update { it.copy(dark = true, lowLightVetoes = it.lowLightVetoes + 1) }
+}
+
+/** Retour de la lumière : un envoi prouve que la frame a passé la garde nuit/noir. */
+internal fun LiveProbe.noteLight() {
+    if (!_state.value.dark) return
+    _state.update { it.copy(dark = false) }
+}
+
+/**
  * 1re réponse aboutie : le conteneur est chaud, le délai froid retombe au délai
  * normal — **une fois pour tout le réveil**. Aucune session froide ne survit à la
  * chauffe : `coldSession` lit `session` (session unique, FIX-18), il n'y a donc plus
@@ -285,10 +330,12 @@ internal fun LiveProbe.markWarming() {
 /**
  * Nouvel essai manuel (bouton « Réessayer » de la notice) : le lien repart de zéro
  * et rouvre aussitôt, le réveil est relancé, et l'erreur affichée s'efface — la
- * frame suivante la reposera si la panne dure. Sans session (direct arrêté), rien.
+ * frame suivante la reposera si la panne dure. Sans session (direct arrêté), rien ;
+ * trop tôt après le précédent ([ProbeLink.retryDue]), refusé sans rien toucher.
  */
-fun LiveProbe.retryNow(): Boolean {
+fun LiveProbe.retryNow(nowMs: Long = System.currentTimeMillis()): Boolean {
     val single = session ?: return false
+    if (!link.retryDue(nowMs)) return false
     val ok = single.retryNow()
     fireWake(_state.value.endpoint)
     _state.update { it.copy(error = null) }

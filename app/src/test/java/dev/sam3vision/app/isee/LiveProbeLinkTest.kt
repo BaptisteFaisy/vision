@@ -54,7 +54,9 @@ class LiveProbeLinkTest {
         assertEquals("aucune réponse : on n'affirme rien", ProbeLinkKind.Idle, link.snapshot(0).kind)
         link.onAnswer(10_000)
         assertEquals("le lien vit", ProbeLinkKind.Warm, link.snapshot(12_900).kind)
+        assertEquals("sans envoi, l'âge n'accuse pas", ProbeLinkKind.Warm, link.snapshot(13_400).kind)
 
+        link.onSent(13_450)
         val silent = link.snapshot(13_500)
         assertEquals(ProbeLinkKind.Silent, silent.kind)
         assertEquals("âge de la dernière réponse", 3_500L, silent.lastAnswerAgeMs)
@@ -87,6 +89,8 @@ class LiveProbeLinkTest {
 
         assertNotNull("première écriture", link.tick(0))
         assertNull("500 ms plus tard, rien de neuf", link.tick(500))
+        assertEquals("sans envoi, pas de silence", ProbeLinkKind.Warm, link.snapshot(3_400).kind)
+        link.onSent(3_450)
         assertEquals("3 s de silence : la nature change", ProbeLinkKind.Silent, link.tick(3_500)!!.kind)
         assertNull("même seconde de silence : rien", link.tick(3_900))
         assertNotNull("seconde suivante : l'âge se dit", link.tick(4_500))
@@ -194,6 +198,6 @@ class LiveProbeLinkTest {
     private companion object {
         const val ENDPOINT = "https://sam.test"
         const val AUTRE = "https://autre.test"
-        const val SILENCE_NOTICE = "no reply for 4 s — network cut? (retrying)"
+        const val SILENCE_NOTICE = "no reply for 4 s — link silent (retrying)"
     }
 }
