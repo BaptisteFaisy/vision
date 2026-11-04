@@ -86,16 +86,6 @@ internal fun LiveProbe.setCrossingActive(
 }
 
 /**
- * Le feu d'une frame : **où** il est ([box], normalisée 0..1) et **ce qu'il dit**
- * ([state]). Les deux viennent de la même lecture, donc l'étiquette posée sur la
- * vidéo ne peut pas désigner un autre feu que celui qui a été classifié.
- */
-data class CrossingLight(
-    val box: List<Float>?,
-    val state: CrossingState,
-)
-
-/**
  * Vert utilisable pour une décision (veto sonde, pipeline direct) : état vert
  * **et** boîte présente. Une lecture sans boîte (pas de feu en vue —
  * l'ex-`boxOf()` null de la pompe locale supprimée le 31/10) ne fait jamais

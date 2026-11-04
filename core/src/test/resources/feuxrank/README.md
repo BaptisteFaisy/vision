@@ -18,3 +18,19 @@ Mesuré sur ces pixels (miroir `tools/light_features.py` + portages
 `pedScore`/`flux` à l'identique) : ped 0,799 (rouge) contre 0,695
 (vert) — écart 0,104 sous `PED_EPS` (0,30), le flux tranche : 963
 (vert) contre 138 (rouge). Aucune boîte ne touche le bord.
+
+## Densité réelle : `samsung-101521-*.ppm` (04/11/2026)
+
+Les deux crops ci-dessus viennent d'un recadrage 2160 px de haut, soit
+**1,8× plus de pixels** par feu que la caméra : la scène entière (rotation
+−90°, 2160×3840) tient en 640 px sur le grand côté, d'où un feu de 20×25 px
+et non 56×45. À cette densité le rang s'inversait : le test ci-dessus passait
+et la rue alternait. Ces quatre crops sont à la densité réelle (vidéo réduite
+à 360×640, boîtes SAM de `cap521`) :
+
+| fichier | instant | contenu | verdict porte |
+|---|---|---|---|
+| `samsung-101521-tricolore-cote.ppm` (30×65) | t=0,5 s | tricolore vu de côté, lueur rouge | Red |
+| `samsung-101521-vert.ppm` (21×25) | t=0,5 s | bonhomme vert | Green |
+| `samsung-101521-noir.ppm` (21×24) | t=1,0 s | même feu, LED éteinte (battement 100 Hz) | Red |
+| `samsung-101521-rouge.ppm` (20×25) | t=7,0 s | même feu, vrai rouge | Red |

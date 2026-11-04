@@ -62,31 +62,79 @@ object PedLampRank {
     }
 
     /**
-     * Forme piétonne de la tache allumée : `1 − remplissage` de sa boîte
-     * englobante (masque [PedLightColor.isLampPixel], daltonien — bonhomme
-     * rouge et bonhomme vert sont troués, disques voiture pleins). `0` sans
+     * Forme piétonne de la tache allumée : `1 − remplissage` de la boîte de sa
+     * **plus grande tache** 8-connexe (masque [isLampColour], daltonien —
+     * bonhomme rouge et bonhomme vert sont troués, disques voiture pleins).
+     * Sur la tache et pas sur tous les pixels : deux points rouges éloignés font
+     * une boîte vide, donc 0,96 de forme, et battaient un vrai bonhomme. `0` sans
      * tache lisible (le flux tranche). Fraction, invariante à l'échelle.
      */
     fun pedScore(argb: IntArray, width: Int, height: Int): Float {
         if (width <= 0 || height <= 0 || argb.size != width * height) return 0f
-        var lit = 0
-        var minX = width
-        var maxX = -1
-        var minY = height
-        var maxY = -1
-        for (index in argb.indices) {
-            if (!PedLightColor.isLampPixel(argb[index])) continue
-            lit++
-            val x = index % width
-            val y = index / width
-            if (x < minX) minX = x
-            if (x > maxX) maxX = x
-            if (y < minY) minY = y
-            if (y > maxY) maxY = y
-        }
-        if (lit < 2) return 0f
-        val area = (maxX - minX + 1) * (maxY - minY + 1)
-        if (area <= 0) return 0f
-        return 1f - lit.toFloat() / area
+        val blob = largestBlob(BooleanArray(argb.size) { isLampColour(argb[it]) }, width, height)
+        if (blob.size < 2) return 0f
+        val minX = blob.minOf { it % width }
+        val maxX = blob.maxOf { it % width }
+        val minY = blob.minOf { it / width }
+        val maxY = blob.maxOf { it / width }
+        return 1f - blob.size.toFloat() / ((maxX - minX + 1) * (maxY - minY + 1))
     }
+
+    /** Indices de la plus grande tache 8-connexe de [lit] (vidé au passage). */
+    private fun largestBlob(lit: BooleanArray, width: Int, height: Int): IntArray {
+        var best = IntArray(0)
+        val queue = IntArray(lit.size)
+        for (start in lit.indices) {
+            if (!lit[start]) continue
+            val size = flood(lit, start, width, height, queue)
+            if (size > best.size) best = queue.copyOf(size)
+        }
+        return best
+    }
+
+    /** Remplit [queue] de la tache de [start], l'efface de [lit] et rend sa taille. */
+    private fun flood(lit: BooleanArray, start: Int, width: Int, height: Int, queue: IntArray): Int {
+        var head = 0
+        var tail = 1
+        queue[0] = start
+        lit[start] = false
+        while (head < tail) {
+            val x = queue[head] % width
+            val y = queue[head] / width
+            head++
+            for (ny in maxOf(0, y - 1)..minOf(height - 1, y + 1)) {
+                for (nx in maxOf(0, x - 1)..minOf(width - 1, x + 1)) {
+                    val next = ny * width + nx
+                    if (!lit[next]) continue
+                    lit[next] = false
+                    queue[tail++] = next
+                }
+            }
+        }
+        return tail
+    }
+
+    /**
+     * Copie de [argb] réduite aux pixels de lampe ([isLampColour]), le reste
+     * noir : ce que [LampLens.flux] doit noter pour comparer deux feux. Sans
+     * elle, le flux compte le caisson gris-bleu d'un tricolore vu de côté.
+     */
+    fun lampOnly(argb: IntArray): IntArray =
+        IntArray(argb.size) { index -> if (isLampColour(argb[index])) argb[index] else OFF }
+
+    /**
+     * Pixel allumé **et** franchement rouge ou vert : [PedLightColor.isLampPixel]
+     * seul retient tout pixel saturé, dont le gris-bleu d'un caisson et le ciel —
+     * 0,8 de forme pour un tricolore vu de côté contre 0,3-0,5 pour un vrai
+     * bonhomme (vidéo Samsung `20261104_101521`), l'ordre « bonhomme avant
+     * disque » s'y inversait. Mêmes seuils que [PedLightGate].
+     */
+    private fun isLampColour(pixel: Int): Boolean {
+        if (!PedLightColor.isLampPixel(pixel)) return false
+        val projection = PedLightColor.projectionOf(pixel)
+        return projection <= PedLightColor.RED_PROJECTION_MAX || projection >= PedLightColor.GREEN_PROJECTION_MIN
+    }
+
+    /** Pixel éteint de [lampOnly] : noir opaque. */
+    private const val OFF = 0xFF000000.toInt()
 }

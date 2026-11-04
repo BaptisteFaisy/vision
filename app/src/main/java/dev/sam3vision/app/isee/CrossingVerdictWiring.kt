@@ -13,6 +13,7 @@ import dev.sam3vision.core.crossing.CrossingVerdictRule
 import dev.sam3vision.core.crossing.Evidence
 import dev.sam3vision.core.crossing.LightEvidenceGate
 import dev.sam3vision.core.crossing.LightTemporalVote
+import dev.sam3vision.core.crossing.PedLampHold
 import dev.sam3vision.core.distance.DistanceReading
 import dev.sam3vision.core.model.LiveFrame
 import dev.sam3vision.core.model.toDetections
@@ -87,6 +88,8 @@ class CrossingVerdictEngine(
     private val gate: LightEvidenceGate = LightEvidenceGate(minGreenFrames = 1, greenHoldMs = 0L),
     /** Vote temporel du vert (3 preuves sur 5, sortie immédiate sur rouge prouvé). */
     private val vote: LightTemporalVote = LightTemporalVote(),
+    /** Tenue du vert voté : lampe noire ou tricolore voisin ne le retirent pas ([PedLampHold]). */
+    private val hold: PedLampHold = PedLampHold(),
 ) {
     /** Dernier verdict vibré (`null` = aucun : le premier verdict parlé vibre). */
     private var felt: CrossingVerdict? = null
@@ -99,12 +102,6 @@ class CrossingVerdictEngine(
 
     /** [atMs] de la première frame du silence sans preuve courant (`null` = preuve lue). */
     private var unprovenSinceMs: Long? = null
-
-    /** Dernier verdict tenu (`null` = aucun : le premier verdict passe sans tenue). */
-    private var held: CrossingVerdict? = null
-
-    /** DontCross bruts consécutifs d'origine feu depuis un Cross tenu. */
-    private var badStreak = 0
 
     /**
      * Traite une frame à [atMs] : verdict, posts ordonnés publiés ([poster]),
@@ -138,7 +135,8 @@ class CrossingVerdictEngine(
             sawAnyLightBox = read.box != null,
             bestState = if (read.box != null) read.state else null,
         )
-        val light = lightOf(read, evidence)
+        val held = read.state != CrossingState.Green && hold.holds(read.box, read.rank, read.redProven, atMs)
+        val light = if (held) CrossingVerdictLight.Green else lightOf(read, evidence, atMs)
         val proven = light != CrossingVerdictLight.Unknown
         trackSilence(proven, atMs)
         val carDetections = frame.objects.toDetections(frame.width, frame.height)
@@ -147,8 +145,8 @@ class CrossingVerdictEngine(
         cars.update(carDetections, carReadings, atMs, motion = motion)
         val moving = cars.movingThisFrame
         val recent = recentMoving(moving, atMs)
-        val raw = CrossingVerdictRule.decide(light, recent, carVeto)
-        val verdict = holdCross(raw, recent, carVeto)
+        // Vert tenu = vert : le veto de la frame, lu sur la lampe noire, ne compte pas.
+        val verdict = CrossingVerdictRule.decide(light, recent, carVeto && !held)
         val cue = announcer.onFrame(atMs, verdict)
         // Sans preuve on ne PRONONCE rien (pas de « Don't cross. » puis
         // « Cross. » 100 ms plus tard) — mais le silence est BORNÉ (D3/D4).
@@ -178,31 +176,6 @@ class CrossingVerdictEngine(
     private fun recentMoving(moving: Boolean, atMs: Long): Boolean {
         if (moving) lastMovingAtMs = atMs
         return moving || lastMovingAtMs?.let { atMs - it < MOVING_WINDOW_MS } == true
-    }
-
-    /**
-     * Tient un Cross établi à travers 1-2 frames douteuses d'origine FEU
-     * (rouge lu isolé, boîte perdue : jitter SAM sur petite lampe, bout de
-     * tricolore voisin) — le verdict ne bascule qu'au [HOLD_CROSS_FRAMES]e
-     * DontCross consécutif (~150 ms à 12-15 ips, négligeable devant la
-     * répétition de 2 s ; ordre user du 04/11 : vert piéton + rouge voiture
-     * ne doit plus alterner cross/don't-cross). Veto et mouvement tranchent
-     * toujours aussitôt (D7 et sans-feu intacts : seules les bascules d'origine
-     * feu, trafic calme, sont tenues).
-     */
-    private fun holdCross(raw: CrossingVerdict, moving: Boolean, veto: Boolean): CrossingVerdict {
-        if (raw == CrossingVerdict.Cross || held != CrossingVerdict.Cross || moving || veto) {
-            held = raw
-            badStreak = 0
-            return raw
-        }
-        badStreak += 1
-        if (badStreak >= HOLD_CROSS_FRAMES) {
-            held = CrossingVerdict.DontCross
-            badStreak = 0
-            return CrossingVerdict.DontCross
-        }
-        return CrossingVerdict.Cross
     }
 
     /**
@@ -240,15 +213,17 @@ class CrossingVerdictEngine(
      * la sortie du vert est portée par `EXIT_FRAMES = 2` (2 frames non vertes
      * consécutives, ≈130-160 ms), et le verdict lui-même bascule sur le rouge
      * dès la frame rouge lue (le rouge ne dépend pas du vote, seulement le
-     * vert). Le vote ne sert donc qu'à autoriser le vert.
+     * vert). Le vote ne sert donc qu'à autoriser le vert. Le rouge lu n'arrive
+     * ici que s'il réfute la tenue ([PedLampHold]) : une lampe noire ou le rouge
+     * d'une autre boîte sont filtrés avant par [onFrame], sans nourrir le vote.
      */
-    private fun lightOf(read: CrossingLight, evidence: Evidence): CrossingVerdictLight {
-        if (read.box == null) return absentLight(evidence)
+    private fun lightOf(read: CrossingLight, evidence: Evidence, atMs: Long): CrossingVerdictLight {
+        val box = read.box ?: return absentLight(evidence)
         val voted = vote.onFrame(rawState = read.state, redProven = false)
         val light = verdictLightOf(read)
-        if (light == CrossingVerdictLight.Green && voted != CrossingState.Green) {
-            return CrossingVerdictLight.Unknown
-        }
+        if (light != CrossingVerdictLight.Green) return light
+        if (voted != CrossingState.Green) return CrossingVerdictLight.Unknown
+        hold.arm(box, read.rank, atMs)
         return light
     }
 
@@ -318,20 +293,16 @@ class CrossingVerdictEngine(
         cars.reset()
         gate.reset()
         vote.reset()
+        hold.reset()
         felt = null
         lastMovingAtMs = null
         unprovenFrames = 0
         unprovenSinceMs = null
-        held = null
-        badStreak = 0
     }
 
     companion object {
         /** Fenêtre « voiture en mouvement » du sans-feu : 2 s (ordre user du 04/11). */
         const val MOVING_WINDOW_MS = 2_000L
-
-        /** DontCross bruts consécutifs d'origine feu avant d'abandonner un Cross tenu. */
-        const val HOLD_CROSS_FRAMES = 3
     }
 }
 

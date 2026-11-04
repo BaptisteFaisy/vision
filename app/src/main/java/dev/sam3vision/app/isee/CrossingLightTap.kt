@@ -9,13 +9,33 @@ import dev.sam3vision.core.exposure.ClipStats
 import dev.sam3vision.core.model.LiveFrame
 
 /**
+ * Le feu d'une frame : **où** il est ([box], normalisée 0..1) et **ce qu'il dit**
+ * ([state]). Les deux viennent de la même lecture, donc l'étiquette posée sur la
+ * vidéo ne peut pas désigner un autre feu que celui qui a été classifié.
+ */
+data class CrossingLight(
+    val box: List<Float>?,
+    val state: CrossingState,
+    /** Rang de la boîte retenue, `null` sans mesure (repli poteau) : aucune tenue possible. */
+    val rank: PedLampRank.Ranked? = null,
+    /** Rouge franc lu sur [box]. Vrai sans mesure : un rouge non mesuré reste un rouge (sûr). */
+    val redProven: Boolean = true,
+)
+
+/**
  * Prise crop : appelée avec la boîte lue, le crop classifié et le verdict.
  * Sert la collecte ([LightCropLogger]) ; `null` = pas de collecte.
  */
 internal typealias CrossingCropTap = (box: List<Float>, crop: CrossingFrame, verdict: CrossingState) -> Unit
 
 /** Lecture d'une frame : la boîte retenue, le verdict et l'écrêtage du crop relu. */
-private data class LightRead(val box: List<Float>?, val state: CrossingState, val clip: ClipStats)
+private data class LightRead(
+    val box: List<Float>?,
+    val state: CrossingState,
+    val clip: ClipStats,
+    val rank: PedLampRank.Ranked? = null,
+    val redProven: Boolean = true,
+)
 
 /**
  * Lecture du feu sur une frame : boîtes SAM candidates (tête puis caissons),
@@ -44,7 +64,7 @@ internal fun crossingLightOf(
 ): CrossingLight {
     val read = readLightOf(frame, jpegB64, onCrop)
     LightExposureSignal.offer(read.box, read.clip)
-    return CrossingLight(read.box, read.state)
+    return CrossingLight(read.box, read.state, read.rank, read.redProven)
 }
 
 /** Corps de [crossingLightOf], sans la publication (une seule sortie par frame au-dessus). */
@@ -61,7 +81,7 @@ private fun readLightOf(frame: LiveFrame, jpegB64: String, onCrop: CrossingCropT
             box = box,
             crop = crop,
             verdict = PedLightGate.verdict(crop.argb, crop.width, crop.height),
-            rank = PedLampRank.rank(box, crop.argb, crop.width, crop.height, flux),
+            rank = PedLampRank.rank(box, crop.argb, crop.width, crop.height, lampFlux(crop)),
         )
         last = candidate
         if (flux >= LampLens.MIN_FLUX && (best == null || PedLampRank.better(candidate.rank, best.rank))) {
@@ -77,8 +97,13 @@ private fun readLightOf(frame: LiveFrame, jpegB64: String, onCrop: CrossingCropT
     // Collecte (voir LightCropLogger) : seuls les crops classifiés partent,
     // jamais les frames sans boîte ni les échecs de décodage.
     if (onCrop != null) onCrop(pick.box, pick.crop, pick.verdict)
-    return LightRead(pick.box, pick.verdict, pick.crop.clip)
+    val red = PedLightGate.hasRedLamp(pick.crop.argb, pick.crop.width, pick.crop.height)
+    return LightRead(pick.box, pick.verdict, pick.crop.clip, pick.rank, red)
 }
+
+/** Flux de la seule lampe de [crop] : le rang compare des feux, pas leurs caissons. */
+private fun lampFlux(crop: CrossingFrame): Float =
+    LampLens.flux(PedLampRank.lampOnly(crop.argb), crop.width, crop.height)
 
 /** Boîte candidate déjà croppée : verdict de la porte et rang du feu piéton. */
 private class Candidate(
