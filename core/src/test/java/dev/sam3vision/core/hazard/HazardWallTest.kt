@@ -33,7 +33,7 @@ class HazardWallTest {
         assertTrue(cue.urgent)
         assertEquals(HazardKind.OTHER, cue.kind)
         assertNull(cue.safetyPhrase)
-        assertEquals(4, cue.level)
+        assertEquals(5, cue.level)
         assertEquals("wall-avoid", cue.antiRepeatKey)
     }
 

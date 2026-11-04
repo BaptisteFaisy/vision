@@ -32,15 +32,15 @@ object IseeClipsEn {
     const val CARS = "cars"
     const val CARS_TEXT = "Cars."
 
-    // Niveau 2 : humain < 10 m (phrase + cadran [clock] + distance [meters]).
+    // Niveau 3 : humain < 10 m (phrase + cadran [clock] + distance [meters]).
     const val HUMAN_PERSON = "human_person"
     const val HUMAN_PERSON_TEXT = "Person."
 
-    // Niveau 2 imminent (2 m ou moins) : mot immédiat, clip existant.
+    // Niveau 3 imminent (2 m ou moins) : mot immédiat, clip existant.
     const val HUMAN_IMMINENT = "guide_stop"
     const val HUMAN_IMMINENT_TEXT = "Stop."
 
-    // Niveau 4 : grillages + murs + barrières < 6 m.
+    // Niveau 5 : grillages + murs + barrières < 6 m.
     const val FENCE = "fence"
     const val FENCE_TEXT = "Fence."
     const val WALL = "wall"
@@ -48,13 +48,13 @@ object IseeClipsEn {
     const val BARRIER = "barrier"
     const val BARRIER_TEXT = "Barrier."
 
-    // Niveau 5 : bordures < 6 m.
+    // Niveau 6 : bordures < 6 m.
     const val CURB_UP = "curb_up"
     const val CURB_UP_TEXT = "Curb up."
     const val CURB_DOWN = "curb_down"
     const val CURB_DOWN_TEXT = "Curb down."
 
-    // Niveau 6 : escaliers, jalons 2/1/0,5 m + nombre de marches ([number] + STEPS).
+    // Niveau 7 : escaliers, jalons 2/1/0,5 m + nombre de marches ([number] + STEPS).
     const val STAIRS_2M = "stairs_2m"
     const val STAIRS_2M_TEXT = "Stairs, 2 meters."
     const val STAIRS_1M = "stairs_1m"
@@ -64,7 +64,7 @@ object IseeClipsEn {
     const val STAIRS_STEPS = "stairs_steps"
     const val STAIRS_STEPS_TEXT = "Steps."
 
-    // Niveau 7 : poteaux + mobilier vertical + divers < 6 m.
+    // Niveau 8 : poteaux + mobilier vertical + divers < 6 m.
     const val POLE = "pole"
     const val POLE_TEXT = "Pole."
     const val LAMP = "lamp"
@@ -78,7 +78,7 @@ object IseeClipsEn {
     const val KEEPSAKE = "keepsake"
     const val KEEPSAKE_TEXT = "Keepsake."
 
-    // Niveau 8 : passage piéton < 4 m (annonce) / < 6 m (alignement + arrivée).
+    // Niveau 2 : passage piéton < 4 m (annonce) / < 6 m (alignement + arrivée).
     const val CROSSWALK_ALIGNED = "crosswalk_aligned"
     const val CROSSWALK_ALIGNED_TEXT = "Aligned with the crosswalk."
     const val CROSSWALK_ARRIVED = "cross_arrived"
@@ -172,7 +172,7 @@ object IseeClipsEn {
     const val WHERE_TO = "where_to"
     const val WHERE_TO_TEXT = "Where to?"
 
-    // Dedans : les 10 objets cherchés (humain = clip niveau 2).
+    // Dedans : les 10 objets cherchés (humain = clip niveau 3).
     const val KEYS = "keys"
     const val KEYS_TEXT = "Keys."
     const val MEDBOX = "medbox"

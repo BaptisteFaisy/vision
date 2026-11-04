@@ -37,7 +37,7 @@ class StairAnnounceTest {
             listOf("Escalier montant.", "Escalier 2 m.", "Escalier 1 m.", "Escalier 0,5 m."),
             cues.map { it.phrase },
         )
-        assertEquals(listOf(6, 6, 6, 6), cues.map { it.level })
+        assertEquals(listOf(7, 7, 7, 7), cues.map { it.level })
         assertEquals(listOf("stairs", "stairs:2", "stairs:1", "stairs:0.5"), cues.map { it.antiRepeatKey })
     }
 
