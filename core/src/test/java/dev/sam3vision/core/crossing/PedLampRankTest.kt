@@ -122,4 +122,53 @@ class PedLampRankTest {
         assertTrue(PedLampRank.better(green, red))
         assertFalse(PedLampRank.better(red, green))
     }
+
+    /** Crop réel `feuxrank/samsung-101521-[name].ppm` (densité caméra, voir le README). */
+    private fun real(name: String) = pixelsOf(javaClass.classLoader, "feuxrank", "samsung-101521-$name.ppm")
+
+    private fun ranked(box: List<Float>, crop: Triple<IntArray, Int, Int>): PedLampRank.Ranked {
+        val (argb, w, h) = crop
+        return PedLampRank.rank(box, argb, w, h, LampLens.flux(PedLampRank.lampOnly(argb), w, h))
+    }
+
+    @Test
+    fun `samsung 101521 - densite reelle - le bonhomme vert bat le tricolore vu de cote`() {
+        val tricolore = ranked(listOf(0.14f, 0.09f, 0.22f, 0.19f), real("tricolore-cote"))
+        val man = ranked(listOf(0.44f, 0.23f, 0.50f, 0.27f), real("vert"))
+        assertTrue(PedLampRank.better(man, tricolore))
+        assertFalse(PedLampRank.better(tricolore, man))
+    }
+
+    @Test
+    fun `samsung 101521 - la porte lit juste les trois etats du feu pieton`() {
+        val (g, gw, gh) = real("vert")
+        val (n, nw, nh) = real("noir")
+        val (r, rw, rh) = real("rouge")
+        assertEquals(CrossingState.Green, PedLightGate.verdict(g, gw, gh))
+        assertEquals(CrossingState.Red, PedLightGate.verdict(n, nw, nh))
+        assertEquals(CrossingState.Red, PedLightGate.verdict(r, rw, rh))
+        assertFalse(PedLightGate.hasRedLamp(g, gw, gh))
+        assertFalse("lampe noire : un non-vert, pas un rouge", PedLightGate.hasRedLamp(n, nw, nh))
+        assertTrue(PedLightGate.hasRedLamp(r, rw, rh))
+    }
+
+    @Test
+    fun `deux points eloignes ne font pas une silhouette`() {
+        val specks = crop(red, 1 to 1, 2 to 1, 10 to 10, 9 to 10)
+        assertEquals(0f, PedLampRank.pedScore(specks, 12, 12), 0f)
+    }
+
+    @Test
+    fun `le gris-bleu d'un caisson n'est pas une lampe`() {
+        val housing = 0xFF5070A0.toInt()
+        val argb = crop(housing, 1 to 1, 1 to 2, 1 to 3, 8 to 3, 8 to 8, 2 to 9, 3 to 10)
+        assertEquals(0f, PedLampRank.pedScore(argb, 12, 12), 0f)
+        assertEquals(0f, LampLens.flux(PedLampRank.lampOnly(argb), 12, 12), 0f)
+    }
+
+    @Test
+    fun `lampOnly garde rouge et vert francs`() {
+        val argb = man(green)
+        assertTrue(PedLampRank.lampOnly(argb).contentEquals(argb.map { if (it == green) green else 0xFF000000.toInt() }.toIntArray()))
+    }
 }

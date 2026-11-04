@@ -3,6 +3,17 @@
 Le journal part du 2026-10-26 après 19 h : le commit de départ, puis une entrée par fait
 livré et ses preuves (tâche, fichiers, chiffres) dans l'arbre.
 
+## 2026-11-04 — iSee : la décision suit le feu piéton, plus le tricolore ni le battement LED (branche `fix/cross-alternance-replay`)
+
+- **Demande** : « il me dit cross dont cross […] il devrait pas prendre en compte le feu tricolore » puis « il alterne entre cross et dont cross » (ordre user du 04/11/2026).
+- **Cause racine** (vidéo Samsung `20261104_101521` rejouée dans le vrai code, boîtes SAM réelles, densité caméra) : `PedLightGate` lisait juste, c'est le **choix de la boîte** qui décidait sur le tricolore. (1) `PedLampRank` comptait tout pixel saturé : le caisson gris-bleu d'un tricolore vu de côté sortait 0,8 de forme contre 0,3-0,5 pour un vrai bonhomme, et deux points rouges éloignés 0,96. (2) La LED du feu piéton bat à 100 Hz : salves de ~1,3 s de lampe noire, lue `Red`, le tricolore reprenait la main.
+- **Fait** :
+  - `PedLampRank` : forme sur la plus grande tache connexe, pixels rouges ou verts francs seulement ; flux du rang sur la lampe seule (`lampOnly`).
+  - `PedLampHold` (nouveau) : un vert voté tient à travers lampe noire, rouge d'une autre boîte et boîte perdue, borne **1,5 s en temps** ; rouge franc sur la lampe tenue ou bonhomme mieux classé ailleurs : sortie à la frame.
+  - `PedLightGate.hasRedLamp` : un rouge franc, pas un simple non-vert ; `CrossingLight` porte le rang et cette preuve.
+  - Retire `holdCross` (#1186) : tenue en frames, elle ne couvrait pas la cause et retardait le vrai rouge.
+- **Preuves** : `docs/MESURES-FEU-TEMPOREL.md` § 7. À 100 ms : don't cross à tort 378/419 → 26/419, verts lus rouges 258 → 1, vrai rouge 3-86 ms (3-269 avec #1186). Tests `:core` 3 767 et `:app` 2 445 verts, `assembleDebug` vert, mutation : l'ancien calcul fait échouer le test sur crop réel.
+- **Reste** : recette rue. Aucune trace appareil de l'alternance (logcat Samsung vide sur la fenêtre) : la preuve vient de la caméra native à 60 ips, l'exposition de l'app peut différer.
 ## 2026-11-04 — iSee : la mort rapide lunettes nomme sa cause, le fatal ne rejoue plus (branche `fix-isee-lunettes-cause-retry`)
 
 - **Demande** : « il me dit glasses cut the sessions instantly sur mon xiaomi » (ordre user du 04/11/2026).

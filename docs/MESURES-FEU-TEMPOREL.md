@@ -199,3 +199,41 @@ corpus. Elle coupe les faux verts de **46 %** en PTL.
    `CrossingAnnouncer.blinkDetected()` en plus de l'état voté.
 5. **Latence en frames**, non horodatée : pas de borne en ms. Si le parent en
    veut une, il faut un anneau de `(preuve, atMs)` — même coût, non fait.
+
+---
+
+## 7. Battement LED et tricolore voisin (04/11/2026)
+
+Vidéo Samsung `20261104_101521` (4K, 60 ips, 7,6 s, rotation −90°), réduite à
+360×640 (640 px sur le grand côté, densité de la caméra de l'app), boîtes SAM
+réelles de `cap521`, rejouée dans `CrossingVerdictEngine`. Vérité terrain mesurée
+sur les 456 frames : feu piéton **vert jusqu'à 6,98 s**, puis rouge.
+
+**Battement.** La lampe sort noire une frame sur trois (17 ms) par salves de
+~1,3 s : alias exact d'une LED à 100 Hz à 60 ips (`|100 − 2×60| = 20 Hz`), pas un
+clignotement du feu. 1 383 ms noires sur 6 982 ms de vert. Une cadence calée sur
+un multiple de 50 ms voit la salve entière noire : trous jusqu'à 1,6 s.
+
+**Résultat** (6 phases par cadence, phase verte = avant 6,98 s) :
+
+| 100 ms | bascules voix | don't cross à tort | vert lu rouge | vrai rouge | cross après rouge |
+|---|---|---|---|---|---|
+| avant #1186 | 2 à 9 | 393/419 | 258 | 3-86 ms | 0 |
+| #1186 (tenue 3 frames) | 2 à 8 | 378/419 | 258 | 3-269 ms | jusqu'à 2 frames |
+| **rang + `PedLampHold` 1,5 s** | **0 à 2** | **26/419** | **1** | **3-86 ms** | **0** |
+
+À 300 et 333 ms, #1186 n'annonce pas le vrai rouge dans certaines phases avant
+la fin de la vidéo (620 ms après) : 3 frames n'y font pas 150 ms. Les 26 restants
+sont surtout l'entrée 3/5 ; les bascules restantes, des cadences calées sur le
+battement. Cadence irrégulière (écart-type 25 %, 100 tirages de 120 à 400 ms) :
+0 à 2 bascules, jamais de cross après le rouge, vrai rouge en une frame environ.
+
+Durée de tenue (don't cross à tort à 100 ms) : 0 ms 108, 500 ms 81, 1 s 56,
+**1,5 s 26** — seule 1,5 s couvre une salve, le vrai rouge ne bouge pas.
+
+**Limites.** (1) Caméra native, pas la caméra de l'app : l'antibanding 50 Hz est
+demandé, mais en plein soleil l'exposition reste sous 10 ms. (2) Les 4 autres
+vidéos (`cap016`, `cap943`, `cap144`, `cap053`) ne lisent aucun vert : aucun cross
+nouveau, mais elles n'exercent pas la tenue. (3) Coût assumé : si le feu passe au
+rouge **pendant** une salve calée, « Cross. » peut tenir jusqu'à 1,5 s.
+

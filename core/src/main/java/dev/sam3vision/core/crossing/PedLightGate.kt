@@ -189,6 +189,16 @@ object PedLightGate {
         return (scan.red + scan.green).toFloat() / argb.size >= GREEN_MIN_FRACTION
     }
 
+    /**
+     * Vrai si le crop montre un rouge **franc** ([RED_MAX_FRACTION]) : une lampe
+     * rouge allumée, pas un simple non-vert — [verdict] vaut aussi [CrossingState.Red]
+     * pour une lampe noire. Public : l'appelant est `:app`.
+     */
+    fun hasRedLamp(argb: IntArray, width: Int, height: Int): Boolean {
+        if (width <= 0 || height <= 0 || argb.size != width * height) return false
+        return scan(argb, width, height).red.toFloat() / argb.size >= RED_MAX_FRACTION
+    }
+
     /** Vrai si le vert du crop a la position et la forme d'un bonhomme. */
     fun acceptGreen(argb: IntArray, width: Int, height: Int): Boolean {
         if (width <= 0 || height <= 0 || argb.size != width * height) return false
