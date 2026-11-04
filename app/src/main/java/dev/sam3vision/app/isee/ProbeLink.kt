@@ -175,6 +175,21 @@ internal class ProbeLink(
         outage.reset()
     }
 
+    /**
+     * Vraie reconfiguration (endpoint, prompts, mode) : les compteurs affichés
+     * repartent de zéro avec la nouvelle session — mais le budget froid reste
+     * payé (FIX-19 : une bascule de mode ne réarme pas 60 s).
+     */
+    fun resetForReconfigure() {
+        answeredAtMs = null
+        sentAtMs = null
+        lastRetryMs = 0L
+        written = null
+        consecutiveFailures = 0
+        reconnects = 0
+        outage.reset()
+    }
+
     /** L'état du lien à cet instant (pur : ni écriture, ni compteur touché). */
     fun snapshot(nowMs: Long = now()): ProbeLinkState {
         val at = answeredAtMs
