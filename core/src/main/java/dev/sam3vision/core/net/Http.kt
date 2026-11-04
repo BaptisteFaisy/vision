@@ -378,8 +378,8 @@ internal suspend fun OkHttpClient.execute(request: Request): Result<HttpOutcome>
 
 internal fun Throwable.toApiError(): ApiError = when (this) {
     is ApiError -> this
-    is SocketTimeoutException -> ApiError.Timeout()
-    is InterruptedIOException -> ApiError.Timeout()
+    is SocketTimeoutException -> ApiError.Timeout(cause = this)
+    is InterruptedIOException -> ApiError.Timeout(cause = this)
     // TLS (certificat, date, proxy) et DNS (faute de frappe d'endpoint) : dits tels
     // quels, pas noyés dans le « network » générique — l'écran les montre bruts.
     is SSLException -> ApiError.Network(TLS_FAILED, cause = this)
