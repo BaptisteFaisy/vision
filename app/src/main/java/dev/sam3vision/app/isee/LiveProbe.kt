@@ -12,7 +12,6 @@ import dev.sam3vision.app.ForegroundTracker
 import dev.sam3vision.app.GpuWake
 import dev.sam3vision.app.MASK_ALPHA
 import dev.sam3vision.app.maskColorAt
-import dev.sam3vision.app.TRANSPORT_WS
 import dev.sam3vision.core.distance.DistanceMeter
 import dev.sam3vision.core.distance.LensSpec
 import dev.sam3vision.core.live.Cadence
@@ -88,6 +87,9 @@ class LiveProbe(
     val state: StateFlow<LiveProbeState> = _state
 
     internal var session: LiveSession? = null
+
+    /** Dernière configuration appliquée : `configure()` identique ne recrée rien. */
+    internal var appliedConfig: ProbeAppliedConfig? = null
 
     /**
      * Alias de **lecture** de [session] (session unique, FIX-18) : le délai froid vit
@@ -188,10 +190,13 @@ class LiveProbe(
         followed: List<String> = emptyList(),
     ) {
         val clean = baseUrl.trim()
+        val next = ProbeAppliedConfig(clean, prompts, guide, lens, distancesOn, maxObjects, language, crossingActive, modelsLine, collectCrops, followed)
+        if (!shouldApply(next)) return
         // Budget froid : dû **une seule fois par réveil** (FIX-19). Un réglage, une
         // bascule de mode Traversée ou une rentrée d'écran sur un GPU déjà chaud ne
         // reposent plus 60 s de latence tolérée sur le direct.
         val cold = link.coldDue(clean)
+        link.resetForReconfigure()
         openSessions(clean, prompts, maxObjects, cold)
         rotation.usePrompts(prompts)
         voice.guide = guide
@@ -203,23 +208,7 @@ class LiveProbe(
         cropLogger = if (collectCrops) appContext?.let { LightCropLogger(java.io.File(it.filesDir, "lightcrops"), dev.sam3vision.app.BuildConfig.VERSION_NAME) } else null
         resetPipeline()
         warmed = clean.isNotBlank() && !cold
-        _state.update {
-            LiveProbeState(
-                endpoint = clean,
-                gpu = it.gpu,
-                modelsLine = modelsLine,
-                conceptsSent = LivePrompts.normalize(prompts),
-                followed = followed,
-                transport = TRANSPORT_WS,
-                timeoutSec = when {
-                    clean.isBlank() -> 0L
-                    cold -> COLD_TIMEOUT_SECONDS
-                    else -> DEFAULT_TIMEOUT_SECONDS
-                },
-                error = if (clean.isBlank()) "no endpoint (Settings)" else null,
-                crossingActive = crossingActive,
-            )
-        }
+        _state.update { freshConfiguredState(clean, prompts, modelsLine, followed, crossingActive, cold) }
         if (clean.isNotBlank()) armWake(clean, cold)
     }
 

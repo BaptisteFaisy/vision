@@ -59,7 +59,9 @@ class LiveProbeColdBudgetTest {
         assertFalse("plus de notice de réveil", probe.state.value.warming)
         assertEquals("le lien est chaud", ProbeLinkKind.Warm, probe.state.value.link.kind)
 
-        probe.configure(ENDPOINT) // réglage / bascule de mode en séance
+        // Bascule de mode en séance (vraie reconfiguration) : délai normal, pas 60 s.
+        // La reconfiguration identique est un no-op (LiveProbeConfigureTest).
+        probe.configure(ENDPOINT, crossingActive = true)
 
         assertEquals("aucun second budget froid", DEFAULT_TIMEOUT_SECONDS, timeouts.last())
         assertEquals("l'état ne redit plus 60 s", DEFAULT_TIMEOUT_SECONDS, probe.state.value.timeoutSec)

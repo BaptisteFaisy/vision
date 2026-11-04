@@ -82,7 +82,9 @@ class LiveProbeStopTest {
     fun `configure referme les anciennes sessions`() = runTest {
         val (probe, fake) = probeHarness(this)
 
-        probe.configure(PROBE_TEST_ENDPOINT)
+        // Vraie reconfiguration (endpoint changé) : l'ancienne session est fermée,
+        // pas orphelinée. La reconfiguration identique est un no-op (LiveProbeConfigureTest).
+        probe.configure("https://reconfigure.test")
 
         assertEquals("une session à fermer, pas deux (FIX-19)", 1, fake.closed)
         probe.onFrame("A")
