@@ -47,6 +47,21 @@ internal fun legOf(httpFallback: Boolean, binary: Boolean): String = when {
     else -> LEG_TEXT
 }
 
+/**
+ * Vue figée du repli HTTP ([WsHttpFallback]) : ce qu'un journal ou un test lit d'un
+ * coup — miroir de [LinkSnapshot] pour le lien. [sticks]/[unsticks]/[probes] sont les
+ * cumulés de session, [wsServed]/[wsFailed] les séries en cours de confirmation.
+ */
+internal data class HttpFallbackSnapshot(
+    val active: Boolean,
+    val httpServed: Int,
+    val wsServed: Int,
+    val wsFailed: Int,
+    val sticks: Int,
+    val unsticks: Int,
+    val probes: Int,
+)
+
 /** Annulation one-way (FIX-8) : le serveur annule l'inférence abandonnée, sans répondre. */
 internal fun cancelMessage(id: Int): String = "{\"id\":$id,\"cancel\":true}"
 
