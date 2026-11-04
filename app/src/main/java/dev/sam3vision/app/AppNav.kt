@@ -156,23 +156,23 @@ private fun NavOrderEffect(isee: IseeViewModel) {
 }
 
 /**
- * L'état de session pilote l'écran navigation : arrivée = poussé (une fois),
- * tout le reste = dépilé (arrivée fermée, arrêt, annulation). La confirmation
- * et le guidage vivent sur l'accueil iSee (caméra + carte dessous,
- * questions et tap caméra inchangés) : s'ils sont poussés, ils sont dépilés.
- * Le retour système dépile sans repousse : quitter l'arrivée la referme.
+ * L'état de session pilote l'écran navigation : l'arrivée ne pousse plus
+ * aucun écran (demande user 2026-11-04 : la page d'arrivée n'existe plus),
+ * elle est refermée aussitôt (moteur coupé, session au repos, annonce
+ * vocale gardée — la session l'émet avant, sur une voix indépendante).
+ * La confirmation et le guidage vivent sur l'accueil iSee (caméra + carte
+ * dessous) : s'ils sont poussés (débogage adb), ils sont dépilés.
  */
 @Composable
 private fun VoiceNavStateEffect(
     isee: IseeViewModel,
     route: Route,
-    push: (Route) -> Unit,
     pop: () -> Unit,
 ) {
     val navState by isee.voiceNavState.collectAsState()
     LaunchedEffect(navState) {
         when {
-            navState is VoiceNavUiState.Arrived -> if (route != Route.VoiceNav) push(Route.VoiceNav)
+            navState is VoiceNavUiState.Arrived -> isee.voiceNav().dismissArrived()
             route == Route.VoiceNav -> pop()
             else -> Unit
         }
@@ -199,7 +199,7 @@ fun AppNav(
     BenchRequestEffect(push)
     RouteRequestEffect(push)
     NavOrderEffect(isee)
-    VoiceNavStateEffect(isee, route, push, pop)
+    VoiceNavStateEffect(isee, route, pop)
     BackHandler(enabled = stack.size > 1) { pop() }
     // Accueil iSee plein écran : le téléphone ne doit pas se mettre en veille.
     KeepScreenOnEffect(keepsScreenOn(route))
