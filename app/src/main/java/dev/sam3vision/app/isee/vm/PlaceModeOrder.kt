@@ -48,21 +48,30 @@ class PlaceModeOrder(
      * Dictée ([run]) et geste (quadruple tap) partagent ce chemin.
      */
     suspend fun apply(mode: PictoPlaceMode, confirm: String) {
-        if (!mode.pictoEnabled) onLeaveIndoor()
+        align(mode)
+        update { it.copy(status = confirm) }
         val (clipId, clipText) = placeConfirmClip(mode)
+        onPlaceMode(mode)
+        post(FindIndoorLevels.FIND, clipText, clipId)
+        speak(confirm)
+    }
+
+    /**
+     * Lieu seul, sans statut ni confirmation : chasse vidée vers dehors, état
+     * (lieu, picto). Les Réglages y passent directement : leur interrupteur a
+     * déjà changé le monde sonde, il ne reste qu'à l'afficher.
+     */
+    fun align(mode: PictoPlaceMode) {
+        if (!mode.pictoEnabled) onLeaveIndoor()
         update {
             it.copy(
                 placeMode = mode,
-                status = confirm,
                 picto = if (mode.pictoEnabled) it.picto else it.picto.copy(
                     phase = PictoPhase.Idle,
                     hits = emptyList(),
                 ),
             )
         }
-        onPlaceMode(mode)
-        post(FindIndoorLevels.FIND, clipText, clipId)
-        speak(confirm)
     }
 }
 
