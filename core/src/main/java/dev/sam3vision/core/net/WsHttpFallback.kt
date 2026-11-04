@@ -126,7 +126,7 @@ class WsHttpFallback(
     }
 
     /** Vue figée : état, séries en cours et cumulés ([HttpFallbackSnapshot]). */
-    fun snapshot(): HttpFallbackSnapshot =
+    internal fun snapshot(): HttpFallbackSnapshot =
         HttpFallbackSnapshot(active, httpServed, wsServed, wsFailed, stickCount, unstickCount, probeCount)
 
     /** Bascule annoncée une seule fois ([onChange]) — les appels redondants se taisent. */
