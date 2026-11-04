@@ -238,6 +238,18 @@ class GlassesPolicyTest {
     }
 
     @Test
+    fun `seules les erreurs deterministes coupent les essais`() {
+        // Mise à jour ou service manquant : rejouer dans 1 à 5 s ne peut pas aider.
+        assertTrue(sessionErrorIsFatal(DeviceSessionError.DAT_APP_ON_THE_GLASSES_UPDATE_REQUIRED))
+        assertTrue(sessionErrorIsFatal(DeviceSessionError.INSUFFICIENT_SDK_VERSION))
+        assertTrue(sessionErrorIsFatal(DeviceSessionError.DWA_UNAVAILABLE))
+        // Le reste se rejoue : coupure lunettes, Bluetooth, ou cause inconnue.
+        assertFalse(sessionErrorIsFatal(DeviceSessionError.SESSION_ENDED_BY_DEVICE))
+        assertFalse(sessionErrorIsFatal(DeviceSessionError.DEVICE_DISCONNECTED))
+        assertFalse(sessionErrorIsFatal(DeviceSessionError.UNEXPECTED_ERROR))
+    }
+
+    @Test
     fun `le balayage droit connecte quand le bouton le pourrait`() {
         assertTrue(shouldSwipeConnect(state(phase = SessionPhase.IDLE), linked = true))
         assertTrue(shouldSwipeConnect(state(phase = SessionPhase.STOPPED), linked = true))

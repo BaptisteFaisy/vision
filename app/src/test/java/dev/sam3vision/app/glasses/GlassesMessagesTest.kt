@@ -108,6 +108,18 @@ class GlassesMessagesTest {
     }
 
     @Test
+    fun `le nouvel essai nomme sa cause quand elle est sue`() {
+        // Sans cause, le texte historique ne change pas d'une virgule.
+        assertEquals(
+            "Glasses cut the session instantly, retrying (1/3)…",
+            GlassesMessages.sessionRetrying(1, 3).text,
+        )
+        val avec = GlassesMessages.sessionRetrying(1, 3, DeviceSessionError.SESSION_ENDED_BY_DEVICE).text
+        assertTrue(avec, avec.contains("(SESSION_ENDED_BY_DEVICE)"))
+        assertTrue(avec, avec.contains("(1/3)"))
+    }
+
+    @Test
     fun `le refus de camera dit d abord le bouton, puis le chemin manuel`() {
         // La permission est par paquet et se demande dans Meta AI : d'abord le bouton qui
         // ouvre la page du SDK, et seulement en repli le chemin de la fiche de l'app.
