@@ -170,4 +170,60 @@ class BackendRouteTest {
         assertFalse(sameCellularRouteInstalled(routeActive = true, installedKey = null, currentKey = "109"))
         assertFalse(sameCellularRouteInstalled(routeActive = true, installedKey = "109", currentKey = null))
     }
+
+    @Test
+    fun `mark suit install et clear`() {
+        val before = BackendRoute.mark()
+        assertFalse(before.active)
+
+        BackendRoute.install(CountingFactory())
+        val imposed = BackendRoute.mark()
+        assertTrue(imposed.active)
+        assertEquals(before.version + 1, imposed.version)
+
+        BackendRoute.clear()
+        val released = BackendRoute.mark()
+        assertFalse(released.active)
+        assertEquals(before.version + 2, released.version)
+    }
+
+    @Test
+    fun `routeTag formate la marque cellulaire ou defaut`() {
+        assertEquals("+cell#r3", routeTag(RouteMark(active = true, version = 3L)))
+        assertEquals("#r4", routeTag(RouteMark(active = false, version = 4L)))
+    }
+
+    @Test
+    fun `swap de fabrique change la cle iface (reopen visible)`() {
+        BackendRoute.install(CountingFactory())
+        val before = ifaceRouteKey("wifi#109", BackendRoute.mark())
+
+        BackendRoute.install(CountingFactory())
+        val after = ifaceRouteKey("wifi#109", BackendRoute.mark())
+
+        assertTrue("même base, route swappée : la clé doit changer", before != after)
+    }
+
+    @Test
+    fun `reinstaller la meme fabrique garde la cle (pas de reopen)`() {
+        val factory = CountingFactory()
+        BackendRoute.install(factory)
+        val before = ifaceRouteKey("wifi#109", BackendRoute.mark())
+
+        assertFalse(BackendRoute.install(factory))
+
+        assertEquals(before, ifaceRouteKey("wifi#109", BackendRoute.mark()))
+    }
+
+    @Test
+    fun `clear rend le retour defaut visible dans la cle`() {
+        BackendRoute.install(CountingFactory())
+        val imposed = ifaceRouteKey("wifi#109", BackendRoute.mark())
+
+        BackendRoute.clear()
+        val released = ifaceRouteKey("wifi#109", BackendRoute.mark())
+
+        assertTrue("le tag cellulaire disparaît", imposed != released)
+        assertEquals("#r${BackendRoute.mark().version}", routeTag(BackendRoute.mark()))
+    }
 }
