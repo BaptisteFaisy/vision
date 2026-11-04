@@ -114,10 +114,11 @@ class VoiceBusRefundTest {
 
     @Test
     fun `cle 1 fois ecrasee = reparle a la re-detection`() {
-        VoiceBus.post(OutdoorLevel.HUMAN, "Right.")
+        // Passage premier (cran 2) : seul le niveau 0 l'écrase encore.
+        VoiceBus.post(OutdoorLevel.CAR_MOVING, "Cars.")
         assertTrue(AntiRepeat.allow(AntiRepeat.KEY_CROSSWALK_ANNOUNCE, System.currentTimeMillis()))
         VoiceBus.post(OutdoorLevel.CROSSWALK, "Crosswalk.", antiRepeatKey = AntiRepeat.KEY_CROSSWALK_ANNOUNCE)
-        assertEquals(listOf("Right."), speaker.said)
+        assertEquals(listOf("Cars."), speaker.said)
         assertTrue(AntiRepeat.allow(AntiRepeat.KEY_CROSSWALK_ANNOUNCE, System.currentTimeMillis()))
     }
 
