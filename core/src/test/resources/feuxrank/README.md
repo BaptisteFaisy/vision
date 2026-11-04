@@ -34,3 +34,16 @@ et la rue alternait. Ces quatre crops sont à la densité réelle (vidéo rédui
 | `samsung-101521-vert.ppm` (21×25) | t=0,5 s | bonhomme vert | Green |
 | `samsung-101521-noir.ppm` (21×24) | t=1,0 s | même feu, LED éteinte (battement 100 Hz) | Red |
 | `samsung-101521-rouge.ppm` (20×25) | t=7,0 s | même feu, vrai rouge | Red |
+
+## Faux feux sur panneau (`SignLightVetoTest`)
+
+Boîtes « pedestrian traffic light » faibles, inscrites dans un `sign` mieux
+noté, sur deux passages sans feu (frames 180×320, q55, `/live`, 04/11/2026) :
+
+| fichier | vidéo, frame | boîte SAM (px) | score feu | score panneau |
+|---|---|---|---|---|
+| `samsung-20261104-panneau-rond.ppm` | `20261104_101016`, t=4,0 s | [4,9 ; 50 ; 12,9 ; 63,8] | 0,47 | 0,66 |
+| `samsung-20261104-barre.ppm` | `20261104_100943`, t=6,9 s | [0 ; 42 ; 34 ; 49] | 0,53 | 0,59 |
+
+Aucune lampe dans ces crops (`LampLens.flux` sous `MIN_FLUX`) : c'est ce qui
+les sépare d'un vrai feu rouge, dont la lampe passe au-dessus de la géométrie.

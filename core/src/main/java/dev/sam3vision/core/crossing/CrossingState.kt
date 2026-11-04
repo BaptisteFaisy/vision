@@ -189,6 +189,19 @@ object CrossingPrompts {
         return listOfNotNull(bestBox(heads, width, height)) + bestBoxes(housings, width, height, HOUSING_LIMIT)
     }
 
+    /**
+     * Boîtes de feu normalisées qui ne sont peut-être qu'un panneau
+     * ([SignLightVeto]) : mêmes valeurs que [selectLightBoxes]. L'appelant ne
+     * les écarte que sans lampe allumée (voir `:app`, `crossingLightOf`).
+     */
+    fun signLikeBoxes(objects: List<SegObject>, width: Int, height: Int): Set<List<Float>> {
+        if (width <= 0 || height <= 0) return emptySet()
+        return objects.asSequence()
+            .filter { isLightLabel(it.label) && SignLightVeto.isVetoed(it, objects) }
+            .mapNotNull { Detection(it.label, it.score, it.box, width, height).normalizedBox() }
+            .toSet()
+    }
+
     /** Caissons relus : le deuxième survit à l'éviction par un mieux noté. */
     private const val HOUSING_LIMIT = 2
 
