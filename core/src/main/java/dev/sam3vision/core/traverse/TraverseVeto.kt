@@ -123,7 +123,9 @@ data class TraverseDecision(
  * proche non prouvé immobile ou doute bloque — sauf croissance expliquée par
  * la caméra (pan suivi, voir [vetoCandidate]). L'approche suivie
  * (IoU + tau < 3 s — voir [approachVerdict]) bloque aussi, en ceinture et
- * bretelles.
+ * bretelles. Au-dessus de tout ça, ce que [ParkedProof] prouve garé sur sa
+ * fenêtre sort du veto : le test paire-de-frames ci-dessus reste sous le bruit
+ * d'une prise à la main, seul il ne prouve qu'une caméra fixe.
  *
  * Machine d'état : [TraversePhase.ATTENDRE] par défaut et sous veto, `PRET` à la
  * première frame verte sans veto, `TRAVERSER` quand le vert se maintient, `ALERTE`
@@ -145,12 +147,19 @@ class TraverseVeto {
     /** Suivi temporel des véhicules (IoU + TTC) — ceinture et bretelles du veto. */
     private val approach = VehicleApproach()
 
+    /** Preuve « garée » sur fenêtre : ce qu'elle prouve sort du veto (voir [ParkedProof]). */
+    private val parked = ParkedProof()
+
+    /** Vrai si [detection] (dernière frame) est un véhicule prouvé garé : le verdict l'écarte aussi. */
+    fun isParked(detection: Detection): Boolean = parked.isParked(detection)
+
     /** Oublie la phase, la frame précédente et les pistes (nouvelle traversée). */
     @Synchronized
     fun reset() {
         currentState = TraversePhase.ATTENDRE
         previousSeen = emptyMap()
         approach.reset()
+        parked.reset()
     }
 
     /**
@@ -176,12 +185,14 @@ class TraverseVeto {
         depthByBox: Map<List<Float>, Float>? = null, // PISTE2 : proximités par boîte vers le suivi — null = repli géométrie.
         noLight: Boolean = false,
     ): TraverseDecision {
-        val picked = seenByInstance(detections)
+        parked.update(detections, atMs, groundOf(motion)?.let { it > ParkedProof.PAN_SPEED } == true)
+        val live = detections.filterNot(parked::isParked)
+        val picked = seenByInstance(live)
         val stopped = stoppedKeys(picked, focalPx, atMs, motion)
         val hushed = if (atMs < 0L) emptySet() else approach.cameraMovedKeys
         val blocking = findBlocking(picked, focalPx, stopped, hushed)
         previousSeen = stillMemoryOf(picked, focalPx, atMs)
-        val tracked = approachVerdict(detections, atMs, motion, depthByBox)
+        val tracked = approachVerdict(live, atMs, motion, depthByBox)
         // Vert confirmé : le vert gagne toujours (ordre user du 02/11). Le
         // suivi (instantané + pistes) tourne quand même, tenu chaud pour
         // trancher dès le flip rouge ; seule la sortie veto est tue.
@@ -298,12 +309,12 @@ class TraverseVeto {
      * (`null` ou inutilisable) : on ne prouve pas le pan, l'immobilité mesurée
      * vaut arrêt (le chemin iSee ne câble pas le fond au veto).
      */
-    private fun backgroundPanning(motion: FrameMotion?): Boolean {
-        if (motion == null) return false
-        val ground = VehicleBackground.groundOf(motion.global, motion.lumaWidth, motion.lumaHeight, motion.dtMs)
-            ?: return false
-        return ground > VehicleBackground.LATERAL_RATIO
-    }
+    private fun backgroundPanning(motion: FrameMotion?): Boolean =
+        groundOf(motion)?.let { it > VehicleBackground.LATERAL_RATIO } == true
+
+    /** Vitesse du fond (image/s), `null` sans signal utilisable. */
+    private fun groundOf(motion: FrameMotion?): Float? =
+        motion?.let { VehicleBackground.groundOf(it.global, it.lumaWidth, it.lumaHeight, it.dtMs) }
 
     /** Véhicules confiants à boîte saine, groupés par instance (deux garées à deux endroits ne fusionnent plus). */
     private fun seenByInstance(detections: List<Detection>): Map<String, List<Seen>> {
