@@ -159,7 +159,7 @@ class CrossingVerdictEngine(
         val cue = announcer.onFrame(atMs, verdict)
         // Sans preuve on ne PRONONCE rien (pas de « Don't cross. » puis
         // « Cross. » 100 ms plus tard) — mais le silence est BORNÉ (D3/D4).
-        val silent = isSilent(proven, atMs)
+        val silent = isSilent(proven, atMs) || (ghosts.polePending && verdict == CrossingVerdict.Cross)
         // Rien n'est prononcé sur une frame muette : la phrase reste DUE et part
         // dès la première frame qui a une preuve (sinon l'annonceur croyait
         // avoir parlé et le silence durait 2 s de plus).

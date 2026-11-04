@@ -240,6 +240,12 @@ Terrain du 04/11, passage **sans aucun feu** (confirmé par le user), build
   rouges de suite. Seul, le repli doit tenir 15 frames (~1,5 s) pour créer un feu.
   Une boîte SAM reste immédiate, un feu confirmé se prolonge par le repli, le vert
   ne change pas, et une vraie lampe sur un poteau finit par bloquer (ordre du 31/10).
+- **Jamais « Cross. » sur un rouge de poteau non tranché** : avant cette règle, un
+  vrai rouge vu au seul poteau disait « Cross. » pendant ~1,7 s. L'app se tait sur la
+  frame où ce rouge est lu et les 2 suivantes. Aucun rouge sur un poteau : rien ne
+  change. Faux rouge qui clignote : silence sur 7 % à 39 % du temps de scène (2
+  terrains), jamais un « Don't cross. ». L'écran peut rester sur « Cross. », seules
+  la voix et la vibration se taisent.
 - **Reste à mesurer** : les autres blocages de ce terrain (veto et mouvement), sur
   des frames dont les boîtes sautent d'un bout à l'autre de l'image en 100 ms. La
   ligne debug `ISEE_CROSS` les donne à chaque frame bloquée.

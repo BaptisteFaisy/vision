@@ -18,6 +18,8 @@ package dev.sam3vision.core.crossing
  * dans le carré suffisent à y lire un rouge (feu arrière derrière le poteau). Sur
  * le terrain du 04/11, sans aucun feu, il a tenu 9 frames de suite : seul, il doit
  * en tenir [POLE_CONFIRM_FRAMES]. Une vraie lampe sur un poteau reste là et bloque.
+ * En attendant, [polePending] interdit de dire « Cross. » : devant un vrai rouge que
+ * SAM ne voit pas, l'app se tait au lieu de dire de traverser.
  *
  * Pur Kotlin testé en JVM, aucune horloge.
  */
@@ -26,6 +28,10 @@ class LightGhostGate {
     private var streak = 0
     private var silentFrames = 0
     private var confirmed = false
+    private var poleAge = NO_POLE
+
+    /** Vrai si un rouge de poteau non tranché est vu, ou l'était il y a [POLE_BRIDGE_FRAMES] frames au plus. */
+    val polePending: Boolean get() = !confirmed && poleAge <= POLE_BRIDGE_FRAMES
 
     /**
      * Avance d'une frame : vrai si la boîte de cette frame compte comme un feu.
@@ -34,6 +40,7 @@ class LightGhostGate {
      * seul repli haut-de-poteau : sa lampe lue ne vaut pas preuve.
      */
     fun admits(sawBox: Boolean, lampRead: Boolean, poleOnly: Boolean = false): Boolean {
+        poleAge = if (sawBox && poleOnly) 0 else minOf(poleAge + 1, NO_POLE)
         if (!sawBox) {
             onSilence()
             return false
@@ -49,6 +56,7 @@ class LightGhostGate {
         streak = 0
         silentFrames = 0
         confirmed = false
+        poleAge = NO_POLE
     }
 
     private fun onSilence() {
@@ -63,6 +71,11 @@ class LightGhostGate {
 
         /** Frames de suite exigées du seul repli haut-de-poteau : le faux rouge du terrain a tenu 9 frames. */
         const val POLE_CONFIRM_FRAMES = 15
+
+        /** Frames tenues après un rouge de poteau : une lampe qui scintille ne dit pas « Cross. » entre deux lectures. */
+        const val POLE_BRIDGE_FRAMES = 2
+
+        private const val NO_POLE = 1_000
 
         /** Sans boîte depuis ce nombre de frames, le feu confirmé est oublié. */
         const val FORGET_FRAMES = LightEvidenceGate.ABSENT_REARM_FRAMES
