@@ -14,7 +14,9 @@ import kotlin.math.hypot
  * Les cinq véhicules du contrat (audit réel 31/10 : camion et moto réintégrés,
  * trottinettes toujours sorties), en anglais (la forme que SAM segmente le mieux).
  * Le français reste reconnu côté veto ([isVehicle]) : un label « voiture » bloque
- * comme un « car », « trottinette » comme un « scooter ».
+ * comme un « car », « trottinette » comme un « scooter ». Le van (« van »,
+ * prompt de la base dehors depuis le 03/11) bloque comme une voiture,
+ * « camionnette » et « fourgon » comme lui (miroir de `concepts.py` serveur).
  */
 object VehicleConcepts {
 
@@ -23,8 +25,8 @@ object VehicleConcepts {
 
     private val KEYS = setOf(
         "car", "bus", "buses", "truck", "motorcycle", "bicycle", "bike",
-        "scooter", "electric scooter", "trottinette", "trottinette electrique",
-        "voiture", "camion", "moto", "velo",
+        "van", "vans", "scooter", "electric scooter", "trottinette", "trottinette electrique",
+        "voiture", "camion", "camionnette", "fourgon", "moto", "velo",
     )
 
     /** Vrai si [label] désigne un véhicule (casse, accents, pluriel simple neutralisés). */

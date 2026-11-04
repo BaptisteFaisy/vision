@@ -18,6 +18,7 @@ class VehicleStateTextTest {
         assertTrue(VehicleStateText.isSafetyPhrase("Stop, 3 véhicules en mouvement."))
         assertFalse("bus non parlé", VehicleStateText.isSafetyPhrase("Stop, bus moving."))
         assertFalse("camion hors liste dehors", VehicleStateText.isSafetyPhrase("Stop, camion en mouvement."))
+        assertFalse("van parlé comme voiture", VehicleStateText.isSafetyPhrase("Stop, van moving."))
     }
 
     @Test
@@ -73,6 +74,7 @@ class VehicleStateTextTest {
         assertEquals("car", VehicleStateText.clipIdFor("Car."))
         assertNull("bus non parlé", VehicleStateText.clipIdFor("Bus moving."))
         assertEquals("car", VehicleStateText.movingClipId(car))
+        assertEquals("car", VehicleStateText.movingClipId(VehicleStateText.nameOf("van")!!))
         assertEquals("cars", VehicleStateText.clipIdFor("Cars."))
         assertNull("le stop part en voix de sécurité, pas en clip", VehicleStateText.clipIdFor("Stop, car moving."))
         assertNull(VehicleStateText.clipIdFor("Voiture à l'arrêt, à 2 mètres."))
