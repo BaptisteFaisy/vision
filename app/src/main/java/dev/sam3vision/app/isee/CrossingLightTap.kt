@@ -71,6 +71,7 @@ internal fun crossingLightOf(
 private fun readLightOf(frame: LiveFrame, jpegB64: String, onCrop: CrossingCropTap?): LightRead {
     val boxes = CrossingPrompts.selectLightBoxes(frame.objects, frame.width, frame.height)
     if (boxes.isEmpty()) return poleFallbackOf(frame, jpegB64, onCrop)
+    val signLike = CrossingPrompts.signLikeBoxes(frame.objects, frame.width, frame.height)
     var best: Candidate? = null
     var last: Candidate? = null
     for (box in boxes) {
@@ -83,7 +84,10 @@ private fun readLightOf(frame: LiveFrame, jpegB64: String, onCrop: CrossingCropT
             verdict = PedLightGate.verdict(crop.argb, crop.width, crop.height),
             rank = PedLampRank.rank(box, crop.argb, crop.width, crop.height, lampFlux(crop)),
         )
-        last = candidate
+        // Boîte faible dans un panneau mieux noté : sans lampe, c'est le panneau
+        // (`SignLightVeto`) — elle ne compte plus comme un feu lu, une lampe
+        // allumée passe au-dessus juste après.
+        if (box !in signLike) last = candidate
         if (flux >= LampLens.MIN_FLUX && (best == null || PedLampRank.better(candidate.rank, best.rank))) {
             best = candidate
         }

@@ -15,6 +15,7 @@ import dev.sam3vision.core.crossing.LightEvidenceGate
 import dev.sam3vision.core.crossing.LightTemporalVote
 import dev.sam3vision.core.crossing.PedLampHold
 import dev.sam3vision.core.distance.DistanceReading
+import dev.sam3vision.core.model.Detection
 import dev.sam3vision.core.model.LiveFrame
 import dev.sam3vision.core.model.toDetections
 import dev.sam3vision.core.traverse.FrameMotion
@@ -116,7 +117,9 @@ class CrossingVerdictEngine(
      * ([CrossingLevels.verdictLevelFor]) — le premier verdict compte comme
      * changé (jamais entendu : il doit couper). Le verdict n'est réputé
      * prononcé que si [poster] l'a **retenu** ; sinon l'annonceur est ré-armé
-     * et la frame suivante rejoue la phrase (A9 § 3 D8).
+     * et la frame suivante rejoue la phrase (A9 § 3 D8). [parked] écarte les
+     * voitures prouvées garées (`TraverseVeto.isParked`) : leur gigue de boîte
+     * ne dit plus mouvement, ce qui bloquait 2 s de plus à chaque frame.
      */
     fun onFrame(
         frame: LiveFrame,
@@ -128,6 +131,7 @@ class CrossingVerdictEngine(
         motion: FrameMotion? = null,
         carVeto: Boolean = false,
         onCrosswalk: Boolean = false,
+        parked: (Detection) -> Boolean = { false },
     ): CrossingVerdictFrame {
         val read = readLight(frame, jpegB64)
         val evidence = gate.onFrame(
@@ -140,7 +144,7 @@ class CrossingVerdictEngine(
         val proven = light != CrossingVerdictLight.Unknown
         trackSilence(proven, atMs)
         val carDetections = frame.objects.toDetections(frame.width, frame.height)
-            .filter { CrossingVerdictRule.isCarLabel(it.label) }
+            .filter { CrossingVerdictRule.isCarLabel(it.label) && !parked(it) }
         val carReadings = readings.filter { CrossingVerdictRule.isCarLabel(it.label) }
         cars.update(carDetections, carReadings, atMs, motion = motion)
         val moving = cars.movingThisFrame
