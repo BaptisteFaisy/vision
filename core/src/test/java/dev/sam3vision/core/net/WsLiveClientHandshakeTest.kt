@@ -217,7 +217,9 @@ class WsLiveClientHandshakeTest {
 
         transport.fail(1, WsClosedAbnormally(1001, "idle"))
         assertTrue(second.await().exceptionOrNull() is ApiError.Network)
-        assertEquals("un idle n'est pas un échec", 0, link.attemptCount)
+        // L'idle compte (sinon la réouverture repart immédiate en boucle),
+        // mais le premier reste sans délai.
+        assertEquals("l'idle compte, mais sans délai", 1, link.attemptCount)
         assertEquals(1001, client.linkSnapshot.lastCloseCode)
         assertTrue("reprise immédiate après idle", link.canAttempt())
         client.close()
