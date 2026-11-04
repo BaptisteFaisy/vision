@@ -3,6 +3,13 @@
 Le journal part du 2026-10-26 après 19 h : le commit de départ, puis une entrée par fait
 livré et ses preuves (tâche, fichiers, chiffres) dans l'arbre.
 
+## 2026-11-04 — iSee : jamais « Cross. » sur un rouge de poteau non tranché (branche `fix/poteau-jamais-cross`)
+
+- **Demande** : corriger le risque de `fix/repli-poteau-preuve`, sans toucher aux « Cross. » légitimes.
+- **Cause racine** : le rouge du seul repli haut-de-poteau attendait 15 frames en se lisant comme une frame sans boîte : sans voiture, un vrai rouge que SAM ne voit pas disait « Cross. » pendant ~1,7 s.
+- **Fait** : `LightGhostGate.polePending` fait taire « Cross. » sur la frame où ce rouge est lu et les 2 suivantes. Sans rouge sur un poteau, rien ne change.
+- **Preuves** : `LightGhostGateTest`, `CrossingSweepVideoTest` (vrai rouge et lampe qui scintille : aucun « Cross. » ; sans rouge : mêmes paroles). Silence sur 7 % à 39 % du temps de scène sur 2 terrains, estimé depuis les frames `Red` bloquées. Dans la rue : non mesuré.
+
 ## 2026-11-04 — iSee : un haut de poteau seul ne crée plus un feu rouge en une frame (branche `fix/repli-poteau-preuve`)
 
 - **Demande** : « à la fin il n'y avait plus de voiture qui bougeait et il m'a dit don't cross ».
