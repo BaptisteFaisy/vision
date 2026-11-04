@@ -215,9 +215,9 @@ class GuidanceObstaclesTest {
         val pole = out.readings.first { it.label == "poteau" }
         assertEquals(4f, pole.meters, 0.05f)
         assertTrue(out.decision.blocked)
-        // Chemin optimal (gauche) contre comptage (droite) : la mesure tranche.
-        assertEquals(GuidanceSide.Left, out.decision.side)
-        assertEquals("Gauche.", Guidance.phrase(out.decision, SpeechLanguage.Fr))
+        // Le poteau compte, à sa distance : il mange la place de gauche (ordre user du 04/11).
+        assertEquals(GuidanceSide.Right, out.decision.side)
+        assertEquals("Droite.", Guidance.phrase(out.decision, SpeechLanguage.Fr))
     }
 
     @Test
@@ -238,9 +238,9 @@ class GuidanceObstaclesTest {
         val decision = Guidance.decide(placedLabels(frame, readings))
 
         assertTrue(decision.blocked)
-        // Chemin optimal (gauche) contre comptage (droite) : la mesure tranche.
-        assertEquals(GuidanceSide.Left, decision.side)
-        assertEquals("Gauche.", Guidance.phrase(decision, SpeechLanguage.Fr))
+        // Le poteau compte, à sa distance : il mange la place de gauche (ordre user du 04/11).
+        assertEquals(GuidanceSide.Right, decision.side)
+        assertEquals("Droite.", Guidance.phrase(decision, SpeechLanguage.Fr))
     }
 
     @Test

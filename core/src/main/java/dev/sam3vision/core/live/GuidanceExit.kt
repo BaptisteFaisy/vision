@@ -2,10 +2,11 @@ package dev.sam3vision.core.live
 
 /**
  * Côté de sortie d'un couloir bouché, partagé par le couloir, le passage serveur
- * et [ClearPath] : le chemin optimal ([PeoplePath.plan]) quand il existe, sinon
- * le trou de grillage, sinon le côté le moins encombré. Le résultat est borné par
- * l'espace libre, un ordre ne pointe pas hors du trottoir — sauf si cette borne
- * renvoie vers une personne : on serre, on ne fonce pas. Pur et testé en JVM.
+ * et [ClearPath] : le plus grand espace libre ([WidestGap]) ; obstacle sans distance
+ * ou frame bouchée, le trou de grillage s'il garantit 1 m à toute personne, sinon le
+ * côté le moins encombré. Le résultat est borné par l'espace libre, un ordre ne pointe pas hors du trottoir — sauf si
+ * cette borne renvoie vers une personne : on serre, on ne fonce pas. Pur et testé
+ * en JVM.
  */
 internal object GuidanceExit {
 
@@ -18,31 +19,12 @@ internal object GuidanceExit {
         hfovDeg: Float,
         free: FreeSpace,
     ): GuidanceSide {
-        val path = PeoplePath.plan(labels, rangeMeters, hfovDeg)
-        val computed = if (path != null && path.detour) {
-            path.side
-        } else {
-            holeOrFreer(labels, obstacle, holeSide, rangeMeters, hfovDeg)
-        }
+        val room = ClearPath.nearDepth(obstacle)?.let { WidestGap.of(labels, it, hfovDeg) }
+        val computed = room?.side
+            ?: holeSide?.takeIf { PeoplePath.clearsSide(labels, it, rangeMeters, hfovDeg) }
+            ?: freerSide(labels, obstacle, rangeMeters, hfovDeg)
         val bounded = GuidanceBounds.boundedSide(computed, free)
         return if (PeoplePath.clearsSide(labels, bounded, rangeMeters, hfovDeg)) bounded else computed
-    }
-
-    /**
-     * Repli quand le chemin optimal échoue : vers le trou ([holeSide]) quand
-     * il garantit 1 m à toute personne ([PeoplePath.clearsSide]), sinon le
-     * côté le moins encombré ([freerSide]) — l'évitement des humains prime
-     * sur le trou, toujours.
-     */
-    private fun holeOrFreer(
-        labels: List<PlacedLabel>,
-        obstacle: PlacedLabel,
-        holeSide: GuidanceSide?,
-        rangeMeters: Float,
-        hfovDeg: Float,
-    ): GuidanceSide {
-        if (holeSide != null && PeoplePath.clearsSide(labels, holeSide, rangeMeters, hfovDeg)) return holeSide
-        return freerSide(labels, obstacle, rangeMeters, hfovDeg)
     }
 
     /**

@@ -39,7 +39,7 @@ class ClearPathTest {
 
     @Test
     fun `obstacle au dela de la portee proche ne donne pas d ordre`() {
-        assertNull(orderOf(box("pole", 0.49f, 0.51f, 4.5f)))
+        assertNull(orderOf(box("pole", 0.49f, 0.51f, 10.5f)))
     }
 
     @Test
@@ -147,7 +147,7 @@ class ClearPathTest {
 
     @Test
     fun `chemin lointain donne le cote sans ordre`() {
-        val view = ClearPath.view(listOf(box("person", 0.56f, 0.60f, 10f)), hfov)
+        val view = ClearPath.view(listOf(box("person", 0.57f, 0.62f, 12f)), hfov)
         assertNull(view.order)
         assertEquals(GuidanceSide.Left, view.side)
     }

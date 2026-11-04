@@ -113,8 +113,8 @@ class AvoidanceWalkTest {
     }
 
     private companion object {
-        /** Contacts tolérés sur 280 marches : 50 et 33 avant `ClearPath`, 10 et 7 après. */
-        const val MAX_CONTACTS = 12
+        /** Contacts tolérés sur 280 marches : 12 et 4 avant `WidestGap`, 5 et 6 après, ordre dès 10 m. */
+        const val MAX_CONTACTS = 8
 
         /** Barrières et mur de face : la sortie est évidente, aucun contact. */
         val FRONTAL_SCENES = setOf("S7", "S8", "S9")

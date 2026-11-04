@@ -106,8 +106,8 @@ object WalkModel {
     /** Pas de simulation (ms). */
     const val STEP_MS = 50L
 
-    /** Âge de l'image jugée par chaque décision (ms). */
-    const val IMAGE_AGE_MS = 700L
+    /** Âge de l'image jugée par chaque décision (ms) : 260 en médiane, 302 au 90e centile sur le Samsung (04/11). */
+    const val IMAGE_AGE_MS = 300L
 
     /** Durée maximale d'une scène (ms). */
     const val MAX_MS = 25_000L
@@ -201,7 +201,7 @@ class WalkRun(
     private fun gapAt(atMs: Long): Double =
         scene.obstacles.minOf { it.gapFrom(walker.x, walker.y, atMs) } - WalkModel.BODY_HALF_M
 
-    /** Une décision : l'image d'il y a 0,7 s passe par la vraie mesure, puis par la voix. */
+    /** Une décision : l'image d'il y a 0,3 s passe par la vraie mesure, puis par la voix. */
     private fun decide(nowMs: Long) {
         val seenAtMs = nowMs - WalkModel.IMAGE_AGE_MS
         val objects = camera.shoot(scene.obstacles, poses[(seenAtMs / WalkModel.STEP_MS).toInt()], seenAtMs, rng)
@@ -232,7 +232,9 @@ class WalkRun(
     /** Ligne de trace : le marcheur **maintenant**, la scène telle que l'image l'a vue. */
     private fun traceLine(nowMs: Long, placed: List<PlacedLabel>, word: String?): String {
         val seen = placed.joinToString(" ") { "${it.label}[${f2(it.x0)}-${f2(it.x1)} ${f2(it.meters)}m]" }
-        return "t=${nowMs}ms x=${f2(walker.x)} y=${f2(walker.y)} cap=${f2(walker.commandDeg)} $seen -> ${word ?: "-"}"
+        val view = voice.announcer.lastView
+        val judge = "${view?.side} ${f2(view?.room?.left)}/${f2(view?.room?.right)}"
+        return "t=${nowMs}ms x=${f2(walker.x)} y=${f2(walker.y)} cap=${f2(walker.commandDeg)} $seen [$judge] -> ${word ?: "-"}"
     }
 
     private fun f2(value: Number?): String = value?.let { walkFmt(it.toDouble(), 2) } ?: "?"

@@ -1,5 +1,6 @@
 package dev.sam3vision.core.live
 
+import dev.sam3vision.core.curb.CurbConcepts
 import dev.sam3vision.core.distance.LensSpec
 import dev.sam3vision.core.hazard.HazardConcepts
 import dev.sam3vision.core.hazard.HazardWatcher
@@ -14,9 +15,13 @@ data class AvoidOrder(val side: GuidanceSide, val threat: PlacedLabel) {
 /**
  * Lecture du chemin d'une frame. [order] : un obstacle proche entre dans le
  * couloir, l'ordre parle à son niveau. [side] : le côté conseillé, ordre ou
- * chemin lointain ; `null` quand la géométrie ne conseille rien.
+ * obstacle lointain ; `null` quand rien ne gêne l'axe. [room] : la place vue.
  */
-data class ClearView(val order: AvoidOrder?, val side: GuidanceSide?)
+data class ClearView(val order: AvoidOrder?, val side: GuidanceSide?, val room: GapRoom? = null) {
+    /** Côté vu comme cap, `null` sans conseil. */
+    val cap: SteeringCap?
+        get() = side?.let { if (it == GuidanceSide.Left) SteeringCap.Left else SteeringCap.Right }
+}
 
 /**
  * Le seul juge de l'écart latéral : qui entre dans le couloir, et de quel côté
@@ -35,6 +40,9 @@ data class ClearView(val order: AvoidOrder?, val side: GuidanceSide?)
  * testé en JVM.
  */
 object ClearPath {
+
+    /** Portée de l'ordre d'écart (m, ordre user du 04/11) : tout obstacle, dès 10 m. */
+    const val ORDER_RANGE_M = 10f
 
     /** Écart voulu à un corps (m) : l'ordre user du 02/11, 1 m. */
     const val BODY_CLEARANCE_M = PeoplePath.MIN_CLEARANCE_M
@@ -73,22 +81,27 @@ object ClearPath {
         holeSide: GuidanceSide? = null,
     ): ClearView {
         val cleaned = labels.filter { Guidance.isObstacle(it) }
-        val range = Guidance.RANGE_METERS
+        val range = ORDER_RANGE_M
         val threat = threat(cleaned, hfovDeg, range)
         if (threat != null) {
             val side = GuidanceExit.side(cleaned, threat, holeSide, range, hfovDeg, free)
-            return ClearView(AvoidOrder(side, threat), side)
+            return ClearView(AvoidOrder(side, threat), side, roomOf(cleaned, threat, range, hfovDeg))
         }
-        val far = PeoplePath.plan(cleaned, Guidance.AXIS_RANGE_METERS, hfovDeg)
-            ?.takeIf { it.detour }?.side
-        return ClearView(null, far?.let { GuidanceBounds.boundedSide(it, free) })
+        val farRange = Guidance.AXIS_RANGE_METERS
+        val far = threat(cleaned, hfovDeg, farRange) ?: return ClearView(null, null)
+        val side = GuidanceExit.side(cleaned, far, holeSide, farRange, hfovDeg, free)
+        return ClearView(null, side, roomOf(cleaned, far, farRange, hfovDeg))
     }
+
+    /** Place de la frame autour de [obstacle] : ce que le journal montre, le côté s'y lit. */
+    private fun roomOf(labels: List<PlacedLabel>, obstacle: PlacedLabel, range: Float, hfovDeg: Float): GapRoom? =
+        WidestGap.of(labels, depthOf(obstacle, range) ?: range, hfovDeg)
 
     /** Obstacle le plus proche qui entre dans le couloir, `null` si tout passe. */
     fun threat(
         labels: List<PlacedLabel>,
         hfovDeg: Float = LensSpec.DEFAULT_H_FOV_DEG,
-        rangeMeters: Float = Guidance.RANGE_METERS,
+        rangeMeters: Float = ORDER_RANGE_M,
     ): PlacedLabel? {
         val halfTangent = LensSpec.halfTangent(hfovDeg)
         if (!halfTangent.isFinite() || halfTangent <= 0f) return null
@@ -96,9 +109,12 @@ object ClearPath {
             .minByOrNull { nearDepth(it) ?: rangeMeters }
     }
 
+    /** Vrai si [label] se contourne : une bordure se monte ou se descend, elle ne barre pas. */
+    internal fun bars(label: PlacedLabel): Boolean = !CurbConcepts.isCurb(label.label)
+
     /** Vrai si [label] manque d'écart à l'axe marché, à portée. */
     private fun intrudes(label: PlacedLabel, halfTangent: Float, rangeMeters: Float): Boolean {
-        if (!label.centerX.isFinite()) return false
+        if (!label.centerX.isFinite() || !bars(label)) return false
         if (isRail(label)) {
             val lateral = railLateralM(label, halfTangent) ?: return false
             return lateral < RAIL_CLEARANCE_M
@@ -125,7 +141,7 @@ object ClearPath {
      * Distance de [label] pour juger de près : la mesure, sinon [UNSEEN_DEPTH_M]
      * s'il est coupé par le bas ; `null` = on ne sait pas qu'il est proche.
      */
-    private fun nearDepth(label: PlacedLabel): Float? {
+    internal fun nearDepth(label: PlacedLabel): Float? {
         val meters = label.meters
         if (meters != null && meters.isFinite() && meters > 0f) return meters
         return if (label.cutBottom) UNSEEN_DEPTH_M else null

@@ -301,7 +301,7 @@ class GuidanceTest {
     /** Le côté calculé sans marge (0,10 m) cède la place au côté large (0,90 m). */
     @Test
     fun `un cote sans place est ecarte au profit du plus large`() {
-        val labels = listOf(placed("chaise", 0.55f, 3.5f))
+        val labels = listOf(placed("chaise", 0.60f, 3.5f))
         val mesure = Guidance.decide(labels, free = FreeSpace(0.1f, 0.9f))
 
         assertEquals(GuidanceSide.Left, Guidance.decide(labels).side)
@@ -323,7 +323,7 @@ class GuidanceTest {
     /** Aucun côté n'a la marge : le côté calculé est gardé, jamais de silence. */
     @Test
     fun `aucune place des deux cotes = le cote calcule est garde`() {
-        val labels = listOf(placed("chaise", 0.55f, 3.5f))
+        val labels = listOf(placed("chaise", 0.60f, 3.5f))
         val mesure = Guidance.decide(labels, free = FreeSpace(0f, 0.1f))
 
         assertTrue(mesure.blocked)
