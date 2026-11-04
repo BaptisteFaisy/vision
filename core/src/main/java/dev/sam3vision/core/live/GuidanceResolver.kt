@@ -5,8 +5,9 @@ import dev.sam3vision.core.model.Passage
 
 /**
  * Décision de couloir de la frame : locale ([Guidance.decide]) sauf passage
- * serveur ([Passage]) qui la remplace — le serveur ne juge que les personnes,
- * donc un mur qui bouche localement reprend la main sur son « libre ».
+ * serveur ([Passage]) qui la remplace — le serveur ne juge que les
+ * bloqueurs (personnes, barrières, poteaux), donc un mur, une barrière ou
+ * un poteau qui bouche localement reprend la main sur son « libre ».
  * Pur JVM, extrait de [GuidanceAnnouncer.onFrame] (plafond 50 lignes).
  */
 internal fun resolveDecision(
@@ -24,18 +25,21 @@ internal fun resolveDecision(
         holeSide = holeSide,
     )
     val server = samPassage?.let { samDecision(it, labels, cap, hfovDeg, rangeMeters) }
-    if (server != null && !server.blocked && wallBlocks(local)) return local
+    if (server != null && !server.blocked && localStaticBlocks(local)) return local
     return server ?: local
 }
 
 /**
- * Le serveur ne juge que les personnes ([Passage]) : un mur qui bouche
- * le couloir localement reprend la main sur un « libre » serveur (ordre
- * user : les murs s'esquivent, ils ne se disent pas — et ils comptent
- * pour décider gauche/droite).
+ * Le serveur ne juge que les bloqueurs ([Passage]) : un mur, une barrière
+ * ou un poteau qui bouche le couloir localement reprend la main sur un
+ * « libre » serveur (ordre user : les murs s'esquivent, ils ne se disent
+ * pas — et ils comptent pour décider gauche/droite).
  */
-private fun wallBlocks(decision: GuidanceDecision): Boolean =
-    decision.blocked && decision.obstacle?.label?.let { HazardConcepts.isWall(it) } == true
+private fun localStaticBlocks(decision: GuidanceDecision): Boolean {
+    if (!decision.blocked) return false
+    val label = decision.obstacle?.label ?: return false
+    return HazardConcepts.isWall(label) || StaticAvoidance.isStaticObstacle(label)
+}
 
 /**
  * Décision lue dans le passage SAM : bouché et côté viennent du serveur

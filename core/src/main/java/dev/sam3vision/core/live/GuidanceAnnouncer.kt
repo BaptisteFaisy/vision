@@ -125,8 +125,9 @@ class GuidanceAnnouncer(
      * cap (ordre de retour), une absence parle prudemment ; le bouché prime.
      * [samPassage] est le passage conseillé par SAM : bouché et côté du
      * serveur, obstacle chiffré du téléphone ; `null` (backend antérieur) =
-     * décision locale. Le serveur ne voit que les personnes : un mur qui
-     * bouche localement reprend la main sur son « libre » ([resolveDecision]).
+     * décision locale. Le serveur ne voit que les bloqueurs (personnes,
+     * barrières, poteaux) : un mur, une barrière ou un poteau qui bouche
+     * localement reprend la main sur son « libre » ([resolveDecision]).
      * [holeSide] est le côté du trou de grillage (ouvert,
      * proche, localisé par l'appelant) : sur couloir bouché sans chemin
      * optimal, on part vers lui sauf humain à moins de 1 m — sinon
