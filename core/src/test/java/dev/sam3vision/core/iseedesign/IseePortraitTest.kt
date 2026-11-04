@@ -35,7 +35,7 @@ class IseePortraitTest {
             val spoken = portraitGeometry(w, h, 1f, 1f)
             assertEquals(h * IseePortrait.PICTURE_SPEAKING_H, spoken.pictureH, 0.01f)
             assertTrue(spoken.pictureH < h * IseePortrait.PICTURE_H)
-            // Caméra ×1,25 (2026-11-03) : la phrase garde 5 % sous son haut.
+            // Bloc réduit (2026-11-04) : la phrase garde au moins 5 % sous son haut.
             assertTrue(spoken.textTop + h * 0.05f < h)
         }
     }
@@ -109,6 +109,8 @@ class IseePortraitTest {
         assertEquals(0.40f, IseePortrait.REST_Y, 0f)
         assertEquals(0.335f, IseePortrait.REST_R, 0f)
         assertEquals(0.725f, IseePortrait.PICTURE_H, 0f)
+        assertEquals(0.60f, IseePortrait.PICTURE_SPEAKING_H, 0f)
+        assertEquals(0.70f, IseePortrait.PICTURE_GUIDING_H, 0f)
         assertEquals(0.555f, IseePortrait.CAM_Y, 0f)
         assertEquals(0.20f, IseePortrait.CAM_R, 0f)
     }

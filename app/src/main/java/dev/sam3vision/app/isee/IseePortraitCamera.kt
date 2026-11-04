@@ -30,7 +30,7 @@ import dev.sam3vision.core.picto.PictoPlaceMode
 
 /**
  * La caméra du design « Portrait » : la rue est un bloc comme la carte (mêmes coins
- * 16 dp, même ombre, mêmes marges latérales 16 dp), 62,5 % de l'écran (75 % en
+ * 16 dp, même ombre, mêmes marges latérales 16 dp), 60 % de l'écran (70 % en
  * guidage), sans trait de séparation (le bord du bloc suffit) ; le voile haut est
  * conservé pour la pastille. À l'ouverture la rue arrive floue et un peu
  * agrandie, puis devient nette (mise au point). L'aperçu porte toujours les masques SAM et les

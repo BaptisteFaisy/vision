@@ -2,7 +2,7 @@ package dev.sam3vision.core.iseedesign
 
 /**
  * Le design « Portrait » de l'écran iSee (choisi sur la maquette web) : logique pure, testable
- * sur JVM. La rue occupe le haut de l'écran et un trait clair l'en sépare ; la boule de verre est
+ * sur JVM. La rue occupe le haut de l'écran dans un bloc comme la carte ; la boule de verre est
  * posée sous l'image, le court passage en cours dessous. Couleurs « Amber » : le user en bleu,
  * iSee en ambre. Aucun pixel sur la boule : verre + liquide marbré seulement.
  */
@@ -28,15 +28,16 @@ object IseePortrait {
     const val REST_R = 0.335f
 
     /**
-     * Caméra ouverte ×1,25 (demande user 2026-11-03) : parole 62,5 %,
-     * guidage 75 %. Le repos (0,64) est hors prod — le pane fige speech=1 —
-     * et reste tel quel : plus haut, la boule et la phrase sortiraient.
+     * Bloc caméra réduit (demande user 2026-11-04) : parole 60 %, guidage
+     * 70 % — la phrase garde sa place entre le bloc et la carte. Le repos
+     * (0,64) est hors prod — le pane fige speech=1 — et reste tel quel :
+     * plus haut, la boule et la phrase sortiraient.
      */
     const val PICTURE_H = 0.725f
     const val PICTURE_IDLE_H = 0.64f
-    const val PICTURE_SPEAKING_H = 0.625f
+    const val PICTURE_SPEAKING_H = 0.60f
     /** Guidage (carte en bas, boule effacée) : la rue grandit, la phrase garde sa place. */
-    const val PICTURE_GUIDING_H = 0.75f
+    const val PICTURE_GUIDING_H = 0.70f
     const val CAM_Y = 0.555f
     const val CAM_R = 0.20f
 

@@ -24,8 +24,8 @@
   restants restent blanc laiteux. Shader AGSL sur API 33+,
   repli en dégradés en dessous. **Aucun pixel sur la boule, aucun satellite.**
 - **Caméra = un bloc comme la carte** (`IseePortraitCamera`) : elle occupe
-  62,5 % du haut quand elle est affichée (la taille parole,
-  `PICTURE_SPEAKING_H`), 75 % en guidage (`PICTURE_GUIDING_H`, la boule
+  60 % du haut quand elle est affichée (la taille parole,
+  `PICTURE_SPEAKING_H`), 70 % en guidage (`PICTURE_GUIDING_H`, la boule
   s'efface entre le bloc et la carte, la phrase reste), avec les mêmes bords
   que la map — arrondi 16 dp (`IseeBlockShape`), même ombre portée, marges
   latérales 16 dp (`IseeBlockSide`), coins natifs rognés
