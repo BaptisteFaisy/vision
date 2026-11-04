@@ -49,10 +49,14 @@ internal class GlassesSessionOpener(
     /** Chutes de sessions établies déjà reprises dans ce cycle (remis à zéro par [open]). */
     private var rescueDeaths: Int = 0
 
+    /** Dernière erreur de la session en cours, pour nommer la cause à la retombée. */
+    private var lastError: DeviceSessionError? = null
+
     /** Ouvre une session ; tue une ouverture précédente restée en vie. */
     fun open() {
         quickDeaths = 0
         rescueDeaths = 0
+        lastError = null
         relaunch()
     }
 
@@ -73,22 +77,41 @@ internal class GlassesSessionOpener(
     }
 
     /**
+     * Erreur de session vue par le collecteur : mémorisée pour la retombée, puis
+     * dite comme avant ([report]). L'écho `UNEXPECTED_ERROR` post-`STOPPED`
+     * n'écrase jamais une cause déjà sue — sinon la retombée nommerait l'écho
+     * au lieu du causal ([sessionErrorWorthTelling]).
+     */
+    fun onSessionError(error: DeviceSessionError) {
+        if (error != DeviceSessionError.UNEXPECTED_ERROR || lastError == null) lastError = error
+        report(error, snapshot().phase, snapshot().message)
+    }
+
+    /**
      * Session retombée (`STOPPED`) : les capacités se libèrent toujours, puis la
      * chute se reprend seule — mort rapide espacée ([quickDeathDelayMs]) comme
-     * session établie tombée (backoff [rescueDelayMs]). Passé le budget
-     * ([QUICK_DEATH_MAX_RETRIES], [RESCUE_MAX_RETRIES]), c'est un refus durable
-     * et il se dit comme tel.
+     * session établie tombée (backoff [rescueDelayMs]). La cause sue se nomme
+     * dans les essais, et les erreurs déterministes ([sessionErrorIsFatal]) se
+     * disent sans essai. Passé le budget ([QUICK_DEATH_MAX_RETRIES],
+     * [RESCUE_MAX_RETRIES]), c'est un refus durable et il se dit comme tel.
      */
     fun settled(release: () -> Unit) {
         release()
+        val cause = lastError
+        if (cause != null && sessionErrorIsFatal(cause)) {
+            quickDeaths = 0
+            rescueDeaths = 0
+            noteEnd(cause)
+            return
+        }
         if (isQuickDeath(startMs, clock())) {
             if (quickDeaths >= QUICK_DEATH_MAX_RETRIES) {
                 quickDeaths = 0
-                note(GlassesMessages.sessionRefusedByGlasses())
+                noteEnd(cause)
                 return
             }
             quickDeaths += 1
-            note(GlassesMessages.sessionRetrying(quickDeaths, QUICK_DEATH_MAX_RETRIES))
+            note(GlassesMessages.sessionRetrying(quickDeaths, QUICK_DEATH_MAX_RETRIES, cause))
             scheduleRetry(quickDeathDelayMs(quickDeaths))
             return
         }
@@ -97,12 +120,23 @@ internal class GlassesSessionOpener(
         if (rescueForgiven(startMs, clock())) rescueDeaths = 0
         if (rescueDeaths >= RESCUE_MAX_RETRIES) {
             rescueDeaths = 0
-            note(GlassesMessages.sessionRefusedByGlasses())
+            noteEnd(cause)
             return
         }
         rescueDeaths += 1
         note(GlassesMessages.sessionReconnecting(rescueDeaths))
         scheduleRetry(rescueDelayMs(rescueDeaths))
+    }
+
+    /**
+     * Fin de budget (ou erreur déterministe) : le causal connu nomme le geste qui
+     * répare (mise à jour, Bluetooth, batterie…) ; sans causal, le force-restart
+     * reste le seul geste à proposer. Sans doublon quand l'écran le dit déjà.
+     */
+    private fun noteEnd(cause: DeviceSessionError?) {
+        val message = if (cause == null) GlassesMessages.sessionRefusedByGlasses()
+        else sessionErrorMessage(cause)
+        if (snapshot().message != message) note(message)
     }
 
     /**
@@ -145,6 +179,9 @@ internal class GlassesSessionOpener(
             onSuccess = { created ->
                 Log.i(TAG, "session créée, démarrage")
                 startMs = clock()
+                // Session neuve, cause neuve : une erreur tardive de la précédente
+                // ne doit pas signer la retombée de celle-ci.
+                lastError = null
                 onCreated(created)
                 null
             },

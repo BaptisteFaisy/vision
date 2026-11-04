@@ -195,6 +195,17 @@ fun sessionErrorNeedsGlassesAppUpdate(error: DeviceSessionError): Boolean =
         error == DeviceSessionError.INSUFFICIENT_SDK_VERSION
 
 /**
+ * Erreurs déterministes : rejouer dans 1 à 5 s ne peut pas aider (mise à jour
+ * ou service manquant), donc la retombée dit le geste qui répare sans brûler
+ * ses essais — mesuré le 04/11/2026 : « Glasses cut the session instantly » en
+ * boucle masquait la cause et finissait sur un force-restart hors sujet.
+ */
+fun sessionErrorIsFatal(error: DeviceSessionError): Boolean =
+    error == DeviceSessionError.DAT_APP_ON_THE_GLASSES_UPDATE_REQUIRED ||
+        error == DeviceSessionError.INSUFFICIENT_SDK_VERSION ||
+        error == DeviceSessionError.DWA_UNAVAILABLE
+
+/**
  * Pourquoi la collecte des frames vidéo ne tourne pas — `null` quand elle tourne.
  *
  * La collecte éteinte est un **silence documenté** : pas de frames, donc pas
