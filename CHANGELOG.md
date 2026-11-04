@@ -3,6 +3,13 @@
 Le journal part du 2026-10-26 après 19 h : le commit de départ, puis une entrée par fait
 livré et ses preuves (tâche, fichiers, chiffres) dans l'arbre.
 
+## 2026-11-04 — iSee : plus de « Don't cross. » sur un feu fantôme (branche `fix/faux-feu-traversee`)
+
+- **Demande** : « encore beaucoup trop de cas où il me dit don't cross alors que les voitures ou vans sont garés », sur un passage sans aucun feu.
+- **Cause racine** : 7 des 14 lignes `verdict` bloquées du terrain viennent du feu, pas des voitures. SAM sort des boîtes de feu fantômes, et une seule frame relançait 8 frames de doute.
+- **Fait** : `LightGhostGate` exige 3 frames de suite d'une boîte sans lampe lue. Une lampe lue compte tout de suite, un feu confirmé reparle en une frame. Ligne debug `ISEE_CROSS` à chaque frame bloquée.
+- **Preuves** : fantômes 2 frames au plus (scores 0,36 à 0,67), vrais feux 93 frames sur 93. `LightGhostGateTest`, `CrossingSweepVideoTest`, `docs/TRAVERSEE.md` § 21. Dans la rue : non mesuré. Les blocages `roule=true` du même terrain restent à expliquer.
+
 ## 2026-11-04 — iSee : un seul juge de l'écart latéral (branche `fix/isee-ecart-obstacles`)
 
 - **Demande** : « il ne s'écarte pas bien des objets, donc murs, barrière, humain, poteau » (ordre user du 04/11).

@@ -211,3 +211,27 @@ devant des garées.
   `CrossingSweepVideoTest`. Fixtures `real-motion/samsung-balayage-*.json`. Sur
   `rue-arret-*.json`, des taxis à l'arrêt filmés par une caméra qui tourne : le
   mouvement mesuré est celui du balayage injecté, à ±0,002 image près.
+
+## 21. Feux fantômes : plus de « Don't cross. » sans feu (04/11)
+
+Terrain du 04/11, passage **sans aucun feu** (confirmé par le user), build
+`1.0.1926` : 27 « Don't cross. » en moins de 2 minutes. Sur les 14 lignes
+`verdict` bloquées, 7 viennent de `feu=Unknown` ou `feu=Red`.
+
+- **Cause** : SAM sort « pedestrian traffic light » sur des morceaux de rue, et
+  `selectLightBoxes` n'a pas de plancher de score. Une seule frame disait
+  « Don't cross. » puis relançait 8 frames de doute (`LightEvidenceGate`).
+- **Mesure** : sans feu, ces boîtes tiennent 2 frames au plus (scores 0,36 à
+  0,67). Un vrai feu est là sur 93 frames sur 93.
+- **Fait** : `LightGhostGate` (`:core`) exige 3 frames de suite d'une boîte sans
+  lampe lue, avant la porte de preuve. La frame refusée se lit comme une frame
+  sans boîte.
+- **Sûreté** : une lampe lue (`redProven` ou vert) compte tout de suite. Un feu
+  confirmé reparle en une frame, jusqu'à 8 frames sans boîte (l'asymétrie sûre du
+  03/11 est gardée). Coût : un vrai feu dont la lampe n'est pas lue bloque au bout
+  de 3 frames (~600 ms) au lieu d'une.
+- **Reste à mesurer** : l'autre moitié des blocages du même terrain vient de
+  `roule=true`, sans cause connue : les logs n'avaient pas les boîtes. La ligne
+  debug `ISEE_CROSS` les donne maintenant à chaque frame bloquée.
+- **Preuves** : `LightGhostGateTest`, `CrossingSweepVideoTest`.
+
