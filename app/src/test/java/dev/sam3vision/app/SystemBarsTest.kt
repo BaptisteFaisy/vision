@@ -5,21 +5,21 @@ import org.junit.Assert.assertTrue
 import org.junit.Test
 
 /**
- * Le bandeau système du haut est blanc sur les écrans clairs (fond blanc),
- * sombre partout ailleurs (scène iSee, écrans sombres, caméra).
+ * Le bandeau système du haut est blanc sur iSee et les écrans clairs (fond
+ * blanc), sombre partout ailleurs (écrans sombres, caméra).
  */
 class SystemBarsTest {
 
     @Test
     fun `light screens get the white status band`() {
+        assertTrue(whiteStatusBar(Route.Isee))
         assertTrue(whiteStatusBar(Route.Settings))
         assertTrue(whiteStatusBar(Route.Caregiver))
         assertTrue(whiteStatusBar(Route.Onboarding))
     }
 
     @Test
-    fun `scene and dark screens keep the dark status band`() {
-        assertFalse(whiteStatusBar(Route.Isee))
+    fun `dark screens keep the dark status band`() {
         assertFalse(whiteStatusBar(Route.Capture))
         assertFalse(whiteStatusBar(Route.Analysis))
         assertFalse(whiteStatusBar(Route.Chat))
@@ -31,13 +31,13 @@ class SystemBarsTest {
     }
 
     @Test
-    fun `isee scene and live hide the status bar over the camera`() {
-        assertTrue(hidesStatusBar(Route.Isee))
+    fun `live hides the status bar over the camera`() {
         assertTrue(hidesStatusBar(Route.Live))
     }
 
     @Test
     fun `other screens keep the status bar`() {
+        assertFalse(hidesStatusBar(Route.Isee))
         assertFalse(hidesStatusBar(Route.Settings))
         assertFalse(hidesStatusBar(Route.Caregiver))
         assertFalse(hidesStatusBar(Route.Onboarding))

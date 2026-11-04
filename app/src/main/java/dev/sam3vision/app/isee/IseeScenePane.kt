@@ -59,7 +59,7 @@ fun IseeScenePane(
     viewModel: IseeViewModel,
     modifier: Modifier = Modifier,
 ) {
-    // Barre de statut : cachée au niveau navigation (AppNav, iSee + direct).
+    // Barre de statut : blanche au niveau navigation (AppNav, `WhiteTopBar`) ; seul le direct la cache.
     val glue = rememberCameraGlue(viewModel)
     // Pas de collecte ici : la sonde descend telle quelle et chaque feuille collecte sa
     // tranche (pixels/chiffres/notice, voir ProbeSlices) — sinon chaque écriture (deux par
