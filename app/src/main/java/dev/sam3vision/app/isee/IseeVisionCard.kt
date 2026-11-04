@@ -267,7 +267,7 @@ private fun RecordingChip() {
  * est pris par le debug et le verdict).
  */
 @Composable
-internal fun BoxScope.CrossingChip(
+internal fun CrossingChip(
     probe: LiveProbeState,
     modifier: Modifier,
     onToggle: () -> Unit,

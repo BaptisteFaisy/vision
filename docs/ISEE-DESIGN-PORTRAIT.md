@@ -50,7 +50,8 @@
   suivent la lumière venant du haut-gauche. L'ombre accompagne la respiration
   et reste visible sous la caméra. La place des boutons système est réservée.
 - **Seule la phrase en cours**, en gros, **sous la boule** (`IseeSpokenLine`,
-  5 mots / 32 caractères par passage, 2 lignes, label YOU/ISEE au-dessus).
+  5 mots / 32 caractères par passage, 2 lignes, sans label locuteur —
+  la couleur suffit : bleu user, ambre iSee).
   Les passages avancent avec la position et la durée réelles du lecteur MP3,
   quelle que soit sa vitesse. Elle **s'allume mot à
   mot** : mot en cours dans la couleur de qui parle, mots dits en noir, mots
