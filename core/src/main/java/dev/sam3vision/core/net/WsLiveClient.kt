@@ -213,8 +213,9 @@ class WsLiveClient(
     /**
      * Le lien n'est plus celui qu'on croyait : réseau changé, socket déclaré mort par le
      * watchdog, envoi refusé. Ferme le socket, réveille **toutes** les frames en vol en
-     * échec (au lieu de leur faire attendre leur budget) et arme une reprise immédiate.
-     * Appelable de n'importe quel thread : tout passe par le verrou du client.
+     * échec (au lieu de leur faire attendre leur budget) et arme une reprise (immédiate
+     * au premier, backoff sinon). Appelable de n'importe quel thread : tout passe par
+     * le verrou du client.
      */
     fun invalidate(reason: String) {
         synchronized(lock) {
@@ -374,12 +375,16 @@ class WsLiveClient(
     private fun onText(text: String) {
         val id = readId(text)
         val reply = synchronized(lock) {
-            // Toute réponse, même orpheline, prouve que le socket vit : le watchdog recule.
-            link.markProof()
-            pending[id]?.reply ?: run {
+            // Toute réponse prouve que le socket vit (le watchdog recule) ; une
+            // réponse corrélée prouve en plus qu'il sert (le timeout épargne).
+            val hit = pending[id]?.reply
+            if (hit == null) {
+                link.markProof()
                 noteBinaryRefused(id, text)
-                null
+            } else {
+                link.markFrameProof()
             }
+            hit
         } ?: return
         // Corps (message) complet, avant le parsing de la réponse par l'appelant.
         marks?.onBody()
@@ -396,8 +401,8 @@ class WsLiveClient(
     /**
      * Socket fermé : les frames en vol échouent, l'état passe en `Degraded` et la reprise
      * est armée — sauf si la fermeture vient d'un socket déjà remplacé (ack tardif).
-     * Idle serveur (`1001`) : reprise **sans backoff** (contrat LIVE-SPEC §9), comme une
-     * invalidation — un idle n'est pas un échec, il ne consomme pas de tentative.
+     * Idle serveur (`1001`) : reprise **sans délai au premier** (contrat LIVE-SPEC §9),
+     * puis backoff si les idles se répètent sans preuve — un idle compte, sans attendre.
      * [onText] reste sans garde : une réponse tardive au bon `id` reste la bonne.
      */
     private fun onClosed(error: Throwable?, gen: Int) {
@@ -468,21 +473,20 @@ class WsLiveClient(
     }
 
     /**
-     * Délai dépassé sans fermeture = socket **apparemment** vivant mais mort (conteneur
-     * arrêté, passerelle changée). On ferme, on marque l'échec, on **réveille les sœurs**
-     * (leurs réponses ne peuvent plus arriver : le socket qui les portait meurt ici — les
-     * laisser payer leur budget viderait la queue en série) et on **rouvre aussitôt**
-     * (FIX-16) — sauf [gen] périmé. La coupe est sous le premier verrou, avant la
-     * fermeture : une frame enregistrée après part sur le socket neuf et survit.
+     * Délai dépassé : si une frame a été répondue dans le budget, le socket sert
+     * et survit avec ses sœurs (lenteur, pas mort — seul ce timeout échoue).
+     * Sinon socket muet : coupe via [dropSocketLocked] (génération neuve, donc
+     * l'ack du `close` est toujours périmé), sœurs en `Timeout`, et **réouverture
+     * aussitôt** (FIX-16) — sauf [gen] périmé.
      */
     private fun dropDeadSocket(gen: Int, id: Int) {
-        val orphaned = synchronized(lock) {
+        synchronized(lock) {
             if (!(connected && socketGen == gen)) return
-            connected = false
+            if (link.frameProvenWithin(timeoutMs)) return
             link.onFailure()
-            pending.keys.filter { it != id }.mapNotNull { pending.remove(it) }
+            pending.remove(id)
+            dropSocketLocked(ApiError.Timeout())
         }
-        orphaned.forEach { it.reply.completeExceptionally(ApiError.Timeout()) }
         runCatching { transport.close() }
         synchronized(lock) { openLocked() }
     }

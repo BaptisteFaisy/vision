@@ -170,14 +170,17 @@ class WsLink(
     }
 
     /**
-     * Lien invalidé (interface changée, socket déclaré mort) : reprise **immédiate**,
-     * l'interface retenue devient celle du prochain socket. [closeCode] : comme
-     * [onFailure] — un idle `1001` n'est pas un échec mais reste un code observé.
+     * Lien invalidé (silence déclaré, idle `1001`, envoi refusé) : l'événement
+     * **compte** ([attempts]), donc une répétition sans preuve arme le backoff
+     * puis le palier muet au lieu de rouvrir immédiat en boucle. Le premier
+     * reste immédiat ([delayFor] nul) : un idle isolé n'attend pas. [closeCode] :
+     * comme [onFailure] — un idle `1001` reste un code observé.
      */
     fun onInvalidate(iface: String?, closeCode: Int? = null) {
         this.iface = iface
         if (closeCode != null) lastCloseCode = closeCode
-        nextAttemptAtMs = clock()
+        attempts += 1
+        nextAttemptAtMs = clock() + delayFor(attempts)
         _state.value = WsLinkState.Degraded
     }
 
