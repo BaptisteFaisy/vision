@@ -1,5 +1,6 @@
 package dev.sam3vision.app.isee
 
+import org.junit.After
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
 import org.junit.Assert.assertTrue
@@ -9,8 +10,15 @@ import org.junit.Test
  * Décisions pures du pont lunettes → SAM ([stairFeedDue]) + parité d'encodage
  * avec le téléphone : le pont envoie en [ISEE_FRAME_EDGE]/[ISEE_FRAME_QUALITY],
  * jamais en 480/q65. Le JPEG lui-même (`Bitmap`) ne s'éprouve que sur appareil.
+ * Compteurs de refus ([BridgeRefusals]) : un pont fermé ne ressemble plus à
+ * une GPU morte sans laisser de trace.
  */
 class GlassesProbeWiringTest {
+
+    @After
+    fun resetRefusals() {
+        BridgeRefusals.reset()
+    }
 
     @Test
     fun `le premier Canny des marches passe toujours`() {
@@ -29,5 +37,37 @@ class GlassesProbeWiringTest {
         // Parité SAM : 320/q55 téléphone (le 480/q65 coûtait 2,25× pixels).
         assertEquals(320, ISEE_FRAME_EDGE)
         assertEquals(55, ISEE_FRAME_QUALITY)
+    }
+
+    @Test
+    fun `les refus du pont sont comptes par cause`() {
+        BridgeRefusals.note(BridgeRefusal.BOX_NULL)
+        BridgeRefusals.note(BridgeRefusal.PROBE)
+        BridgeRefusals.note(BridgeRefusal.PROBE)
+        BridgeRefusals.note(BridgeRefusal.GATE)
+
+        assertEquals(1L, BridgeRefusals.boxNull)
+        assertEquals(2L, BridgeRefusals.probe)
+        assertEquals(1L, BridgeRefusals.gate)
+    }
+
+    @Test
+    fun `la ligne de refus dit le total et les causes`() {
+        BridgeRefusals.note(BridgeRefusal.PROBE)
+        BridgeRefusals.note(BridgeRefusal.GATE)
+
+        assertEquals("pont lunettes : 2 refus (boîte=0 sonde=1 porte=1)", BridgeRefusals.line())
+    }
+
+    @Test
+    fun `la ligne de transition dit la porte et ses entrees`() {
+        assertEquals(
+            "pont lunettes : feed=true (live=true streaming=false photo=false)",
+            bridgeFeedLine(feed = true, live = true, streaming = false, photo = false),
+        )
+        assertEquals(
+            "pont lunettes : feed=false (live=true streaming=true photo=true)",
+            bridgeFeedLine(feed = false, live = true, streaming = true, photo = true),
+        )
     }
 }
