@@ -15,9 +15,11 @@ Depuis le portage de latence (``docs/LATENCE-PROD.md``) :
 * ``mask_encoding`` (``png`` par défaut, ``bits`` sur demande, ``none`` pour les boîtes)
   est négocié sur ``POST /live`` **et** sur ``/live/ws`` ; la réponse porte toujours la
   représentation appliquée ;
-* ``@modal.concurrent(max_inputs=4)`` : quatre slots par conteneur (une seule inférence
-  à la fois, ``_gpu_lock``), ce qui supprime l'attente des frames en vol et laisse un
-  zombie résiduel sans bloquer les reconnexions ;
+* ``@modal.concurrent(max_inputs=8)`` : huit slots par conteneur (une seule inférence
+  à la fois, ``_gpu_lock``) : deux clients live simultanés (un slot WS longue vie
+  chacun + leurs POST/health/handshakes transitoires) plus une marge zombie — sans
+  eux les nouvelles connexions font la queue au proxy Modal sans fin (ni 429, ni
+  réponse) dès que les slots sont tenus, et le client ne voit que des timeouts ;
 * ``run_frame`` garde le verrou GPU sur la seule inférence : le décodage, le préprocess et
   l'encodage des masques se font hors verrou ;
 * ``FAST_TIMING=1`` ajoute ``timings_ms`` à la réponse et l'en-tête ``Server-Timing``.
@@ -148,16 +150,22 @@ app = modal.App(APP_NAME)
     # sous les 10 s (sans lui : ~12 s de poids + scheduling, relevé antérieur).
     enable_memory_snapshot=SNAPSHOT,
 )
-# DEUX ENTRÉES PAR CONTENEUR, UNE SEULE INFÉRENCE SUR LA CARTE. Sans ce décorateur, Modal
-# n'admet qu'une entrée à la fois : la 2e frame en vol (le client iSee tourne à 2 créneaux)
-# attend ~90 ms au proxy (mesuré : elapsed 91/90 ms mais ttfb 232 → 322 ms). Les routes sont
-# `async` et le travail bloquant passe par `asyncio.to_thread` : les entrées concurrentes
-# tournent en threads séparés, donc le décodage + le pré-traitement CPU de la frame N+1 se
-# cachent sous le GPU de la frame N. `self._gpu_lock` garde l'inférence strictement
-# sérialisée (une frame sur la carte, aucune VRAM en plus) et `max_containers=1` interdit
-# toujours une seconde carte. Le décorateur se pose sur la CLASSE, sous `@app.cls`
-# (doc Modal « Input concurrency »).
-@modal.concurrent(max_inputs=4)  # 4 slots : un zombie résiduel ne bloque plus tout
+# HUIT ENTRÉES PAR CONTENEUR, UNE SEULE INFÉRENCE SUR LA CARTE. Sans ce décorateur,
+# Modal n'admet qu'une entrée à la fois : la 2e frame en vol (le client iSee tourne à
+# 2 créneaux) attend ~90 ms au proxy (mesuré : elapsed 91/90 ms mais ttfb 232 → 322 ms).
+# Les routes sont `async` et le travail bloquant passe par `asyncio.to_thread` : les
+# entrées concurrentes tournent en threads séparés, donc le décodage + le pré-traitement
+# CPU de la frame N+1 se cachent sous le GPU de la frame N. `self._gpu_lock` garde
+# l'inférence strictement sérialisée (une frame sur la carte, aucune VRAM en plus) et
+# `max_containers=1` interdit toujours une seconde carte. Le décorateur se pose sur la
+# CLASSE, sous `@app.cls` (doc Modal « Input concurrency »).
+# 8, pas 4 : une session WS **tient** son slot toute sa vie, donc 2 clients live + leurs
+# POST/health/handshakes transitoires + un zombie saturent 4 slots — et au-delà Modal
+# parque les nouvelles connexions au proxy sans fin (ni 429, ni réponse : incident
+# Samsung du 04/11/2026 — timeouts + boucle WS_RECONNECTING alors que le conteneur
+# servait l'autre client en 200). Admises, les entrées en trop répondent 429 via
+# `gpu_guard` (file bornée 15 s), que le client comprend déjà (backoff 250 ms).
+@modal.concurrent(max_inputs=8)  # 8 slots : 2 clients live + transitoires + zombies
 class Sam3Live(Sam3LiveService):
     """Conteneur de probe : modèle chargé une fois, leviers activables, verrou GPU unique."""
 

@@ -23,7 +23,7 @@ sealed class ApiError(message: String, cause: Throwable? = null) : Exception(mes
             "configured (ElevenLabs library voice? take a premade one, e.g. Sarah)",
     ) : ApiError(message)
 
-    class Timeout(message: String = "backend unreachable: timeout") : ApiError(message)
+    class Timeout(message: String = "backend unreachable: timeout", cause: Throwable? = null) : ApiError(message, cause)
 
     class Network(
         message: String = "backend unreachable: network",
