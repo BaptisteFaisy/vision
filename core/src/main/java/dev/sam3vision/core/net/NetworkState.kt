@@ -8,8 +8,8 @@ package dev.sam3vision.core.net
  * O(1), sans DNS, sans TCP, sans handshake et sans consommer de délai — la radio reste au
  * repos et la prochaine frame repart dès le retour annoncé.
  *
- * [iface] identifie l'interface en service (`wifi`, `cellulaire`, `vpn`…) : un simple
- * changement de valeur suffit à déclarer mort-né le socket de l'ancienne interface, sans
+ * [iface] identifie le réseau en service (`wifi#109`, `cell#111`…) : un simple
+ * changement de valeur suffit à déclarer mort-né le socket de l'ancien réseau, sans
  * registre d'abonnés ni génération à propager.
  */
 interface NetworkState {
@@ -31,6 +31,13 @@ interface NetworkState {
         }
     }
 }
+
+/**
+ * Clé de réseau : transport + `netId` système — deux Wi-Fi successifs (domicile →
+ * Wifirst) sont deux routes, même transport. `netId` inconnu : transport seul.
+ */
+fun netIfaceKey(transport: String, netId: String?): String =
+    if (netId.isNullOrBlank()) transport else "$transport#$netId"
 
 /**
  * Faux état réseau des tests JVM (et du câblage sans plateforme) : deux champs mutables,
