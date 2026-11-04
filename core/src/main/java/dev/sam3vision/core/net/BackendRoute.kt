@@ -3,6 +3,7 @@ package dev.sam3vision.core.net
 import java.net.InetAddress
 import java.net.Socket
 import javax.net.SocketFactory
+import okhttp3.Dns
 
 /**
  * Fenêtre de stabilité anti-flap : une valeur réseau qui ne tient pas 2 s
@@ -33,10 +34,11 @@ data class RouteMark(val active: Boolean, val version: Long)
  * Le correctif ne touche jamais à la route par défaut (`bindProcessToNetwork`
  * casserait le flux local des lunettes, qui vit sur ses propres sockets) : la
  * plateforme demande le cellulaire en plus
- * (`requestNetwork(TRANSPORT_CELLULAR)`) et pousse ici sa `socketFactory`, que
- * les deux racines OkHttp ([defaultHttpClient], [liveHttpClient]) consultent
- * via [RoutedSocketFactory] — tous les clients dérivés (`newBuilder()` : live,
- * WS, tracker, `/release`, LLM, ASR, TTS) suivent sans changer de pool.
+ * (`requestNetwork(TRANSPORT_CELLULAR)`) et pousse ici sa `socketFactory` et
+ * sa résolution DNS, que les deux racines OkHttp ([defaultHttpClient],
+ * [liveHttpClient]) consultent via [RoutedSocketFactory] et [RoutedDns] —
+ * tous les clients dérivés (`newBuilder()` : live, WS, tracker, `/release`,
+ * LLM, ASR, TTS) suivent sans changer de pool.
  *
  * 100 % JVM (aucun Android) : la décision [wantsCellularRoute] et le routage
  * se testent sans radio.
@@ -46,6 +48,10 @@ object BackendRoute {
     /** Fabrique cellulaire poussée par la plateforme, `null` = route par défaut. */
     @Volatile
     private var override: SocketFactory? = null
+
+    /** Résolution DNS cellulaire poussée avec [override], `null` = DNS système. */
+    @Volatile
+    private var dnsOverride: ((String) -> List<InetAddress>)? = null
 
     /**
      * Génération de la route : bumpée à chaque bascule effective. Lue avec
@@ -60,16 +66,19 @@ object BackendRoute {
     val active: Boolean get() = override != null
 
     /**
-     * Impose [factory] au trafic backend ; `true` si ça change quelque chose
-     * (l'appelant vide alors les pools, sinon les connexions gardées suivraient
-     * l'ancienne route).
+     * Impose [factory] au trafic backend (+ [dnsLookup] pour la résolution) ;
+     * `true` si ça change quelque chose (l'appelant vide alors les pools, sinon
+     * les connexions gardées suivraient l'ancienne route).
      *
      * Comparaison par **identité** : `Network.getSocketFactory()` alloue un
      * objet neuf à chaque appel — l'appelant retient le réseau installé et
      * consulte [sameCellularRouteInstalled] au lieu de réimposer à chaque rappel.
+     * La résolution est toujours retenue (même sans bascule : le DNS n'a pas de
+     * pool à vider).
      */
     @Synchronized
-    fun install(factory: SocketFactory): Boolean {
+    fun install(factory: SocketFactory, dnsLookup: ((String) -> List<InetAddress>)? = null): Boolean {
+        dnsOverride = dnsLookup
         if (override === factory) return false
         override = factory
         version += 1
@@ -81,6 +90,7 @@ object BackendRoute {
     fun clear(): Boolean {
         if (override == null) return false
         override = null
+        dnsOverride = null
         version += 1
         return true
     }
@@ -94,6 +104,10 @@ object BackendRoute {
 
     /** Fabrique en vigueur : l'imposée, sinon [fallback] (route par défaut). */
     internal fun current(fallback: SocketFactory): SocketFactory = override ?: fallback
+
+    /** Résolution en vigueur : l'imposée, sinon [fallback] (DNS système). */
+    internal fun currentLookup(fallback: (String) -> List<InetAddress>): (String) -> List<InetAddress> =
+        dnsOverride ?: fallback
 }
 
 /**
@@ -210,4 +224,22 @@ class RoutedSocketFactory(
         route().createSocket(address, port, localAddress, localPort)
 
     private fun route(): SocketFactory = BackendRoute.current(fallback)
+}
+
+/**
+ * DNS qui suit [BackendRoute] : chaque résolution part sur le réseau cellulaire
+ * imposé (session lunettes) ou, à défaut, sur [fallback] (DNS système).
+ *
+ * Sans lui, les sockets cellulaires ne servaient à rien : OkHttp résout les
+ * hôtes via le DNS système, qui suit la route par défaut — le Wi-Fi des
+ * lunettes, sans internet — et `UnknownHostException` tuait le direct alors
+ * que le TCP aurait pu passer. Posé une fois dans les racines OkHttp, il
+ * rebascule sans reconstruire aucun client.
+ */
+class RoutedDns(
+    private val fallback: Dns = Dns.SYSTEM,
+) : Dns {
+
+    override fun lookup(hostname: String): List<InetAddress> =
+        BackendRoute.currentLookup { fallback.lookup(it) }(hostname)
 }

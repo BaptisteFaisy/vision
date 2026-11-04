@@ -72,6 +72,8 @@ class HttpLiveClient(
     private val withDepth: Boolean = false,
     /** Attente avant le 2e essai de `/health` (transitoire) : injectée pour les tests. */
     private val retryDelayMs: Long = HEALTH_RETRY_DELAY_MS,
+    /** Attente avant le 2e essai DNS en bascule lunettes (injectée pour les tests). */
+    private val routeRetryDelayMs: Long = HANDOVER_RETRY_DELAY_MS,
 ) : LiveClient {
 
     /** Client effectif : exposé aux tests, qui prouvent le partage du pool. */
@@ -92,6 +94,22 @@ class HttpLiveClient(
         maxObjects: Int,
     ): Result<LiveFrame> {
         endpointRefusal("endpoint direct", baseUrl, "/live")?.let { return Result.failure(it) }
+        val first = attemptLive(jpegB64, prompts, workEdge, maxObjects)
+        val error = first.exceptionOrNull() ?: return first
+        // Bascule lunettes : le DNS a suivi la route morte, le 2e essai part sur
+        // la route installée (rien n'a été envoyé : zéro inférence rejouée).
+        if (!isHandoverTransient(error)) return first
+        delay(routeRetryDelayMs)
+        return attemptLive(jpegB64, prompts, workEdge, maxObjects)
+    }
+
+    /** Une tentative de frame : corps neuf à chaque essai (jamais de corps rejoué). */
+    private suspend fun attemptLive(
+        jpegB64: String,
+        prompts: List<String>?,
+        workEdge: Int,
+        maxObjects: Int,
+    ): Result<LiveFrame> {
         if (!binaryUpload) return client.executeBytesBuilt(marks) {
             val body = OneShotJsonBody(
                 liveFrameJson(jpegB64, prompts, workEdge, maxObjects, maskFormat = maskFormat, maskEdge = maskEdge, withDepth = withDepth, masks = masks),
@@ -114,8 +132,13 @@ class HttpLiveClient(
         maxObjects: Int,
     ): Result<LiveFrame> {
         endpointRefusal("endpoint direct", baseUrl, "/live")?.let { return Result.failure(it) }
+        // JSON : [live] rejoue déjà lui-même le DNS mort (un seul retry par appel).
         if (!binaryUpload) return live(base64Text(jpeg), prompts, workEdge, maxObjects)
         if (jpeg.isEmpty()) return Result.failure(ApiError.BadResponse("/live : image vide"))
+        val first = postBytes(jpeg, prompts, workEdge, maxObjects)
+        val error = first.exceptionOrNull() ?: return first
+        if (!isHandoverTransient(error)) return first
+        delay(routeRetryDelayMs)
         return postBytes(jpeg, prompts, workEdge, maxObjects)
     }
 
@@ -136,14 +159,15 @@ class HttpLiveClient(
 
     /**
      * Sonde + bouton de réveil : un échec transitoire (503 de boot, bascule de
-     * déploiement, hoquet réseau) est rejoué **une fois** — 2 appels au plus.
+     * déploiement, hoquet réseau) ou un DNS mort en bascule lunettes
+     * ([isHandoverTransient]) est rejoué **une fois** — 2 appels au plus.
      * GET idempotent : jamais une inférence rejouée, contrairement aux frames.
      */
     override suspend fun health(): Result<LiveHealth> {
         endpointRefusal("endpoint direct", baseUrl, "/health")?.let { return Result.failure(it) }
         val first = probeHealth()
         val error = first.exceptionOrNull()
-        if (error == null || !error.isTransient) return first
+        if (error == null || (!error.isTransient && !isHandoverTransient(error))) return first
         delay(retryDelayMs)
         return probeHealth()
     }

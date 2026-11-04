@@ -22,9 +22,11 @@ import dev.sam3vision.core.net.wantsCellularRoute
  * - `requestNetwork(TRANSPORT_CELLULAR + INTERNET)` garde le cellulaire monté
  *   à côté du Wi-Fi lunettes (jamais de `bindProcessToNetwork` global : le
  *   flux local des lunettes et l'audio Bluetooth gardent leurs routes) ;
- * - la `socketFactory` du réseau cellulaire est poussée dans [BackendRoute]
- *   **si et seulement si** le réseau par défaut n'est pas validé (sur Wi-Fi
- *   maison validé, rien ne change : pas de données mobiles pour rien) ;
+ * - la `socketFactory` ET la résolution DNS du réseau cellulaire sont poussées
+ *   dans [BackendRoute] **si et seulement si** le réseau par défaut n'est pas
+ *   validé (sur Wi-Fi maison validé, rien ne change : pas de données mobiles
+ *   pour rien) — sans le DNS, la résolution suivrait la route morte
+ *   (`UnknownHost`) alors que les sockets partiraient bien sur le cellulaire ;
  * - à la bascule, les pools OkHttp sont vidés et le WebSocket est rouvert via
  *   le suffixe `+cell` d'[AndroidNetworkState.iface] (invalidation d'interface
  *   existante, aucun changement dans le client du direct).
@@ -178,7 +180,7 @@ object GlassesNetworkRoute {
         if (want && sameCellularRouteInstalled(BackendRoute.active, installedKey, key)) return
         val changed = if (want && network != null) {
             installedKey = key
-            BackendRoute.install(network.socketFactory)
+            BackendRoute.install(network.socketFactory) { host -> network.getAllByName(host).toList() }
         } else {
             installedKey = null
             BackendRoute.clear()

@@ -4,6 +4,7 @@ import dev.sam3vision.core.live.TimingsText
 import java.util.Locale
 import dev.sam3vision.core.distance.DistanceReading
 import dev.sam3vision.core.distance.DistanceText
+import dev.sam3vision.core.net.isHandoverTransient
 import dev.sam3vision.core.net.isLinkRefusal
 import dev.sam3vision.core.net.isTransient
 
@@ -142,10 +143,15 @@ fun silenceNotice(ageMs: Long): String = "$SILENCE_PREFIX ${ageMs / 1_000} s —
  * un hoquet isolé ne flash plus « HTTP error 500… » à l'écran. Les refus locaux
  * du lien ([isLinkRefusal] : reconnexion, hors-ligne, silence — aucun handshake
  * tenté) prennent les mêmes lignes : l'escalade reste portée par les compteurs
- * et la veille de panne. Le reste remonte brut, dont « SAM GPU off — ask b to
- * turn it on », qui demande une vraie action, pas un nouvel essai.
+ * et la veille de panne. Le DNS mort en bascule lunettes ([isHandoverTransient])
+ * dit le handover, pas l'endpoint. Le reste remonte brut, dont « SAM GPU off —
+ * ask b to turn it on », qui demande une vraie action, pas un nouvel essai.
  */
+/** Bascule lunettes → cellulaire en cours : le DNS a suivi la route morte, ça repart seul. */
+const val HANDOVER_LINE = "cellular handover… (retrying on the next frame)"
+
 fun probeFailureText(error: Throwable, link: ProbeLinkState = ProbeLinkState()): String = when {
+    isHandoverTransient(error) -> HANDOVER_LINE
     !error.isTransient && !isLinkRefusal(error) -> error.message ?: "SAM call failed"
     link.silent -> silenceNotice(link.lastAnswerAgeMs)
     link.kind == ProbeLinkKind.Warm -> "slow answer — retrying on the next frame"

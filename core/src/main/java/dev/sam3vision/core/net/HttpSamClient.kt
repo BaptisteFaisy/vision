@@ -1,6 +1,7 @@
 package dev.sam3vision.core.net
 
 import dev.sam3vision.core.model.SegmentResult
+import kotlinx.coroutines.delay
 import okhttp3.OkHttpClient
 
 /**
@@ -10,15 +11,22 @@ import okhttp3.OkHttpClient
 class HttpSamClient(
     private val baseUrl: String,
     private val client: OkHttpClient = defaultHttpClient(),
+    /** Attente avant le 2e essai DNS en bascule lunettes (injectée pour les tests). */
+    private val routeRetryDelayMs: Long = HANDOVER_RETRY_DELAY_MS,
 ) : SamClient {
 
     override suspend fun segment(pngOrJpegB64: String, prompts: List<String>?): Result<SegmentResult> {
         endpointRefusal("endpoint SAM", baseUrl, "/segment")?.let { return Result.failure(it) }
         val first = attemptSegment(pngOrJpegB64, prompts)
+        val error = first.exceptionOrNull() ?: return first
         // 404 Modal ambigu (fenêtre de déploiement, restore proxy) : le proxy n'a
         // déclenché aucune inférence, un seul nouvel essai est gratuit et évite un
         // faux « SAM GPU off ». Tout autre échec remonte tel quel (pas de 2e inférence).
-        if (first.exceptionOrNull() !is ApiError.BackendStopped) return first
+        if (error is ApiError.BackendStopped) return attemptSegment(pngOrJpegB64, prompts)
+        // Bascule lunettes : le DNS a suivi la route morte, le 2e essai part sur
+        // la route installée (rien n'a été envoyé : zéro inférence rejouée).
+        if (!isHandoverTransient(error)) return first
+        delay(routeRetryDelayMs)
         return attemptSegment(pngOrJpegB64, prompts)
     }
 

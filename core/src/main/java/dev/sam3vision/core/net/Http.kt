@@ -31,6 +31,15 @@ private const val USER_AGENT_HEADER = "User-Agent"
 /** Échec TLS (certificat, date du téléphone, proxy) : dit tel quel, actionnable. */
 internal const val TLS_FAILED = "TLS handshake failed — check date, network, or proxy"
 
+/**
+ * Attente avant le 2e essai d'un échec DNS en bascule lunettes
+ * ([isHandoverTransient]) : `requestNetwork` cellulaire met quelques centaines
+ * de millisecondes à livrer son réseau, le 2e essai part dessus. Un seul
+ * barème partagé (photo `/segment`, direct `/live`) : le DNS n'a rien envoyé,
+ * l'essai est gratuit dans les deux cas.
+ */
+internal const val HANDOVER_RETRY_DELAY_MS = 800L
+
 internal val JSON_MEDIA = "application/json; charset=utf-8".toMediaType()
 
 /** Délai par défaut imposé par la spec : 60 s. */
@@ -44,11 +53,13 @@ const val DEFAULT_TIMEOUT_SECONDS: Long = 60L
  *
  * `RoutedSocketFactory` : la fabrique suit [BackendRoute] (cellulaire imposé en
  * session lunettes, route par défaut sinon) — les clients déjà construits suivent
- * aussi, sans être reconstruits.
+ * aussi, sans être reconstruits. `RoutedDns` : pareil pour la résolution, sinon
+ * le DNS système suivrait la route morte du Wi-Fi lunettes (`UnknownHost`).
  */
 private val sharedBaseClient: OkHttpClient by lazy {
     OkHttpClient.Builder()
         .socketFactory(RoutedSocketFactory())
+        .dns(RoutedDns())
         .connectTimeout(DEFAULT_CONNECT_SECONDS, TimeUnit.SECONDS)
         .readTimeout(DEFAULT_TIMEOUT_SECONDS, TimeUnit.SECONDS)
         .writeTimeout(DEFAULT_TIMEOUT_SECONDS, TimeUnit.SECONDS)
@@ -101,6 +112,7 @@ fun defaultHttpClient(timeoutSeconds: Long = DEFAULT_TIMEOUT_SECONDS): OkHttpCli
  */
 private val liveSharedClient: OkHttpClient by lazy {
     OkHttpClient.Builder()
+        .dns(RoutedDns())
         .connectTimeout(LIVE_CONNECT_SECONDS, TimeUnit.SECONDS)
         .writeTimeout(LIVE_WRITE_SECONDS, TimeUnit.SECONDS)
         .readTimeout(LIVE_READ_SECONDS, TimeUnit.SECONDS)
