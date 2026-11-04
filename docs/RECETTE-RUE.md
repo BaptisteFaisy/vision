@@ -28,7 +28,7 @@ même temps** (bus vocal : le plus petit niveau gagne, écrasé jeté).
 | Bordure | « Curb up. » / « Curb down. » (< 6 m, 2 s) | Niveau 5 |
 | Escalier | Jalons « Stairs up/down, 4/2/1 meters. » (2 s) + marches (« Five. Steps. », 1 s, prioritaire — esquive au milieu) | Niveau 6 |
 | Animal / poubelle | « Animal. » / « Trash can. » (< 6 m, 2 s) | Niveau 7 divers |
-| Passage piéton | « Crosswalk. » (joué < 500 ms, toutes les 2 s hors Traversée) / « left/right » (1 fois par vue), « Aligned with the crosswalk. » (au changement), « On the crosswalk. » (1 fois) | Niveau 8 |
+| Passage piéton | « Crosswalk. » (< 4 m au bord proche, joué < 500 ms, toutes les 2 s hors Traversée) / « left/right » (1 fois par vue), « Aligned with the crosswalk. » (au changement), « On the crosswalk. » (1 fois) | Niveau 8 |
 | Trottoir | « Sidewalk ahead/on the left/on the right. » (dérive seule, 10 s) | Niveau 10 |
 | Virage + obstacle | 0 chevauchement : manœuvre (11) et obstacle ne parlent jamais l'un sur l'autre (le plus petit gagne, écrasé jeté) | `VoiceBus` |
 | Traversée, préavis | « Crosswalk. » (niveau 8), jamais de « Straight. » au bord | Niveau 8 |

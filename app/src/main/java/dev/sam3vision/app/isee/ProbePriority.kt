@@ -20,7 +20,7 @@ import dev.sam3vision.core.speech.IseeClipsEn
  * immédiat) ; 3 rappel GPS (silence 15 s ou plus) ; 4 grillages, murs
  * et barrières (< 6 m) ; 5 bordures (< 6 m) ; 6 escaliers (jalons 2/1/0,5,
  * marches comptées) ; 7 poteaux, mobilier vertical et divers (< 6 m) ;
- * 8 passages piétons (< 6 m) ; 9 réponses du chat ; 10 trottoirs ;
+ * 8 passages piétons (annonce < 4 m) ; 9 réponses du chat ; 10 trottoirs ;
  * 11 manœuvres et événements GPS ; 12 repli (gauche, droite ou tout droit).
  * Les escaliers (6) coupent un mot de guidage en cours (11, 3), comme la
  * bordure (ordre user du 02/11/2026).

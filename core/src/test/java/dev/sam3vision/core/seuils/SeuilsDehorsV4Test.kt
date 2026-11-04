@@ -37,7 +37,7 @@ import org.junit.Test
  * mot immédiat), grillages/murs/barrières niveau 4 (< 6 m, 4 s), bordures
  * niveau 5 (< 6 m, 2 s), escaliers niveau 6 (jalons 2/1/0,5 + marches dites,
  * 2 s), poteaux/mobilier/divers niveau 7 (< 6 m, 2 s), passages niveau 8
- * (< 6 m, annonce 1 fois par vue + « devant » toutes les 2 s hors
+ * (< 4 m, annonce 1 fois par vue + « devant » toutes les 2 s hors
  * Traversée + alignement au changement + arrivée 1 fois), trottoirs
  * niveau 10 (inchangés), textes EN voitures (présence
  * seule + pluriel). La détection voitures et la traversée sont d'autres
@@ -364,18 +364,18 @@ class SeuilsDehorsV4Test {
     // Passages piétons — niveau 8, 3 couches.
 
     @Test
-    fun `passage annonce 1 fois par vue sans repetition sous 6m`() {
+    fun `passage annonce 1 fois par vue sans repetition sous 4m`() {
         val watcher = CrossingApproachWatcher()
-        assertNull(watcher.onFrame(0.5f, 5.5f, En))
-        assertEquals("Ahead, 6 meters.", watcher.onFrame(0.5f, 5.5f, En))
-        assertNull(watcher.onFrame(0.5f, 5.5f, En))
+        assertNull(watcher.onFrame(0.5f, 3.5f, En))
+        assertEquals("Ahead, 4 meters.", watcher.onFrame(0.5f, 3.5f, En))
+        assertNull(watcher.onFrame(0.5f, 3.5f, En))
         assertNull(watcher.onFrame(null, null, En))
-        watcher.onFrame(0.5f, 5.5f, En)
-        assertNotNull(watcher.onFrame(0.5f, 5.5f, En))
+        watcher.onFrame(0.5f, 3.5f, En)
+        assertNotNull(watcher.onFrame(0.5f, 3.5f, En))
         val far = CrossingApproachWatcher()
-        assertNull(far.onFrame(0.5f, 6.5f, En))
-        assertNull(far.onFrame(0.5f, 6.5f, En))
-        assertNull(far.onFrame(0.5f, 6.5f, En))
+        assertNull(far.onFrame(0.5f, 4.5f, En))
+        assertNull(far.onFrame(0.5f, 4.5f, En))
+        assertNull(far.onFrame(0.5f, 4.5f, En))
         assertEquals(8, CrossingApproachWatcher.LEVEL)
         assertEquals("crosswalk-announce", CrossingApproachWatcher.KEY_ANNOUNCE)
     }

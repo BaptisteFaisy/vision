@@ -22,8 +22,9 @@ import dev.sam3vision.core.speech.SpeechLanguage
  * [dev.sam3vision.core.live.GuidanceAnnouncer] (mot nouveau seul).
  *
  * Distance : jamais le sténopé (`crosswalk` est DEPTH_ONLY,
- * [dev.sam3vision.core.distance.KnownSizes]) — profondeur médiane calibrée
- * d'abord, plan de sol ensuite ([CrossingDistance]). Arrivée : « Sur le
+ * [dev.sam3vision.core.distance.KnownSizes]) — plan de sol d'abord (bord
+ * proche du passage), profondeur médiane calibrée en repli
+ * ([CrossingDistance]). Arrivée : « Sur le
  * passage. » ([CrossingText.arrived]), douce, 2 frames, changement seul.
  * En Traversée, le mot ne parle que passage proche (≤ [GUIDE_METERS],
  * [CrossingOffer.seesNearCrosswalk]) — le feu et le veto gardent la priorité.
@@ -41,7 +42,7 @@ object CrossingGuidance {
     /** En deçà, la profondeur dit « arrivé » (mètres, profondeur ou sol). */
     const val ARRIVAL_METERS = 1.5f
 
-    /** En deçà, le passage se rejoint à la voix, même en Traversée (SPEC v4 : annoncé à 6 m, guidé dès 6 m). */
+    /** En deçà, le passage se rejoint à la voix, même en Traversée (annoncé à 4 m, guidé dès 6 m). */
     const val GUIDE_METERS = 6.0f
 
     /** Bas de boîte normalisé qui touche le bas du cadre (arrivée). */
@@ -65,7 +66,7 @@ object CrossingGuidance {
     /** Bas de boîte normalisé minimal d'un passage (zébrures au sol, bas du cadre). */
     const val CROSSWALK_MIN_BOTTOM = 0.5f
 
-    /** Niveau VoiceBus v4 : passages piétons (< 6 m, 3 couches). */
+    /** Niveau VoiceBus v4 : passages piétons (annonce < 4 m, guidage < 6 m, 3 couches). */
     const val LEVEL = 8
 
     /** Clé AntiRepeat v4 : alignement vers le passage (au changement). */
@@ -207,9 +208,10 @@ object CrossingGuidance {
 }
 
 /**
- * Distance du passage : profondeur médiane calibrée d'abord, plan de sol
- * ensuite — jamais le sténopé (`crosswalk` est DEPTH_ONLY : un plan au sol n'a
- * pas de hauteur). Pur JVM.
+ * Distance du passage : plan de sol d'abord (ligne des pieds = bord proche,
+ * la distance qu'il reste à marcher), profondeur médiane calibrée en repli —
+ * jamais le sténopé (`crosswalk` est DEPTH_ONLY : un plan au sol n'a pas de
+ * hauteur). Pur JVM.
  */
 object CrossingDistance {
 
@@ -226,12 +228,18 @@ object CrossingDistance {
     ): Float? = GroundPlane.forwardMeters(footRowPx, pose, focalPx, principalY, imageH)
 
     /**
-     * Meilleure distance : la profondeur calibrée quand elle mesure, le sol
+     * Meilleure distance : **le sol d'abord** (ligne des pieds = bord proche du
+     * passage, la distance qu'il reste à marcher), la profondeur calibrée
      * sinon, `null` si aucun ne mesure. Jamais de sténopé ici.
+     *
+     * Ordre inversé le 04/11/2026 (ordre user « annonce dès 4 m ») : la
+     * profondeur serveur est la médiane du masque, donc le **milieu** du
+     * passage — 1 à 4 m plus loin que son bord. Son gate étouffait l'annonce
+     * jusqu'à ~2 m réels ; le sol mesure le bord qu'on va atteindre.
      */
     fun bestMeters(depthMeters: Float?, groundMeters: Float?): Float? {
-        depthMeters?.takeIf { it.isFinite() && it > 0f }?.let { return it }
-        return groundMeters?.takeIf { it.isFinite() && it > 0f }
+        groundMeters?.takeIf { it.isFinite() && it > 0f }?.let { return it }
+        return depthMeters?.takeIf { it.isFinite() && it > 0f }
     }
 }
 

@@ -139,10 +139,14 @@ class CrossingGuidanceTest {
     }
 
     @Test
-    fun `distance profondeur d abord, sol ensuite, jamais inventee`() {
-        assertEquals(2.0f, CrossingDistance.bestMeters(2.0f, 5.0f)!!, 0f)
+    fun `distance sol d abord (bord proche), profondeur en repli, jamais inventee`() {
+        // Ordre user du 04/11/2026 : le sol mesure le bord qu'on va atteindre,
+        // la profondeur le milieu du masque (plus loin) — elle ne l'écrase plus.
+        assertEquals(5.0f, CrossingDistance.bestMeters(2.0f, 5.0f)!!, 0f)
+        assertEquals(2.0f, CrossingDistance.bestMeters(2.0f, null)!!, 0f)
+        assertEquals(2.0f, CrossingDistance.bestMeters(2.0f, Float.NaN)!!, 0f)
+        assertEquals(2.0f, CrossingDistance.bestMeters(2.0f, -1f)!!, 0f)
         assertEquals(5.0f, CrossingDistance.bestMeters(null, 5.0f)!!, 0f)
-        assertEquals(5.0f, CrossingDistance.bestMeters(Float.NaN, 5.0f)!!, 0f)
         assertNull(CrossingDistance.bestMeters(null, null))
         assertNull(CrossingDistance.bestMeters(-1f, Float.NaN))
     }
