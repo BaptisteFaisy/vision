@@ -4,6 +4,7 @@ import android.os.SystemClock
 import dev.sam3vision.core.model.LiveFrame
 import dev.sam3vision.core.model.ObjectLimits
 import dev.sam3vision.core.net.ApiError
+import dev.sam3vision.core.net.LEG_HTTP
 import dev.sam3vision.core.net.LIVE_TIMEOUT_SECONDS
 import dev.sam3vision.core.net.LiveClient
 import dev.sam3vision.core.net.WsLiveClient
@@ -163,6 +164,9 @@ class LiveSession(
 
     /** Les frames partent-elles en POST /live (repli HTTP) ? `false` sans socket. */
     val httpFallback: Boolean get() = (client as? WsLiveClient)?.httpFallbackActive ?: false
+
+    /** Jambe empruntée par les frames ([WsLiveClient.leg]) : `http` sans socket. */
+    val leg: String get() = (client as? WsLiveClient)?.leg ?: LEG_HTTP
 
     /**
      * Handshake anticipé (voir [LiveClient.preconnect]) : à appeler dès la liaison caméra,

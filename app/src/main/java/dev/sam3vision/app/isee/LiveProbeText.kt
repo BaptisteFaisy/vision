@@ -59,7 +59,7 @@ fun motionSummary(motion: MotionDebug): String = buildString {
  */
 fun liveProbeDetails(state: LiveProbeState): List<String> = buildList {
     if (state.endpoint.isNotBlank()) add("endpoint: ${shortEndpoint(state.endpoint)}")
-    if (state.endpoint.isNotBlank()) add(liveProbeLinkLine(state.link))
+    if (state.endpoint.isNotBlank()) add(liveProbeLinkLine(state.link, state.leg))
     if (state.width > 0 && state.height > 0) add("frame: ${state.width}×${state.height}")
     if (state.frames > 0) {
         add("latency: ${state.latencyMs} ms · p95 ${state.p95Ms} ms · server ${state.serverMs} ms")
@@ -67,6 +67,7 @@ fun liveProbeDetails(state: LiveProbeState): List<String> = buildList {
         add("transport: ${state.transport}")
     }
     if (state.skippedFrames > 0) add("skipped: ${state.skippedFrames} refused")
+    if (state.dark || state.lowLightVetoes > 0) add("dark: ${state.dark} · vetoes ${state.lowLightVetoes}")
     state.motion?.let { add(motionSummary(it)) }
     if (state.timings.known) {
         addAll(TimingsText.detail(state.timings))
@@ -104,13 +105,17 @@ fun shortEndpoint(endpoint: String): String {
 }
 
 /**
- * Ce qui se dit **au centre de la fenêtre** : réveil du GPU en cours, backend arrêté,
- * silence du lien, ou simple attente de la première analyse. `null` quand tout va bien.
+ * Ce qui se dit **au centre de la fenêtre** : veto nuit/noir, réveil du GPU en cours,
+ * backend arrêté, silence du lien, ou simple attente de la première analyse. `null`
+ * quand tout va bien.
  *
+ * Le veto passe **avant** l'erreur : rien n'est envoyé, donc tout texte accusant le
+ * lien serait périmé — et le veto remonte à l'UI au lieu de rester dans les logs.
  * L'erreur passe **avant** la garde `frames > 0` : un lien muet doit se dire même après
  * la première frame (audit C3 — sinon on marche avec des masques figés crus à jour).
  */
 fun liveProbeNotice(state: LiveProbeState): String? {
+    if (state.dark) return LOW_LIGHT_PHRASE
     state.error?.let { return it }
     if (state.link.silent) return silenceNotice(state.link.lastAnswerAgeMs)
     if (state.frames > 0) return null
@@ -124,7 +129,7 @@ fun liveProbeNotice(state: LiveProbeState): String? {
  * démarrage d'un conteneur froid se dit « GPU waking up », jamais ceci — voir
  * [probeFailureText].
  */
-fun silenceNotice(ageMs: Long): String = "$SILENCE_PREFIX ${ageMs / 1_000} s — network cut? (retrying)"
+fun silenceNotice(ageMs: Long): String = "$SILENCE_PREFIX ${ageMs / 1_000} s — link silent (retrying)"
 
 /**
  * Message d'échec lisible, qui distingue les trois cas réels :
@@ -153,11 +158,13 @@ fun probeFailureText(error: Throwable, link: ProbeLinkState = ProbeLinkState()):
 fun probeRetryVisible(state: LiveProbeState): Boolean = state.error != null
 
 /**
- * Ligne de diagnostic du lien : « link: warm · 0.3 s · fails 0 · reprises 1 ». Fonction
- * pure (aucun Android) : le panneau la montre, la voix peut la lire.
+ * Ligne de diagnostic du lien : « link: warm · 0.3 s · fails 0 · reprises 1 · binary ».
+ * Fonction pure (aucun Android) : le panneau la montre, la voix peut la lire. [leg] est
+ * la jambe empruntée par les frames (`binary`, `text`, `http`) — vide = omise.
  */
-fun liveProbeLinkLine(link: ProbeLinkState): String {
+fun liveProbeLinkLine(link: ProbeLinkState, leg: String = ""): String {
     val age = DistanceText.decimal(link.lastAnswerAgeMs / 1000f, 1, Locale.US)
     val kind = link.kind.name.lowercase(Locale.US)
-    return "link: $kind · $age s · fails ${link.consecutiveFailures} · reprises ${link.reconnects}"
+    val tail = if (leg.isBlank()) "" else " · $leg"
+    return "link: $kind · $age s · fails ${link.consecutiveFailures} · reprises ${link.reconnects}$tail"
 }
