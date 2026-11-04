@@ -138,17 +138,26 @@ class WsLiveHttpFallbackTest {
         assertEquals(9, http.liveCalls)
         assertTrue("aucun essai WS avant la re-sonde", transport.sent.isEmpty())
 
-        // 10e frame HTTP : re-sonde — le WS sert, le repli se décolle.
+        // 10e frame HTTP : re-sonde — le WS sert, mais un succès isolé ne
+        // décolle plus (hystérésis : 2 succès de suite exigés, anti-oscillation).
         val frame = client.live("QQ==", null, 640, 4).getOrThrow()
         assertEquals(512, frame.width)
         assertEquals(1, transport.sent.size)
         assertEquals("aucun POST pour la frame re-sondée", 9, http.liveCalls)
+        assertTrue("1 succès ne décolle pas", client.httpFallbackActive)
+
+        // 9 frames en POST direct, puis 2e re-sonde : 2e succès de suite, décolle.
+        repeat(9) { client.live("QQ==", null, 640, 4).getOrThrow() }
+        assertEquals(18, http.liveCalls)
+        client.live("QQ==", null, 640, 4).getOrThrow()
+        assertEquals(2, transport.sent.size)
+        assertEquals(18, http.liveCalls)
         assertFalse(client.httpFallbackActive)
 
         // La suivante repart direct en WS, sans POST.
         client.live("QQ==", null, 640, 4).getOrThrow()
-        assertEquals(2, transport.sent.size)
-        assertEquals(9, http.liveCalls)
+        assertEquals(3, transport.sent.size)
+        assertEquals(18, http.liveCalls)
         client.close()
     }
 
@@ -250,7 +259,8 @@ class WsLiveHttpFallbackTest {
 
     @Test
     fun `la politique sonde une frame sur N puis se decolle au succes`() {
-        val policy = WsHttpFallback(probeEvery = 3)
+        // unstickAfter = 1 : l'ancien décollement immédiat, verrouillé en chemin configuré.
+        val policy = WsHttpFallback(probeEvery = 3, unstickAfter = 1)
 
         assertTrue("jamais replié : WS direct", policy.routeWs())
         assertFalse(policy.active)
