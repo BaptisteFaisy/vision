@@ -78,7 +78,8 @@ qui **précède** le verdict (plus petit nombre = plus forte priorité, donc
   position : cadence SAM. Hystérésis gardée côté voix (le verdict ne bégaye pas).
 - Mouvement voiture : suivi client (association IoU, vitesse lissée,
   ego-motion fond + gyro) — une boîte qui suit la caméra (pan sur une
-  voiture garée) n'est pas un mouvement.
+  voiture garée) n'est pas un mouvement. Une voiture **prouvée garée**
+  (§ 19) sort du veto et du mouvement.
 
 ## 5. Proposition du mode (niveau 2)
 
@@ -128,3 +129,47 @@ venait de passer libérait le verdict aussitôt.
 - **preuves** : `NoLightCrossingTest` :core (silence avant 3 s, fenêtre
   rouverte par un danger, phrase calme qui ne rouvre pas). Le câblage
   :app (`NoLightCrossingVoice`, supprimé par la v4) n'est plus testé.
+
+## 19. Garée prouvée sur fenêtre : « Cross. » devant des voitures garées (04/11)
+
+Ordre user : sur la vidéo Samsung `20261104_101016` (2 vans garés, passage sans
+feu, téléphone à la main), l'app disait « Don't cross. » parce qu'elle voyait une
+voiture, alors qu'une voiture garée doit laisser dire « Cross. ».
+
+- **Cause** : rejeu des boîtes SAM réelles dans le vrai code : « Don't cross. »
+  44 frames sur 44, veto sur 43, « en mouvement » sur 11. La preuve d'arrêt du
+  veto se jouait sur **une paire de frames** (dérive sous 2 %/s, portée à 0,5 m),
+  sous le bruit réel : une garée filmée à la main tremble de 2 à 7 %/s d'une
+  frame à l'autre. Jamais prouvée immobile, elle bloquait à vie sous 15 m. Le
+  fond ne rattrapait rien : `BlockMotionSource` se tait sur les petits mouvements
+  (181 frames sur 182 sans signal sur ces vidéos). Et SAM rend `van`, `truck` et
+  `car` sur le même véhicule, avec des morceaux qui vont et viennent.
+- **Mesure** (5 vidéos Samsung, boîtes réelles, frames 320 px) : sur 1 s, en
+  médianes, une garée reste sous 0,06 image/s à 5 ips (0,09 au pire à 10 ips) ;
+  une voiture qui roule dépasse 0,4. Plus d'un ordre de grandeur d'écart, là où la paire de frames n'en
+  laissait aucun.
+- **Fait** : `ParkedProof` (`:core`) suit les **véhicules physiques** sur une
+  fenêtre glissante. Prouvée au bout de 600 ms et 4 vues : dérive ≤ 0,07 image/s,
+  taille tenue. Ce qu'elle prouve sort du veto (`TraverseVeto`) et du mouvement du
+  verdict (`CrossingVerdictEngine`, paramètre `parked`). Le guidage obstacles,
+  lui, garde l'objet proche.
+- **Sûreté** : la preuve **ne fait qu'exempter** ; tout ce qui n'est pas prouvé
+  garde le veto d'avant. Ne se prouvent jamais : une piste jeune, une dérive
+  au-dessus du seuil, une boîte qui grandit ou rétrécit, une boîte sans bord libre
+  (voiture qui entre dans le cadre ou le remplit), une boîte fixe sous pan rapide
+  (> 0,2 image/s). Une preuve tombe au-delà de 0,12 image/s (démarrage à
+  2 m/s² à 10 m : moins de 1,2 s) ou dès que la taille sort du bruit sur 3 s
+  (approche, même lente, sans se reprouver). Un deux-roues n'hérite jamais
+  de la preuve du véhicule qu'il croise.
+- **Limite assumée** : une voiture qui rampe (moins de ~1 m/s à 10 m, droit vers
+  la caméra) lit comme garée au début ; au sens de la voix, elle ne roule pas.
+  Une voiture à l'arrêt qui repart redevient « Don't cross. » avec moins d'une
+  seconde de retard, là où le veto la bloquait d'office.
+- **Faux feux** : le dos d'un panneau rond sortait en feu piéton (0,36 à 0,55) et
+  relançait 8 frames de « Don't cross. ». `SignLightVeto` écarte une boîte de feu
+  faible (< 0,6), inscrite dans un `sign` mieux noté, **sans lampe allumée** : une
+  lampe vue l'emporte toujours. Aucune frame de vrai feu perdue sur 186.
+- **Preuves** : `ParkedProofTest`, `TraverseVetoParkedTest`, `SignLightVetoTest`
+  (crops réels) et `CrossingParkedVideoTest` (vidéos réelles dans le vrai moteur :
+  garées → « Cross. », voiture qui passe ou traverse au loin → « Don't cross. »).
+  Fixtures : `app/src/test/resources/real-motion/samsung-*.json`.

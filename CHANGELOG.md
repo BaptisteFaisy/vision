@@ -14,6 +14,17 @@ livré et ses preuves (tâche, fichiers, chiffres) dans l'arbre.
   - Retire `holdCross` (#1186) : tenue en frames, elle ne couvrait pas la cause et retardait le vrai rouge.
 - **Preuves** : `docs/MESURES-FEU-TEMPOREL.md` § 7. À 100 ms : don't cross à tort 378/419 → 26/419, verts lus rouges 258 → 1, vrai rouge 3-86 ms (3-269 avec #1186). Tests `:core` 3 767 et `:app` 2 445 verts, `assembleDebug` vert, mutation : l'ancien calcul fait échouer le test sur crop réel.
 - **Reste** : recette rue. Aucune trace appareil de l'alternance (logcat Samsung vide sur la fenêtre) : la preuve vient de la caméra native à 60 ips, l'exposition de l'app peut différer.
+## 2026-11-04 — iSee : une voiture garée laisse dire « Cross. » (branche `fix/traversee-voiture-garee`)
+
+- **Demande** : « il ne réussit pas bien à faire la distinction entre voiture en mouvement et voiture garée […] il doit me dire de cross […] et là il me dit don't cross parce qu'il voit une voiture » (ordre user du 04/11/2026, vidéo Samsung `20261104_101016`).
+- **Cause racine** : mesurée en rejouant les boîtes SAM réelles dans le vrai code (44 frames sur 44 en « Don't cross. », veto sur 43, « en mouvement » sur 11) : la preuve d'arrêt du veto se joue sur une paire de frames, sous le bruit réel d'une prise à la main ; une garée n'était donc jamais prouvée et bloquait à vie sous 15 m. Détail : `docs/TRAVERSEE.md` § 19.
+- **Fait** :
+  - `ParkedProof` (`:core`, nouveau) : preuve « garée » sur fenêtre, par véhicule physique (600 ms, 0,07 image/s, taille sur 3 s) ; ne fait qu'exempter, le reste garde le veto d'avant.
+  - `TraverseVeto` : ce qui est prouvé sort du veto et de l'approche suivie ; `isParked` exposé. `CrossingVerdictEngine` : paramètre `parked`, ces voitures ne nourrissent plus le mouvement.
+  - `SignLightVeto` (`:core`, nouveau) + `crossingLightOf` : une boîte de feu faible dans un panneau mieux noté, sans lampe allumée, n'est plus un feu.
+- **Preuves** : vidéo `20261104_101016` rejouée dans le vrai moteur : « Cross. » dès 600 ms puis toutes les 2 s, plus aucun « Don't cross. » (5 ips, deux phases ; idem à 3,3 ips et en cadence irrégulière ; à 6,7 et 7 ips, seconde passe SAM comprise, un seul « Don't cross. » dans la première seconde, avant toute preuve). Témoins, rejoués aussi sur `master` non modifié à 7 cadences : voiture qui traverse au loin (`20261104_101521`) et voiture qui passe (`20261102_161053`) strictement identiques avant et après ; voiture qui passe à 2 m devant des garées (`20261102_160144`) : « Don't cross. » tenu pendant tout le passage. Tests : `ParkedProofTest`, `TraverseVetoParkedTest`, `SignLightVetoTest`, `CrossingParkedVideoTest`.
+- **Reste** : recette sur le Samsung après merge (l'émulateur segfaulte, qemu exit 139) ; sur `20261104_100943`, « Cross. » passe de 0 à 35 frames sur 45, mais un van qui entre dans le cadre et des morceaux le coupent encore brièvement. `BlockMotionSource` reste muet sur ces prises à la main : non traité ici.
+
 ## 2026-11-04 — iSee : la mort rapide lunettes nomme sa cause, le fatal ne rejoue plus (branche `fix-isee-lunettes-cause-retry`)
 
 - **Demande** : « il me dit glasses cut the sessions instantly sur mon xiaomi » (ordre user du 04/11/2026).
