@@ -2,6 +2,7 @@ package dev.sam3vision.app.isee
 
 import dev.sam3vision.core.crossing.CrossingPrompts
 import dev.sam3vision.core.crossing.CrossingState
+import dev.sam3vision.core.crossing.LightGhostGate
 import dev.sam3vision.core.crossing.CrossingVerdict
 import dev.sam3vision.core.distance.DistanceReading
 import dev.sam3vision.core.distance.KnownSizes
@@ -183,6 +184,28 @@ class CrossingSweepVideoTest {
             val steps = replay(name, light = ::unlitLight)
             assertEquals(name, emptyList<CrossingVerdict>(), steps.drop(2).map { it.verdict }.filter { it != CrossingVerdict.DontCross })
         }
+    }
+
+    @Test
+    fun `faux rouge du repli poteau sur 9 frames, sans feu - Cross tenu`() {
+        val steps = replay(fixed, light = { CrossingLight(null, CrossingState.Red) }, scene = { _, frame -> frame }).settled()
+        var frames = 0
+        val flicker = replay(fixed, light = {
+            frames += 1
+            val red = frames % 12 < 9
+            CrossingLight(if (red) listOf(0.4f, 0.1f, 0.5f, 0.2f) else null, CrossingState.Red, redProven = true, poleOnly = true)
+        }).settled()
+        assertEquals(steps.count { it.verdict == CrossingVerdict.Cross }, flicker.count { it.verdict == CrossingVerdict.Cross })
+    }
+
+    @Test
+    fun `vraie lampe sur un poteau, boite SAM ratee - Don't cross des qu elle a tenu`() {
+        val steps = replay(fixed, light = {
+            CrossingLight(listOf(0.4f, 0.1f, 0.5f, 0.2f), CrossingState.Red, redProven = true, poleOnly = true)
+        })
+        val held = steps.drop(LightGhostGate.POLE_CONFIRM_FRAMES - 1)
+        assertTrue(held.isNotEmpty())
+        assertTrue(held.all { it.verdict == CrossingVerdict.DontCross })
     }
 
     @Test

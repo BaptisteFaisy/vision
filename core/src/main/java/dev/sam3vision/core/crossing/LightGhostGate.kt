@@ -10,11 +10,14 @@ package dev.sam3vision.core.crossing
  * les frames (93 frames sur 93). Une boîte sans lampe lue doit donc tenir
  * [CONFIRM_FRAMES] frames de suite avant de compter.
  *
- * Une lampe lue compte tout de suite : un rouge vu reste un rouge. Le repli
- * haut-de-poteau passe ici comme les autres boîtes, avec sa vraie lecture : sur
- * le terrain du 04/11, 9 rafales de doute sur 10 venaient de lui, sans aucune
- * boîte SAM. Un feu confirmé garde l'asymétrie sûre : toute boîte qui revient reparle en une frame,
+ * Une lampe lue compte tout de suite : un rouge vu reste un rouge. Un feu
+ * confirmé garde l'asymétrie sûre : toute boîte qui revient reparle en une frame,
  * jusqu'à [FORGET_FRAMES] frames sans boîte ([LightEvidenceGate.ABSENT_REARM_FRAMES]).
+ *
+ * Le repli haut-de-poteau est à part : sans boîte de feu SAM, 2 % de pixels rouges
+ * dans le carré suffisent à y lire un rouge (feu arrière derrière le poteau). Sur
+ * le terrain du 04/11, sans aucun feu, il a tenu 9 frames de suite : seul, il doit
+ * en tenir [POLE_CONFIRM_FRAMES]. Une vraie lampe sur un poteau reste là et bloque.
  *
  * Pur Kotlin testé en JVM, aucune horloge.
  */
@@ -27,16 +30,18 @@ class LightGhostGate {
     /**
      * Avance d'une frame : vrai si la boîte de cette frame compte comme un feu.
      * [sawBox] dit si une boîte de feu a été lue, [lampRead] si elle porte une
-     * lampe lue sur ses pixels (rouge franc ou vert).
+     * lampe lue sur ses pixels (rouge franc ou vert), [poleOnly] si elle vient du
+     * seul repli haut-de-poteau : sa lampe lue ne vaut pas preuve.
      */
-    fun admits(sawBox: Boolean, lampRead: Boolean): Boolean {
+    fun admits(sawBox: Boolean, lampRead: Boolean, poleOnly: Boolean = false): Boolean {
         if (!sawBox) {
             onSilence()
             return false
         }
         streak += 1
         silentFrames = 0
-        if (lampRead || streak >= CONFIRM_FRAMES) confirmed = true
+        val proven = if (poleOnly) streak >= POLE_CONFIRM_FRAMES else lampRead || streak >= CONFIRM_FRAMES
+        if (proven) confirmed = true
         return confirmed
     }
 
@@ -55,6 +60,9 @@ class LightGhostGate {
     companion object {
         /** Frames de suite exigées d'une boîte sans lampe : les fantômes n'ont jamais dépassé 2. */
         const val CONFIRM_FRAMES = 3
+
+        /** Frames de suite exigées du seul repli haut-de-poteau : le faux rouge du terrain a tenu 9 frames. */
+        const val POLE_CONFIRM_FRAMES = 15
 
         /** Sans boîte depuis ce nombre de frames, le feu confirmé est oublié. */
         const val FORGET_FRAMES = LightEvidenceGate.ABSENT_REARM_FRAMES

@@ -20,6 +20,8 @@ data class CrossingLight(
     val rank: PedLampRank.Ranked? = null,
     /** Rouge franc lu sur [box]. Vrai sans mesure : un rouge non mesuré reste un rouge (sûr). */
     val redProven: Boolean = true,
+    /** Boîte du repli haut-de-poteau, sans boîte de feu SAM : 2 % de rouge y suffisent (feu arrière, panneau). */
+    val poleOnly: Boolean = false,
 )
 
 /**
@@ -35,6 +37,7 @@ private data class LightRead(
     val clip: ClipStats,
     val rank: PedLampRank.Ranked? = null,
     val redProven: Boolean = true,
+    val poleOnly: Boolean = false,
 )
 
 /**
@@ -64,7 +67,7 @@ internal fun crossingLightOf(
 ): CrossingLight {
     val read = readLightOf(frame, jpegB64, onCrop)
     LightExposureSignal.offer(read.box, read.clip)
-    return CrossingLight(read.box, read.state, read.rank, read.redProven)
+    return CrossingLight(read.box, read.state, read.rank, read.redProven, read.poleOnly)
 }
 
 /** Corps de [crossingLightOf], sans la publication (une seule sortie par frame au-dessus). */
@@ -138,5 +141,5 @@ private fun poleFallbackOf(
     }
     val verdict = PedLightGate.verdict(crop.argb, crop.width, crop.height)
     if (onCrop != null) onCrop(poleBox, crop, verdict)
-    return LightRead(poleBox, verdict, crop.clip, redProven = PedLightGate.hasRedLamp(crop.argb, crop.width, crop.height))
+    return LightRead(poleBox, verdict, crop.clip, redProven = PedLightGate.hasRedLamp(crop.argb, crop.width, crop.height), poleOnly = true)
 }

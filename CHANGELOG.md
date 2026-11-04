@@ -3,6 +3,13 @@
 Le journal part du 2026-10-26 après 19 h : le commit de départ, puis une entrée par fait
 livré et ses preuves (tâche, fichiers, chiffres) dans l'arbre.
 
+## 2026-11-04 — iSee : un haut de poteau seul ne crée plus un feu rouge en une frame (branche `fix/repli-poteau-preuve`)
+
+- **Demande** : « à la fin il n'y avait plus de voiture qui bougeait et il m'a dit don't cross ».
+- **Cause racine** : sans aucun feu, le repli haut-de-poteau lisait un rouge dès 2 % de pixels rouges. Terrain `1.0.1932` : aucun feu dans les 22 lignes `sonde`, mais 84 frames `Red` et 110 `Unknown` sur 265 bloquées, alors que les voitures étaient prouvées garées.
+- **Fait** : seul, le repli doit tenir 15 frames de suite. Boîte SAM immédiate, vert inchangé, feu confirmé prolongé par le repli. `ISEE_CROSS` dit la source (`poteau=`).
+- **Preuves** : faux rouge du terrain 9 frames au plus. `LightGhostGateTest`, `CrossingSweepVideoTest`, `docs/TRAVERSEE.md` § 21. Dans la rue : non mesuré.
+
 ## 2026-11-04 — iSee : le repli haut-de-poteau ne relance plus de faux doute (branche `fix/faux-feu-poteau`)
 
 - **Demande** : « il m'affiche encore don't cross alors qu'il y a des voitures à l'arrêt », sur le moment sans feu.
