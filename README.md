@@ -30,8 +30,8 @@ can follow along remotely, live, from their browser.
 
 > This repository (`BaptisteFaisy/vision`) carries the whole product: the Android
 > app, the segmenting GPU backend, and the companion page. This page describes
-> what the tree **actually ships**, re-checked on **04/11/2026** against
-> `origin/master` (`995c42223`). The tree counts in [Figures](#figures) are the
+> what the tree **actually ships**, re-checked on **04/11/2026** (evening) against
+> `origin/master` (`572e0d9c`). The tree counts in [Figures](#figures) are the
 > output of `python3 tools/count-tree.py`; measured figures elsewhere are dated
 > and marked as measurements, not as code guarantees.
 
@@ -40,9 +40,11 @@ can follow along remotely, live, from their browser.
 These are not marketing principles; they are the rules the app is tested against,
 written down after ten days of real walks with the phone and the glasses:
 
-1. **Safety is fail-closed.** A doubtful pedestrian light, an unreadable box, or a
-   missing box means **do not cross**. The app never trades a false green for
-   convenience.
+1. **A doubtful light means wait.** A doubtful pedestrian light or an unreadable lamp
+   means **do not cross**: the app never trades a false green for convenience. With
+   **no light in view** the rule is different, and it is not fail-closed: "Cross."
+   comes after 3 s without a moving car, so a red light the app never sees falls under
+   that rule ([known limits](#crossing-three-different-measurements-0204112026)).
 2. **Present tense only.** No announcement may describe something older than
    ~1.5 s ago. Buffered, timestamped, or queued phrases are dropped rather than
    spoken late.
@@ -88,7 +90,7 @@ iSee is built on Meta AI, end to end:
   (`core/src/main/java/dev/sam3vision/core/net/MetaImageClient.kt`,
   `core/src/main/java/dev/sam3vision/core/picto/PictoPrompt.kt`,
   `docs/META-IMAGE.md`).
-- **Glasses — Meta Wearables SDK** (`com.meta.wearable:mwdat` 1.0.0): camera and
+- **Glasses — Meta Wearables SDK** (`com.meta.wearable:mwdat` 1.0.1): camera and
   microphone on Ray-Ban Meta glasses (`docs/META-GLASSES.md`).
 
 ## The problem
@@ -173,7 +175,8 @@ primary interface:
   key is used or required**. Arrival is announced, but the arrival screen was
   removed on 04/11 — the app stays on the camera.
 - **Walking guidance** — "straight ahead" instructions, obstacles and crossings
-  announced by voice, stairs counted, curbs signalled
+  announced by voice, stairs counted, curbs signalled. Avoidance steers toward the
+  **widest free gap** among all obstacles, from 10 m (`WidestGap`, `ClearPath`)
   (`docs/GUIDAGE-TOUT-DROIT.md`, `docs/VOIX-DANGER.md`).
 - **Crossing mode (beta)** — **armed manually** (chip, or voice "traverser" /
   "crossing mode on"; "crossing mode off" stops it). It never arms itself. The
@@ -181,13 +184,14 @@ primary interface:
   and the car housing is vetoed by shape, so a green pedestrian figure is not
   overridden by the red car light next to it. A green is confirmed by a 3-of-5 sliding vote; without a
   light, the app says cross only after 3 s of continuous calm with no moving car.
-  Parked cars are exempt when the app can prove they are still (`docs/TRAVERSEE.md`).
+  Parked cars are exempt once proven still, even while the phone sweeps, and ghost
+  light boxes no longer block the verdict (`docs/TRAVERSEE.md` §19–21).
 - **Landmark pictograms** — film an object, Meta Muse Image (`muse-image-1.0`)
   redraws its photo as a black-on-yellow pictogram, stored directly (no caregiver
-  confirmation since 03/11), then recognised on live video on-device with no
+  confirmation since 01/11), then recognised on live video on-device with no
   network. Display is **XXL (54 % of the card width)** and rotated 90° clockwise
   since 04/11 (`docs/META-IMAGE.md`).
-- **Ray-Ban Meta glasses** — glasses camera and mic (DAT SDK 1.0.0), test bench
+- **Ray-Ban Meta glasses** — glasses camera and mic (DAT SDK 1.0.1), test bench
   built into the app (`docs/META-GLASSES.md`), live on the phone screen at a
   requested **24 fps, MEDIUM 504×896 H.265**, with automatic fallback to 15 fps /
   LOW when the link drops more than 5 % of frames.
@@ -199,7 +203,7 @@ primary interface:
 
 ## What changed since 02/11/2026
 
-The tree moved 268 commits and +16,226 / −3,920 lines in two days. The changes a
+The tree moved 340 commits and +26,183 / −5,023 lines in two days. The changes a
 README reader must know about:
 
 - **Live transport is no longer WebSocket-only.** If `/live/ws` cannot open,
@@ -220,9 +224,14 @@ README reader must know about:
 - **iSee UI**: rounded camera block, chips on one row, white system bar, wordmark
   removed, arrival screen and route spinner removed, pictograms ×2 and rotated.
 - **Crossing**: pedestrian-only prompts, car-housing veto, per-instance
-  moving/parked memory, "no light → cross after 3 s without a moving car".
+  moving/parked memory, "no light → cross after 3 s without a moving car". On 04/11,
+  field videos drove four more fixes: `ParkedProof`, `AnchorMotion`, `LightGhostGate`
+  and the pole-top fallback rules ([section C](#c-field-replay-on-real-videos-04112026-docstraverseemd-1921)).
+- **Guidance**: the side now comes from the widest free gap, for every voice, and the
+  left/right order starts at 10 m instead of 4 m. The fixed bias to the right is gone.
 - **Glasses**: H.265 decoder rewritten, session recovery, 24 fps / MEDIUM,
-  glasses photo sent to the LLM on the capture button.
+  glasses photo sent to the LLM on the capture button, SDK pin back on the runtime
+  (1.0.1).
 
 ## Repository contents
 
@@ -249,7 +258,7 @@ README reader must know about:
 | Data | Room 2.8.5 (KSP), WorkManager 2.12.0 (hourly capture purge), security-crypto 1.1.0, core-ktx 1.18.0, Guava 33.3.1-android (Room transitive pin) |
 | Network | OkHttp 4.12.0 (shared pools: base + live, one dispatcher each), `org.json` (shipped with Android; real `org.json` only in JVM tests), coroutines 1.10.2 |
 | Voice / audio | ElevenLabs (`eleven_v4_turbo` TTS, `scribe_v1` STT fallback), Meta ASR batch + realtime, jump3r 1.0.4 (pure-Java MP3 for the media cache); fixed clips are an **English-only pack** since 01/11 (`docs/VOICEPACK.md`) |
-| Glasses | Meta `mwdat-*` 1.0.0 (the only version served by the glasses), 24 fps request, MEDIUM 504×896 H.265, fallback 15 fps / LOW |
+| Glasses | Meta `mwdat-*` 1.0.1 (pinned to the runtime the glasses run), 24 fps request, MEDIUM 504×896 H.265, fallback 15 fps / LOW |
 | Map | MapLibre 13.7.1 (guidance screen, OSM raster tiles, `docs/CARTE-OSM.md`) |
 | Version | `versionName = 1.0.<commits>-<sha>`, `versionCode` = commit date (a stale APK cannot overwrite the phone) |
 
@@ -313,7 +322,7 @@ in `builds/<name>/…/app-debug.apk` there. The workstation debug keystore is au
 same one (`INSTALL_FAILED_UPDATE_INCOMPATIBLE` otherwise).
 
 ```bash
-./gradlew :core:testDebugUnitTest :app:testDebugUnitTest   # JVM tests (6,130 @Test: 3,735 + 2,395 — run in CI, never locally)
+./gradlew :core:testDebugUnitTest :app:testDebugUnitTest   # JVM tests (6,381 @Test: 3,913 + 2,468 — run in CI, never locally)
 ./gradlew :app:assembleDebug                               # debug APK (server build only, see above)
 python3 tools/check-kotlin-limits.py                       # file < 500 lines, function < 50 (Kotlin only)
 python3 tools/check-isee-design.py                         # mandatory Portrait design
@@ -324,7 +333,7 @@ python3 tools/check-masques.py                             # mask transport cont
 python3 tools/check-ws-runbook.py                          # WS budgets ↔ code
 bash scripts/test_scripts.sh                               # 230 shell tests
 node --test suivi-parent/test/*.test.mjs suivi-relais/test/*.test.mjs  # 69 tests
-python3 server/scripts/test_units.py                       # backend unit tests (960, stdlib stubs, no GPU)
+python3 server/scripts/test_units.py                       # backend unit tests (964, stdlib stubs, no GPU)
 bash scripts/build.sh                                      # assembleDebug --offline + APK check
 python3 tools/count-tree.py                                # the Figure table below
 ```
@@ -339,34 +348,35 @@ neither phone nor glasses runs on the `isee-sim` emulator with a video-file came
 
 ## Figures
 
-Measured on `origin/master` (`995c42223`), 04/11/2026 — `python3 tools/count-tree.py`
+Measured on `origin/master` (`572e0d9c`), 04/11/2026 — `python3 tools/count-tree.py`
 prints exactly this table (`--json` for scripts). The census is a script, not a habit:
 recopied numbers had drifted three times in one day.
 
 | Mesure | Valeur | Commande |
 |---|---|---|
-| Fichiers `.kt` | **1448** | `find . -name '*.kt' -not -path './.git/*' -not -path '*/build/*' \| wc -l` |
-| Lignes Kotlin | **189,969** | idem, `-exec cat {} + \| wc -l` |
-| Lignes de prod (`*/src/main`) | **93,915** — `:core` 297 f. / 41,047 l. · `:app` 415 f. / 52,868 l. | idem sous `core/src/main`, `app/src/main` |
-| `@Test` JVM | **6,130** — `:core` 3,735 · `:app` 2,395 | `grep -rho '@Test' core/src/test app/src/test --include='*.kt' \| wc -l` |
+| Fichiers `.kt` | **1480** | `find . -name '*.kt' -not -path './.git/*' -not -path '*/build/*' \| wc -l` |
+| Lignes Kotlin | **195,843** | idem, `-exec cat {} + \| wc -l` |
+| Lignes de prod (`*/src/main`) | **95,812** — `:core` 305 f. / 42,543 l. · `:app` 416 f. / 53,269 l. | idem sous `core/src/main`, `app/src/main` |
+| `@Test` JVM | **6,381** — `:core` 3,913 · `:app` 2,468 | `grep -rho '@Test' core/src/test app/src/test --include='*.kt' \| wc -l` |
 | Tests instrumentés | **10** (appareil requis) | idem sous `app/src/androidTest*` |
 | `@Preview` Compose | **11** | idem, `@Preview` |
-| Backend Python (`server/backend`) | **47** fichiers, **10,328** lignes | `find server/backend -name '*.py' \| wc -l` |
-| Tests backend | **960** OK (`test_units.py`) | `python3 server/scripts/test_units.py` |
+| Backend Python (`server/backend`) | **47** fichiers, **10,350** lignes | `find server/backend -name '*.py' \| wc -l` |
+| Tests backend | **964** OK (`test_units.py`) | `python3 server/scripts/test_units.py` |
 | Docs | **68** fichiers dans `docs/` | `ls docs/*.md \| wc -l` |
 | Workflows CI | **8** | `ls .github/workflows/*.yml \| wc -l` |
-| Plus gros fichier de prod | `app/src/main/java/dev/sam3vision/app/glasses/GlassesController.kt` — **499** lignes | `find core app -path '*/src/main/*' -name '*.kt' \| xargs wc -l \| sort -rn \| head` |
+| Plus gros fichier de prod | `app/src/main/java/dev/sam3vision/app/voicenav/VoiceNavEngineDriver.kt` — **499** lignes | `find core app -path '*/src/main/*' -name '*.kt' \| xargs wc -l \| sort -rn \| head` |
 
 Details (constants, budgets, thresholds) are in `docs/PERF.md`; recipes in
 `docs/TESTING.md`. The guards are green on this tree; Gradle tests are the only ones not
 replayed by the census (`docs/TESTING.md` §2 gives the recipe).
 
-## Crossing: two different measurements (02–03/11/2026)
+## Crossing: three different measurements (02–04/11/2026)
 
-Two test families exist and must not be mixed: **crop classification** (does the
-gate read this crop as red/green?) and the **end-to-end video benchmark** (what
-verdict does the whole pipeline emit over 146k consecutive frames?). Both are
-reported below.
+Three test families exist and must not be mixed: **crop classification** (does the
+gate read this crop as red/green?), the **end-to-end video benchmark** (what verdict
+does the whole pipeline emit over 146k consecutive frames?) and the **field replay**
+(does the real engine say the right word on a real scene?). All three are reported
+below.
 
 The earlier claim — *"`PedLightGate` says green 1 time out of 6 true green signals"* —
 was measured on **29/10** with `ELONGATION_MIN = 1.5`. That constant is **1.0 since
@@ -383,7 +393,7 @@ quoted as current.
 | French day-light set | **133/183 green = 72.7 %** (49 of the 50 misses are the *gate*, not the colour) | 02/11 |
 | Red crops | **1/473 read green = 0.21 %** | 02/11 |
 | Jittered 96 px crops | 201/240 = 83.8 %, but **22/40 red crops read green (55 %)** | 02/11 |
-| Sliding vote 3-of-5 | **370/400 greens, 15 false greens = 2.6 %**, 180 ms p50 | 02/11 |
+| Sliding vote 3-of-5 (980 simulated sequences) | **370/400 greens, 15/580 false greens = 2.6 %**, 180 ms p50 | 02/11 |
 
 **Safety is not carried by the colour gate alone.** On the jittered 96 px set, 22 of
 40 red crops can read green, so the shape veto (`CarHousingVeto`, housing h/w ≥ 3.0) and the
@@ -422,9 +432,36 @@ concepts, no masks and no depth. Verdicts are raw (no temporal smoothing); produ
 adds the 3-of-5 vote. Flicker has two proven mechanisms: `best_pick` alternating
 between two lights, and the colour gate flipping at ±4 px of framing.
 
-Known limits, stated rather than hidden: a crop that mixes both lamps is "wait"; two
-fully visible lights of ambiguous shape are resolved by the stream, not by one frame;
-the `1.0f` elongation is a traced debt (`docs/CALIBRAGE-FEU.md`).
+### C. Field replay on real videos (04/11/2026, `docs/TRAVERSEE.md` §19–21)
+
+Field sessions on 04/11 exposed the opposite failure: on a crossing with **no light**
+and parked vans, build `1.0.1926` said "Don't cross." 27 times in under 2 minutes. The
+real SAM boxes of those Samsung videos now replay in the real verdict engine
+(`CrossingParkedVideoTest`, `CrossingSweepVideoTest`).
+
+| Problem | Fix | Measured on replay |
+|---|---|---|
+| A hand-held parked car never proved still | `ParkedProof`: proof per physical vehicle on a sliding window (600 ms, 4 views) | Before: "Don't cross." on 44/44 frames. Parked cars stay under 0.06 image/s at 5 fps, moving cars exceed 0.4 |
+| Sweeping the phone read as car motion | `AnchorMotion`: camera motion read from the fixed objects SAM already returns (pole, sign, wall), no sensor | "Cross." 25 → 39 of 39 frames hand-held, 13 → 37 at 0.10 image/s, 3 → 37 at 0.20 image/s |
+| Ghost light boxes relaunched the doubt | `LightGhostGate`: a box with no lamp read must hold 3 frames in a row; a read lamp counts at once | Ghosts last 2 frames at most (scores 0.36–0.67), real lights are there on 93/93 frames |
+| The back of a round sign read as a light | `SignLightVeto` | No real-light frame lost out of 186 |
+| The pole-top fallback invented reds | Alone it must hold 15 frames; "Cross." stays silent on the frame a pole red is read and the next 2 | False red down to 9 frames at most |
+
+On the same replay, a car passing at 2 m or crossing far away still gives "Don't
+cross.". **None of these fixes has been measured in the street yet**: these are replays
+of field videos, not new field sessions.
+
+Known limits, stated rather than hidden:
+
+- A red light that neither SAM nor the pole fallback sees falls under the no-light rule,
+  so iSee can say "Cross." in front of it when no car moves.
+- A confirmed green says "Cross." even with moving cars, by design, and the verdict's
+  own vehicle test reads `car` labels only (`CrossingVerdict.kt`).
+- A car creeping straight at the camera (under ~1 m/s at 10 m) first reads as parked,
+  and a stopped car that pulls away returns "Don't cross." with less than 1 s of delay.
+- A crop that mixes both lamps is "wait"; two fully visible lights of ambiguous shape
+  are resolved by the stream, not by one frame; the `1.0f` elongation is a traced debt
+  (`docs/CALIBRAGE-FEU.md`).
 
 ## Glasses: current stream and the old measurement
 
@@ -442,9 +479,11 @@ treat the numbers as historical, not as a guarantee. Protocol:
 `docs/LUNETTES-RECETTE-TEL.md` §3/§7; verdict script:
 `scripts/parse_glasses_link.py`.
 
-The "glasses cut the session instantly" failure on Xiaomi was the SDK 1.0.1 vs runtime
-1.0.0 mismatch: the session started and died after ~70 ms with *"Your glasses need an
-update"*. The tree pins `mwdat` **1.0.0** (`DatPinTest` guards it). The
+The SDK must match the glasses runtime exactly, and the runtime moved. On 27/10 the
+glasses ran 1.0.0 and SDK 1.0.1 died after ~70 ms with *"Your glasses need an update"*.
+Since the Meta AI 296 wave and the mandatory update of 29/10 they run 1.0.1.x, and SDK
+1.0.0 is the one cut during the handshake (`SESSION_ENDED_BY_DEVICE`, measured 04/11).
+The tree pins `mwdat` **1.0.1** (`DatPinTest` guards it). The
 "glasses connected → GPU unreachable" failure was DNS: the glasses' internet-less Wi-Fi
 became the default route while sockets stayed on cellular, so `modal.run` resolution
 failed 14 times with no retry. `RoutedDns` + a single handover retry fixes it
@@ -456,13 +495,72 @@ failed 14 times with no retry. `RoutedDns` + a single handover retry fixes it
 |---|---|---|
 | Samsung end-to-end | **229 ms mean, 379 max**, N=2166 | 31/10, `parse_isee_lat.py` |
 | Redmi end-to-end | **343 ms mean, 722 max**, N=323 | 01/11, `parse_isee_lat.py` |
+| Samsung, field logcat | **260 ms median, 302 ms p90** | 04/11, 2 min, build `1.0.1930` |
 | Server SAM (benchmark AVANT) | p50 **46 ms**, p95 **53 ms** | 03/11, 58 videos / 146,569 frames |
 | Client pipeline (benchmark AVANT) | p50 **146.7 ms**, p95 **180.3 ms** | 03/11, same campaign |
 | R/V flips (benchmark AVANT) | **25.9 per 1000 frames** | 03/11, same campaign |
+| Avoidance, simulated walk at 5 Hz | contacts **12 → 5**, passes under 0.25 m **20 → 11** | 04/11, `WidestGap` vs previous `master`; at 1.5 Hz it regresses (contacts 4 → 6, 14 → 16). Not a street measure |
 | GPU A100-40GB EU | **$2.415/h**, ~$0.02 per boot | tariff, not re-checked |
 
 The product target is **300 ms mean / 500 ms max**. It is held on the Samsung
 measurement and **not held** on the Redmi one; do not generalise either number.
+
+## Partner technologies
+
+What each partner does in iSee, and what running it taught us.
+
+### Modal: the GPU
+
+Serves SAM 3.1 (`sam3-eu-a100`, A100-40GB, EU) and the Valhalla CPU routing.
+
+- **Wake-up** (`server/docs/LIVE-PERF.md`): weights baked into the image took
+  `load_seconds` from 32 s to 12–13 s, and a memory snapshot restores `/health` in
+  2.3–7.3 s. A container left to idle is frozen and thaws in 5.5–10.9 s, while
+  `POST /release` kills it and costs a 27.6 s full boot.
+- **GPU and region are configuration**: A100, H200 and B200 were compared by changing
+  a setting. A H200 cut server time from 406 to 245 ms and changed nothing on the phone
+  (`docs/LATENCE-BUDGET.md`): the bottleneck is the uplink and the queue, not the card.
+- **Fan-out**: benchmark AVANT ran 146,569 frames on 10 containers in ~56 min for ~$13.
+- **Scale to zero**: idle costs nothing; the A100 is $2.415/h, ~$0.02 per boot.
+- **Learned**: a snapshot holds no CUDA state, so loading is split across two `enter`
+  hooks (CPU, then GPU). A WebSocket holds a `max_inputs` slot for its whole life: an
+  unbounded send to a gone peer parks it forever, and new connections then wait at the
+  proxy with no 429, hence bounded sends and 8 slots (`ws_session.py`,
+  `live_app_fast.py`). Endpoint URLs carry the workspace name, so a workspace move
+  means migrating the URLs saved on installed phones (`SettingsSeed.kt`).
+
+### Baseten: the Meta LLM
+
+Hosts Muse Spark (`meta-models/muse-spark-open-1026`) behind
+`https://inference.baseten.co/v1`, for questions and live narration.
+
+- **OpenAI-compatible**: on 28/10 all LLM traffic moved over with a base URL, a model
+  and a key, on one client class (`HttpLlmClient`).
+- **Pass-through**: `chat_template_kwargs.enable_thinking=false` reaches the model, so
+  the 200-token narration budget goes entirely to the spoken sentence.
+- **Learned**: reasoning tokens count toward `max_tokens`. At 800, `/analyze` came back
+  empty (finish `length`, 29/10), so budgets are sized for reasoning. Base, model and
+  key must migrate together, or the old key reaches the new host and gets a 401
+  (`docs/CLES-DU-BUILD.md`).
+- **Also ported**: the SAM live service has a Baseten host config
+  (`server/backend/baseten/`). Modal stays the deployed host; the port is not measured.
+
+### Fireworks: the development pipeline
+
+Runs MiniMax M3.1 Flash for the CI agents that keep the merge queue moving: **885 PRs
+merged** between 26/10 and 04/11, at ~300 commits a day (`.github/fireworks/README.md`,
+`docs/CI-QUEUE.md`).
+
+- **Conflict agent** (`conflict_agent.py`): resolves rebase conflicts, finishes the
+  rebase and pushes with lease; it reported on 70 PRs.
+- **Scope agent** (`scope_agent.py`): writes the `## Scope` section from the diff, then
+  replays the real `couche0` guard on it before saving.
+- **Never a gate**: only green CI merges. Caps: 10 calls an hour, 3 per PR in 30 min,
+  240 s per run, nothing under `.github/`, and the model never sees a secret.
+- **Learned**: keep the model for what needs judgment. #215 was rebased six times on
+  `CHANGELOG.md` (29/10), one quota call each, until append-only journals got a
+  deterministic union. A pre-push rebase then cut the rest at the source: 24 % of PRs
+  arrived stale, and half of those ended in a ~15 min LLM loop.
 
 ## CI and merge queue
 
