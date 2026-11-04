@@ -19,7 +19,7 @@ import org.junit.Test
  * Bout-en-bout bordure→bus : le vrai [obstacleFrame] branché sur un
  * porte-parole faux — une bordure valide (label `curb`, ≤ 3 m, centre du
  * couloir, bas de boîte en bande basse) confirmée sur 2 frames poste au
- * niveau 5 (« Bordure détectée… ») ; des lectures qu'aucun guetteur ne
+ * niveau 6 (« Bordure détectée… ») ; des lectures qu'aucun guetteur ne
  * revendique restent muettes. La ligne diagnostique `CurbVoice` y résume
  * la frame.
  */
@@ -84,7 +84,7 @@ class ObstacleCurbVoiceTest {
     )
 
     @Test
-    fun `bordure confirmee sur 2 frames = postee niveau 5`() {
+    fun `bordure confirmee sur 2 frames = postee niveau 6`() {
         val guetteurs = ObstacleWatchers(CurbWatcher(), HazardWatcher())
 
         obstacleFrame(etat(frames = 1, listOf(bordure())), { SpeechLanguage.Fr }, guetteurs)
@@ -107,7 +107,7 @@ class ObstacleCurbVoiceTest {
     }
 
     @Test
-    fun `montee sous 1m confirmee = boucle curb up niveau 5 en clip`() {
+    fun `montee sous 1m confirmee = boucle curb up niveau 6 en clip`() {
         val guetteurs = ObstacleWatchers(CurbWatcher(), HazardWatcher())
 
         obstacleFrame(etat(frames = 1, listOf(bordure(0.8f))), { SpeechLanguage.Fr }, guetteurs)

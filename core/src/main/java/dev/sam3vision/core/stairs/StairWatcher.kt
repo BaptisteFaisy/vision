@@ -124,7 +124,7 @@ object StairText {
 }
 
 /**
- * Lissage temporel du [StairSignal] (SPEC v4 : escaliers niveau 6, jalons
+ * Lissage temporel du [StairSignal] (SPEC v4 : escaliers niveau 7, jalons
  * 2/1/0,5 m, nombre de marches dit, silence 2 s) : un positif isolé ne parle
  * pas, il faut [confirmFrames] positifs consécutifs, puis silence pendant
  * [cooldownMs].
@@ -485,7 +485,7 @@ class StairWatcher(
         const val REARM_MARGIN_METERS = 0.2f
 
         /** Niveau VoiceBus v4 : escaliers (jalons 2/1/0,5 + nombre de marches dit). */
-        const val LEVEL = 6
+        const val LEVEL = 7
 
         /** Clé AntiRepeat v4 : escaliers (2 s ; jalons : clé paramétrée `stairs:<palier>`). */
         const val KEY_STAIRS = "stairs"

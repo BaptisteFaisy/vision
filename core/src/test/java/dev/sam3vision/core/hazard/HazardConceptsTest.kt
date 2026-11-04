@@ -6,7 +6,7 @@ import org.junit.Assert.assertNull
 import org.junit.Assert.assertTrue
 import org.junit.Test
 
-/** Danger suivi : personne + mobilier FR/EN reconnus, le reste ignoré, le poteau parlé niveau 7. */
+/** Danger suivi : personne + mobilier FR/EN reconnus, le reste ignoré, le poteau parlé niveau 8. */
 class HazardConceptsTest {
 
     @Test

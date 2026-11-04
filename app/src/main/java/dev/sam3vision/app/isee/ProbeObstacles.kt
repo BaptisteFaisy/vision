@@ -64,7 +64,7 @@ internal fun LiveProbe.observeObstacles(
  * Une frame d'obstacles : les deux signaux relus dans l'état (lectures de
  * distance + dimensions, déjà publiées par frame), convertis en vœux
  * ([hazardWish], [curbWish] — mot d'évitement continu en clip immédiat,
- * humain niveau 2, poteau niveau 7 — et [curbUpWish] quand la boucle
+ * humain niveau 3, poteau niveau 8 — et [curbUpWish] quand la boucle
  * « curb up » est active, à la place du doux), arbitrés ([decideFrame])
  * puis proposés au bus ([offer]). `collect` séquentiel : une alerte
  * confirmée ne s'annule pas.
@@ -85,7 +85,7 @@ internal fun obstacleFrame(
     val hazardSignal = HazardSignal.of(readings, st.width, st.height)
     val hazardCue = watchers.hazard.onSignal(hazardSignal, nowMs, lang)
     if (BuildConfig.DEBUG) android.util.Log.d("HazardVoice", hazardVoiceLine(readings, hazardSignal, hazardCue?.phrase))
-    // Dedans : seule la personne parle (cran 2, le même que dehors) —
+    // Dedans : seule la personne parle (cran 3, le même que dehors) —
     // bordures, mobilier et 101/102 se taisent (le verdict 100, lui,
     // parle toujours en Traversée).
     val indoor = placeMode() == PictoPlaceMode.DEDANS

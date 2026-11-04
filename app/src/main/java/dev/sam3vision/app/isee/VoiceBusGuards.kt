@@ -10,16 +10,16 @@ import dev.sam3vision.core.stairs.StairCountVoice
  */
 
 /**
- * Bus bloqué sur des escaliers : niveau 6 en cours depuis plus de
+ * Bus bloqué sur des escaliers : niveau 7 en cours depuis plus de
  * [STAIRS_BUS_TTL_MS] sans parole acceptée (lecteur pendu, synthèse
  * jamais revenue — sinon chaque compte rafraîchit l'horodatage).
- * Sans cette garde, un niveau 6 orphelin tairait toute la voix,
+ * Sans cette garde, un niveau 7 orphelin tairait toute la voix,
  * les forts comme les doux. Pur, testé en JVM.
  */
 internal fun stairsBusStuck(activeLevel: Int, nowMs: Long, lastSayMs: Long): Boolean =
     activeLevel == OutdoorLevel.STAIRS && nowMs - lastSayMs > STAIRS_BUS_TTL_MS
 
-/** Silence maximal sous un niveau 6 (4 s : 4 comptes manqués, jamais en direct normal). */
+/** Silence maximal sous un niveau 7 (4 s : 4 comptes manqués, jamais en direct normal). */
 internal const val STAIRS_BUS_TTL_MS = 4_000L
 
 /** Fin des marches : 2 s sans compte accepté (2 cycles manqués, le compte bat à 1 s). */
@@ -84,13 +84,13 @@ internal fun VoiceBus.holds(level: Int, token: Long): Boolean =
     synchronized(this) { activeLevel == level && holdToken == token }
 
 /**
- * Vrai quand des escaliers parlent (niveau 6 en cours) : les producteurs
+ * Vrai quand des escaliers parlent (niveau 7 en cours) : les producteurs
  * s'y taisent en amont (sans consommer leur tour d'antirépétition —
  * offre et guetteurs directs) au lieu d'être jetés par `post`.
  */
 fun VoiceBus.stairsSpeaking(): Boolean = synchronized(this) { activeLevel == OutdoorLevel.STAIRS }
 
-/** Vrai quand une bordure parle (niveau 5) : la boucle « curb up » s'y tait en amont au lieu de se couper elle-même. */
+/** Vrai quand une bordure parle (niveau 6) : la boucle « curb up » s'y tait en amont au lieu de se couper elle-même. */
 fun VoiceBus.curbSpeaking(): Boolean = synchronized(this) { activeLevel == OutdoorLevel.CURB }
 
 /** Vrai quand un trottoir parle (niveau 10 absolu, § 45) : producteurs et GPS attendent sa fin. */

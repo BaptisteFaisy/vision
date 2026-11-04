@@ -29,7 +29,7 @@ private class CurbFakeSpeaker : VoiceBusSpeaker {
 
 /**
  * Bordure devant « droite » / « gauche » (ordre user du 02/11/2026) : la
- * bordure (niveau 5) attend la fin d'un mot de guidage en cours (manœuvre
+ * bordure (niveau 6) attend la fin d'un mot de guidage en cours (manœuvre
  * 11, rappel 3 — sans le couper depuis le 03/11) et n'est jamais coupée
  * par eux (ni par le repli 12). Les paliers 2 / 1 / 0,5 m sont couverts
  * côté cœur ([CurbWatcher.COUNTDOWN_METERS], `CurbAnnounceTest`).

@@ -3,7 +3,7 @@ package dev.sam3vision.core.hazard
 import dev.sam3vision.core.distance.KnownSizes
 
 /**
- * Concepts grillage (SPEC v4, niveau 4, moins de 6 m) : ce que SAM doit
+ * Concepts grillage (SPEC v4, niveau 5, moins de 6 m) : ce que SAM doit
  * suivre pour dire si la clôture qui barre le chemin est fermée ou ouverte
  * ([FenceOpeningSignal]) — clôtures, grillages et barrières. Le français
  * reste reconnu : « grillage » compte comme « fence ».

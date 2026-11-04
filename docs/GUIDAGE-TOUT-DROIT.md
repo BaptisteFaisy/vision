@@ -1,7 +1,7 @@
 # Guidage — spec v4 (contrat actuel)
 
 > **Spec v4, 01/11/2026.** Le guidage, c'est trois voix : le GPS (manœuvres
-> 11 + rappel 3, synthèse réseau), le rail trottoir (10, clips), et le
+> 11 + rappel 4, synthèse réseau), le rail trottoir (10, clips), et le
 > repli (12, clips). Les mots SAM/TwinLite (« gauche. », « Tout droit. »,
 > « obstacle, arrêtez-vous. »), le contournement chiffré et le stop ont
 > vécu : l'échelle 0 à 12 les remplace.
@@ -10,19 +10,19 @@
 ## 1. Le contrat, en une phrase
 
 Dire à voix haute **où mettre le prochain pas** — consigne GPS quand il y
-a un itinéraire (11), rappel de la consigne après 15 s de silence (3),
+a un itinéraire (11), rappel de la consigne après 15 s de silence (4),
 correction de dérive trottoir (10), et à défaut (rien à dire + silence
 300 ms) un repli gauche/droite/tout droit selon GPS + obstacles (12) —
 GPS en synthèse réseau, le reste en clips anglais, **jamais deux voix en
 même temps** (bus vocal, le plus petit gagne).
 
-## 2. GPS : manœuvres (11) et rappel (3)
+## 2. GPS : manœuvres (11) et rappel (4)
 
 - **Manœuvres et événements (11)** : le moteur Valhalla parle aux
   événements (préavis, ordre de virage, sortie de trace, recalcul,
   arrivée) par la voix réseau ElevenLabs. Une seule voix : GPS et
   obstacles partagent le même tuyau.
-- **Rappel (3)** : si **silence depuis 15 s ou plus**, répète la **dernière
+- **Rappel (4)** : si **silence depuis 15 s ou plus**, répète la **dernière
   consigne + la distance restante** (« … 50 meters remaining. », synthèse,
   anglais). Un événement moteur recale la cadence (le rappel se tait sur
   un fix qui a parlé). Sans consigne encore parlée : repli ligne droite
@@ -31,7 +31,7 @@ même temps** (bus vocal, le plus petit gagne).
   `gps-reminder` : sans délai).
 - Sans `routeBaseUrl` : pas de guidage (« Guidance unavailable. »), **pas
   de repli Google Maps** (supprimé).
-- En traversée : GPS muet (ni 11, ni 3). La parole du user (1) coupe la
+- En traversée : GPS muet (ni 11, ni 4). La parole du user (1) coupe la
   voix route ; seul le niveau 0 parle par-dessus.
 
 ## 3. Rail trottoir (10, comportement actuel)

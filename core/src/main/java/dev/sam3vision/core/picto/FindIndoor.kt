@@ -79,7 +79,7 @@ object FindIndoorLevels {
     const val USER = 1
 
     /** Humain dedans (autre mission, même cran que dehors). */
-    const val HUMAN = 2
+    const val HUMAN = 3
 
     /** Réponse chat (autre mission, même cran que dehors). */
     const val CHAT = 9

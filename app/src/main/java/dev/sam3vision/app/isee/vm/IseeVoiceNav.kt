@@ -56,7 +56,7 @@ class IseeVoiceNav(
     private val speak: suspend (String) -> Unit,
     /** Voix réseau (noms GPS dynamiques : exception ElevenLabs). */
     private val speakNetwork: suspend (String) -> Unit = speak,
-    /** Parole route (manœuvres niveau 11, rappel niveau 3 : postée au bus). */
+    /** Parole route (manœuvres niveau 11, rappel niveau 4 : postée au bus). */
     private val speakRoute: (suspend (phrase: String, level: Int) -> Unit)? = null,
     /** Coupe la parole route (fin de guidage). */
     private val stopRoute: () -> Unit = {},

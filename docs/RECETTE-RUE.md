@@ -13,7 +13,7 @@ jusqu'à la première prise.
 Chaîne : appui long iSee → dictée → routeur « mode … » (11 ordres, § 6 de
 `docs/VOIX-DANGER.md`) → question LLM sinon → moteur Valhalla in-app
 (`VoiceNavEngine` + `VoiceNavEngineDriver`, si `routeBaseUrl` renseignée)
-→ manœuvres (11) et rappels (3) par la voix réseau ElevenLabs ; obstacles
+→ manœuvres (11) et rappels (4) par la voix réseau ElevenLabs ; obstacles
 (0–8, 10, 12) en **clips anglais, zéro réseau**. **Jamais deux voix en
 même temps** (bus vocal : le plus petit niveau gagne, écrasé jeté).
 
@@ -22,20 +22,20 @@ même temps** (bus vocal : le plus petit niveau gagne, écrasé jeté).
 | Dictée ordre | « mode GPS … X » (FR : « je veux aller à X », lieu nu ; EN : « I want to go to X ») consommé avant le LLM, X transmis tel quel ; « mode GPS » seul → « Où aller ? » / « Where to? » ; tout le reste = question LLM | `DictationOrders`, `IseeDictationRouter` |
 | Confirmation | « Guidance started. » (clip `gps_started`) ; indisponible : « Guidance unavailable. » (`gps_unavailable`) | `IseeClipsEn` |
 | Voiture en mouvement | « Car. » / « Cars. » (< 20 m, présence seule, 4 s) | Niveau 0, `car` / `cars` |
-| Humain | « Person. » + cadran + distance (< 10 m, 2 s) ; ≤ 2 m : « Stop. » immédiat | Niveau 2 |
-| Poteau / lampadaire / panneau | « Pole. » / « Street lamp. » / « Sign. » (< 6 m, 2 s) | Niveau 7 |
-| Grillage / mur / barrière | « Fence. » / « Wall. » / « Barrier. » (< 6 m, 4 s) | Niveau 4 |
-| Bordure | « Curb up. » / « Curb down. » (< 6 m, 2 s) | Niveau 5 |
-| Escalier | Jalons « Stairs up/down, 4/2/1 meters. » (2 s) + marches (« Five. Steps. », 1 s, prioritaire — esquive au milieu) | Niveau 6 |
-| Animal / poubelle | « Animal. » / « Trash can. » (< 6 m, 2 s) | Niveau 7 divers |
-| Passage piéton | « Crosswalk. » (< 4 m au bord proche, joué < 500 ms, toutes les 2 s hors Traversée) / « left/right » (1 fois par vue), « Aligned with the crosswalk. » (au changement), « On the crosswalk. » (1 fois) | Niveau 8 |
+| Humain | « Person. » + cadran + distance (< 10 m, 2 s) ; ≤ 2 m : « Stop. » immédiat | Niveau 3 |
+| Poteau / lampadaire / panneau | « Pole. » / « Street lamp. » / « Sign. » (< 6 m, 2 s) | Niveau 8 |
+| Grillage / mur / barrière | « Fence. » / « Wall. » / « Barrier. » (< 6 m, 4 s) | Niveau 5 |
+| Bordure | « Curb up. » / « Curb down. » (< 6 m, 2 s) | Niveau 6 |
+| Escalier | Jalons « Stairs up/down, 4/2/1 meters. » (2 s) + marches (« Five. Steps. », 1 s, prioritaire — esquive au milieu) | Niveau 7 |
+| Animal / poubelle | « Animal. » / « Trash can. » (< 6 m, 2 s) | Niveau 8 divers |
+| Passage piéton | « Crosswalk. » (< 4 m au bord proche, joué < 500 ms, toutes les 2 s hors Traversée) / « left/right » (1 fois par vue), « Aligned with the crosswalk. » (au changement), « On the crosswalk. » (1 fois) | Niveau 2 |
 | Trottoir | « Sidewalk ahead/on the left/on the right. » (dérive seule, 10 s) | Niveau 10 |
 | Virage + obstacle | 0 chevauchement : manœuvre (11) et obstacle ne parlent jamais l'un sur l'autre (le plus petit gagne, écrasé jeté) | `VoiceBus` |
-| Traversée, préavis | « Crosswalk. » (niveau 8), jamais de « Straight. » au bord | Niveau 8 |
+| Traversée, préavis | « Crosswalk. » (niveau 2), jamais de « Straight. » au bord | Niveau 2 |
 | Traversée, mode | « Crossing mode on. » (`cross_on`), chat et GPS muets, dictée active | Niveaux 100-102 |
 | Traversée, verdict | « Cross. » / « Don't cross. » (3 s, changement immédiat) | Niveau 100 |
 | Traversée passée | « Crossing mode off. » (`cross_off`), le guidage reprend | Retour dehors |
-| Rappel GPS | Silence ≥ 15 s : dernière consigne + distance restante (synthèse) | Niveau 3 |
+| Rappel GPS | Silence ≥ 15 s : dernière consigne + distance restante (synthèse) | Niveau 4 |
 | Repli | Rien à dire + silence 300 ms : « Left. » / « Right. » / « Straight. » | Niveau 12 |
 | Arrivée | Une seule fois, moteur arrêté | Niveau 11 |
 | Interdits | Aucun « Bus… », « Bicycle… », « Motorcycle… », « Truck… » ; aucune clé dehors ; aucune borne, arbre, portail, bateau ; aucun passage par Google Maps ; aucune voix FR hors chat/GPS | Spec v4 § 0 |
