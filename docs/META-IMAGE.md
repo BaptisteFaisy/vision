@@ -35,6 +35,9 @@ fichier      : name="image"; filename="photo.jpg", image/jpeg, <octets JPEG 512 
   (`BadResponse` explicite, pas de second appel silencieux).
 - **Coût/latence** : ~0,01 $ par image (doc Meta, dépense non mesurée ici) ;
   latence ~10-15 s mesurée sur le téléphone le 2026-10-29 (2 générations live).
+- **Budget** : client picto dédié ([pictoHttpClient], pool partagé), 120 s en
+  lecture/écriture/appel global — une génération lente ne doit plus mourir à
+  60 s (`backend unreachable: timeout`, incident 2026-11-04).
 
 ## Erreurs : ce que voit l'utilisateur
 

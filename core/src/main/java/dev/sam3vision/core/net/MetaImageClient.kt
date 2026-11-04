@@ -21,7 +21,7 @@ class MetaImageClient(
     private val baseUrl: String,
     private val apiKey: String,
     private val model: String = IMAGE_MODEL,
-    private val http: OkHttpClient = defaultHttpClient(),
+    private val http: OkHttpClient = pictoHttpClient(),
 ) : PictoImageClient {
 
     override suspend fun editToPictogram(photoJpeg: ByteArray, hint: String): Result<ByteArray> {
@@ -67,5 +67,14 @@ class MetaImageClient(
 
     companion object {
         const val EDITS_PATH = "/images/edits"
+
+        /**
+         * Budget du client picto ([pictoHttpClient]) : 120 s en lecture,
+         * écriture et appel global (connect à 10 s, comme ailleurs). La
+         * génération Meta prend 10-15 s au nominal : le plafond historique
+         * de 60 s coupait les générations lentes (`backend unreachable:
+         * timeout`) tout en les facturant quand même côté serveur.
+         */
+        const val PICTO_TIMEOUT_SECONDS: Long = 120L
     }
 }

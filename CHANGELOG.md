@@ -3,6 +3,11 @@
 Le journal part du 2026-10-26 après 19 h : le commit de départ, puis une entrée par fait
 livré et ses preuves (tâche, fichiers, chiffres) dans l'arbre.
 
+## 2026-11-04 — iSee : le picto ne meurt plus à 60 s (branche `fix/picto-120s`)
+
+- **Cause racine** : `MetaImageClient` héritait du plafond global de 60 s ; une génération lente mourait en `backend unreachable: timeout`, facturée quand même côté serveur.
+- **Fait** : client picto dédié (`pictoHttpClient`, instance partagée), 120 s en lecture, écriture et appel global, connect à 10 s ; `docs/META-IMAGE.md`.
+- **Preuves** : test `client picto dedie budget 120 s et instance unique` ; génération réelle validée par le user sur le téléphone (04/11, build `picto-120s`) ; aucun autre plafond sur le chemin (`IseePicto` ne borne que la capture photo).
 ## 2026-11-04 — iSee : la décision suit le feu piéton, plus le tricolore ni le battement LED (branche `fix/cross-alternance-replay`)
 
 - **Demande** : « il me dit cross dont cross […] il devrait pas prendre en compte le feu tricolore » puis « il alterne entre cross et dont cross » (ordre user du 04/11/2026).

@@ -220,6 +220,20 @@ private val releaseSharedClient: OkHttpClient by lazy {
 fun releaseHttpClient(): OkHttpClient = releaseSharedClient
 
 /**
+ * Client **partagé** des pictogrammes (`POST /images/edits` Meta) : mêmes
+ * délais que [defaultHttpClient] pour 120 s — une génération lente (file
+ * d'attente ou réseau du téléphone lent, le nominal est déjà de 10-15 s)
+ * dépassait le plafond global de 60 s (`backend unreachable: timeout`).
+ * `newBuilder()` partage pool + dispatcher : le tunnel reste chaud.
+ */
+private val pictoSharedClient: OkHttpClient by lazy {
+    defaultHttpClient(MetaImageClient.PICTO_TIMEOUT_SECONDS)
+}
+
+/** Le client HTTP des pictos : **toujours le même** (pool, DNS, TLS partagés). */
+fun pictoHttpClient(): OkHttpClient = pictoSharedClient
+
+/**
  * Vide les pools des deux racines ([defaultHttpClient], [liveHttpClient]) : à
  * appeler quand [BackendRoute] bascule, sinon les connexions gardées (clé du
  * pool = hôte, pas fabrique) continueraient sur l'ancienne route. Les
