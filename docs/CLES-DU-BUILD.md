@@ -39,6 +39,11 @@ Exception : une base inutilisable (vide ou sans `https://`, LLM comme SAM, route
 ou dictée) n'est pas un choix — le build (à défaut le défaut du code, le preset
 de région, Maps ou Scribe selon le champ) reprend la main tout seul.
 
+Garde du banc téléphone : `scripts/install-phone-latest.sh` refuse de builder si
+`sam.base.url` / `sam.us.base.url` pointe un preset retiré (ancien workspace
+`baptiste-faisy`, `SamRegion.kt` : `RETIRED_PRESETS`) — vider la clé pour le
+preset `gaiamelie` vivant. Une URL manuelle hors preset reste acceptée (signalée).
+
 ## Modèles épinglés (démo)
 
 | Rôle | Base | Modèle |

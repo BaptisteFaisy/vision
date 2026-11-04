@@ -70,7 +70,7 @@ export JAVA_HOME=<un JDK 17 qui a javac> ANDROID_HOME=$HOME/android-sdk
 ./gradlew :app:assembleDebug --offline          # l'APK, banc lunettes inclus (plus de module dédié)
 bash scripts/build.sh                            # assembleDebug --offline (GRADLE_TIMEOUT, 600 s par défaut)
 python3 tools/check-kotlin-limits.py             # fichier < 500 l, fonction < 50 l
-bash scripts/test_scripts.sh                     # 177 tests
+bash scripts/test_scripts.sh                     # 230 tests
 python3 tools/check-voicepack.py                 # garde du pack voix (catalogue <-> code <-> MP3)
 python3 -m unittest tools/test_check_kotlin_limits.py tools/test_check_budget_derive.py tools/test_check_voice_nav_doc.py    # 58 tests
 python3 -m unittest tools/test_check_apk_keys.py tools/test_export_caregiver_orb.py    # 14 tests
@@ -184,7 +184,9 @@ cron le relance toutes les 10 minutes : `*/10 * * * * ~/bin/vision-phone-latest 
 `master`). Options : `--check` (rien n'est installé, sortie `0` = à jour / `3` = en retard /
 `2` = occupé), `--reinstall`, `--wait S`, `--init`, `--lock [motif]` (verrou manuel levé par
 `--unlock` ; `--hold` a été supprimé le 27/10). Le script ne prend jamais le verrou d'un autre
-agent : téléphone occupé = sortie `2`, le tour suivant réessaie.
+agent : téléphone occupé = sortie `2`, le tour suivant réessaie. Avant de builder, il refuse les
+presets SAM retirés (`sam.base.url` / `sam.us.base.url` sur l'ancien workspace `baptiste-faisy`) :
+vider la clé pour le preset `gaiamelie` vivant, puis relancer (`docs/CLES-DU-BUILD.md`).
 
 ## 4. Ce qui n'a jamais été rejoué sur appareil
 
@@ -308,7 +310,7 @@ le script jetable n'est pas versionné.
 
 - `tools/check-kotlin-limits.py` (heuristique accolades, faux positifs possibles) : **vert le
   01/11** sur cet arbre (1 356 fichiers `.kt`/`.kts`/`.py` inspectés, 0 dépassement).
-- `bash scripts/test_scripts.sh` : **177 tests, 177 ok**.
+- `bash scripts/test_scripts.sh` : **230 tests, 230 ok (mesuré le 04/11)**.
 - `python3 tools/check-voicepack.py` : **OK** (114 clips EN, 0 FR, 0 surplus).
 - Voix ElevenLabs sans clé : `VoiceAnnouncer.say()` rend `InvalidKey`
   (`app/VoiceAnnouncer.kt:32-33`), mais les bandeaux ignorent le résultat —

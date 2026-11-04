@@ -22,6 +22,12 @@
 #   - lie le fichier de clés de la machine (VISION_KEYS, défaut
 #     ~/.config/sam-vision/build-keys.properties) dans le miroir, sinon l'APK
 #     s'installerait sans clé ;
+#   - refuse de builder si `sam.base.url` / `sam.us.base.url` pointe un preset
+#     SAM retiré (ancien workspace baptiste-faisy) : vide = preset gaiamelie
+#     vivant (SamRegion.kt), URL manuelle hors preset = signalée, laissée telle
+#     quelle ; la valeur lue n'est jamais affichée ;
+#   - PHONE_SERIAL choisit le téléphone ET son verrou (état par appareil côté
+#     `~/bin/phone` : le Samsung ne prend plus le verrou du Redmi) ;
 #   - n'installe que du master ; `adb install -r -d` accepte un versionCode plus
 #     ancien qu'une build de mission déjà posée (les données de l'app restent).
 #
@@ -72,6 +78,29 @@ keys_build() {
         return 0
     fi
     ln -sfn "$keys" "$MIRROR/local.properties" || die "lien des clés impossible dans le miroir"
+}
+
+# keys_check_sam : refuse de builder sur des presets SAM retirés, AVANT Gradle.
+# Un `sam.base.url` / `sam.us.base.url` périmé (ancien workspace baptiste-faisy)
+# a déjà produit un APK qui appelle un backend mort (404 « invalid function
+# call ») : l'app migre au runtime (SamRegion.kt), mais le build est refusé ici
+# pour forcer le nettoyage des clés. Vide/absent = preset vivant gaiamelie par
+# défaut : accepté. URL manuelle ni vide ni preset (ex. boucle locale de test) :
+# acceptée, signalée. La valeur lue n'est JAMAIS affichée (ni stdout ni journal).
+keys_check_sam() {
+    local keys="${VISION_KEYS:-$HOME/.config/sam-vision/build-keys.properties}"
+    [ -f "$keys" ] || return 0
+    local k v
+    for k in sam.base.url sam.us.base.url; do
+        v="$(sed -n "s/^[ \t]*${k//./\\.}[ \t]*[=:][ \t]*//p" "$keys" | tail -1 | tr -d '\r' | sed 's/[ \t]*$//')"
+        [ -n "$v" ] || continue
+        case "$v" in
+            *baptiste-faisy--sam3-*)
+                die "$k : preset SAM retiré (ancien workspace baptiste-faisy) — vide la clé pour le preset gaiamelie vivant, puis relance" ;;
+            *gaiamelie--sam3-*-sam3live-web.*) ;;
+            *) say "$k : URL manuelle hors preset, laissée telle quelle" ;;
+        esac
+    done
 }
 
 # --- miroir de build (une fois) -------------------------------------------
@@ -179,6 +208,7 @@ if [ "$head_sha" != "$latest" ]; then
     short="${latest:0:7}"
 fi
 keys_build
+keys_check_sam
 say "build de $short dans le miroir…"
 
 # --- build (hors verrou : c'est long) --------------------------------------

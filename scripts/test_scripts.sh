@@ -183,6 +183,50 @@ expect_status 0 'install-phone-latest lie le fichier de cles de la machine'
 run grep -nE '(cat|echo|tee|printf|head|tail)[^#]*build-keys' "$LATEST"
 expect_nonzero 'le fichier de cles ne sort jamais du script'
 
+# --- 5 ter. install-phone-latest.sh : garde des presets SAM ----------------
+# Un dépôt git local joue GitHub : le script va jusqu'à la garde des clés,
+# puis échoue au build (miroir sans scripts/build.sh) — atteindre « build en
+# échec » prouve que la garde a laissé passer ; mourir avant prouve le refus.
+echo "== 5 ter. install-phone-latest.sh : garde des presets SAM =="
+mkdir -p "${TMP}/gitg"
+git init -q -b master "${TMP}/gitg/src"
+git -C "${TMP}/gitg/src" -c user.email=t@t -c user.name=t commit -q --allow-empty -m init
+git init -q --bare "${TMP}/gitg/origin.git"
+git -C "${TMP}/gitg/src" push -q "${TMP}/gitg/origin.git" master
+git clone -q "${TMP}/gitg/origin.git" "${TMP}/gitg/miroir"
+cat >"${TMP}/bin/phone" <<'STUB'
+#!/usr/bin/env bash
+printf '    versionName=1.0.0-0000000\n'
+exit 0
+STUB
+chmod +x "${TMP}/bin/phone"
+sam_env() { env VISION_MIRROR="${TMP}/gitg/miroir" VISION_PHONE_STATE="${TMP}/etat-sam" PHONE_BIN="${TMP}/bin/phone" VISION_KEYS="$1" bash "$LATEST"; }
+printf 'sam.base.url=https://baptiste-faisy--sam3-eu-a100-sam3live-web.eu-west.modal.run\n' >"${TMP}/cles-retirees.properties"
+run sam_env "${TMP}/cles-retirees.properties"
+expect_nonzero 'install-phone-latest refuse un preset SAM retire (EU)'
+expect_grep 'sam.base.url' 'le refus nomme la cle fautive'
+expect_grep 'retiré' 'le refus dit preset retire'
+expect_grep 'gaiamelie' 'le refus indique le preset vivant'
+run env KEYS_OUT="$OUT" bash -c 'printf "%s" "$KEYS_OUT" | grep -q "modal.run"'
+expect_nonzero 'le refus n affiche pas la valeur des cles'
+printf 'sam.us.base.url=https://baptiste-faisy--sam3-us-a100-sam3live-web.us-east.modal.run\n' >"${TMP}/cles-retirees-us.properties"
+run sam_env "${TMP}/cles-retirees-us.properties"
+expect_nonzero 'install-phone-latest refuse un preset SAM retire (US)'
+expect_grep 'sam.us.base.url' 'le refus US nomme la cle fautive'
+printf 'sam.base.url=https://gaiamelie--sam3-eu-a100-sam3live-web.eu-west.modal.run\n' >"${TMP}/cles-vivantes.properties"
+run sam_env "${TMP}/cles-vivantes.properties"
+expect_nonzero 'le preset vivant passe la garde (echec au build, sans Gradle)'
+expect_grep 'build en échec' 'le preset vivant atteint le build'
+printf '# sans sam\nllm.model=x\n' >"${TMP}/cles-vides.properties"
+run sam_env "${TMP}/cles-vides.properties"
+expect_grep 'build en échec' 'cles sans sam.base.url : la garde laisse passer (preset par defaut)'
+run sam_env "${TMP}/cles-absentes.properties"
+expect_grep 'build en échec' 'sans fichier de cles : la garde laisse passer'
+printf 'sam.base.url=http://127.0.0.1:8099\n' >"${TMP}/cles-manuelles.properties"
+run sam_env "${TMP}/cles-manuelles.properties"
+expect_grep 'build en échec' 'URL manuelle : la garde laisse passer'
+expect_grep 'hors preset' 'URL manuelle : la garde la signale'
+
 # --- 6. garde-fous statiques ----------------------------------------------
 echo "== 6. garde-fous statiques =="
 run grep -nE '(^|[^[:alnum:]_])eval[[:space:]]' "${SCRIPTS[@]}" "$LIB" "$GUARD"
