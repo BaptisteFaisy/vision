@@ -14,6 +14,7 @@ import androidx.compose.foundation.layout.asPaddingValues
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.offset
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.statusBars
 import androidx.compose.runtime.Composable
@@ -101,15 +102,17 @@ internal fun BoxWithConstraintsScope.PortraitCamera(
 
 /**
  * Rangée haut-centre de la rue : lieu, Traversée, pastille d'état (demande
- * user 2026-11-04). La pastille n'y est que caméra franchement ouverte
- * (même seuil que l'en-tête : pas de doublon pendant l'ouverture).
+ * user 2026-11-04). La pastille n'y est que caméra franchement ouverte (même
+ * seuil que l'en-tête : pas de doublon pendant l'ouverture). Écart resserré
+ * et rangée décalée à gauche (demande user 2026-11-04) : LISTENING, le mot
+ * le plus long de la pastille, garde sa ligne entière.
  */
 @Composable
 private fun BoxScope.ModeToggles(probe: LiveProbe, viewModel: IseeViewModel, mode: PictoPlaceMode, scene: IseeScene, open: Float) {
     // Chips chiffres : Traversée et lieu seuls, invisibles aux pixels.
     Row(
-        Modifier.align(Alignment.TopCenter).padding(top = 12.dp),
-        horizontalArrangement = Arrangement.spacedBy(8.dp),
+        Modifier.align(Alignment.TopCenter).padding(top = 12.dp).offset(x = -8.dp),
+        horizontalArrangement = Arrangement.spacedBy(4.dp),
     ) {
         PlaceModeChip(
             mode,
