@@ -3,6 +3,17 @@
 Le journal part du 2026-10-26 après 19 h : le commit de départ, puis une entrée par fait
 livré et ses preuves (tâche, fichiers, chiffres) dans l'arbre.
 
+## 2026-11-04 — iSee : la mort rapide lunettes nomme sa cause, le fatal ne rejoue plus (branche `fix-isee-lunettes-cause-retry`)
+
+- **Demande** : « il me dit glasses cut the sessions instantly sur mon xiaomi » (ordre user du 04/11/2026).
+- **Cause racine** : la session DAT meurt en moins de 2 s après création (coupure côté lunettes/SDK, cause exacte encore inconnue sans logcat) ; `settled()` écrasait le message causal par le générique « retrying », puis finissait sur un force-restart même quand la cause sue demandait un autre geste (mise à jour, Bluetooth…).
+- **Fait** :
+  - `GlassesSessionOpener` : mémorise la dernière erreur (`onSessionError`, l'écho `UNEXPECTED_ERROR` post-`STOPPED` n'écrase pas le causal) ; les essais nomment la cause ; les erreurs déterministes (`sessionErrorIsFatal` : DAT app à mettre à jour, SDK trop vieux, DWA indisponible) se disent sans essai ; fin de budget = message causal quand il est su, force-restart sinon.
+  - `GlassesMessages.sessionRetrying` : cause optionnelle (texte inchangé sans cause).
+  - `GlassesController` : le collecteur d'erreurs passe par l'ouvreur (1 ligne, le dit reste identique).
+- **Preuves** : 8 tests JVM nouveaux (séquence 3×retrying→refus, cause nommée, écho non-écrasant, fatal rapide+établi, reset `open()`, texte avec/sans cause, fatalité) — **non lancés ici** (pas de toolchain sur le poste, r630 injoignable le 04/11/2026) : la CI de la PR les lancera. Garde `check-kotlin-limits` OK (contrôleur 499/500).
+- **Reste** : recette téléphone + `logcat -s GlassesChain` pour la cause racine du cut (piste : état DAT/Meta AI du Xiaomi).
+
 ## 2026-11-04 — iSee : le passage piéton s'annonce à 4 m réels (branche `fix/crosswalk-annonce-4m`)
 
 - **Demande** : « je veux qu'il m'annonce plus tôt les passages piétons, donc
