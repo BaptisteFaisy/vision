@@ -5,6 +5,24 @@ import java.net.Socket
 import javax.net.SocketFactory
 
 /**
+ * Fenêtre de stabilité anti-flap : une valeur réseau qui ne tient pas 2 s
+ * (trou de handover, rappel système répété) n'est jamais publiée.
+ */
+const val STABLE_WINDOW_MS = 2_000L
+
+/**
+ * Suffixe cellulaire de la clé iface, **source unique** (l'ancienne copie
+ * vivait dans `AndroidNetworkState`, lue avec un `actif` d'une autre source).
+ */
+const val ROUTE_CELL_SUFFIX = "+cell"
+
+/**
+ * Marque atomique de la route : [active] + [version] lus d'un bloc sous le
+ * même moniteur ([BackendRoute.mark]) — jamais l'un sans l'autre.
+ */
+data class RouteMark(val active: Boolean, val version: Long)
+
+/**
  * Route cellulaire du trafic backend (correctif « perte 5G » + lunettes Meta).
  *
  * Le scénario : à l'association au Wi-Fi des lunettes (local, sans internet,
@@ -30,8 +48,9 @@ object BackendRoute {
     private var override: SocketFactory? = null
 
     /**
-     * Génération de la route : bumpée à chaque bascule effective. Les lecteurs
-     * qui échantillonnent (`iface` d'[NetworkState]) n'ont qu'à comparer.
+     * Génération de la route : bumpée à chaque bascule effective. Lue avec
+     * [mark] (jamais seule : actif + génération forment un tout) et composée
+     * dans la clé iface ([ifaceRouteKey]) : tout swap y change la clé.
      */
     @Volatile
     var version: Long = 0L
@@ -66,6 +85,13 @@ object BackendRoute {
         return true
     }
 
+    /**
+     * Marque atomique : actif + génération lus sous le même moniteur
+     * qu'[install] et [clear] — un swap entre les deux lectures est impossible.
+     */
+    @Synchronized
+    fun mark(): RouteMark = RouteMark(override != null, version)
+
     /** Fabrique en vigueur : l'imposée, sinon [fallback] (route par défaut). */
     internal fun current(fallback: SocketFactory): SocketFactory = override ?: fallback
 }
@@ -93,6 +119,70 @@ fun wantsCellularRoute(cellularUp: Boolean, defaultValidated: Boolean): Boolean 
  */
 fun sameCellularRouteInstalled(routeActive: Boolean, installedKey: String?, currentKey: String?): Boolean =
     routeActive && installedKey != null && installedKey == currentKey
+
+/**
+ * Tag de route : `+cell#r3` sur le cellulaire imposé, `#r4` sur la route par
+ * défaut. La génération rend **visible** tout swap effectif : deux marques
+ * différentes donnent deux tags différents — une réinstallation no-op (même
+ * fabrique, génération inchangée) garde le même tag.
+ *
+ * Pure, testée en JVM.
+ */
+fun routeTag(mark: RouteMark): String =
+    if (mark.active) "$ROUTE_CELL_SUFFIX#r${mark.version}" else "#r${mark.version}"
+
+/**
+ * Clé iface complète : base système (`wifi#109`) + tag de route. Le client du
+ * direct n'a qu'à comparer : un swap de route y change la clé et rouvre le
+ * socket — avant, la version bumpée n'était lue par personne et les pools
+ * drainés restaient seuls, sans reopen.
+ *
+ * Pure, testée en JVM.
+ */
+fun ifaceRouteKey(base: String, mark: RouteMark): String = base + routeTag(mark)
+
+/**
+ * Anti-flap paresseux : ne publie une valeur que si elle **dure**.
+ *
+ * - premier échantillon publié aussitôt (démarrage inchangé) ;
+ * - retour à la valeur stable avant la fenêtre : le flap est oublié (A-B-A
+ *   ne publie jamais B) ;
+ * - valeur durable : publiée au premier échantillon post-fenêtre, une fois ;
+ * - [fastPath] : court-circuit immédiat (le retour en ligne n'attend pas).
+ *
+ * Aucun thread, aucun minuteur : l'expiration est constatée à la lecture
+ * (l'horloge vient de l'appelant, monotone côté Android). `@Synchronized` :
+ * les callbacks système et la boucle de frames partagent une instance.
+ */
+class FlapGuard<T : Any>(
+    private val windowMs: Long = STABLE_WINDOW_MS,
+    private val fastPath: (candidate: T, stable: T) -> Boolean = { _, _ -> false },
+) {
+    private var stable: T? = null
+    private var pending: T? = null
+    private var pendingSinceMs = 0L
+
+    /** Échantillonne [candidate] à [nowMs] : rend la valeur stable publiée. */
+    @Synchronized
+    fun sample(candidate: T, nowMs: Long): T {
+        val current = stable ?: return publish(candidate)
+        if (candidate == current) {
+            pending = null
+            return current
+        }
+        if (fastPath(candidate, current)) return publish(candidate)
+        if (pending != candidate) pendingSinceMs = nowMs
+        pending = candidate
+        if (nowMs - pendingSinceMs >= windowMs) return publish(candidate)
+        return current
+    }
+
+    private fun publish(value: T): T {
+        stable = value
+        pending = null
+        return value
+    }
+}
 
 /**
  * Fabrique qui suit [BackendRoute] : chaque socket créé part sur la fabrique
