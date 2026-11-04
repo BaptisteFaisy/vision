@@ -7,10 +7,13 @@ import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.BoxScope
 import androidx.compose.foundation.layout.BoxWithConstraintsScope
+import androidx.compose.foundation.layout.WindowInsets
+import androidx.compose.foundation.layout.asPaddingValues
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.statusBars
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.remember
@@ -30,11 +33,11 @@ import dev.sam3vision.core.picto.PictoPlaceMode
 
 /**
  * La caméra du design « Portrait » : la rue est un bloc comme la carte (mêmes coins
- * 16 dp, même ombre, mêmes marges latérales 16 dp), 60 % de l'écran (70 % en
- * guidage), sans trait de séparation (le bord du bloc suffit) ; le voile haut est
- * conservé pour la pastille. À l'ouverture la rue arrive floue et un peu
- * agrandie, puis devient nette (mise au point). L'aperçu porte toujours les masques SAM et les
- * distances.
+ * 16 dp, même ombre, mêmes marges latérales 16 dp), sous le bandeau système
+ * blanc, 60 % de l'écran (70 % en guidage), sans trait de séparation (le bord
+ * du bloc suffit) ; le voile haut est conservé pour la pastille. À l'ouverture
+ * la rue arrive floue et un peu agrandie, puis devient nette (mise au point).
+ * L'aperçu porte toujours les masques SAM et les distances.
  *
  * Lunettes connectées ([showGlasses]) : la même rue montre le direct des lunettes à la
  * place de la caméra du téléphone — avec les mêmes masques, pastilles, flèche et debug,
@@ -62,10 +65,10 @@ internal fun BoxWithConstraintsScope.PortraitCamera(
     Box(
         Modifier
             .align(Alignment.TopCenter)
-            .padding(top = 8.dp)
+            .padding(top = cameraBlockTop(statusBarTopDp()))
             .padding(horizontal = IseeBlockSide)
             .fillMaxWidth()
-            .height(height)
+            .height(cameraBlockHeight(height, statusBarTopDp()))
             .shadow(6.dp, IseeBlockShape)
             .clip(IseeBlockShape)
             .background(Color(0xFF14161B))
@@ -166,6 +169,13 @@ private fun HeaderShade(modifier: Modifier) {
     }
     Box(modifier.background(shade))
 }
+
+/**
+ * Haut du bandeau système, pour caler le bloc caméra dessous : l'aperçu natif
+ * recouvrirait sinon le bandeau blanc et ses icônes (constaté sur appareil).
+ */
+@Composable
+private fun statusBarTopDp(): Dp = WindowInsets.statusBars.asPaddingValues().calculateTopPadding()
 
 /** L'ouverture de la caméra : 0 → 1 en 0,8 s quand elle s'allume, 1 → 0 en 0,7 s à la fin. */
 @Composable
