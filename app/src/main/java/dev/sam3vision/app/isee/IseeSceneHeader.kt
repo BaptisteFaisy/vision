@@ -11,6 +11,7 @@ import androidx.compose.runtime.Composable
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import dev.sam3vision.core.iseedesign.IseePortrait
@@ -30,7 +31,7 @@ internal fun Header(scene: IseeScene, onPicture: Boolean, modifier: Modifier = M
     }
 }
 
-/** Pastille d'état : bleu à l'écoute, ambre quand iSee parle, discrète sinon. */
+/** Pastille d'état : bleu à l'écoute, ambre quand iSee parle, discrète sinon. Toujours sur une ligne. */
 @Composable
 internal fun StatusChip(scene: IseeScene, onPicture: Boolean) {
     val (bg, fg) = when (scene) {
@@ -44,6 +45,8 @@ internal fun StatusChip(scene: IseeScene, onPicture: Boolean) {
         fontSize = 11.sp,
         fontWeight = FontWeight.ExtraBold,
         letterSpacing = 1.3.sp,
+        maxLines = 1,
+        overflow = TextOverflow.Ellipsis,
         modifier = Modifier.background(bg, RoundedCornerShape(50)).padding(horizontal = 14.dp, vertical = 7.dp),
     )
 }
