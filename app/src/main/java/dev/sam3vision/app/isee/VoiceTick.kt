@@ -50,13 +50,13 @@ internal object VoiceTick {
     /** Même (niveau, texte) : ne repart pas avant 1 s (le battement ne coupe jamais un clip en cours). */
     const val SAME_MS = 1_000L
 
-    /** Annonce escaliers (niveau 6, guetteur confirmatif). */
+    /** Annonce escaliers (niveau 7, guetteur confirmatif). */
     const val SRC_STAIRS = "stairs"
 
-    /** Compte des marches (niveau 6, battement 300 ms du compteur). */
+    /** Compte des marches (niveau 7, battement 300 ms du compteur). */
     const val SRC_STAIRS_COUNT = "stairs-count"
 
-    /** Grillage et pans suivis (niveau 4, guetteur confirmatif). */
+    /** Grillage et pans suivis (niveau 5, guetteur confirmatif). */
     const val SRC_FENCE = "fence"
 
     /** Trottoir nommé (niveau 10 absolu, § 45, guetteur confirmatif). */

@@ -73,13 +73,13 @@ class EchelleOverwriteTest {
     fun `niveaux dehors 0 a 12 dans l ordre de la spec`() {
         assertEquals(0, OutdoorLevel.CAR_MOVING)
         assertEquals(1, OutdoorLevel.USER_SPEECH)
-        assertEquals(2, OutdoorLevel.HUMAN)
-        assertEquals(3, OutdoorLevel.GPS_REMINDER)
-        assertEquals(4, OutdoorLevel.FENCE)
-        assertEquals(5, OutdoorLevel.CURB)
-        assertEquals(6, OutdoorLevel.STAIRS)
-        assertEquals(7, OutdoorLevel.POLE)
-        assertEquals(8, OutdoorLevel.CROSSWALK)
+        assertEquals(2, OutdoorLevel.CROSSWALK)
+        assertEquals(3, OutdoorLevel.HUMAN)
+        assertEquals(4, OutdoorLevel.GPS_REMINDER)
+        assertEquals(5, OutdoorLevel.FENCE)
+        assertEquals(6, OutdoorLevel.CURB)
+        assertEquals(7, OutdoorLevel.STAIRS)
+        assertEquals(8, OutdoorLevel.POLE)
         assertEquals(9, OutdoorLevel.CHAT)
         assertEquals(10, OutdoorLevel.SIDEWALK)
         assertEquals(11, OutdoorLevel.GPS_EVENT)
@@ -131,7 +131,7 @@ class EchelleOverwriteTest {
     // Vœux par guetteur.
 
     @Test
-    fun `personne douce niveau 2, mot imminent meme niveau en clip`() {
+    fun `personne douce niveau 3, mot imminent meme niveau en clip`() {
         val soft = hazardWish(HazardCue("Attention à la personne.", meters = 3f, kind = HazardKind.PERSON))
 
         assertEquals(OutdoorLevel.HUMAN, soft?.level)
@@ -148,7 +148,7 @@ class EchelleOverwriteTest {
     }
 
     @Test
-    fun `poteau mot continu niveau 7 en clip`() {
+    fun `poteau mot continu niveau 8 en clip`() {
         val pole = hazardWish(HazardCue("Droite.", meters = 9f, urgent = true, kind = HazardKind.POLE, level = OutdoorLevel.POLE, antiRepeatKey = AntiRepeat.KEY_POLE_AVOID))
 
         assertEquals(OutdoorLevel.POLE, pole?.level)
@@ -158,7 +158,7 @@ class EchelleOverwriteTest {
     }
 
     @Test
-    fun `barriere niveau 4, divers niveau 7`() {
+    fun `barriere niveau 5, divers niveau 8`() {
         assertEquals(
             OutdoorLevel.FENCE,
             hazardWish(HazardCue("Attention à la barrière.", meters = 2f, kind = HazardKind.BARRIER, level = OutdoorLevel.FENCE, antiRepeatKey = AntiRepeat.KEY_FENCE))?.level,
@@ -197,7 +197,7 @@ class EchelleOverwriteTest {
     }
 
     @Test
-    fun `bordure 5 dehors, 102 en traversee`() {
+    fun `bordure 6 dehors, 102 en traversee`() {
         val cue = CurbCue("Bordure détectée.", meters = 2f, tier = CurbTier.FAR)
 
         assertEquals(OutdoorLevel.CURB, curbWish(cue)?.level)
@@ -207,7 +207,7 @@ class EchelleOverwriteTest {
     }
 
     @Test
-    fun `lateral 8 dehors, 101 en traversee`() {
+    fun `lateral 2 dehors, 101 en traversee`() {
         assertEquals(OutdoorLevel.CROSSWALK, crossingLateralLevel(false))
         assertEquals(CrossingLevels.HUMAN, crossingLateralLevel(true))
     }
@@ -395,7 +395,7 @@ class EchelleOverwriteTest {
     )
 
     @Test
-    fun `personne postee niveau 2 en clip des la premiere frame`() = runTest {
+    fun `personne postee niveau 3 en clip des la premiere frame`() = runTest {
         val guetteurs = rig()
         val personne = lecture("person", 100f, 3f)
 
@@ -409,7 +409,7 @@ class EchelleOverwriteTest {
     }
 
     @Test
-    fun `poteau poste niveau 7 en clip des la premiere frame`() = runTest {
+    fun `poteau poste niveau 8 en clip des la premiere frame`() = runTest {
         val guetteurs = rig()
         val poteau = lecture("pole", 40f, 9f)
 
@@ -423,7 +423,7 @@ class EchelleOverwriteTest {
     }
 
     @Test
-    fun `personne imminente postee niveau 2 en clip des la premiere frame`() = runTest {
+    fun `personne imminente postee niveau 3 en clip des la premiere frame`() = runTest {
         val guetteurs = rig()
 
         obstacleFrame(etat(1, lecture("person", 200f, 1.5f)), { SpeechLanguage.Fr }, guetteurs)

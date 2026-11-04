@@ -27,10 +27,10 @@ private const val TAG_MUTE = "VoiceMute"
  * ([dev.sam3vision.core.live.AntiRepeat], côté producteurs) : le bus
  * n'arbitre que l'instant, et rend le tour de tout jeté.
  *
- * Les absolus restent absolus, sans couper : escaliers (niveau 6, §§ 42/44)
+ * Les absolus restent absolus, sans couper : escaliers (niveau 7, §§ 42/44)
  * et trottoir (niveau 10, § 45) prennent la place d'attente devant tous
  * (le trottoir devant les escaliers) et vont au bout, personne ne les en
- * déloge ; la bordure (niveau 5) passe devant un mot de guidage, pas
+ * déloge ; la bordure (niveau 6) passe devant un mot de guidage, pas
  * l'inverse. Périmée, la place se rend au lieu de se dire (compte : un
  * cycle ; autres : [PENDING_TTL_MS]).
  */
@@ -238,7 +238,7 @@ object VoiceBus {
     }
 
     /**
-     * Bordure (5) sur un mot de guidage en cours (manœuvre 11, rappel 3) :
+     * Bordure (6) sur un mot de guidage en cours (manœuvre 11, rappel 4) :
      * elle passe devant (même ordre — l'écrasement d'échelle ne s'applique
      * pas) : retenue, dite à la fin du mot, jamais par-dessus.
      */
@@ -246,7 +246,7 @@ object VoiceBus {
         level == OutdoorLevel.CURB && guidanceSpeaking()
 
     /**
-     * Poste une phrase escaliers (niveau 6) : parle au repos, sinon attend
+     * Poste une phrase escaliers (niveau 7) : parle au repos, sinon attend
      * en place unique (le plus récent l'emporte — §§ 42/44 : un compte ne
      * se coupe jamais lui-même, et depuis le 03/11 ne coupe plus les autres
      * non plus : il parle à la fin du mot). Rend vrai dans les deux cas :
@@ -264,7 +264,7 @@ object VoiceBus {
             // `lastStairsSayMs` seul : le chat attend la fin des marches, mais
             // `lastSayMs` reste celui de la dernière parole RÉELLE — sinon la
             // garde `stairsBusStuck` (4 s) ne pourrait plus jamais libérer un
-            // niveau 6 dont la fin de lecture s'est perdue.
+            // niveau 7 dont la fin de lecture s'est perdue.
             lastStairsSayMs = nowMs
             return retainWish(PendingWish(OutdoorLevel.STAIRS, text, clipId, clips, nowMs, antiRepeatKey))
         }

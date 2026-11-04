@@ -8,7 +8,7 @@ import org.junit.Test
 
 /**
  * Annonces escaliers : détection standard puis compte à rebours 2 / 1 /
- * 0,5 m (miroir `CurbAnnounceTest`) — phrases courtes, niveau 6, clés
+ * 0,5 m (miroir `CurbAnnounceTest`) — phrases courtes, niveau 7, clés
  * d'antirépétition par palier (`stairs:<palier>`).
  */
 class StairAnnounceTest {
@@ -25,7 +25,7 @@ class StairAnnounceTest {
         watcher.onSignal(positive(lineCount = 0), nowMs, SpeechLanguage.Fr, StairDirection.Up, null, meters)
 
     @Test
-    fun `compte a rebours 2 1 05 FR, niveau 6, cles par palier`() {
+    fun `compte a rebours 2 1 05 FR, niveau 7, cles par palier`() {
         val watcher = StairWatcher(confirmFrames = 2)
         val cues = mutableListOf<StairCue>()
 

@@ -105,7 +105,7 @@ class FenceOpeningWatcher(
         const val PASS_WIDTH_M = 2f * BODY_HALF_WIDTH_M + Guidance.SHOULDER_MARGIN_M
 
         /** Niveau VoiceBus v4 : grillages, murs et barrières (< 6 m). */
-        const val LEVEL = 4
+        const val LEVEL = 5
 
         /** Clé AntiRepeat v4 : grillages, murs et barrières (4 s). */
         const val KEY_FENCE = "fence"

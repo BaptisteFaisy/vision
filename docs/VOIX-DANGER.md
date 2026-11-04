@@ -25,19 +25,21 @@
 ## 1. Dehors : échelle 0 à 12
 
 Le plus petit nombre gagne (voir § 4). Phrases en anglais (clips), sauf
-chat (9) et GPS (3, 11) en synthèse réseau.
+chat (9) et GPS (4, 11) en synthèse réseau. Ordre user du 04/11 : le
+passage piéton passe premier des annonces (2) ; humains 3, rappel GPS 4,
+grillages/murs/barrières 5, bordures 6, escaliers 7, poteaux/divers 8.
 
 | Niveau | Quoi | Règle | Clip / voix |
 |---|---|---|---|
 | 0 | Voitures en mouvement < 20 m | Présence seule, **sans cadran ni distance** ; pluriel si plusieurs | `car` « Car. », `cars` « Cars. » |
 | 1 | Parole du user | Tait tout ; **seul 0 la coupe** | — (micro) |
-| 2 | Humains ≤ 15 m droit devant (plein axe ≤ 2 m) | **Mot d'évitement en continu** « Droite. »/« Gauche. », répété toutes les 300 ms (§ 36) | `guide_left`, `guide_right` |
-| 3 | Rappel GPS | Si silence depuis 15 s ou plus : répète la dernière consigne + distance restante | Synthèse réseau (GPS) |
-| 4 | Grillages + murs + barrières < 6 m | **Mot d'évitement en continu** « Droite. »/« Gauche. », répété toutes les 300 ms (§ 36) | `guide_left`, `guide_right` |
-| 5 | Bordures < 6 m | Montée **en face seule** (bande « midi », à côté = silence) / descente | `curb_up`, `curb_down` |
-| 6 | Escaliers | **Jalons 4 / 2 / 1 m** + **nombre de marches dit** | `stairs_up/down_4/2/1`, `n_1..12` + `stairs_steps` |
-| 7 | Poteaux + mobilier vertical + divers < 6 m (poteau ≤ 15 m droit devant) | **Mot d'évitement en continu** « Droite. »/« Gauche. », répété toutes les 300 ms (§ 36) | `guide_left`, `guide_right` |
-| 8 | Passages piétons < 4 m (bord proche, sol d'abord) | Annonce (**« Crosswalk. »**, joué < 500 ms à vitesse de base, toutes les 2 s hors Traversée ; 1 fois par vue sinon) + alignement **au changement** + arrivée **1 fois** | `crosswalk`, `crosswalk_aligned`, `cross_arrived` |
+| 2 | Passages piétons < 4 m (bord proche, sol d'abord) | Annonce (**« Crosswalk. »**, joué < 500 ms à vitesse de base, toutes les 2 s hors Traversée ; 1 fois par vue sinon) + alignement **au changement** + arrivée **1 fois** | `crosswalk`, `crosswalk_aligned`, `cross_arrived` |
+| 3 | Humains ≤ 15 m droit devant (plein axe ≤ 2 m) | **Mot d'évitement en continu** « Droite. »/« Gauche. », répété toutes les 300 ms (§ 36) | `guide_left`, `guide_right` |
+| 4 | Rappel GPS | Si silence depuis 15 s ou plus : répète la dernière consigne + distance restante | Synthèse réseau (GPS) |
+| 5 | Grillages + murs + barrières < 6 m | **Mot d'évitement en continu** « Droite. »/« Gauche. », répété toutes les 300 ms (§ 36) | `guide_left`, `guide_right` |
+| 6 | Bordures < 6 m | Montée **en face seule** (bande « midi », à côté = silence) / descente | `curb_up`, `curb_down` |
+| 7 | Escaliers | **Jalons 4 / 2 / 1 m** + **nombre de marches dit** | `stairs_up/down_4/2/1`, `n_1..12` + `stairs_steps` |
+| 8 | Poteaux + mobilier vertical + divers < 6 m (poteau ≤ 15 m droit devant) | **Mot d'évitement en continu** « Droite. »/« Gauche. », répété toutes les 300 ms (§ 36) | `guide_left`, `guide_right` |
 | 9 | Réponses du chat | **Attente + reprise depuis la coupure** (tranche interrompue rejouée) ; **seule file restante** | Synthèse réseau (chat) |
 | 10 | Trottoirs | **Absolu (§ 45)** : coupe tout, va au bout, seul le micro user passe devant ; **< 500 ms (§ 46)** : formes courtes lues en pastille 500 ms | `sidewalk_*_short` (nouveaux, `sidewalk_*` gardés pour le voicepack) |
 | 11 | GPS manœuvres et événements | Aux événements moteur | Synthèse réseau (GPS) |
@@ -52,7 +54,7 @@ Détail : `docs/TRAVERSEE.md`.
   sinon **« Cross. »**. Véhicules = **voiture uniquement** (bus, vélo,
   camion, moto ne tranchent jamais).
 - **101 humains** du passage + alignement passage (mot + annonce +
-  arrivée : niveau 8 dehors, 101 en Traversée), après le verdict.
+  arrivée : niveau 2 dehors, 101 en Traversée), après le verdict.
 - **102 bordures** du passage, après les humains.
 - **Dictée active** (les 11 ordres restent écoutés, `crossing off` compris).
 - **Chat et GPS muets** tant que le mode est actif (le chat reprend à la
@@ -67,7 +69,7 @@ Chaîne (la plus prioritaire gagne, même règle d'écrasement qu'au § 4) :
    humain, chaussettes. Résultats **en clips** (« Looking for » + objet,
    « Found. » + cadran).
 2. **Parole du user** (seul l'objet cherché la coupe, cran 0).
-3. **Humain** (même cran que dehors : 2).
+3. **Humain** (même cran que dehors : 3).
 4. **Chat** (même cran que dehors : 9, reprise depuis la coupure).
 5. **Porte et murs** (cran 13, le plus bas de la chaîne dedans).
 
@@ -93,22 +95,22 @@ une annonce avalée ne consomme pas son tour).
 | Clé | Niveau | Durée |
 |---|---|---|
 | `car-moving` | 0 voitures | 4 s |
-| `human-soft` | 2 humains | 2 s |
-| `human-imminent` | 2 mot humain continu 0-15 m | **immédiat** (toujours autorisé) |
-| `pole-avoid` | 7 mot poteau continu 0-15 m | **immédiat** (toujours autorisé, § 36) |
-| `wall-avoid` | 4 mot mur continu | **immédiat** (toujours autorisé, § 36) |
-| `fence-avoid` | 4 mot clôture/barrière continu | **immédiat** (toujours autorisé, § 36) |
-| `misc-avoid` | 7 mot divers continu | **immédiat** (toujours autorisé, § 36) |
-| `gps-reminder` | 3 rappel | sans antirépétition (le 15 s est le déclencheur, pas une fenêtre) |
+| `human-soft` | 3 humains | 2 s |
+| `human-imminent` | 3 mot humain continu 0-15 m | **immédiat** (toujours autorisé) |
+| `pole-avoid` | 8 mot poteau continu 0-15 m | **immédiat** (toujours autorisé, § 36) |
+| `wall-avoid` | 5 mot mur continu | **immédiat** (toujours autorisé, § 36) |
+| `fence-avoid` | 5 mot clôture/barrière continu | **immédiat** (toujours autorisé, § 36) |
+| `misc-avoid` | 8 mot divers continu | **immédiat** (toujours autorisé, § 36) |
+| `gps-reminder` | 4 rappel | sans antirépétition (le 15 s est le déclencheur, pas une fenêtre) |
 | `fence` | trou de grillage | 4 s (le doux dangers est supprimé, 03/11) |
-| `curb` | 5 bordures | 2 s |
-| `stairs` | 6 escaliers (annonce, jalons, montée) | 2 s |
-| `stairs-count` | 6 compte des marches | 1 s (§ 42, amende § 37) |
+| `curb` | 6 bordures | 2 s |
+| `stairs` | 7 escaliers (annonce, jalons, montée) | 2 s |
+| `stairs-count` | 7 compte des marches | 1 s (§ 42, amende § 37) |
 | `pole` | — (doux supprimé le 03/11) | 2 s (gardé pour compat de la table) |
 | `misc` | — (doux supprimé le 03/11) | 2 s (gardé pour compat de la table) |
-| `crosswalk-announce` | 8 annonce | **2 s** (« Crosswalk. » redit hors Traversée ; oubli explicite à la vue perdue) |
-| `crosswalk-align` | 8 alignement | **au changement** (l'appelant n'appelle que si ça change) |
-| `crosswalk-arrival` | 8 arrivée | **1 fois** |
+| `crosswalk-announce` | 2 annonce | **2 s** (« Crosswalk. » redit hors Traversée ; oubli explicite à la vue perdue) |
+| `crosswalk-align` | 2 alignement | **au changement** (l'appelant n'appelle que si ça change) |
+| `crosswalk-arrival` | 2 arrivée | **1 fois** |
 | `sidewalk` | 10 trottoirs | 10 s |
 | `verdict` / `verdict:état` | 100 verdict | **2 s, changement immédiat** (clé paramétrée : un état nouveau parle aussitôt) |
 | (aucune) | 9 chat | **aucune** (attente + reprise, pas de délai) |
@@ -225,10 +227,10 @@ côté où aller, en boucle — plus de doux « Attention … » depuis le
 
 - **mot continu** (`HazardWatcher.onContinuous`, dès la 1re frame — plus
   de confirmation, plus de cooldown, plus de ré-armement, plus de repli
-  `HazardAlt`) : personne (niveau 2, clé `human-imminent`), poteau
-  (niveau 7, clé `pole-avoid`, sorte `POLE`), mur (niveau 4, clé
-  `wall-avoid`), clôture/barrière (niveau 4, clé `fence-avoid`) et
-  divers (niveau 7, clé `misc-avoid`) disent « Droite. » / « Gauche. »
+  `HazardAlt`) : personne (niveau 3, clé `human-imminent`), poteau
+  (niveau 8, clé `pole-avoid`, sorte `POLE`), mur (niveau 5, clé
+  `wall-avoid`), clôture/barrière (niveau 5, clé `fence-avoid`) et
+  divers (niveau 8, clé `misc-avoid`) disent « Droite. » / « Gauche. »
   (`HazardText.avoidWord`, côté opposé, droite par défaut), répété
   toutes les 300 ms (`AVOID_REPEAT_MS`, immédiat au changement de mot),
   urgent, en clip `guide_*` via `hazardWish` ;
@@ -242,11 +244,11 @@ côté où aller, en boucle — plus de doux « Attention … » depuis le
   repli haut-de-poteau (`isPole`).
 
 Verrouillé par `HazardWatchTest` (mot 1re frame tous dangers proche
-et loin, niveaux 2/4/7, clés, répétition 300 ms, immédiat au changement,
+et loin, niveaux 3/5/8, clés, répétition 300 ms, immédiat au changement,
 sans cooldown ni ré-armement, barrière tue puis esquive au départ),
 `HazardConceptsTest` (sorte `POLE`), `SeuilsDehorsV4Test` (humain 9 m
 et poteau en continu), `EchelleOverwriteTest` (personne et poteau
-postés niveau 2/7 en clip dès la 1re frame), `AntiRepeatTest` +
+postés niveau 3/8 en clip dès la 1re frame), `AntiRepeatTest` +
 `IseeSpecV4AntiRepeatTest` (clé `pole-avoid` immédiate) et
 `ProbeHazardVoiceTest` (ligne sans repli). `check-kotlin-limits.py` et
 `check-voicepack.py` verts.
@@ -358,10 +360,10 @@ aucune coupure mid-mot — **non mesuré**, exige un APK sur appareil réel.
 Le user marche : l'annonce des marches (« Escalier montant. »,
 « 5 marches. », « Plus que N marches. », « Dernière marche. ») est coupée
 en pleine phrase par « Car. » — le niveau 0, re-posté à chaque frame,
-écrase le niveau 6 (écrasement pur du bus). Incompréhensible. Nouveau
+écrase le niveau 7 (écrasement pur du bus). Incompréhensible. Nouveau
 contrat : des escaliers en cours vont au bout.
 
-- **bus** : `VoiceBus.post` jette le niveau 0 pendant un niveau 6
+- **bus** : `VoiceBus.post` jette le niveau 0 pendant un niveau 7
   (`app/.../isee/VoiceBus.kt`) — seule exception à l'écrasement pur ;
   la Traversée (100+, déjà non préemptive sur 6 : `100 > 6`) attend
   aussi (chevauchement d'armement seul — en Traversée, les escaliers
@@ -452,27 +454,27 @@ que la voix doit dire — et au milieu de chaque seconde, l'esquive dit
 « gauche » / « droite » pour passer les gens. Deux écarts au contrat
 du matin (§ 37, § 40) : le compte se taisait dès qu'une esquive
 commençait (`stairsYieldToAvoidance`), et humains, grillages et
-bordures coupaient le niveau 6 en pleine phrase.
+bordures coupaient le niveau 7 en pleine phrase.
 
 - **cadence 1 s** : les deux portes du compte passent de 0,5 s à 1 s
   (`StairCountVoice.REPEAT_MS`, `AntiRepeat` clé `stairs-count` —
   le changement parle toujours aussitôt, clé paramétrée
   `stairs-count:<compte>`, battement 300 ms inchangé) : le compte
   suit chaque pas, l'esquive tient au milieu ;
-- **bus** : le niveau 6 coupe toute parole en cours (voitures,
+- **bus** : le niveau 7 coupe toute parole en cours (voitures,
   humains, bordures, chat compris) et va au bout, personne ne
   le coupe (`VoiceBus.post` — parole du user et mot de guidage
   en cours exceptés, § 41) ; garde anti-blocage (`stairsBusStuck`,
-  4 s : un niveau 6 orphelin ne tait plus jamais toute la voix) ;
+  4 s : un niveau 7 orphelin ne tait plus jamais toute la voix) ;
 - **boucle** : le compteur ne cède plus à l'esquive
   (`observeStairsCount` sans `stairsYieldToAvoidance`, gardé pour
   l'annonce seule) — l'esquive ne perd rien : mots continus
-  humains (niveau 2, sans antirépétition) et repli 12, re-postés
+  humains (niveau 3, sans antirépétition) et repli 12, re-postés
   en continu, parlent dans le silence entre deux comptes, jamais
   par-dessus ;
 - **audible** : synthèse rouverte pour tous sans clip (porte D-04
   tombée le matin même — le compte parle, cache voix : une synthèse
-  par compte et par session au plus), verrouillée pour le niveau 6
+  par compte et par session au plus), verrouillée pour le niveau 7
   par `MortsVoixV4Test` ;
 - **GPS mutuel** : une parole GPS en cours (rappel 3, manœuvre 11,
   jamais re-proposée) va au bout, le compte reprenant après — en
@@ -542,14 +544,14 @@ exige un APK sur appareil réel (preuves par `logcat`).
 
 Le user, dans l'escalier : « quand il détecte un escalier et qu'il doit dire
 le nombre de marches, il se coupe en permanence et donc n'arrive pas à dire
-le nombre de marches. » Le § 43 protégeait le niveau 6 de **tous les autres**
-niveaux, mais pas de lui-même : trois producteurs postent au niveau 6
+le nombre de marches. » Le § 43 protégeait le niveau 7 de **tous les autres**
+niveaux, mais pas de lui-même : trois producteurs postent au niveau 7
 (annonce `Escalier montant.` à 2 s, compte `N marches.` à 300 ms, battement
 700 ms), et chaque post refaisait `player.stop()` (`BusSpeaker.say`) —
 le compte changeait donc de phrase avant d'avoir fini la précédente.
 
-- **règle** : une phrase de niveau 6 en cours **n'est jamais interrompue par
-  une autre phrase de niveau 6**. La nouvelle est retenue dans une **place
+- **règle** : une phrase de niveau 7 en cours **n'est jamais interrompue par
+  une autre phrase de niveau 7**. La nouvelle est retenue dans une **place
   unique** (la plus récente écrase les précédentes), jouée à la fin de la
   phrase courante (`VoiceBus.onSpeechIdle`), et abandonnée si elle a plus de
   [1,5 s] (`STAIRS_PENDING_TTL_MS`) — un compte de l'image d'avant ne se dit
@@ -570,7 +572,7 @@ le compte changeait donc de phrase avant d'avoir fini la précédente.
   repostera le compte — au lieu de la dire par-dessus la raison de la
   coupe ;
 - **garde anti-blocage inchangée** : `stairsBusStuck` (4 s) rend le bus si un
-  niveau 6 orphelin ne parle plus.
+  niveau 7 orphelin ne parle plus.
 
 Verrouillé par `StairsUncuttableTest` (amendé : « escaliers re-détectés
 dernier gagnant **sans couper** » ; +4 : place unique dernier gagnant,

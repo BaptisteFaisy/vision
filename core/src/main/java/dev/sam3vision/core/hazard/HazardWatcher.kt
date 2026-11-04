@@ -265,13 +265,13 @@ class HazardWatcher {
         const val AVOID_REPEAT_MS = 300L
 
         /** Niveau VoiceBus v4 : humains (phrase + cadran + distance, imminent ≤ 2 m). */
-        const val LEVEL_PERSON = 2
+        const val LEVEL_PERSON = 3
 
         /** Niveau VoiceBus v4 : grillages, murs et barrières (< 6 m). */
-        const val LEVEL_FENCE = 4
+        const val LEVEL_FENCE = 5
 
         /** Niveau VoiceBus v4 : poteaux, mobilier vertical et divers (< 6 m). */
-        const val LEVEL_POLE = 7
+        const val LEVEL_POLE = 8
 
         /** Clé AntiRepeat v4 : personne douce (2 s). */
         const val KEY_HUMAN_SOFT = "human-soft"

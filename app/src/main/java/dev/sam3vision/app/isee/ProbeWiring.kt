@@ -184,7 +184,7 @@ internal fun LiveProbe.ensureConcept(settings: Settings, label: String, sensorLe
 
 /**
  * Voix parlée de la sonde (SPEC v4) : la dernière phrase décidée (`spoken`)
- * lue dans l'état. Le mot stop part niveau 4 (blocage, sous clé `fence`) ;
+ * lue dans l'état. Le mot stop part niveau 5 (blocage, sous clé `fence`) ;
  * les mots du guidage vont au repli 12 ([FallbackVoice]) ; les positions ne
  * parlent pas ici (niveaux 2 et 7). La parole du user passe par le bus
  * ([VoiceBus.userSpeaking], câblé au ViewModel), pas par un coupeur local.
@@ -225,7 +225,7 @@ internal fun LiveProbe.observeSpoken(
 }
 
 /**
- * Guetteur grillage de la sonde (SPEC v4, niveau 4) : les pans suivis lus
+ * Guetteur grillage de la sonde (SPEC v4, niveau 5) : les pans suivis lus
  * dans l'état, postés au bus avec le niveau et la clé du signalement, et rapportés au battement 700 ms ([VoiceTick]).
  * Coupé en mode Traversée (le verdict y est propriétaire du son).
  */

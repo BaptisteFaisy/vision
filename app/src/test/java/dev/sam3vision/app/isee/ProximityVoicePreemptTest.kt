@@ -41,9 +41,9 @@ class ProximityVoicePreemptTest {
     }
 
     @Test
-    fun `marches ne preemptent plus, niveau 6 ecrase`() {
-        assertEquals(6, arbitrate(listOf(6, 9, 10)))
-        assertEquals(2, arbitrate(listOf(2, 6)))
+    fun `marches ne preemptent plus, niveau 7 ecrase`() {
+        assertEquals(7, arbitrate(listOf(7, 9, 10)))
+        assertEquals(3, arbitrate(listOf(3, 7)))
     }
 
     @Test

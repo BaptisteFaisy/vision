@@ -27,7 +27,7 @@ private class StairsPriorityFakeSpeaker : VoiceBusSpeaker {
 
 /**
  * Escaliers devant « droite » / « gauche » (ordre user du 02/11/2026) : les
- * escaliers (niveau 6) coupent un mot de guidage en cours (manœuvre 11,
+ * escaliers (niveau 7) coupent un mot de guidage en cours (manœuvre 11,
  * rappel 3, comme la bordure) et ne sont jamais coupés par eux (ni par le
  * repli 12). Les paliers 2 / 1 / 0,5 m sont couverts côté cœur
  * ([StairWatcher.COUNTDOWN_METERS], `StairAnnounceTest`).

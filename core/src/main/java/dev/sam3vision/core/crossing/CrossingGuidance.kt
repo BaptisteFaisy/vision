@@ -67,7 +67,7 @@ object CrossingGuidance {
     const val CROSSWALK_MIN_BOTTOM = 0.5f
 
     /** Niveau VoiceBus v4 : passages piétons (annonce < 4 m, guidage < 6 m, 3 couches). */
-    const val LEVEL = 8
+    const val LEVEL = 2
 
     /** Clé AntiRepeat v4 : alignement vers le passage (au changement). */
     const val KEY_ALIGN = "crosswalk-align"
