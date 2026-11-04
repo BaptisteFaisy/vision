@@ -100,4 +100,15 @@ class MetaImageClientTest {
             server.close()
         }
     }
+
+    @Test
+    fun `client picto dedie budget 120 s et instance unique`() {
+        assertEquals(120L, MetaImageClient.PICTO_TIMEOUT_SECONDS)
+        val client = pictoHttpClient()
+        assertEquals(10_000, client.connectTimeoutMillis)
+        assertEquals(120_000, client.readTimeoutMillis)
+        assertEquals(120_000, client.writeTimeoutMillis)
+        assertEquals(120_000, client.callTimeoutMillis)
+        assertTrue(pictoHttpClient() === client)
+    }
 }
