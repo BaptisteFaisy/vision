@@ -442,7 +442,7 @@ real SAM boxes of those Samsung videos now replay in the real verdict engine
 | Problem | Fix | Measured on replay |
 |---|---|---|
 | A hand-held parked car never proved still | `ParkedProof`: proof per physical vehicle on a sliding window (600 ms, 4 views) | Before: "Don't cross." on 44/44 frames. Parked cars stay under 0.06 image/s at 5 fps, moving cars exceed 0.4 |
-| Sweeping the phone read as car motion | `AnchorMotion`: camera motion read from the fixed objects SAM already returns (pole, sign, wall), no sensor | "Cross." 25 → 39 of 39 frames hand-held, 13 → 37 at 0.10 image/s, 3 → 37 at 0.20 image/s |
+| Sweeping the phone read as car motion | `AnchorMotion`: camera motion read from the fixed objects SAM already returns (pole, sign, wall), no sensor | "Cross." 25 → 39 of 39 frames hand-held; sweep simulated by re-cropping the video: 13 → 37 at 0.10 image/s, 3 → 37 at 0.20 image/s |
 | Ghost light boxes relaunched the doubt | `LightGhostGate`: a box with no lamp read must hold 3 frames in a row; a read lamp counts at once | Ghosts last 2 frames at most (scores 0.36–0.67), real lights are there on 93/93 frames |
 | The back of a round sign read as a light | `SignLightVeto` | No real-light frame lost out of 186 |
 | The pole-top fallback invented reds | Alone it must hold 15 frames; "Cross." stays silent on the frame a pole red is read and the next 2 | False red down to 9 frames at most |
