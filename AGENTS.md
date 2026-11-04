@@ -120,7 +120,24 @@ export JAVA_HOME=~/toolchains/jdk17 ANDROID_HOME=$HOME/android-sdk
 python3 tools/check-kotlin-limits.py            # garde-fou tailles (§3.1)
 ```
 
-Ce sont les chemins de **cette** machine (r630) : le JDK 17 est dans `~/toolchains/jdk17`, le
+**Machine de build : le r630, jamais le poste local.** Les commandes Gradle
+ci-dessus ne tournent qu'en session ouverte **sur** le r630 (utilisateur
+`baptiste`, `~/bin/sam3-gpu` présent). Depuis tout autre poste (ex. Chromebook
+`penguin`), `./gradlew` en local est interdit, même pour « juste un test
+rapide » : builds et tests JVM passent par le build serveur (`tar|ssh`, clés
+de `local.properties` transmises, jamais `.git`) :
+
+```bash
+timeout 280 tools/r630-build.sh <worktree> ":core:testDebugUnitTest :app:testDebugUnitTest assembleDebug"
+python3 tools/check-kotlin-limits.py            # local, sans Gradle (§3.1)
+```
+
+Prérequis : `ssh -o BatchMode=yes "${BUILD_SERVER:-baptiste@100.124.18.48}" true`
+vert (clé autorisée côté serveur, voir `tools/r630-build.sh`) ; si rouge,
+demander à l'utilisateur au lieu de replier sur Gradle local. Mesuré le
+04/11/2026 : `:app:assembleDebug` en 1 min 8 s, cache Gradle serveur réutilisé.
+
+Ces chemins sont ceux du **r630** : le JDK 17 est dans `~/toolchains/jdk17`, le
 SDK Android dans `~/android-sdk`. **Aucun chemin en dur dans le dépôt** : la chaîne d'outils
 vient de `JAVA_HOME` / `ANDROID_HOME` (§3.3).
 
