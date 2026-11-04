@@ -32,6 +32,7 @@ import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.ImageBitmap
 import androidx.compose.ui.graphics.asImageBitmap
+import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.layout.onGloballyPositioned
 import androidx.compose.ui.text.font.FontWeight
@@ -51,9 +52,10 @@ private val PICTO_YELLOW = Color(0xFFFFD600)
 /**
  * Les objets reconnus, dessinés sur la vidéo : chaque pictogramme est
  * dessiné à taille fixe ([PictoSize.DEFAULT], carré centré sur l'objet
- * reconnu) dans un cadre jaune — jamais à la taille du rectangle reconnu,
- * qui varie avec la distance. Plusieurs objets reconnus : plusieurs
- * pictos, chacun à la même taille. Rien d'autre : ni nom, ni carte
+ * reconnu), pivote de 90° vers la droite, dans un cadre jaune — jamais à
+ * la taille du rectangle reconnu, qui varie avec la distance. Plusieurs
+ * objets reconnus : plusieurs pictos, chacun à la même taille. Rien
+ * d'autre : ni nom, ni carte
  * « en grand ». Posée après les pastilles de distance, comme
  * [SteeringLayer]. Rien de composé sans reconnaissance — la vidéo reste
  * nette le reste du temps.
@@ -82,7 +84,12 @@ internal fun PictoLayer(hits: List<PictoHit>, pngOf: (String) -> ByteArray?, mod
                 ) {
                     val bitmap = image
                     if (bitmap != null) {
-                        Image(bitmap, contentDescription = hit.label, modifier = Modifier.fillMaxSize(), contentScale = ContentScale.Fit)
+                        Image(
+                            bitmap,
+                            contentDescription = hit.label,
+                            modifier = Modifier.fillMaxSize().graphicsLayer { rotationZ = 90f },
+                            contentScale = ContentScale.Fit,
+                        )
                     } else {
                         Text(hit.label, color = PICTO_YELLOW, fontSize = 10.sp, fontWeight = FontWeight.Bold)
                     }

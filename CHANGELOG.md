@@ -17,6 +17,21 @@ livré et ses preuves (tâche, fichiers, chiffres) dans l'arbre.
     `docs/ISEE-DESIGN-PORTRAIT.md` à jour.
 - **Preuves** : gardes `check-isee-design` + `check-kotlin-limits` OK ;
   CI PR #1145 verte (run 41757611877, `ci-core` + `ci-app`).
+## 2026-11-04 — Pictos : taille d'affichage doublée, pivotés 90° vers la droite (branche `picto-double-taille-rotation`)
+
+- **Demande** : quand un picto s'affiche, l'afficher à x2 sa taille actuelle,
+  et pivoter les pictos de 90° vers la droite (ordre user du 04/11/2026).
+- **Fait** :
+  - `core/picto/PictoSizes.kt` : taille affichée `M` (27 %) → `XXL` (54 %,
+    le double de M) ; `withFixedSize` inchangé (centre + bornes réutilisés).
+  - `isee/PictoLayer.kt` (iSee) + `app/PictoOverlay.kt` (Direct) : image
+    pivote 90° sens horaire (`rotationZ`) ; `BIG_PICTO_SIZE` 176 → 352 dp.
+  - `suivi-parent/styles.css` : vignettes 56 → 112 px, `rotate(90deg)`,
+    retour à la ligne (`flex-wrap`).
+  - `PictoSizesTest` : défaut XXL 54 %, panel XS→XXL, défaut = 2×M figé.
+- **Preuves** : gardes `check-kotlin-limits` + `check-isee-design` OK ;
+  `PictoSizesTest` 6/6 OK en local (Gradle offline, JDK 17 du poste) ;
+  page proche 36/36 OK (`node --test`). CI : non jouée (pas de PR).
 
 ## 2026-11-04 — iSee : phrase sans label locuteur, puces lieu et Traversée en rangée (branche `isee-puces-ligne-sans-label`)
 
