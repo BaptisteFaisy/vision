@@ -50,7 +50,7 @@ class CrosswalkFirstTest {
     }
 
     @Test
-    fun `frame : le passage bat tous les autres niveaux de la scene`() {
+    fun `frame le passage bat tous les autres niveaux de la scene`() {
         val winner = decideFrame(
             listOf(
                 VoiceWish(OutdoorLevel.HUMAN, "personne", AntiRepeat.KEY_HUMAN_SOFT),
@@ -68,7 +68,7 @@ class CrosswalkFirstTest {
     }
 
     @Test
-    fun `bus : le passage retenu parle avant l humain retenu`() {
+    fun `bus le passage retenu parle avant l humain retenu`() {
         speaker.idleValue = false
         VoiceBus.chatSpeaking(true)
         VoiceBus.post(OutdoorLevel.HUMAN, "personne")
@@ -86,7 +86,7 @@ class CrosswalkFirstTest {
     }
 
     @Test
-    fun `parole user : le passage se tait et garde son tour`() {
+    fun `parole user le passage se tait et garde son tour`() {
         assertTrue(AntiRepeat.allow(AntiRepeat.KEY_CROSSWALK_ANNOUNCE, System.currentTimeMillis()))
 
         VoiceBus.userSpeaking(true)
