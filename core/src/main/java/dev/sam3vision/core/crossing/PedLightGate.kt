@@ -49,8 +49,19 @@ object PedLightGate {
     /** Le vert ne doit pas être confiné en haut (bruit sur un rouge). */
     const val GREEN_BOTTOM_MIN = 0.35f
 
-    /** Rouge franc toléré avec un vert (au-delà : signal mélangé, doute). */
+    /**
+     * Rouge franc toléré avec un vert (au-delà : signal mélangé, doute —
+     * sauf disque rouge disjoint d'un bonhomme vert, voir [redVetoes]).
+     */
     const val RED_MAX_FRACTION = 0.02f
+
+    /**
+     * Partage bonhomme/disque du remplissage d'une tache (04/11) : un
+     * bonhomme est troué (0,09-0,16 mesurés), un disque est plein (0,75-0,88,
+     * voir `WIDE_FILL_MAX`) — 0,50 tombe dans le vide. Sert [redVetoes] à
+     * attribuer les lampes d'un crop mixte, dans les deux couleurs.
+     */
+    private const val LAMP_FILL_SPLIT = 0.50f
 
     /**
      * Vert minimal dans le cadre (en dessous : reflet ou bruit). Partagé
@@ -185,7 +196,7 @@ object PedLightGate {
         val scan = scan(argb, width, height, mask)
         val total = argb.size.toFloat()
         if (scan.green / total < GREEN_MIN_FRACTION) return false
-        if (scan.red / total >= RED_MAX_FRACTION) return false
+        if (redVetoes(scan, total)) return false
         val boxWidth = scan.maxX - scan.minX + 1
         val boxHeight = scan.maxY - scan.minY + 1
         if (boxHeight < BBOX_MIN_PX) return false
@@ -201,6 +212,44 @@ object PedLightGate {
         if (bottomFraction <= R1B_BOTTOM_FLOOR) return false
         // R1b : quasi-raté de la garde bas — la forme du nuage tranche.
         return acceptShaped(argb, width, height)
+    }
+
+    /**
+     * Vrai si le rouge du crop interdit le vert : au plancher [RED_MAX_FRACTION],
+     * sauf autre lampe — un disque rouge disjoint d'un bonhomme vert est le
+     * tricolore voisin, pas un signal mélangé (ordre user du 04/11 : vert
+     * piéton + rouge tricolore = go). Asymétrique, par construction : un
+     * disque vert disjoint d'un bonhomme rouge reste vetoé (miroir sûr), deux
+     * bonhommes aussi (feu en panne), et tout recouvrement doute.
+     */
+    private fun redVetoes(scan: Scan, total: Float): Boolean {
+        if (scan.red / total < RED_MAX_FRACTION) return false
+        return !separateCarLamp(scan)
+    }
+
+    /**
+     * Vrai si le rouge est une lampe voiture à part : boîtes rouge et verte
+     * disjointes (aucun pixel commun), vert troué comme un bonhomme, rouge
+     * plein comme un disque ([LAMP_FILL_SPLIT] des deux côtés). Fractions
+     * seules, invariantes à l'échelle.
+     */
+    private fun separateCarLamp(scan: Scan): Boolean {
+        if (scan.green <= 0 || scan.red <= 0) return false
+        if (scan.maxX < scan.redMinX || scan.redMaxX < scan.minX) return manAndDisk(scan)
+        if (scan.maxY < scan.redMinY || scan.redMaxY < scan.minY) return manAndDisk(scan)
+        return false
+    }
+
+    /**
+     * Vert troué (bonhomme) et rouge plein (disque) : l'attribution qui lève
+     * le veto — appelée boîtes disjointes, sinon le veto tient.
+     */
+    private fun manAndDisk(scan: Scan): Boolean {
+        val greenArea = (scan.maxX - scan.minX + 1) * (scan.maxY - scan.minY + 1)
+        val redArea = (scan.redMaxX - scan.redMinX + 1) * (scan.redMaxY - scan.redMinY + 1)
+        if (greenArea <= 0 || redArea <= 0) return false
+        if (scan.green.toFloat() / greenArea >= LAMP_FILL_SPLIT) return false
+        return scan.red.toFloat() / redArea > LAMP_FILL_SPLIT
     }
 
     /** R1b : nuage vert allongé, avec de l'intérieur, masse non entassée en haut. */
@@ -279,6 +328,10 @@ object PedLightGate {
             val projection = PedLightColor.projectionOf(pixel)
             if (isRedSide(projection)) {
                 scan.red += 1
+                scan.redMinX = minOf(scan.redMinX, index % width)
+                scan.redMaxX = maxOf(scan.redMaxX, index % width)
+                scan.redMinY = minOf(scan.redMinY, index / width)
+                scan.redMaxY = maxOf(scan.redMaxY, index / width)
             } else if (isGreenSide(projection)) {
                 scan.green += 1
                 if (mask != null) mask[index] = true
@@ -377,7 +430,7 @@ object PedLightGate {
         return cursor
     }
 
-    /** Compteurs du balayage, boîte du vert en coordonnées pixels. */
+    /** Compteurs du balayage, boîtes du vert et du rouge en coordonnées pixels. */
     private class Scan(
         var green: Int = 0,
         var greenBottom: Int = 0,
@@ -386,5 +439,9 @@ object PedLightGate {
         var maxX: Int = Int.MIN_VALUE,
         var minY: Int = Int.MAX_VALUE,
         var maxY: Int = Int.MIN_VALUE,
+        var redMinX: Int = Int.MAX_VALUE,
+        var redMaxX: Int = Int.MIN_VALUE,
+        var redMinY: Int = Int.MAX_VALUE,
+        var redMaxY: Int = Int.MIN_VALUE,
     )
 }
