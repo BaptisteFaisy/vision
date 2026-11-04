@@ -179,11 +179,23 @@ internal fun healSamManual(loaded: Settings): Settings =
     if (loaded.samBaseUrl.isNotBlank() && !isUsableHttpUrl(loaded.samBaseUrl)) loaded.copy(samBaseUrl = "") else loaded
 
 /**
- * Auto-réparation : une base itinéraire inutilisable n'a jamais été un choix — le
- * build reprend la main, à défaut le vide qui rend le guidage à Maps.
+ * Ancien workspace Modal, désactivé : tout `/route` y répond 404 « workspace … is
+ * disabled ». Son URL, ancien défaut du build, reste persistée sur les téléphones
+ * installés avant gaiamelie (même migration que [SamRegion.isPreset] pour SAM).
+ */
+private const val RETIRED_ROUTE_PREFIX = "https://baptiste-faisy--"
+
+private fun isRetiredRoute(url: String): Boolean =
+    url.trim().startsWith(RETIRED_ROUTE_PREFIX, ignoreCase = true)
+
+/**
+ * Auto-réparation : une base itinéraire inutilisable ou sur le workspace retiré n'a
+ * jamais été un choix — le build reprend la main, à défaut le vide qui rend le
+ * guidage à Maps.
  */
 internal fun healRoute(loaded: Settings, build: BuildDefaults): Settings {
-    if (loaded.routeBaseUrl.isBlank() || isUsableHttpUrl(loaded.routeBaseUrl)) return loaded
+    val url = loaded.routeBaseUrl
+    if (url.isBlank() || (isUsableHttpUrl(url) && !isRetiredRoute(url))) return loaded
     val base = build.routeBaseUrl.takeIf { isUsableHttpUrl(it) } ?: ""
     return loaded.copy(routeBaseUrl = base)
 }
