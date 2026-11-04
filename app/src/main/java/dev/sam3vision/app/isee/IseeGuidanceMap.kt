@@ -67,7 +67,9 @@ internal fun BoxWithConstraintsScope.SceneGuidanceLayer(
     orb: @Composable () -> Unit,
 ) {
     val navState by viewModel.voiceNavState.collectAsState()
-    val placed = Modifier.align(Alignment.BottomCenter).padding(bottom = navInsetDp() + 10.dp).padding(horizontal = 16.dp)
+    // Carte légèrement abaissée (demande user 2026-11-04) : 8 dp au-dessus de
+    // l'inset — l'ombre 6 dp de la carte ne touche pas les boutons système.
+    val placed = Modifier.align(Alignment.BottomCenter).padding(bottom = navInsetDp() + 8.dp).padding(horizontal = 16.dp)
     when (val nav = navState) {
         is VoiceNavUiState.Guiding -> {
             // L'orb décide : transcript, phrase seule, ou boule et phrase.
