@@ -110,7 +110,7 @@ private fun BoxWithConstraintsScope.PortraitScene(
     val geo = remember(density, width, height, open, guidance) {
         with(density) { portraitGeometry(width.toPx(), (height - bottom).toPx(), open, 1f, guidance) }
     }
-    with(density) { PortraitCamera(state, glue, probe, viewModel, open, geo.pictureH.toDp(), showGlasses, layers.glassesGhost) }
+    with(density) { PortraitCamera(state, glue, probe, viewModel, open, geo.pictureH.toDp(), showGlasses, layers.glassesGhost, view.scene) }
     GlassesProbeLayer(state, viewModel.probe, glassesLive, glassesStreaming, guidance)
     Header(view.scene, onPicture = open > 0.5f, modifier = Modifier.fillMaxWidth())
     // navState est collecté plus haut : la taille de la rue en dépend.

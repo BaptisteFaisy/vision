@@ -10,8 +10,9 @@
 ## 1. Ce que l'écran montre
 
 - **Fond blanc**, plein écran. En-tête : pastille d'état seule (wordmark
-  « iSee » retiré le 2026-11-03 sur demande user), en blanc sur la rue
-  quand la caméra est ouverte, en encre sinon ; bandeau blanc derrière
+  « iSee » retiré le 2026-11-03 sur demande user), en haut à droite ;
+  caméra ouverte, elle rejoint la rangée des puces (lieu, Traversée, état),
+  en blanc sur la rue ; bandeau blanc derrière
   les boutons système du bas. Le bandeau système du haut (heure, batterie,
   notifications) est blanc lui aussi, aux icônes sombres, sans ligne noire
   (blanc demandé le 2026-11-04 : la barre n'est plus cachée sur iSee,
