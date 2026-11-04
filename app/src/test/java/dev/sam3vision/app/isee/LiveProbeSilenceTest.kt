@@ -3,6 +3,7 @@ package dev.sam3vision.app.isee
 import dev.sam3vision.core.model.LiveFrame
 import kotlinx.coroutines.test.advanceUntilIdle
 import kotlinx.coroutines.test.runTest
+import org.junit.After
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
 import org.junit.Assert.assertTrue
@@ -15,6 +16,10 @@ import org.junit.Test
  * Horloges injectées : aucun test ne dort.
  */
 class LiveProbeSilenceTest {
+
+    /** Ces tests lancent de vraies frames : les globaux de séance suivent. */
+    @After
+    fun remettreLaSeanceAZero() = seanceVide()
 
     @Test
     fun `sans envoi, jamais de silence`() {
