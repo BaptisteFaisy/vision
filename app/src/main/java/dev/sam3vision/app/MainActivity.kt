@@ -229,19 +229,27 @@ class MainActivity : ComponentActivity() {
         }
     }
 
-    /** Fond : grâce 60 s iSee (pas d'extinction immédiate) ou coupure directe hors sonde. */
+    /**
+     * Fond : grâce 60 s iSee ; hors sonde, gel Modal (pas d'extinction immédiate).
+     * Les sessions sont déjà coupées localement (Direct via `LiveScreen`, Tap et
+     * Capture sans session) : sans trafic, Modal gèle le conteneur au bout de sa
+     * fenêtre (60 s) — un retour avant retrouve la carte chaude, un retour après
+     * dégèle en ~6-11 s au lieu de payer un boot complet (~28 s après un
+     * `/release`, qui tue le processus au lieu de le geler). Seule la fermeture
+     * réelle (`onDestroy`) éteint aussitôt. Coût plafonné comme la grâce sonde :
+     * 60 s d'inactivité au plus par mise en fond sans retour.
+     */
     override fun onPause() {
         root.cancelGesture()
-        // L'app n'est plus visible (bouton home, changement d'app, écran éteint) : on coupe
-        // le GPU ici et pas à onStop — sur ce téléphone, home ne déclenche pas toujours onStop.
+        // L'app n'est plus visible (bouton home, changement d'app, écran éteint) :
+        // la sonde arme sa grâce ici et pas à onStop — sur ce téléphone, home ne
+        // déclenche pas toujours onStop.
         // Session lunettes-iSee en cours : la carte reste allumée, la veille ne coupe rien.
         // Sonde iSee vivante : pas d'extinction immédiate, la grâce (60 s) éteint sans
         // retour avant — un aller-retour rapide retrouve la carte chaude.
         // Rotation : l'activité est recréée mais les ViewModels survivent — le direct
         // (socket `/live/ws`, sessions) survit avec eux au lieu d'être coupé/rouvert.
         if (!isChangingConfigurations) isee.onBackground()
-        val probeAlive = isee.probe.session != null
-        if (!isChangingConfigurations && !glassesKeepAlive() && !probeAlive) viewModel.releaseGpu()
         super.onPause()
     }
 
@@ -249,8 +257,9 @@ class MainActivity : ComponentActivity() {
         super.onResume()
         isee.onForeground()
         // Pas de réveil GPU à l'ouverture : la carte ne démarre que quand ça filme,
-        // réveillée par GpuWake à la liaison caméra (la 1re frame reste le signal de prêt).
-        // Cycle contrat user : quitter (onPause → /release, ~0 $) puis rouvrir → réveil auto.
+        // pré-réveillée dès que la liaison caméra commence (la 1re frame reste le
+        // signal de prêt). Cycle contrat user : fermer (onDestroy → /release, ~0 $)
+        // puis rouvrir → réveil auto ; mise en fond transitoire → gel Modal.
         // Micro mains libres : armé **ici**, seul moment où Android autorise un service de
         // premier plan à démarrer (app visible). Il survit ensuite à l'écran verrouillé.
         LockedMicBridge.arm(this)
