@@ -27,7 +27,7 @@ class IseeModeOrders(
     speak: suspend (String) -> Unit,
     update: StateUpdate,
     onFind: (String) -> Unit = {},
-    placeMode: () -> PictoPlaceMode = { PictoPlaceMode.DEDANS },
+    private val placeMode: () -> PictoPlaceMode = { PictoPlaceMode.DEDANS },
     onFindOff: () -> Unit = {},
     onPlaceMode: (PictoPlaceMode) -> Unit = {},
     post: (level: Int, text: String, clipId: String?) -> Unit = { _, _, _ -> },
@@ -40,6 +40,11 @@ class IseeModeOrders(
 
     /** Bascule geste (quadruple tap) : même application que l'ordre vocal, annonce fournie. */
     suspend fun applyPlace(mode: PictoPlaceMode, confirm: String) = place.apply(mode, confirm)
+
+    /** Réglages : le lieu suit le monde sonde, sans annonce ; rien s'il y est déjà. */
+    fun alignPlace(mode: PictoPlaceMode) {
+        if (mode != placeMode()) place.align(mode)
+    }
 
     /** Vrai si [text] portait un ordre de mode (texte consommé, rien d'autre à faire). */
     suspend fun run(text: String): Boolean =

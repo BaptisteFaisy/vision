@@ -29,3 +29,21 @@ internal class IseePlaceSync(
         syncProbe()
     }
 }
+
+/** Le lieu que dit le monde sonde : [Settings.outdoorMode] décide. */
+internal fun placeOf(settings: Settings): PictoPlaceMode =
+    if (settings.outdoorMode) PictoPlaceMode.DEHORS else PictoPlaceMode.DEDANS
+
+/**
+ * Monde sonde au lancement : le lieu n'est pas persisté et repart dehors, le
+ * monde sonde l'est. Sans ce retour, un « dedans » d'avant la relance laissait
+ * la puce sur OUTDOOR avec les 10 prompts d'intérieur : plus aucun masque de
+ * rue. Enregistré, pour que les Réglages relisent la même valeur ; un échec
+ * d'écriture ne retient pas le lancement.
+ */
+internal suspend fun outdoorsAtLaunch(loaded: Settings, save: suspend (Settings) -> Unit): Settings {
+    if (loaded.outdoorMode) return loaded
+    val next = loaded.copy(outdoorMode = true)
+    runCatching { save(next) }
+    return next
+}

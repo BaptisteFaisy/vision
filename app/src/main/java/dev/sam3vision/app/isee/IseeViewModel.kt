@@ -261,7 +261,6 @@ class IseeViewModel(app: Application) : AndroidViewModel(app) {
 
     private var settings: Settings = Settings.Default
 
-
     init {
         // Le texte d'intro est le premier message une fois pour toutes.
         update { it.copy(introVisible = true) }
@@ -270,7 +269,7 @@ class IseeViewModel(app: Application) : AndroidViewModel(app) {
             // est aussi faite ici, car un force-stop ou un balayage des apps récentes
             // ne passe pas par onDestroy — le téléphone gardait alors les messages.
             runCatching { cleaner.purgeAll() }
-            settings = loadedSettings(prefs)
+            settings = outdoorsAtLaunch(loadedSettings(prefs), prefs::save)
             // Porte GPS non persistée : elle rouvre à chaque redémarrage — un
             // ordre « désactive le GPS » d'hier ne tait pas la voix d'aujourd'hui.
             syncProbe()
@@ -382,6 +381,7 @@ class IseeViewModel(app: Application) : AndroidViewModel(app) {
     /** Réglages enregistrés depuis l'écran Settings : rechargement brûlant. */
     fun refreshSettings() = viewModelScope.launch {
         settings = loadedSettings(prefs)
+        modes.alignPlace(placeOf(settings))
         syncProbe()
         transcript.refresh()
     }

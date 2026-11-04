@@ -3,6 +3,13 @@
 Le journal part du 2026-10-26 après 19 h : le commit de départ, puis une entrée par fait
 livré et ses preuves (tâche, fichiers, chiffres) dans l'arbre.
 
+## 2026-11-04 — iSee : la puce de lieu et les prompts disent le même monde (branche `fix/lieu-relance-dehors`)
+
+- **Demande** : « tu n'affiches plus beaucoup de masques escalier », « pareil pour les masques de poteau, de barrière, de route, de trottoir, de voiture ».
+- **Cause racine** : `IseeUiState.placeMode` n'est pas persisté et repart dehors, `Settings.outdoorMode` est persisté et choisit les prompts (`ProbeWiring`). Un « dedans » suivi d'une relance de l'écran laissait la puce sur `Mode: OUTDOOR` avec les 10 prompts d'intérieur : ni poteau, ni barrière, ni trottoir, ni voiture, ni escalier. L'interrupteur des Réglages ouvrait le même écart : `refreshSettings` rechargeait le monde sonde sans toucher la puce.
+- **Fait** : `outdoorsAtLaunch` remet le monde sonde dehors au lancement et l'enregistre ; `alignPlace` fait suivre la puce aux Réglages, sans annonce, et vide la chasse en repassant dehors (`PlaceModeOrder.align`, extrait de `apply`).
+- **Preuves** : logcat Samsung sur 1.0.1922 : liste de rue et ~24 masques par image à 14:09 ; `Indoor mode on.` à 14:13:31, relance de l'écran à 14:13:38 ; ensuite puce OUTDOOR et `absents=[keys,medicine box,…]`, étiquettes `wall`, `door`, `person`, `socks` dans la rue ; deux taps sur la puce rendent la liste de rue à 14:39:10. Tests JVM `IseePlaceSyncTest` (5) et `PlaceAlignTest` (3). Le câblage dans `IseeViewModel` n'a pas de test JVM. Retour des masques dehors avec cet APK : non mesuré.
+
 ## 2026-11-04 — iSee : carte active sans boule, ordre GPS du direct qui aboutit (branche `fix/isee-gps-carte-bulle`)
 
 - **Demande** : « quand je donne une location en mode gps il n'affiche pas la map alors qu'il devrait et quand la map est active il devrait pas afficher donc la bulle isee » (ordre user du 04/11).
