@@ -45,7 +45,7 @@ class WsLegTest {
 
     @Test
     fun `le repli http colle la jambe http`() {
-        val fallback = WsHttpFallback()
+        val fallback = WsHttpFallback(unstickAfter = 1)
         val ws = client(binaryWs = true, httpFallback = fallback)
 
         assertEquals("binary", ws.leg)
