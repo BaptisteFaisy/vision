@@ -105,4 +105,21 @@ class PedLampRankTest {
         assertEquals(0f, PedLampRank.pedScore(crop(green, 6 to 6), 12, 12), 0f)
         assertEquals(0f, PedLampRank.pedScore(IntArray(0), 0, 0), 0f)
     }
+
+    @Test
+    fun `samsung 20261104 - vert pieton portrait gagne sur rouge tricolore`() {
+        val loader = javaClass.classLoader
+        val (gArgb, gw, gh) = pixelsOf(loader, "feuxrank", "samsung-20261104-green.ppm")
+        val (rArgb, rw, rh) = pixelsOf(loader, "feuxrank", "samsung-20261104-red.ppm")
+        assertEquals(CrossingState.Green, PedLightGate.verdict(gArgb, gw, gh))
+        assertEquals(CrossingState.Red, PedLightGate.verdict(rArgb, rw, rh))
+        // Boîtes SAM normalisées (portrait 480x640) : rouge 0,9414, vert
+        // 0,8906 — le score seul prendrait le rouge (bug build nogit 04/11).
+        val redBox = listOf(7f / 480, 103.1f / 640, 80.6f / 480, 225f / 640)
+        val greenBox = listOf(258.8f / 480, 256.2f / 640, 315f / 480, 301.2f / 640)
+        val red = PedLampRank.rank(redBox, rArgb, rw, rh, LampLens.flux(rArgb, rw, rh))
+        val green = PedLampRank.rank(greenBox, gArgb, gw, gh, LampLens.flux(gArgb, gw, gh))
+        assertTrue(PedLampRank.better(green, red))
+        assertFalse(PedLampRank.better(red, green))
+    }
 }
