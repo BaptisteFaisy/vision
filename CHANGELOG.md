@@ -3,6 +3,13 @@
 Le journal part du 2026-10-26 après 19 h : le commit de départ, puis une entrée par fait
 livré et ses preuves (tâche, fichiers, chiffres) dans l'arbre.
 
+## 2026-11-04 — iSee : le guidage quitte le workspace Modal désactivé (branche `fix/isee-route-compte-coupe`)
+
+- **Demande** : « il affiche toujours ecran blanc » après `mode GPS` sur le Redmi (ordre user du 04/11).
+- **Cause racine** : les téléphones installés avant gaiamelie gardent en réglage l'ancien défaut Valhalla `baptiste-faisy--…`. Ce workspace est désactivé : tout `/route` répond 404 `workspace … is disabled`, donc ni guidage ni carte. La bascule du défaut n'avait migré que SAM : `seedRouteBaseUrl` ne comble que le vide, `healRoute` ne réparait que les URL mal formées.
+- **Fait** : `healRoute` rend au build toute URL de ce workspace ; une URL saisie ailleurs reste conservée.
+- **Preuves** : logcat Redmi `HTTP error 404: modal-http: workspace ac-3lgJFhzO8zTGDFvgAszRD4 is disabled`, message identique en appelant l'ancienne URL, 200 sur gaiamelie ; `RouteSeedTest` (ancien défaut remplacé, saisie manuelle gardée). Une installation neuve passait : l'émulateur ne montrait pas le défaut.
+
 ## 2026-11-04 — iSee : la puce de lieu et les prompts disent le même monde (branche `fix/lieu-relance-dehors`)
 
 - **Demande** : « tu n'affiches plus beaucoup de masques escalier », « pareil pour les masques de poteau, de barrière, de route, de trottoir, de voiture ».
