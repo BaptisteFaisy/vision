@@ -138,5 +138,5 @@ private fun poleFallbackOf(
     }
     val verdict = PedLightGate.verdict(crop.argb, crop.width, crop.height)
     if (onCrop != null) onCrop(poleBox, crop, verdict)
-    return LightRead(poleBox, verdict, crop.clip)
+    return LightRead(poleBox, verdict, crop.clip, redProven = PedLightGate.hasRedLamp(crop.argb, crop.width, crop.height))
 }

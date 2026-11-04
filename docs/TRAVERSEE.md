@@ -230,8 +230,12 @@ Terrain du 04/11, passage **sans aucun feu** (confirmé par le user), build
   confirmé reparle en une frame, jusqu'à 8 frames sans boîte (l'asymétrie sûre du
   03/11 est gardée). Coût : un vrai feu dont la lampe n'est pas lue bloque au bout
   de 3 frames (~600 ms) au lieu d'une.
-- **Reste à mesurer** : l'autre moitié des blocages du même terrain vient de
-  `roule=true`, sans cause connue : les logs n'avaient pas les boîtes. La ligne
-  debug `ISEE_CROSS` les donne maintenant à chaque frame bloquée.
+- **Repli haut-de-poteau** : son `redProven` restait à vrai par défaut, il passait
+  donc le filtre. Sur le terrain suivant (`1.0.1929`, voitures garées, sans feu),
+  9 rafales de doute sur 10 venaient de lui, sans aucune boîte SAM à moins de 7 s :
+  121 frames bloquées sur 215. Il porte maintenant sa vraie lecture de rouge.
+- **Reste à mesurer** : les autres blocages de ce terrain (veto et mouvement), sur
+  des frames dont les boîtes sautent d'un bout à l'autre de l'image en 100 ms. La
+  ligne debug `ISEE_CROSS` les donne à chaque frame bloquée.
 - **Preuves** : `LightGhostGateTest`, `CrossingSweepVideoTest`.
 

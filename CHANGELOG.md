@@ -3,6 +3,13 @@
 Le journal part du 2026-10-26 après 19 h : le commit de départ, puis une entrée par fait
 livré et ses preuves (tâche, fichiers, chiffres) dans l'arbre.
 
+## 2026-11-04 — iSee : le repli haut-de-poteau ne relance plus de faux doute (branche `fix/faux-feu-poteau`)
+
+- **Demande** : « il m'affiche encore don't cross alors qu'il y a des voitures à l'arrêt », sur le moment sans feu.
+- **Cause racine** : le repli haut-de-poteau laissait `redProven` à vrai par défaut et passait `LightGhostGate`. Terrain `1.0.1929` : 9 rafales `feu=Unknown` sur 10 sans boîte SAM de feu à moins de 7 s, 121 frames bloquées sur 215.
+- **Fait** : le repli porte sa vraie lecture de rouge, il passe `LightGhostGate` comme les autres boîtes.
+- **Preuves** : `LightGhostGateTest`, `CrossingSweepVideoTest`, `docs/TRAVERSEE.md` § 21. Dans la rue : non mesuré. Les blocages veto et mouvement du même terrain restent à expliquer.
+
 ## 2026-11-04 — iSee : plus de « Don't cross. » sur un feu fantôme (branche `fix/faux-feu-traversee`)
 
 - **Demande** : « encore beaucoup trop de cas où il me dit don't cross alors que les voitures ou vans sont garés », sur un passage sans aucun feu.
