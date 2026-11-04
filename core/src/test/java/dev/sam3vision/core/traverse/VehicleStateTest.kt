@@ -293,6 +293,9 @@ class VehicleStateTest {
         assertNull("bus non parlé", VehicleStateText.nameOf("bus"))
         assertNull("camion hors liste dehors", VehicleStateText.nameOf("camion"))
         assertNull("moto hors liste dehors", VehicleStateText.nameOf("moto"))
+        assertEquals(voiture, VehicleStateText.nameOf("van"))
+        assertEquals(voiture, VehicleStateText.nameOf("Vans"))
+        assertEquals(voiture, VehicleStateText.nameOf("camionnette"))
     }
 
     @Test

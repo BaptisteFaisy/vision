@@ -6,7 +6,8 @@ import dev.sam3vision.core.live.PositionText
 import dev.sam3vision.core.speech.SpeechLanguage
 
 /**
- * Noms parlés des véhicules et phrases d'état (SPEC v4, voiture seule) :
+ * Noms parlés des véhicules et phrases d'état (SPEC v4 : voiture, van parlé
+ * comme voiture depuis le 04/11) :
  * « Car. » / « Cars. » (niveau 0, en mouvement — le niveau dit le mouvement,
  * le nom suffit), « Car stopped, 2 meters away. » (l'immobile se situe :
  * distance au mètre entier si mesurée, heure du cadran sinon), « Stop, car
@@ -29,6 +30,11 @@ object VehicleStateText {
     private val NAMES: Map<String, VehicleName> = mapOf(
         "car" to CAR,
         "voiture" to CAR,
+        // Van parlé comme une voiture (ordre user du 04/11 : même cas) —
+        // aucun clip ni pack voix à ajouter, « Car. » couvre les deux.
+        "van" to CAR,
+        "camionnette" to CAR,
+        "fourgon" to CAR,
     )
 
     /** Nom parlé de [label], `null` si ce n'est pas un véhicule nommé. */
