@@ -1,5 +1,7 @@
 package dev.sam3vision.core.net
 
+import dev.sam3vision.core.settings.SamRegion
+
 /**
  * Erreurs réseau typées, avec un message directement affichable dans l'UI.
  * [InvalidKey] = 401, [RateLimited] = 429, [Timeout] = délai dépassé,
@@ -56,6 +58,20 @@ sealed class ApiError(message: String, cause: Throwable? = null) : Exception(mes
 
     /** Opération que ce client ne sait pas rendre (ex. question sans image) : rien à réessayer. */
     class NotSupported(message: String) : ApiError(message)
+}
+
+/**
+ * [BackendStopped] enrichi de l'endpoint interrogé (« … (EU) », « … (hôte) ») :
+ * sans lui, « GPU éteint » ne dit pas QUEL backend a répondu 404 — une carte
+ * peut tourner dans l'autre région pendant que l'app appelle un preset mort ou
+ * une URL manuelle périmée. Les autres erreurs passent inchangées, et un appel
+ * sans URL (mapping unitaire) reste nu.
+ */
+internal fun ApiError.withSource(url: String): ApiError {
+    if (this !is ApiError.BackendStopped || url.isBlank()) return this
+    val where = SamRegion.describeEndpoint(url)
+    if (where.isEmpty()) return this
+    return ApiError.BackendStopped("$message ($where)")
 }
 
 /**

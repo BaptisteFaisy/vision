@@ -1,6 +1,8 @@
 package dev.sam3vision.core.net
 
+import dev.sam3vision.core.TestHttpServer
 import dev.sam3vision.core.model.SegmentResult
+import java.util.concurrent.atomic.AtomicInteger
 import kotlinx.coroutines.runBlocking
 import org.json.JSONObject
 import org.junit.Assert.assertEquals
@@ -87,6 +89,38 @@ class SamContractTest {
                 .segment("QUJD", null)
 
             NetContract.assertError(result, ApiError.Timeout::class.java, "sam lent")
+        }
+    }
+
+    @Test
+    fun `un 404 modal transitoire sur segment est rejoue une fois`() = runBlocking {
+        // Fenêtre de déploiement : le proxy répond 404 le temps du boot, puis le
+        // backend répond — un 404 proxy n'a déclenché aucune inférence, le nouvel
+        // essai ne facture rien et évite un faux « SAM GPU off ».
+        val calls = AtomicInteger(0)
+        TestHttpServer { _ ->
+            if (calls.getAndIncrement() == 0) {
+                TestHttpServer.Response(404, "modal-http: invalid function call")
+            } else {
+                TestHttpServer.Response(200, validSegment)
+            }
+        }.use { server ->
+            val result = segment(server.baseUrl)
+
+            assertTrue("succès au 2e essai, obtenu ${result.exceptionOrNull()}", result.isSuccess)
+            assertEquals(2, server.requests.size)
+        }
+    }
+
+    @Test
+    fun `un 404 modal persistant sur segment donne BackendStopped apres un seul nouvel essai`() = runBlocking {
+        NetContract.server(code = 404, body = "modal-http: invalid function call").use { server ->
+            val result = segment(server.baseUrl)
+
+            NetContract.assertError(result, ApiError.BackendStopped::class.java, "segment 404 persistant")
+            assertEquals("un seul nouvel essai, pas de mitraille", 2, server.requests.size)
+            val message = result.exceptionOrNull()?.message.orEmpty()
+            assertTrue("le message nomme l'endpoint interrogé : $message", message.contains("127.0.0.1"))
         }
     }
 

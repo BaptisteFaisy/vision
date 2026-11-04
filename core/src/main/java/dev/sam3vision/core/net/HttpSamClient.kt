@@ -14,14 +14,25 @@ class HttpSamClient(
 
     override suspend fun segment(pngOrJpegB64: String, prompts: List<String>?): Result<SegmentResult> {
         endpointRefusal("endpoint SAM", baseUrl, "/segment")?.let { return Result.failure(it) }
-        // Corps assemblé dans Dispatchers.IO (base64 ~100 Ko jamais scanné sur l'appelant)
-        // et non rejouable : pas de 2e inférence GPU sur keep-alive mort.
-        return client.executeBuilt {
+        val first = attemptSegment(pngOrJpegB64, prompts)
+        // 404 Modal ambigu (fenêtre de déploiement, restore proxy) : le proxy n'a
+        // déclenché aucune inférence, un seul nouvel essai est gratuit et évite un
+        // faux « SAM GPU off ». Tout autre échec remonte tel quel (pas de 2e inférence).
+        if (first.exceptionOrNull() !is ApiError.BackendStopped) return first
+        return attemptSegment(pngOrJpegB64, prompts)
+    }
+
+    /**
+     * Une tentative de segmentation : corps assemblé dans Dispatchers.IO (base64 ~100 Ko
+     * jamais scanné sur l'appelant) et non rejouable — pas de 2e inférence GPU sur
+     * keep-alive mort.
+     */
+    private suspend fun attemptSegment(pngOrJpegB64: String, prompts: List<String>?): Result<SegmentResult> =
+        client.executeBuilt {
             requestTo(baseUrl, "/segment", "POST", OneShotJsonBody(segmentJson(pngOrJpegB64, prompts)))
         }
             .then { outcome -> outcome.requireSuccess() }
             .then { raw -> catchingResult { parseSegment(raw) } }
-    }
 
     override suspend fun health(): Result<Boolean> {
         endpointRefusal("endpoint SAM", baseUrl, "/health")?.let { return Result.failure(it) }
