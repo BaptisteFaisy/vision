@@ -3,6 +3,7 @@ package dev.sam3vision.app.isee
 import dev.sam3vision.core.crossing.CrossingPrompts
 import dev.sam3vision.core.crossing.CrossingState
 import dev.sam3vision.core.crossing.LampLens
+import dev.sam3vision.core.crossing.PedLampRank
 import dev.sam3vision.core.crossing.PedLightGate
 import dev.sam3vision.core.exposure.ClipStats
 import dev.sam3vision.core.model.LiveFrame
@@ -17,7 +18,7 @@ internal typealias CrossingCropTap = (box: List<Float>, crop: CrossingFrame, ver
 private data class LightRead(val box: List<Float>?, val state: CrossingState, val clip: ClipStats)
 
 /**
- * Lecture du feu sur une frame : boîtes SAM candidates (tête puis caisson),
+ * Lecture du feu sur une frame : boîtes SAM candidates (tête puis caissons),
  * crop JPEG classifié en local puis filtré par la porte anti-confusion
  * ([PedLightGate], 100 % embarqué, aucun réseau). Tête sans lampe vue : le
  * caisson est relu (mauvaise lentille) ; pas de feu en vue ou image
@@ -55,20 +56,23 @@ private fun readLightOf(frame: LiveFrame, jpegB64: String, onCrop: CrossingCropT
     for (box in boxes) {
         val crop = CrossingPixels.frame(jpegB64, box)
             ?: return LightRead(box, CrossingState.Red, ClipStats.NONE)
+        val flux = LampLens.flux(crop.argb, crop.width, crop.height)
         val candidate = Candidate(
             box = box,
             crop = crop,
             verdict = PedLightGate.verdict(crop.argb, crop.width, crop.height),
-            flux = LampLens.flux(crop.argb, crop.width, crop.height),
+            rank = PedLampRank.rank(box, crop.argb, crop.width, crop.height, flux),
         )
         last = candidate
-        if (candidate.flux >= LampLens.MIN_FLUX && candidate.flux > (best?.flux ?: 0f)) best = candidate
+        if (flux >= LampLens.MIN_FLUX && (best == null || PedLampRank.better(candidate.rank, best.rank))) {
+            best = candidate
+        }
     }
-    // La bonne boîte est celle dont la LENTILLE est la plus allumée, pas la mieux
-    // notée par SAM : sur les 9 photos du protocole §6 le meilleur score allait à
-    // la lanterne éteinte (0,84 sur le rouge éteint contre 0,77 sur le vert
-    // allumé) — 5/7 verts au score, 6/7 au flux, 0 faux vert dans les deux cas
-    // (A4 §9.1). Deux candidats suffisent, donc autant de décodages qu'avant.
+    // La bonne boîte est le FEU PIETON, pas la mieux notée par SAM (le score
+    // allait à la lanterne éteinte, 0,84 contre 0,77 sur le vert allumé — A4
+    // §9.1) ni la plus brillante quand un bout de tricolore est en vue : vue
+    // entière avant bout coupé, bonhomme avant disque, flux en cas d'égalité
+    // ([PedLampRank]). Trois décodages au plus, cas rare (deux caissons).
     val pick = best ?: last ?: return poleFallbackOf(frame, jpegB64, onCrop)
     // Collecte (voir LightCropLogger) : seuls les crops classifiés partent,
     // jamais les frames sans boîte ni les échecs de décodage.
@@ -76,12 +80,12 @@ private fun readLightOf(frame: LiveFrame, jpegB64: String, onCrop: CrossingCropT
     return LightRead(pick.box, pick.verdict, pick.crop.clip)
 }
 
-/** Boîte candidate déjà croppée : verdict de la porte et flux de sa lentille. */
+/** Boîte candidate déjà croppée : verdict de la porte et rang du feu piéton. */
 private class Candidate(
     val box: List<Float>,
     val crop: CrossingFrame,
     val verdict: CrossingState,
-    val flux: Float,
+    val rank: PedLampRank.Ranked,
 )
 
 /**

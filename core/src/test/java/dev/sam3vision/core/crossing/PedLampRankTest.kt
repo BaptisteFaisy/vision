@@ -1,0 +1,108 @@
+package dev.sam3vision.core.crossing
+
+import org.junit.Assert.assertEquals
+import org.junit.Assert.assertFalse
+import org.junit.Assert.assertTrue
+import org.junit.Test
+
+class PedLampRankTest {
+
+    private val dark = 0xFF101010.toInt()
+    private val green = 0xFF00FF00.toInt()
+    private val red = 0xFFFF0000.toInt()
+
+    /** Crop 12×12 : fond sombre, pixels [color] aux positions (x, y). */
+    private fun crop(color: Int, vararg pts: Pair<Int, Int>): IntArray {
+        val argb = IntArray(12 * 12) { dark }
+        for ((x, y) in pts) argb[y * 12 + x] = color
+        return argb
+    }
+
+    /** Bonhomme troué : 22 px dans une boîte 5×10 (remplissage 0,44). */
+    private fun man(color: Int): IntArray = crop(
+        color,
+        5 to 1, 6 to 1,
+        5 to 2, 6 to 2,
+        5 to 3, 6 to 3,
+        3 to 4, 4 to 4, 6 to 4, 7 to 4,
+        5 to 5, 6 to 5,
+        5 to 6, 6 to 6,
+        5 to 7, 6 to 7,
+        5 to 8, 6 to 8,
+        5 to 9, 6 to 9,
+        4 to 10, 6 to 10,
+    )
+
+    /** Disque plein : bloc 5×5 (remplissage 1,0). */
+    private fun disk(color: Int): IntArray {
+        val pts = mutableListOf<Pair<Int, Int>>()
+        for (y in 3..7) for (x in 3..7) pts += x to y
+        return crop(color, *pts.toTypedArray())
+    }
+
+    @Test
+    fun `bonhomme vert devant disque vert meme a flux inferieur`() {
+        val man = PedLampRank.rank(listOf(0.2f, 0.2f, 0.4f, 0.5f), man(green), 12, 12, 5f)
+        val disk = PedLampRank.rank(listOf(0.5f, 0.2f, 0.7f, 0.5f), disk(green), 12, 12, 50f)
+        assertTrue(man.ped - disk.ped > PedLampRank.PED_EPS)
+        assertTrue(PedLampRank.better(man, disk))
+        assertFalse(PedLampRank.better(disk, man))
+    }
+
+    @Test
+    fun `daltonien - bonhomme rouge devant disque`() {
+        val man = PedLampRank.rank(listOf(0.2f, 0.2f, 0.4f, 0.5f), man(red), 12, 12, 5f)
+        val disk = PedLampRank.rank(listOf(0.5f, 0.2f, 0.7f, 0.5f), disk(green), 12, 12, 50f)
+        assertTrue(PedLampRank.better(man, disk))
+    }
+
+    @Test
+    fun `bout coupe au bord perd contre vue entiere`() {
+        val cut = PedLampRank.rank(listOf(0f, 0.2f, 0.2f, 0.5f), man(green), 12, 12, 50f)
+        val full = PedLampRank.rank(listOf(0.5f, 0.2f, 0.7f, 0.5f), disk(green), 12, 12, 5f)
+        assertTrue(cut.edgeTouch)
+        assertFalse(full.edgeTouch)
+        assertTrue(PedLampRank.better(full, cut))
+    }
+
+    @Test
+    fun `egalite de forme - le flux tranche comme avant`() {
+        val dim = PedLampRank.rank(listOf(0.2f, 0.2f, 0.4f, 0.5f), disk(green), 12, 12, 5f)
+        val bright = PedLampRank.rank(listOf(0.5f, 0.2f, 0.7f, 0.5f), disk(green), 12, 12, 50f)
+        assertTrue(PedLampRank.better(bright, dim))
+        assertFalse(PedLampRank.better(dim, bright))
+    }
+
+    @Test
+    fun `ecart sous EPS - le flux tranche`() {
+        val low = PedLampRank.Ranked(edgeTouch = false, ped = 0.50f, flux = 10f)
+        val high = PedLampRank.Ranked(edgeTouch = false, ped = 0.60f, flux = 5f)
+        assertTrue(PedLampRank.better(low, high))
+        val clear = PedLampRank.Ranked(edgeTouch = false, ped = 0.90f, flux = 5f)
+        assertFalse(PedLampRank.better(low, clear))
+    }
+
+    @Test
+    fun `contact au bord - interieur faux, bords et coins vrais`() {
+        assertFalse(PedLampRank.isEdgeTouch(listOf(0.2f, 0.2f, 0.4f, 0.5f)))
+        assertTrue(PedLampRank.isEdgeTouch(listOf(0f, 0.2f, 0.4f, 0.5f)))
+        assertTrue(PedLampRank.isEdgeTouch(listOf(0.2f, 0f, 0.4f, 0.5f)))
+        assertTrue(PedLampRank.isEdgeTouch(listOf(0.2f, 0.2f, 1f, 0.5f)))
+        assertTrue(PedLampRank.isEdgeTouch(listOf(0.2f, 0.2f, 0.4f, 1f)))
+        assertTrue(PedLampRank.isEdgeTouch(listOf(0f, 0f, 1f, 1f)))
+    }
+
+    @Test
+    fun `contact au bord - boite illisible jamais en contact`() {
+        assertFalse(PedLampRank.isEdgeTouch(listOf(0.2f, 0.2f)))
+        assertFalse(PedLampRank.isEdgeTouch(listOf(0.4f, 0.2f, 0.2f, 0.5f)))
+        assertFalse(PedLampRank.isEdgeTouch(listOf(0f, 0.2f, Float.NaN, 0.5f)))
+    }
+
+    @Test
+    fun `forme sans tache vaut zero`() {
+        assertEquals(0f, PedLampRank.pedScore(IntArray(12 * 12) { dark }, 12, 12), 0f)
+        assertEquals(0f, PedLampRank.pedScore(crop(green, 6 to 6), 12, 12), 0f)
+        assertEquals(0f, PedLampRank.pedScore(IntArray(0), 0, 0), 0f)
+    }
+}

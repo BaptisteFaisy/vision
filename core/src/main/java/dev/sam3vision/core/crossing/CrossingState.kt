@@ -169,11 +169,14 @@ object CrossingPrompts {
         selectLightBoxes(objects, width, height).firstOrNull()
 
     /**
-     * Boîtes candidates ordonnées (tête puis caisson, 0 à 2) : [selectLightBox]
+     * Boîtes candidates ordonnées (tête puis caissons, 0 à 3) : [selectLightBox]
      * n'en garde que la première, mais une tête peut cadrer la mauvaise
      * lentille (01/11, `nl_panda_10` : tête à 0,48 sur la lentille éteinte,
      * caisson à 0,89 sur le boîtier allumé) — l'appelant relit le caisson
-     * quand la tête est sans lampe (voir `:app`, `crossingLightOf`).
+     * quand la tête est sans lampe (voir `:app`, `crossingLightOf`). Deux
+     * caissons (04/11) : un bout de tricolore mieux noté par SAM ne doit plus
+     * évincer le caisson piéton avant toute lecture de couleur — l'appelant
+     * départage au rang ([PedLampRank]), pas au score.
      */
     fun selectLightBoxes(objects: List<SegObject>, width: Int, height: Int): List<List<Float>> {
         if (width <= 0 || height <= 0) return emptyList()
@@ -183,8 +186,11 @@ object CrossingPrompts {
             .filterNot { CarHousingVeto.isVetoed(it.box) }
         if (lights.isEmpty()) return emptyList()
         val (heads, housings) = lights.partition { isHeadLabel(it.label) }
-        return listOfNotNull(bestBox(heads, width, height), bestBox(housings, width, height))
+        return listOfNotNull(bestBox(heads, width, height)) + bestBoxes(housings, width, height, HOUSING_LIMIT)
     }
+
+    /** Caissons relus : le deuxième survit à l'éviction par un mieux noté. */
+    private const val HOUSING_LIMIT = 2
 
     /**
      * Repli haut-de-poteau : sans boîte de feu, le carré ancré en haut du
@@ -243,17 +249,35 @@ object CrossingPrompts {
     }
 
     /**
+     * Meilleures boîtes d'une classe (au plus [limit], triées au score) :
+     * mêmes éclats écartés et même normalisation que [bestBox]. La tête n'en
+     * prend qu'une, les caissons deux (anti-éviction, voir [selectLightBoxes]).
+     */
+    private fun bestBoxes(objects: List<SegObject>, width: Int, height: Int, limit: Int): List<List<Float>> {
+        return bestPicks(objects, limit)
+            .mapNotNull { Detection(it.label, it.score, it.box, width, height).normalizedBox() }
+            .filter { box -> box.size == 4 && box[2] > box[0] && box[3] > box[1] }
+    }
+
+    /**
      * Meilleur objet d'une classe : éclats écartés sous le dixième de la
      * plus grande aire, tri au score. `null` sans candidat — partagé par
      * [bestBox] (feu) et [selectPoleTopBox] (poteau), mêmes règles.
      */
-    private fun bestPick(objects: List<SegObject>): SegObject? {
+    private fun bestPick(objects: List<SegObject>): SegObject? =
+        bestPicks(objects, 1).firstOrNull()
+
+    /** Les [limit] meilleurs objets d'une classe, triés au score décroissant. */
+    private fun bestPicks(objects: List<SegObject>, limit: Int): List<SegObject> {
+        if (limit <= 0) return emptyList()
         val areas = objects.map { boxArea(it.box) }
-        val biggest = areas.maxOrNull() ?: return null
-        if (biggest <= 0f) return null
+        val biggest = areas.maxOrNull() ?: return emptyList()
+        if (biggest <= 0f) return emptyList()
         return objects.asSequence()
             .filterIndexed { index, _ -> areas[index] >= biggest / SLIVER_RATIO }
-            .maxByOrNull { it.score }
+            .sortedByDescending { it.score }
+            .take(limit)
+            .toList()
     }
 
     /** Éclats ignorés sous le dixième de la plus grande boîte feu (§5a). */

@@ -234,6 +234,35 @@ class CrossingStateTest {
     }
 
     @Test
+    fun `deux caissons - le mieux note n evince plus le second`() {
+        val objects = listOf(
+            light("pedestrian traffic light", 0.91f, listOf(50f, 100f, 150f, 300f)),
+            light("pedestrian traffic light", 0.80f, listOf(10f, 10f, 60f, 110f)),
+        )
+        assertEquals(
+            listOf(listOf(0.25f, 0.25f, 0.75f, 0.75f), listOf(0.05f, 0.025f, 0.3f, 0.275f)),
+            CrossingPrompts.selectLightBoxes(objects, 200, 400),
+        )
+    }
+
+    @Test
+    fun `tete plus deux caissons - trois candidates, tete d abord`() {
+        val objects = listOf(
+            light("pedestrian traffic light", 0.91f, listOf(50f, 100f, 150f, 300f)),
+            light("pedestrian traffic light", 0.80f, listOf(10f, 10f, 60f, 110f)),
+            light("pedestrian signal head", 0.60f, listOf(80f, 120f, 120f, 200f)),
+        )
+        assertEquals(
+            listOf(
+                listOf(0.4f, 0.3f, 0.6f, 0.5f),
+                listOf(0.25f, 0.25f, 0.75f, 0.75f),
+                listOf(0.05f, 0.025f, 0.3f, 0.275f),
+            ),
+            CrossingPrompts.selectLightBoxes(objects, 200, 400),
+        )
+    }
+
+    @Test
     fun `repli poteau - sans poteau pas de carre`() {
         val objects = listOf(light("car", 0.99f, listOf(0f, 0f, 10f, 10f)))
         assertEquals(null, CrossingPrompts.selectPoleTopBox(objects, 200, 400))
