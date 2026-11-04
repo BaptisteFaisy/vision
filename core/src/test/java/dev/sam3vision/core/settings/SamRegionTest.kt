@@ -106,4 +106,19 @@ class SamRegionTest {
         )
         assertEquals(SamRegion.Us.presetBaseUrl, settings.resolveSamEndpoint())
     }
+
+    @Test
+    fun `une url retiree injectee au build migre vers le preset de la region`() {
+        // Régression vue le 04/11 : un APK cuit avec sam.base.url=baptiste-faisy
+        // appelait l'ancien workspace (404 « invalid function call ») au lieu du
+        // preset gaiamelie — la valeur injectée primait sur tout, sans migration.
+        val eu = Settings.Default.resolveSamEndpoint(
+            buildEu = "https://baptiste-faisy--sam3-eu-a100-sam3live-web.eu-west.modal.run",
+        )
+        assertEquals(SamRegion.Eu.presetBaseUrl, eu)
+        val us = Settings.Default.copy(samRegion = SamRegion.Us).resolveSamEndpoint(
+            buildUs = "https://baptiste-faisy--sam3-us-a100-sam3live-web.us-east.modal.run",
+        )
+        assertEquals(SamRegion.Us.presetBaseUrl, us)
+    }
 }
