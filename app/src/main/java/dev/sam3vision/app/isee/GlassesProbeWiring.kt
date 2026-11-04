@@ -18,14 +18,14 @@ import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 
 /**
- * Alimente la sonde SAM depuis la rue des lunettes : quand le direct vit, qu'un live est
- * demandé ([glassesProbeFeed] : guidage ou Traversée, jamais la connexion seule) et que
- * la sonde veut une frame, on décode la poussée du flux hors écran, on l'encode comme le
- * téléphone (JPEG redressé [ISEE_FRAME_EDGE]/[ISEE_FRAME_QUALITY], 320/q55 — pas le 480/q65
- * du partage aidant) et on l'envoie. Guidage, distances et voix suivent alors le même
- * chemin que le mode téléphone : parité par construction, sans toucher à
- * [Guidance][core.live.Guidance]. Le compteur de marches part aussi (même photo → Canny),
- * sinon la voix ne connaît jamais leur nombre.
+ * Alimente la sonde SAM depuis la rue des lunettes : quand le direct vit ([glassesProbeFeed]
+ * : flux vivant, photo non figée — exactement comme la caméra du téléphone, ordre user du
+ * 04/11) et que la sonde veut une frame, on décode la poussée du flux hors écran, on
+ * l'encode comme le téléphone (JPEG redressé [ISEE_FRAME_EDGE]/[ISEE_FRAME_QUALITY],
+ * 320/q55 — pas le 480/q65 du partage aidant) et on l'envoie. Guidage, distances et voix
+ * suivent alors le même chemin que le mode téléphone : parité par construction, sans
+ * toucher à [Guidance][core.live.Guidance]. Le compteur de marches part aussi (même
+ * photo → Canny), sinon la voix ne connaît jamais leur nombre.
  *
  * Plus aucune photo de la vue : l'ancien `takeSnapshot` était un `getBitmap` sur le fil UI
  * (3-15 ms bloquants par poussée, jusqu'à 5-11 fois/s). Le bitstream est désormais toujours
@@ -62,8 +62,18 @@ internal fun GlassesProbeWiring(probe: LiveProbe, glassesFeed: Boolean, guidance
             // hors Main (fil analyseur CameraX) : même contrat de fil ici.
             withContext(Dispatchers.Default) {
                 GlassesVideoLink.frames.collect { box ->
-                    if (box == null || !probe.wantsFrame()) return@collect
-                    if (!gate.admits(guiding.value, SystemClock.elapsedRealtime())) return@collect
+                    if (box == null) {
+                        noteBridgeRefusal(BridgeRefusal.BOX_NULL)
+                        return@collect
+                    }
+                    if (!probe.wantsFrame()) {
+                        noteBridgeRefusal(BridgeRefusal.PROBE)
+                        return@collect
+                    }
+                    if (!gate.admits(guiding.value, SystemClock.elapsedRealtime())) {
+                        noteBridgeRefusal(BridgeRefusal.GATE)
+                        return@collect
+                    }
                     sendBridgeFrame(probe, sampler, box)
                 }
             }
@@ -173,20 +183,71 @@ internal fun stairFeedDue(lastMs: Long, nowMs: Long): Boolean =
     nowMs - lastMs >= STAIR_FEED_MS
 
 /**
- * Porte du pont lunettes → sonde, pure et testée : le direct des lunettes ne part à SAM
- * que sur demande explicite — guidage en cours ou mode Traversée — jamais dès la connexion
- * (ordre user du 03/11 : fini les photos automatiques toutes les X secondes quand les
- * lunettes sont portées). La photo lunettes figée coupe le pont : l'écran montre le figé,
- * pas le flux. Le direct affiché, la photo manuelle et les questions vocales ne passent pas
- * par ici et continuent sans live demandé.
+ * Porte du pont lunettes → sonde, pure et testée : parité stricte avec la caméra du
+ * téléphone (ordre user du 04/11) — le flux vivant nourrit la sonde dès qu'il vit, sans
+ * exiger ni guidage ni Traversée ; seule [LiveProbe.wantsFrame] (session, cadence,
+ * réserve) décide ensuite, comme pour le téléphone. La porte guidage/Traversée du 03/11
+ * est levée : elle murait aussi l'analyse courante (droite/gauche invisibles). La photo
+ * lunettes figée coupe toujours le pont : l'écran montre le figé, pas le flux. Le direct
+ * affiché, la photo manuelle et les questions vocales ne passent pas par ici.
  */
 internal fun glassesProbeFeed(
     glassesLive: Boolean,
     glassesStreaming: Boolean,
     photoDisplayed: Boolean,
-    guidance: Boolean,
-    crossingActive: Boolean,
-): Boolean = (glassesLive || glassesStreaming) && !photoDisplayed && (guidance || crossingActive)
+): Boolean = (glassesLive || glassesStreaming) && !photoDisplayed
+
+/**
+ * Cause d'un refus du pont, pour le compteur [BridgeRefusals] : boîte vide (poussée
+ * nulle), sonde qui n'en veut pas (session/cadence/réserve), porte de guidage
+ * de guidage (créneau 150 ms non échu). Les refus étaient muets — un pont
+ * fermé ressemblait à une GPU morte ; ils sont désormais comptés et journalisés.
+ */
+internal enum class BridgeRefusal { BOX_NULL, PROBE, GATE }
+
+/**
+ * Refus du pont par cause, journalisés tous les 60 (même cadence que les
+ * compteurs téléphone). `internal` + [reset] pour les tests JVM.
+ */
+internal object BridgeRefusals {
+    var boxNull = 0L
+        private set
+    var probe = 0L
+        private set
+    var gate = 0L
+        private set
+
+    fun note(cause: BridgeRefusal): Long {
+        when (cause) {
+            BridgeRefusal.BOX_NULL -> boxNull += 1
+            BridgeRefusal.PROBE -> probe += 1
+            BridgeRefusal.GATE -> gate += 1
+        }
+        return boxNull + probe + gate
+    }
+
+    fun reset() {
+        boxNull = 0L
+        probe = 0L
+        gate = 0L
+    }
+
+    fun line(): String = "pont lunettes : $total refus (boîte=$boxNull sonde=$probe porte=$gate)"
+
+    private val total: Long get() = boxNull + probe + gate
+}
+
+/** Un refus de plus ; une ligne toutes les 60, comme les compteurs téléphone. */
+private fun noteBridgeRefusal(cause: BridgeRefusal) {
+    if (BridgeRefusals.note(cause) % LOG_EVERY_REFUSAL == 0L) Log.i(GLASSES_BRIDGE_TAG, BridgeRefusals.line())
+}
+
+/** Une ligne de refus tous les 60 (même cadence que les compteurs téléphone). */
+private const val LOG_EVERY_REFUSAL = 60L
+
+/** Ligne de transition du pont (ouverte/fermée + entrées) : pure, testée en JVM. */
+internal fun bridgeFeedLine(feed: Boolean, live: Boolean, streaming: Boolean, photo: Boolean): String =
+    "pont lunettes : feed=$feed (live=$live streaming=$streaming photo=$photo)"
 
 /** Fenêtre du Canny des marches côté lunettes : 1 s (le compteur tient 1,5 s). */
 internal const val STAIR_FEED_MS = 1_000L
@@ -199,7 +260,7 @@ private var lastStairFeedMs = 0L
 /** Un envoi sur 20 journalisé (preuve que le pont lunettes → SAM tourne). */
 private fun countSnapshot() {
     snapshots += 1
-    if (snapshots % 20L == 0L) Log.i(TAG, "pont lunettes : $snapshots photos envoyées à la sonde")
+    if (snapshots % 20L == 0L) Log.i(GLASSES_BRIDGE_TAG, "pont lunettes : $snapshots photos envoyées à la sonde")
 }
 
 /**
@@ -208,7 +269,7 @@ private fun countSnapshot() {
  * Invisible à `parse_isee_lat.py` (ni `latency`, ni `server:`), même tag [TAG].
  */
 private fun countBridgeSplit(decodeMs: Long, encMs: Long) {
-    if (snapshots % 20L == 0L) Log.i(TAG, "bridgesplit decode $decodeMs · enc $encMs")
+    if (snapshots % 20L == 0L) Log.i(GLASSES_BRIDGE_TAG, "bridgesplit decode $decodeMs · enc $encMs")
 }
 
 /**
@@ -220,4 +281,5 @@ private fun countBridgeSplit(decodeMs: Long, encMs: Long) {
  */
 internal const val GUIDANCE_FRAME_MS = 150L
 
-private const val TAG = "GlassesBridge"
+/** Tag du pont (`logcat -s GlassesBridge:*`) : envois, refus, transitions. */
+internal const val GLASSES_BRIDGE_TAG = "GlassesBridge"

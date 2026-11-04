@@ -1,6 +1,7 @@
 package dev.sam3vision.app.isee
 
 import android.os.SystemClock
+import android.util.Log
 import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Box
@@ -187,14 +188,17 @@ private fun GlassesProbeLayer(
     glassesStreaming: Boolean,
     guidance: Boolean,
 ) {
-    val crossingActive = probe.collectRest().crossingActive
+    val photo = state.glassesPhoto != null
     val feed = glassesProbeFeed(
         glassesLive = glassesLive,
         glassesStreaming = glassesStreaming,
-        photoDisplayed = state.glassesPhoto != null,
-        guidance = guidance,
-        crossingActive = crossingActive,
+        photoDisplayed = photo,
     )
+    // Transitions du pont (ouverte/fermée + entrées) : un pont fermé ressemblait
+    // à une GPU morte. Keyé sur le seul booléen : une ligne par transition.
+    LaunchedEffect(feed) {
+        Log.i(GLASSES_BRIDGE_TAG, bridgeFeedLine(feed, glassesLive, glassesStreaming, photo))
+    }
     GlassesProbeWiring(probe, feed, guidance)
 }
 
