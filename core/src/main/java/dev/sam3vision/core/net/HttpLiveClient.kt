@@ -192,6 +192,6 @@ private fun parseHealth(raw: String): LiveHealth {
         model = json.str("model"),
         device = json.str("device"),
         gpu = json.str("gpu"),
-        wsBinary = json.optBoolean("ws_binary", true),
+        wsBinary = json.optBoolean("ws_binary", false),
     )
 }

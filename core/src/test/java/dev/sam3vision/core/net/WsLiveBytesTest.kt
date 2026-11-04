@@ -39,7 +39,7 @@ class WsLiveBytesTest {
     fun `liveBytes envoie le JPEG brut en binaire sans texte`() = runBlocking {
         val transport = ContractWsTransport()
             .apply { answerBytesWith { bytes -> listOf(NetContract.frameReply(headerOf(bytes).getInt("id"))) } }
-        val client = WsLiveClient(base, transport, 1_000, RecordingLiveClient())
+        val client = WsLiveClient(base, transport, 1_000, RecordingLiveClient(), binaryWs = true)
 
         val frame = client.liveBytes(jpeg, listOf("person"), 640, 4).getOrThrow()
 
@@ -55,7 +55,7 @@ class WsLiveBytesTest {
     @Test
     fun `liveBytes part immediatement sans attendre la reponse`() = runBlocking {
         val transport = ContractWsTransport()
-        val client = WsLiveClient(base, transport, 5_000, RecordingLiveClient())
+        val client = WsLiveClient(base, transport, 5_000, RecordingLiveClient(), binaryWs = true)
 
         val job = async { client.liveBytes(jpeg, null, 640, 4) }
         val deadline = System.currentTimeMillis() + 2_000L
