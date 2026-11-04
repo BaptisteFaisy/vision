@@ -45,9 +45,13 @@ internal class CameraGlueState(granted: Boolean) {
     var retry by mutableStateOf(0)
 }
 
-/** La liaison caméra de l'écran : permission, aperçu permanent et actions du host. */
+/**
+ * La liaison caméra de l'écran : permission, aperçu permanent et actions du host.
+ * [prewarmEndpoint] (vide = pas de pré-réveil) : le boot GPU part dès que la
+ * liaison commence, sans attendre sa fin.
+ */
 @Composable
-internal fun rememberCameraGlue(viewModel: IseeViewModel): CameraGlue {
+internal fun rememberCameraGlue(viewModel: IseeViewModel, prewarmEndpoint: String = ""): CameraGlue {
     val context = LocalContext.current
     // Android ne prévient personne quand une permission est accordée ou révoquée
     // depuis les Réglages : on relit l'état réel à chaque retour au premier plan.
@@ -69,7 +73,7 @@ internal fun rememberCameraGlue(viewModel: IseeViewModel): CameraGlue {
         if (!state.granted && !firstRun) askCamera.launch(Manifest.permission.CAMERA)
     }
     LaunchedEffect(tick, firstRun, firstRunHandled) { state.granted = cameraGranted(context) }
-    CameraBinding(state, host, LocalLifecycleOwner.current, viewModel)
+    CameraBinding(state, host, LocalLifecycleOwner.current, viewModel, prewarmEndpoint)
     DisposableEffect(host) {
         viewModel.attachCamera(host.actions)
         onDispose {
@@ -92,6 +96,7 @@ private fun CameraBinding(
     host: IseeCameraHost,
     owner: LifecycleOwner,
     viewModel: IseeViewModel,
+    prewarmEndpoint: String,
 ) {
     LaunchedEffect(host) { host.onCameraClosed = { state.retry++ } }
     LaunchedEffect(state.granted, state.retry) {
@@ -105,7 +110,12 @@ private fun CameraBinding(
         when (cameraGate(state.granted, host.bound, host.closed, host.recording, state.failures)) {
             CameraGate.HOLD -> viewModel.setCameraActive(host.bound)
             CameraGate.GIVE_UP -> viewModel.setCameraActive(false)
-            else -> bindWithRetry(state, host, owner, viewModel)
+            // Permission accordée, liaison décidée : le boot GPU part pendant
+            // la liaison au lieu d'attendre `configure` (gardé par `coldDue`).
+            else -> {
+                viewModel.probe.prewarm(prewarmEndpoint)
+                bindWithRetry(state, host, owner, viewModel)
+            }
         }
     }
 }
