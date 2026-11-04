@@ -17,6 +17,10 @@ le throttle (1 carte sur ``FAST_DEPTH_EVERY``, médianes répétées entre deux)
 ``--url`` est OBLIGATOIRE : le banc ouvre une vraie connexion à un backend déployé (donc
 réveille potentiellement un GPU) — il n'est jamais lancé automatiquement, et aucune
 valeur par défaut ne permet de le lancer par accident.
+
+``--binary`` envoie des trames binaires M1 (``uint32 BE + header JSON + JPEG brut``,
+même octets que le téléphone) au lieu du JSON texte : sonde filaire de la jambe
+binaire (11/2026 : l'ingress Modal tue l'opcode 0x2, close 1000 sans réponse).
 """
 
 from __future__ import annotations
@@ -26,6 +30,7 @@ import asyncio
 import base64
 import json
 import statistics
+import struct
 import sys
 import time
 import urllib.parse
@@ -72,17 +77,32 @@ def load_image_b64(image: str | None, image_b64: str | None) -> str:
     return base64.b64encode(data).decode("ascii")
 
 
+def binary_frame(frame_id: int, jpeg: bytes, prompts: list[str], max_objects: int,
+                 work_edge: int, with_depth: bool) -> bytes:
+    """Trame binaire M1 : ``uint32 BE + header JSON (sans image_b64) + JPEG brut``."""
+    header = json.dumps({"id": frame_id, "prompts": prompts, "max_objects": max_objects,
+                         "work_edge": work_edge, **({"with_depth": True} if with_depth else {})},
+                        separators=(",", ":")).encode()
+    return struct.pack(">I", len(header)) + header + jpeg
+
+
 async def run_frames(ws, image_b64: str, runs: int, prompts: list[str], max_objects: int,
-                     work_edge: int, timeout: float, with_depth: bool) -> list[dict]:
+                     work_edge: int, timeout: float, with_depth: bool,
+                     binary: bool = False) -> list[dict]:
     """N frames consécutives sur la connexion ouverte : id renvoyé, serveur, aller-retour."""
     samples: list[dict] = []
+    jpeg = base64.b64decode(image_b64) if binary else b""
     for index in range(runs):
         payload = {"id": index + 1, "image_b64": image_b64, "prompts": prompts,
                    "max_objects": max_objects, "work_edge": work_edge}
         if with_depth:
             payload["with_depth"] = True
         started = time.monotonic()
-        await ws.send(json.dumps(payload))
+        if binary:
+            await ws.send(binary_frame(index + 1, jpeg, prompts, max_objects, work_edge,
+                                       with_depth))
+        else:
+            await ws.send(json.dumps(payload))
         reply = json.loads(await asyncio.wait_for(ws.recv(), timeout))
         roundtrip = (time.monotonic() - started) * 1000
         if reply.get("error"):
@@ -108,12 +128,13 @@ def depth_summary(samples: list[dict]) -> dict:
 
 
 async def bench(url: str, image_b64: str, runs: int, prompts: list[str], max_objects: int,
-                work_edge: int, timeout: float, with_depth: bool) -> dict:
+                work_edge: int, timeout: float, with_depth: bool,
+                binary: bool = False) -> dict:
     """Ouvre ``/live/ws`` une fois et enchaîne les frames, une à la fois comme le client."""
     websockets = websockets_module()
     async with websockets.connect(url, max_size=None, open_timeout=timeout) as ws:
         samples = await run_frames(ws, image_b64, runs, prompts, max_objects, work_edge,
-                                   timeout, with_depth)
+                                   timeout, with_depth, binary)
     server = [item["server_ms"] for item in samples]
     client = [item["roundtrip_ms"] for item in samples]
     result = {"url": url, "runs": len(samples), "samples": samples,
@@ -165,6 +186,8 @@ def main(argv=None) -> int:
     parser.add_argument("--timeout", type=float, default=120.0, help="timeout par frame (défaut 120 s)")
     parser.add_argument("--with-depth", action="store_true",
                         help="demande la profondeur à chaque frame (comme le téléphone)")
+    parser.add_argument("--binary", action="store_true",
+                        help="trames binaires M1 au lieu du JSON texte (sonde filaire)")
     args = parser.parse_args(argv)
     if args.runs < 1:
         parser.error("--runs doit être ≥ 1")
@@ -172,9 +195,10 @@ def main(argv=None) -> int:
     prompts = [item.strip() for item in args.prompts.split(",") if item.strip()]
     print(f"Image : {len(image_b64)} car. base64 · prompts={prompts} · runs={args.runs} · "
           f"work_edge={args.work_edge} · max_objects={args.max_objects} · "
-          f"with_depth={int(args.with_depth)}")
+          f"with_depth={int(args.with_depth)} · leg={'binaire' if args.binary else 'texte'}")
     result = asyncio.run(bench(ws_url(args.url), image_b64, args.runs, prompts,
-                               args.max_objects, args.work_edge, args.timeout, args.with_depth))
+                               args.max_objects, args.work_edge, args.timeout, args.with_depth,
+                               args.binary))
     report(result)
     summary = {key: value for key, value in result.items() if key != "samples"}
     print("JSON " + json.dumps(summary, separators=(",", ":")))

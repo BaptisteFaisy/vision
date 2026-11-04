@@ -255,7 +255,9 @@ def test_health_ws_binary_sha(_pump) -> None:
     service.ctx = {}
     status, payload = asyncio.run(asgi_call(api, "GET", "/health", b""))
     check("health: 200", status == 200, str(status))
-    check("health: ws_binary", payload.get("ws_binary") is True, str(payload)[:200])
+    # False forcé (M2, 11/2026) : l'ingress Modal tue l'opcode binaire 0x2
+    # (close 1000 sans log ni compteur) — repasser True après preuve filaire.
+    check("health: ws_binary", payload.get("ws_binary") is False, str(payload)[:200])
     check("health: sha + commit",
           isinstance(payload.get("sha"), str) and payload.get("commit") == payload.get("sha"),
           str(payload)[:200])

@@ -29,6 +29,31 @@ OVERSIZE_REASON = "response too large: lower max_objects or use mask_format=rle"
 # À 4 sockets parqués, ``/health`` et ``/live`` font la queue au proxy sans fin.
 # 5 s : un pair vivant absorbe une réponse en millisecondes ; au-delà il est parti.
 WS_SEND_SECONDS = 5.0
+# Handshake : au-delà, le slot est rendu sans session (M1 : accept() nu parquait
+# l'input en silence, avant tout log et tout compteur).
+WS_ACCEPT_SECONDS = 10.0
+
+
+async def accept_ws(websocket) -> bool:
+    """Handshake gardé : ``True`` + session ouverte, ``False`` = slot rendu, 0 session.
+
+    Un handshake est un input ``max_inputs`` comme un autre : sans la borne, un
+    client qui dégouline parque le slot jusqu'au timeout Modal (1 h). La durée
+    est loggée (sonde F3) ; un pair parti avant ``accept()`` rend 0 session.
+    """
+    started = time.monotonic()
+    try:
+        await asyncio.wait_for(websocket.accept(), timeout=WS_ACCEPT_SECONDS)
+    except asyncio.TimeoutError:
+        print(f"ws: handshake > {WS_ACCEPT_SECONDS:g} s, slot rendu sans session",
+              flush=True)
+        return False
+    except Exception as exc:  # noqa: BLE001 — pair parti pendant le handshake
+        print(f"ws: accept impossible ({exc}), 0 session", flush=True)
+        return False
+    took_ms = (time.monotonic() - started) * 1000
+    print(f"ws: accept /live/ws en {took_ms:.0f} ms", flush=True)
+    return True
 
 
 def dumps(reply) -> str:

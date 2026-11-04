@@ -48,6 +48,9 @@ WS_MAX_REPLY_BYTES = 4_000_000  # réponse plus grosse : dégradée, 1009 en der
 # Client parti pendant N : on laisse finir la réponse au plus ça, puis on rend le
 # créneau. Le thread d'inférence, lui, va au bout (un thread Python ne se tue pas).
 WS_ABANDON_SECONDS = 2.0
+# Ramassage du double-buffer (M1) : si le waiter (receive transport) ignore
+# l'annulation, la session restait « open » à vie au lieu de se fermer.
+WS_CANCEL_SECONDS = 5.0
 # Vol borné à 2 (FIX-13, structurel : 1 inférence + 1 message tenu, pas de file).
 WS_MAX_IN_FLIGHT = 2
 
@@ -115,11 +118,20 @@ async def _recv_one(websocket) -> tuple:
         # consommé » — le waiter du double-buffer peut consommer le disconnect
         # avant la boucle : le client est parti, sortie propre (pas un 400).
         return ("disconnect", None)
-    except Exception:  # noqa: BLE001 — socket déjà fermé : 400, connexion gardée
+    except Exception as exc:  # noqa: BLE001 — socket déjà fermé : 400, connexion gardée
+        # Imprimée (M2) : avalée, elle taisait le tueur des trames binaires.
+        print(f"ws: receive() a levé {type(exc).__name__}: {exc}", flush=True)
         return ("msg", None)
     if message.get("type") == "websocket.disconnect":
+        print(f"ws: disconnect client (code={message.get('code')} raison={message.get('reason')})", flush=True)
         return ("disconnect", None)
-    return ("msg", message.get("text", message.get("bytes")))
+    if "bytes" in message:
+        print(f"ws: message binaire reçu ({len(message['bytes'])} o)", flush=True)
+        return ("msg", message["bytes"])
+    if "text" in message:
+        return ("msg", message["text"])
+    print(f"ws: message inattendu (clés={sorted(message)})", flush=True)
+    return ("msg", None)
 
 
 async def _recv_idle(websocket, idle_seconds) -> tuple:
@@ -297,7 +309,12 @@ async def _infer_with_prefetch(service, websocket, raw, depth_state, every,
         for task in pending:
             task.cancel()
         if pending:  # ramasse les annulées : pas d'exception orpheline en boucle longue
-            await asyncio.gather(*pending, return_exceptions=True)
+            try:
+                await asyncio.wait_for(asyncio.gather(*pending, return_exceptions=True),
+                                       timeout=WS_CANCEL_SECONDS)
+            except asyncio.TimeoutError:
+                print("ws: ramassage parqué (> 5 s), session fermée quand même",
+                      flush=True)
 
 
 async def ws_frame(service, raw, depth_state=None, every=None) -> dict:

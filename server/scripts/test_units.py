@@ -33,8 +33,8 @@ from tests_units import (boot_tests, concepts_street_tests, crossing_concepts_te
                          live_fast_tests, live_fast_perf_tests, llm_tests, m1_vectors_tests,
                          merge_tests, native_tests, post_tests, preproc_tests, segmentation_tests,
                          tracking_tests,
-                         valhalla_grid_tests, weights_tests, ws_binary_tests, ws_pump_tests,
-                         ws_send_tests)
+                         valhalla_grid_tests, weights_tests, ws_binary_tests, ws_guard_tests,
+                         ws_pump_tests, ws_send_tests)
 
 BACKEND_DIR = Path(__file__).resolve().parent.parent / "backend"
 PASSED: list[str] = []
@@ -473,6 +473,7 @@ RUNNERS = (
     ("live_fast : post (levier recuit au déploiement)", "timing", post_tests.test_post_deploy),
     ("live_fast : WS double-buffer (FIX-13/8/17, health)", "timing", ws_pump_tests.test_ws_pump),
     ("live_fast : WS envois bornés (P0-2, pair parti)", "timing", ws_send_tests.test_ws_send),
+    ("live_fast : anti-coinçage (M1) + réception loggée (M2)", "timing", ws_guard_tests.test_ws_guard),
     ("valhalla : grille feux == scan", "valhalla_cpu", valhalla_grid_tests.test_grid_equivalence),
     ("valhalla : grille feux (bordures)", "valhalla_cpu", valhalla_grid_tests.test_grid_borders),
     ("valhalla : traversées sur grille", "valhalla_cpu", valhalla_grid_tests.test_unsafe_crossings_shape),

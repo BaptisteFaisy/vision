@@ -16,7 +16,7 @@ import detr_graph
 from fast_core import (BATCH_PROMPTS, DEPTH_EVERY, DTYPE_NAME, EDGE, RUNTIME_EDGE, TIMING,
                        clamp_int, gpu_name, levers, load, load_cpu, prepare, run_frame,
                        segment_frame, vision_grid)
-from gpu_guard import Slots, wedged
+from gpu_guard import POST_BODY_SECONDS, Slots, post_guarded, wedged
 from http_errors import validation_detail as _validation_detail
 from passage import suggest_passage
 from pipe_compat import accepts_param, call
@@ -25,7 +25,7 @@ from timing import (Stage, build_breakdown, container_age_seconds, elapsed_ms,
 # Pompe WS extraite (garde < 500 l) : seuils ré-exportés (bancs, live_app).
 from ws_pump import (WS_CLIENT_PING_SECONDS, WS_FRAME_SECONDS, WS_IDLE_SECONDS,
                      WS_MAX_REPLY_BYTES, ws_answer, ws_frame, ws_loop)
-from ws_session import new_ws_metrics, ws_snapshot
+from ws_session import accept_ws, new_ws_metrics, ws_snapshot
 
 MODEL_LABEL = "sam3.1-fast"
 # Laisse le temps de répondre au client avant d'arrêter le processus (POST /release).
@@ -57,22 +57,6 @@ def deploy_sha() -> str:
     pose la variable, ``lever_env()`` la recuit — ``/health`` ne fait que la lire.
     """
     return os.environ.get("DEPLOY_SHA") or "unknown"
-
-
-async def _accept_ws(websocket) -> bool:
-    """Handshake gardé : un pair parti avant ``accept()`` rend 0 session, pas une trace.
-
-    La durée du handshake est loggée (sonde F3). Vrai si le socket est ouvert.
-    """
-    started = time.monotonic()
-    try:
-        await websocket.accept()
-    except Exception as exc:  # noqa: BLE001 — pair parti pendant le handshake
-        print(f"ws: accept impossible ({exc}), 0 session", flush=True)
-        return False
-    took_ms = (time.monotonic() - started) * 1000
-    print(f"ws: accept /live/ws en {took_ms:.0f} ms", flush=True)
-    return True
 
 
 class Sam3LiveService:
@@ -254,7 +238,12 @@ class Sam3LiveService:
         """``POST /live`` binaire : JPEG brut + knobs en query, même réponse que le JSON."""
         from imaging import decode_jpeg_bytes
 
-        raw = await request.body()
+        try:
+            raw = await asyncio.wait_for(request.body(), timeout=POST_BODY_SECONDS)
+        except asyncio.TimeoutError:
+            from fastapi import HTTPException
+
+            raise HTTPException(status_code=400, detail="request body timeout") from None
         params = request.query_params
 
         def _int(name):
@@ -304,9 +293,16 @@ class Sam3LiveService:
         image = decode_image(image_b64)
         concepts = normalize_prompts(prompts) if prompts is not None else None
         if concepts is None:
-            with self._gpu_lock:
+            from gpu_guard import GPU_QUEUE_SECONDS, GpuBusy, acquire
+
+            if not acquire(self._gpu_lock):
+                raise GpuBusy(f"gpu busy > {GPU_QUEUE_SECONDS:g} s")
+            try:
                 return run_segmentation(self.ctx["model"], self.ctx["processor"],
                                         self.ctx["device"], self.ctx["dtype"], image, None)
+            finally:
+                if self._gpu_lock is not None:
+                    self._gpu_lock.release()
         result = segment_frame(self.ctx, image, concepts, WORK_EDGE_MAX, MAX_OBJECTS,
                                BATCH_PROMPTS, gpu_lock=self._gpu_lock)
         result.pop("_edge_applied", None)
@@ -346,8 +342,10 @@ class Sam3LiveService:
         # Totale avant load_container : un conteneur en boot répond « pas prêt »
         # (la route rend 503), jamais un AttributeError sur ctx absent (500).
         ctx = getattr(self, "ctx", None) or {}
+        # ws_binary False : l'ingress Modal tue l'opcode 0x2 (11/2026, close 1000
+        # sans log ni compteur) — repasser True après preuve filaire (bench --binary).
         return {"ok": ready, "model": MODEL_LABEL, "version": MODEL_LABEL,
-                "sha": sha, "commit": sha, "ws_binary": True,
+                "sha": sha, "commit": sha, "ws_binary": False,
                 "ws_ready": ready,
                 "warm": bool(getattr(self, "warm", False)),
                 "device": ctx.get("device_label", "cpu"),
@@ -403,10 +401,15 @@ class Sam3LiveService:
 
         ctype = request.headers.get("content-type", "")
         if ctype.split(";")[0].strip().lower() == "application/octet-stream":
-            result = await self._run_live_binary(request)
+            result = await post_guarded(self, self._run_live_binary(request))
         else:
             try:
-                parsed = LiveFastRequest(**await request.json())
+                body = await asyncio.wait_for(request.json(), timeout=POST_BODY_SECONDS)
+            except asyncio.TimeoutError:
+                return JSONResponse(status_code=400,
+                                    content={"detail": "request body timeout"})
+            try:
+                parsed = LiveFastRequest(**body)
             except Exception as exc:  # noqa: BLE001 — même 400 string que le handler
                 from pydantic import ValidationError as PydanticValidationError
 
@@ -415,7 +418,7 @@ class Sam3LiveService:
                                         content={"detail": _validation_detail(exc.errors())})
                 return JSONResponse(status_code=400,
                                     content={"detail": "invalid request body: JSON illisible"})
-            result = await self._run_live(parsed)
+            result = await post_guarded(self, self._run_live(parsed))
         # En-tête additif (RFC 8673) : le levier FAST_TIMING reste le seul interrupteur.
         # Éteint, `timings_ms` est absent et aucun en-tête n'est émis — un client ancien
         # ne voit strictement rien changer ; un banc lit les postes sans parser le corps.
@@ -465,7 +468,8 @@ class Sam3LiveService:
 
         @api.post("/segment")
         async def segment(request: SegmentRequest):
-            return await call(service._segment_sync, request.image_b64, request.prompts)
+            return await post_guarded(
+                service, call(service._segment_sync, request.image_b64, request.prompts))
 
         @api.post("/live")
         async def live(request: Request):
@@ -481,8 +485,8 @@ class Sam3LiveService:
 
         @api.websocket("/live/ws")
         async def live_ws(websocket: WebSocket):
-            """Même pipeline que POST /live ; handshake via _accept_ws (0 session si refusé)."""
-            if not await _accept_ws(websocket):
+            """Même pipeline que POST /live ; handshake via accept_ws (0 session si refusé)."""
+            if not await accept_ws(websocket):
                 return
             await service._ws_loop(websocket)
 

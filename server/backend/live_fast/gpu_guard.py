@@ -18,12 +18,18 @@ qui continue de tenir ``_gpu_lock``. Trois garde-fous, tous exerçables sans GPU
 
 from __future__ import annotations
 
+import asyncio
 import os
 import threading
 
 # Attente au verrou avant de répondre « occupé » (429) : 15 s couvre la frame
 # chaude (~0,25 s) et une frame froide, sans immobiliser un slot plus longtemps.
 GPU_QUEUE_SECONDS = float(os.environ.get("FAST_GPU_QUEUE_S") or 15.0)
+# POST : borne inférence (WS = 75 s + marge) ; un thread qui ne revient jamais
+# rend 503 au lieu de parquer l'input jusqu'au timeout Modal (1 h).
+POST_FRAME_SECONDS = 90.0
+# POST : lecture du corps (frame ~200 Ko) ; un client qui dégouline rend 400.
+POST_BODY_SECONDS = 30.0
 # 3 × 75 s de blocage prouvé : au-delà, le thread fou ne rendra jamais le verrou.
 WEDGE_RESTART_TIMEOUTS = 3
 # Laisse la réponse 429 partir avant que le processus ne meure.
@@ -118,6 +124,28 @@ def note_timeout(service, frame_seconds: float) -> int:
 def note_success(service) -> None:
     """Une frame a répondu : le compteur de timeouts consécutifs repart à zéro."""
     service.frame_timeouts = 0
+
+
+async def post_guarded(service, coro, frame_seconds: float | None = None):
+    """POST borné + watchdog : 503 + compteur, jamais un input parqué (M1).
+
+    Le watchdog était aveugle hors WS : un wedge déclenché par POST ne
+    redémarrait jamais seul. Ici chaque timeout compte (→ ``os._exit(3)`` au
+    seuil) et chaque succès remet le compteur à zéro, comme en WS.
+    """
+    from fastapi import HTTPException
+
+    bound = POST_FRAME_SECONDS if frame_seconds is None else frame_seconds
+    try:
+        result = await asyncio.wait_for(coro, timeout=bound)
+    except asyncio.TimeoutError:
+        slots = getattr(service, "slots", None)
+        if slots is not None:
+            slots.abandon()
+        note_timeout(service, bound)
+        raise HTTPException(status_code=503, detail="inference timeout, retry") from None
+    note_success(service)
+    return result
 
 
 def restart_later(delay: float = WEDGE_RESTART_DELAY_SECONDS) -> None:
