@@ -5,13 +5,13 @@ import dev.sam3vision.core.live.PersonLabels
 
 /**
  * Concepts qui font parler le guetteur danger : tous disent le mot
- * d'évitement « Droite. »/« Gauche. » en continu (personne niveau 2,
- * grillages/murs/barrières niveau 4, poteaux/mobilier/divers niveau 7 —
+ * d'évitement « Droite. »/« Gauche. » en continu (personne niveau 3,
+ * grillages/murs/barrières niveau 5, poteaux/mobilier/divers niveau 8 —
  * ordre user du 03/11 : les obstacles s'esquivent, ils ne se nomment
  * plus ; la position optimale se dit en permanence).
  *
  * Le français reste reconnu : un label « barrière » compte comme
- * « barrier ». Le poteau parle depuis la v4 (niveau 7) : [isSpoken] ne le
+ * « barrier ». Le poteau parle depuis la v4 (niveau 8) : [isSpoken] ne le
  * tait plus — [isPole] reste, lu par le repli haut-de-poteau de la
  * Traversée (`CrossingPrompts.selectPoleTopBox`, qui vise le haut du
  * poteau pour y lire le feu). Bornes, portails et trottinettes sortis
@@ -71,7 +71,7 @@ object HazardConcepts {
         "child" to HazardName("à l'enfant", "child"),
         "children" to HazardName("à l'enfant", "child"),
         "enfant" to HazardName("à l'enfant", "child"),
-        // Divers v4 (niveau 7) : l'animal générique et le chat, la poubelle,
+        // Divers v4 (niveau 8) : l'animal générique et le chat, la poubelle,
         // la benne, les souvenirs, le bonnet et les chaussettes.
         "animal" to HazardName("à l'animal", "animal"),
         "animaux" to HazardName("à l'animal", "animal"),
@@ -108,11 +108,11 @@ object HazardConcepts {
     /**
      * Premier mot connu NON-personne de [NAMES] (pluriel toléré), `null`
      * sinon. Les entrées personne sont exclues : « child seat » (siège
-     * auto) ne doit pas annoncer un enfant de niveau 2 — une personne ne
+     * auto) ne doit pas annoncer un enfant de niveau 3 — une personne ne
      * se reconnaît qu'en libellé entier. Même raison pour [PersonLabels],
      * jamais consulté mot à mot (« pedestrian traffic light » contient
      * « pedestrian » et n'est pas une personne). Premier mot assumé :
-     * « sign language » donne « sign » (niveau 7, les composés ne venant
+     * « sign language » donne « sign » (niveau 8, les composés ne venant
      * que des suivis) quand « poteau métallique » donne « poteau ».
      */
     private fun wordHit(key: String): HazardName? {
@@ -134,7 +134,7 @@ object HazardConcepts {
     /**
      * Vrai si [label] désigne un poteau (le nom anglais fait foi, jamais
      * une table à part). Requis par `CrossingPrompts.selectPoleTopBox`
-     * (repli haut-de-poteau) : voix parlante depuis la v4 (niveau 7).
+     * (repli haut-de-poteau) : voix parlante depuis la v4 (niveau 8).
      */
     fun isPole(label: String): Boolean = nameOf(label)?.en == "pole"
 
@@ -153,18 +153,18 @@ object HazardConcepts {
      * Vrai si [label] se guide comme une personne (ordre user du 02/11) :
      * personne, enfant, poussette, fauteuil roulant, chien ([kindOf] vaut
      * alors [HazardKind.PERSON]) — mot d'évitement continu, portée et
-     * priorité personne. Le poteau n'y est pas (continu à part, niveau 7).
+     * priorité personne. Le poteau n'y est pas (continu à part, niveau 8).
      */
     fun isGuidedBody(label: String): Boolean = kindOf(label) == HazardKind.PERSON
 
     /**
      * Vrai si [label] fait parler le guetteur : personne ou mobilier
-     * suivi — le poteau parle depuis la v4 (niveau 7), la borne et le
+     * suivi — le poteau parle depuis la v4 (niveau 8), la borne et le
      * portail ne sont plus reconnus ([isHazard] les ignore).
      */
     fun isSpoken(label: String): Boolean = isHazard(label)
 
-    /** Vrai si [label] désigne une barrière (niveau 4, avec grillages et murs). */
+    /** Vrai si [label] désigne une barrière (niveau 5, avec grillages et murs). */
     fun isBarrier(label: String): Boolean = nameOf(label)?.en == "barrier"
 
     /**
@@ -207,18 +207,18 @@ object HazardConcepts {
 }
 
 /**
- * Sorte parlée : personne (niveau 2), barrière (niveau 4, avec les
- * grillages et les murs), poteau (niveau 7), divers (niveau 7 — le mur,
- * niveau 4, en fait partie). Toutes disent le mot d'évitement en continu.
+ * Sorte parlée : personne (niveau 3), barrière (niveau 5, avec les
+ * grillages et les murs), poteau (niveau 8), divers (niveau 8 — le mur,
+ * niveau 5, en fait partie). Toutes disent le mot d'évitement en continu.
  */
 enum class HazardKind {
-    /** Corps qui bloque et s'évite (personne, enfant, poussette, fauteuil roulant, chien : niveau 2). */
+    /** Corps qui bloque et s'évite (personne, enfant, poussette, fauteuil roulant, chien : niveau 3). */
     PERSON,
 
-    /** Barrière : mot d'évitement continu (niveau 4, avec grillages et murs). */
+    /** Barrière : mot d'évitement continu (niveau 5, avec grillages et murs). */
     BARRIER,
 
-    /** Poteau : mot d'évitement continu (niveau 7). */
+    /** Poteau : mot d'évitement continu (niveau 8). */
     POLE,
 
     /** Divers : clôture, mur, lampadaire, panneau, animal, poubelle, souvenirs… (mot continu). */
