@@ -138,12 +138,35 @@ private fun BoxWithConstraintsScope.PortraitScene(
 private fun BoxScope.SceneStatusBar(state: IseeUiState, viewModel: IseeViewModel, guidance: Boolean, bottom: Dp) {
     // La sonde écrit deux fois par frame : ce corps se réexécute à chaque
     // tick, mais le modificateur stable laisse la feuille intacte quand
-    // le texte ne change pas (l'expiration du « Back online » est gardée :
-    // la ligne est toujours recalculée sur l'état frais).
-    val outage = outageLineOf(viewModel.probe.state.collectAsState().value)
+    // le texte ne change pas. La ligne fraîche prime ; à défaut, la dernière
+    // ligne est tenue pendant la grâce (pas de clignotement en flap).
+    val fresh = outageLineOf(viewModel.probe.state.collectAsState().value)
+    val outage = rememberOutageLine(fresh)
     if (guidance && outage == null) return
     val bar = remember(bottom) { Modifier.align(Alignment.BottomCenter).padding(bottom = bottom + 10.dp) }
     SceneBottomBar(state, outage, bar)
+}
+
+/**
+ * Ligne de panne tenue : une ligne fraîchement effacée reste affichée pendant
+ * la grâce ([heldOutageLine]) au lieu de clignoter — même pattern `SideEffect`
+ * que [rememberGlassesFeed] (écrire après application, pas pendant).
+ */
+@Composable
+private fun rememberOutageLine(fresh: String?): String? {
+    var held by remember { mutableStateOf<String?>(null) }
+    var heldAt by remember { mutableStateOf(0L) }
+    val now = System.currentTimeMillis()
+    val line = heldOutageLine(fresh, held, heldAt, now)
+    SideEffect {
+        if (fresh != null) {
+            held = fresh
+            heldAt = now
+        } else if (line == null) {
+            held = null
+        }
+    }
+    return line
 }
 
 /**

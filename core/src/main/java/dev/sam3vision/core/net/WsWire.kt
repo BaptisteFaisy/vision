@@ -15,18 +15,28 @@ internal const val WS_CLOSED = "WebSocket /live/ws closed"
 internal const val WS_UNREADABLE = "WebSocket: unreadable message"
 internal const val WS_BAD_IMAGE = "WebSocket /live/ws : image_b64 illisible"
 
+/** Préfixe commun des refus locaux du lien : un seul test ([isLinkRefusal]) pour l'UI. */
+const val WS_LINK_PREFIX = "WebSocket /live/ws"
+
+/**
+ * Refus local du lien (aucun handshake tenté : repli, hors-ligne, silence) :
+ * l'UI le dit transitoire au lieu d'accuser le réseau — l'escalade reste portée
+ * par les compteurs et la veille de panne, pas par ce texte.
+ */
+fun isLinkRefusal(error: Throwable): Boolean = (error.message ?: "").startsWith(WS_LINK_PREFIX)
+
 /** La frame n'a pas quitté le téléphone (hors ligne connu). */
-internal const val WS_OFFLINE = "WebSocket /live/ws : hors ligne"
+internal const val WS_OFFLINE = "$WS_LINK_PREFIX : hors ligne"
 
 /** Interface changée : le socket de l'ancienne est mort-né. */
-internal const val WS_IFACE_CHANGED = "WebSocket /live/ws : réseau changé"
+internal const val WS_IFACE_CHANGED = "$WS_LINK_PREFIX : réseau changé"
 
 /** Backoff en cours : la reprise est armée, inutile d'empiler les handshakes. */
-internal const val WS_RECONNECTING = "WebSocket /live/ws : reconnexion en cours"
+internal const val WS_RECONNECTING = "$WS_LINK_PREFIX : reconnexion en cours"
 
 /** Le socket n'a plus donné signe de vie : le watchdog l'a déclaré mort. */
-internal const val WS_SILENT = "WebSocket /live/ws : silence, socket mort"
-internal const val WS_SEND_REFUSED = "WebSocket /live/ws: send refused"
+internal const val WS_SILENT = "$WS_LINK_PREFIX : silence, socket mort"
+internal const val WS_SEND_REFUSED = "$WS_LINK_PREFIX: send refused"
 
 /** `id` d'une réponse orpheline (serveur sans binaire) et son marqueur d'erreur. */
 internal const val UNKNOWN_WS_ID = -1

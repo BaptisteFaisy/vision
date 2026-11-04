@@ -5,6 +5,7 @@ import dev.sam3vision.core.live.FrameTimings
 import dev.sam3vision.core.distance.DistanceReading
 import dev.sam3vision.core.distance.DistanceText
 import dev.sam3vision.core.net.ApiError
+import dev.sam3vision.core.net.WS_LINK_PREFIX
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
 import org.junit.Assert.assertTrue
@@ -256,5 +257,41 @@ class LiveProbeTextTest {
         assertFalse(probeRetryVisible(LiveProbeState(frames = 3)))
         assertTrue(probeRetryVisible(LiveProbeState(error = "GPU waking up… (retrying on the next frame)")))
         assertTrue(probeRetryVisible(LiveProbeState(error = "SAM GPU off — ask b to turn it on")))
+    }
+
+    @Test
+    fun `refus local du lien, lignes transitoires au lieu du brut`() {
+        val silent = ProbeLinkState(ProbeLinkKind.Silent, 4_200)
+        val warm = ProbeLinkState(ProbeLinkKind.Warm, 300)
+        val cold = ProbeLinkState(ProbeLinkKind.Cold, 0)
+
+        for (suffix in listOf("reconnexion en cours", "hors ligne", "réseau changé", "silence, socket mort")) {
+            val error = ApiError.Network("$WS_LINK_PREFIX : $suffix")
+            assertEquals(silenceNotice(4_200), probeFailureText(error, silent))
+            assertEquals("slow answer — retrying on the next frame", probeFailureText(error, warm))
+            assertEquals("GPU waking up… (retrying on the next frame)", probeFailureText(error, cold))
+        }
+    }
+
+    @Test
+    fun `non-transient hors lien remonte brut`() {
+        val warm = ProbeLinkState(ProbeLinkKind.Warm, 300)
+
+        assertEquals("SAM GPU off — ask b to turn it on",
+            probeFailureText(ApiError.BackendStopped(), warm))
+        assertEquals("boom", probeFailureText(ApiError.Network("boom"), warm))
+    }
+
+    @Test
+    fun `notice, 1 echec masque, 2 affichent, 0 plus erreur affiche`() {
+        val one = ProbeLinkState(ProbeLinkKind.Warm, 300, consecutiveFailures = 1)
+        val two = ProbeLinkState(ProbeLinkKind.Warm, 300, consecutiveFailures = 2)
+
+        assertEquals("2e échec : dit", "slow answer — retrying on the next frame",
+            liveProbeNotice(LiveProbeState(error = "slow answer — retrying on the next frame", link = two)))
+        assertEquals("sans compteur : dit", "no endpoint (Settings)",
+            liveProbeNotice(LiveProbeState(error = "no endpoint (Settings)")))
+        val masked = liveProbeNotice(LiveProbeState(error = "boom", link = one, warming = true, timeoutSec = 60))
+        assertEquals("1er isolé : masqué, le réveil parle", "waking the SAM GPU… (up to 60 s)", masked)
     }
 }

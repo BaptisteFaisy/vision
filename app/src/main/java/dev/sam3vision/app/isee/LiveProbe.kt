@@ -44,6 +44,7 @@ import kotlinx.coroutines.launch
 import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.sync.withLock
 import kotlinx.coroutines.yield
+import java.util.concurrent.atomic.AtomicLong
 
 /**
  * Analyse SAM de la caméra d'iSee : caméra active, chaque frame part à `/live` (une à la
@@ -145,6 +146,9 @@ class LiveProbe(
     internal val traverseVeto = TraverseVeto()
 
     private val publishMutex = Mutex() // une seule publication à la fois
+
+    /** Séquence d'envoi monotonique : un vol soldé après un vol plus récent est périmé. */
+    private val dispatchSeq = AtomicLong(0L)
 
     /** Porte « sans feu » : 4 frames sans boîte de feu → voix véhicules + « Traversez. ». */
     internal val noLightGate = NoLightGate()
@@ -408,7 +412,8 @@ _state.update { it.cleared() }
         // Hors du thread principal : la sérialisation de la frame (JSON + base64) et la
         // normalisation des concepts ne doivent jamais tomber dans la boucle de composition.
         val send = rotation.send(state.value.conceptsSent)
-        scope.launch(background) { runFrame(active, jpegB64, at, send.prompts, send.rotated) }
+        val frameSeq = dispatchSeq.getAndIncrement()
+        scope.launch(background) { runFrame(active, jpegB64, at, send.prompts, send.rotated, frameSeq) }
     }
 
     /** Une réponse vient d'arriver : une frame en réserve part maintenant, au lieu
@@ -434,7 +439,7 @@ _state.update { it.cleared() }
         session?.useCadence(if (crowd) Cadence.Crowd else Cadence.Fast)
     }
 
-    private suspend fun runFrame(active: LiveSession, jpegB64: String, at: Long, prompts: List<String>, rotated: Boolean) {
+    private suspend fun runFrame(active: LiveSession, jpegB64: String, at: Long, prompts: List<String>, rotated: Boolean, frameSeq: Long) {
         val result = active.runFrameWith(jpegB64, prompts)
         // Réponse complète : le poste « reçu » et l'aller-retour sont posés à l'arrivée,
         // hors file de publication — sinon le `rtt` paie les masques de la frame d'avant.
@@ -446,7 +451,7 @@ _state.update { it.cleared() }
             adaptive.onSettled(roundTripMs, result, jpegB64.length)
             // Frame détachée : elle garde ses marques de rendu quand la suivante démarre.
             val shown = chronology.publishing()
-            if (result.isSuccess) if (!warmed) goWarm() else noteAnswer()
+            if (result.isSuccess) if (!warmed) { link.markSettled(frameSeq); goWarm() } else noteAnswer(frameSeq = frameSeq)
             // La suivante part **avant** la publication : le créneau est déjà rendu, et les
             // masques (~15 ms) ne doivent pas laisser le GPU inactif.
             drain()
@@ -459,7 +464,7 @@ _state.update { it.cleared() }
                 // date ses échecs et n'écrit qu'une ligne de log par seconde.
                 val error = result.exceptionOrNull() ?: ApiError.BadResponse("SAM call failed")
                 if (error is ApiError.Timeout) { if (!warmed) sayColdTimeout(); LiveLatencyLog.drop(DropCause.TIMEOUT) }
-                noteFailure(error, shown.snapshot())
+                noteFailure(error, shown.snapshot(), frameSeq = frameSeq)
                 return@withLock
             }
             if (_state.value.frames == 0) {
