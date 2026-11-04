@@ -3,6 +3,21 @@
 Le journal part du 2026-10-26 après 19 h : le commit de départ, puis une entrée par fait
 livré et ses preuves (tâche, fichiers, chiffres) dans l'arbre.
 
+## 2026-11-04 — iSee : pastille rejointe aux puces lieu et Traversée en rangée (branche `isee-rangee-3-puces`)
+
+- **Demande** : mettre les badges d'état (pastille), lieu et Traversée sur
+  la même ligne, espacés (ordre user du 04/11/2026).
+- **Fait** :
+  - `isee/IseePortraitCamera.kt` : `ModeToggles` en rangée à 3
+    (lieu, Traversée, pastille, 8 dp) ; `PortraitCamera` reçoit `scene`
+    (params `ghost`/`scene` sur une ligne : plafond 50 lignes).
+  - `isee/IseeSceneHeader.kt` : `StatusChip` interne ; `Header` vide
+    caméra ouverte (même seuil 0,5 : pas de doublon à l'ouverture).
+  - `isee/IseeScenePane.kt` : `view.scene` transmis ; §1
+    `docs/ISEE-DESIGN-PORTRAIT.md` à jour.
+- **Preuves** : gardes `check-isee-design` + `check-kotlin-limits` OK ;
+  CI PR #1145 verte (run 41757611877, `ci-core` + `ci-app`).
+
 ## 2026-11-04 — iSee : phrase sans label locuteur, puces lieu et Traversée en rangée (branche `isee-puces-ligne-sans-label`)
 
 - **Demande** : supprimer « ISEE »/« YOU » au-dessus du texte parlé ; sur
