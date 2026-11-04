@@ -123,33 +123,9 @@ class LiveProbePublishConcurrencyTest {
             probe.configure(PROBE_TEST_ENDPOINT)
             probe.begin()
             probe.adaptive.configure(uploadEnabled = false, keyframesEnabled = false)
-            var joue = false
             runBlocking {
                 withTimeout(120_000) {
-                    repeat(30) { cycle ->
-                        if (joue) return@repeat
-                        val baseSent = fake.sent
-                        probe.onFrame("A$cycle")
-                        probe.onFrame("B$cycle")
-                        if (!attendre { fake.sent >= baseSent + 2 }) {
-                            if (fake.sent == baseSent + 1) {
-                                // Un seul admis : A (émis en premier), sinon B — solder
-                                // libère le créneau pour les cycles suivants.
-                                try {
-                                    fake.respond("A$cycle", frame())
-                                } catch (_: IllegalStateException) {
-                                    fake.respond("B$cycle", frame())
-                                }
-                            }
-                            return@repeat
-                        }
-                        val baseFrames = probe.state.value.frames
-                        fake.respond("B$cycle", frame())
-                        if (!attendre { probe.state.value.frames >= baseFrames + 1 }) return@repeat
-                        fake.fail("A$cycle", ApiError.Network("boom"))
-                        joue = true
-                    }
-                    assertTrue("aucune paire admise", joue)
+                    assertTrue("aucune paire admise", jouerPaireDesordonnee(probe, fake))
                     assertFalse("le KO périmé ne compte pas",
                         attendre { probe.state.value.link.consecutiveFailures > 0 })
                 }
@@ -160,6 +136,39 @@ class LiveProbePublishConcurrencyTest {
         } finally {
             scope.cancel()
             seanceVide()
+        }
+    }
+
+    /**
+     * Joue une paire admise en completions inversées : OK frais (B) publié
+     * d'abord, puis KO périmé (A). Rend faux si aucune paire admise.
+     */
+    private suspend fun jouerPaireDesordonnee(probe: LiveProbe, fake: ProbeTestClient): Boolean {
+        repeat(30) { cycle ->
+            val baseSent = fake.sent
+            probe.onFrame("A$cycle")
+            probe.onFrame("B$cycle")
+            if (!attendre { fake.sent >= baseSent + 2 }) {
+                solderIncomplet(fake, cycle, baseSent)
+                return@repeat
+            }
+            val baseFrames = probe.state.value.frames
+            fake.respond("B$cycle", frame())
+            if (!attendre { probe.state.value.frames >= baseFrames + 1 }) return@repeat
+            fake.fail("A$cycle", ApiError.Network("boom"))
+            return true
+        }
+        return false
+    }
+
+    /** Solde un cycle incomplet (un seul vol admis) : libère son créneau. */
+    private fun solderIncomplet(fake: ProbeTestClient, cycle: Int, baseSent: Int) {
+        if (fake.sent != baseSent + 1) return
+        // Un seul admis : A (émis en premier), sinon B.
+        try {
+            fake.respond("A$cycle", frame())
+        } catch (_: IllegalStateException) {
+            fake.respond("B$cycle", frame())
         }
     }
 }
