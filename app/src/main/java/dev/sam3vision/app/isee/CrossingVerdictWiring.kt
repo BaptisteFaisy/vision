@@ -100,6 +100,12 @@ class CrossingVerdictEngine(
     /** [atMs] de la première frame du silence sans preuve courant (`null` = preuve lue). */
     private var unprovenSinceMs: Long? = null
 
+    /** Dernier verdict tenu (`null` = aucun : le premier verdict passe sans tenue). */
+    private var held: CrossingVerdict? = null
+
+    /** DontCross bruts consécutifs d'origine feu depuis un Cross tenu. */
+    private var badStreak = 0
+
     /**
      * Traite une frame à [atMs] : verdict, posts ordonnés publiés ([poster]),
      * overlay rouge-vert et front haptique. [readings] porte les distances
@@ -141,7 +147,8 @@ class CrossingVerdictEngine(
         cars.update(carDetections, carReadings, atMs, motion = motion)
         val moving = cars.movingThisFrame
         val recent = recentMoving(moving, atMs)
-        val verdict = CrossingVerdictRule.decide(light, recent, carVeto)
+        val raw = CrossingVerdictRule.decide(light, recent, carVeto)
+        val verdict = holdCross(raw, recent, carVeto)
         val cue = announcer.onFrame(atMs, verdict)
         // Sans preuve on ne PRONONCE rien (pas de « Don't cross. » puis
         // « Cross. » 100 ms plus tard) — mais le silence est BORNÉ (D3/D4).
@@ -171,6 +178,31 @@ class CrossingVerdictEngine(
     private fun recentMoving(moving: Boolean, atMs: Long): Boolean {
         if (moving) lastMovingAtMs = atMs
         return moving || lastMovingAtMs?.let { atMs - it < MOVING_WINDOW_MS } == true
+    }
+
+    /**
+     * Tient un Cross établi à travers 1-2 frames douteuses d'origine FEU
+     * (rouge lu isolé, boîte perdue : jitter SAM sur petite lampe, bout de
+     * tricolore voisin) — le verdict ne bascule qu'au [HOLD_CROSS_FRAMES]e
+     * DontCross consécutif (~150 ms à 12-15 ips, négligeable devant la
+     * répétition de 2 s ; ordre user du 04/11 : vert piéton + rouge voiture
+     * ne doit plus alterner cross/don't-cross). Veto et mouvement tranchent
+     * toujours aussitôt (D7 et sans-feu intacts : seules les bascules d'origine
+     * feu, trafic calme, sont tenues).
+     */
+    private fun holdCross(raw: CrossingVerdict, moving: Boolean, veto: Boolean): CrossingVerdict {
+        if (raw == CrossingVerdict.Cross || held != CrossingVerdict.Cross || moving || veto) {
+            held = raw
+            badStreak = 0
+            return raw
+        }
+        badStreak += 1
+        if (badStreak >= HOLD_CROSS_FRAMES) {
+            held = CrossingVerdict.DontCross
+            badStreak = 0
+            return CrossingVerdict.DontCross
+        }
+        return CrossingVerdict.Cross
     }
 
     /**
@@ -290,11 +322,16 @@ class CrossingVerdictEngine(
         lastMovingAtMs = null
         unprovenFrames = 0
         unprovenSinceMs = null
+        held = null
+        badStreak = 0
     }
 
     companion object {
         /** Fenêtre « voiture en mouvement » du sans-feu : 2 s (ordre user du 04/11). */
         const val MOVING_WINDOW_MS = 2_000L
+
+        /** DontCross bruts consécutifs d'origine feu avant d'abandonner un Cross tenu. */
+        const val HOLD_CROSS_FRAMES = 3
     }
 }
 
