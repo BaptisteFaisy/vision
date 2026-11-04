@@ -6,6 +6,7 @@ import dev.sam3vision.core.live.LivePrompts
 import dev.sam3vision.core.live.PositionText
 import dev.sam3vision.core.model.Detection
 import dev.sam3vision.core.predict.Box
+import kotlin.math.abs
 import kotlin.math.hypot
 
 /**
@@ -150,6 +151,15 @@ class TraverseVeto {
     /** Preuve « garée » sur fenêtre : ce qu'elle prouve sort du veto (voir [ParkedProof]). */
     private val parked = ParkedProof()
 
+    /** Mouvement de la caméra lu sur les objets fixes (voir [AnchorMotion]). */
+    private val anchors = AnchorMotion()
+
+    /** Pas de caméra de la frame courante, `null` hors balayage prouvé. */
+    private var sweepStep: CameraStep? = null
+
+    /** Balayage prouvé à la dernière frame, `null` caméra posée ou doute : le verdict juge sur le même signal. */
+    val cameraMotion: FrameMotion? get() = anchors.motion
+
     /** Vrai si [detection] (dernière frame) est un véhicule prouvé garé : le verdict l'écarte aussi. */
     fun isParked(detection: Detection): Boolean = parked.isParked(detection)
 
@@ -160,6 +170,7 @@ class TraverseVeto {
         previousSeen = emptyMap()
         approach.reset()
         parked.reset()
+        anchors.reset()
     }
 
     /**
@@ -185,18 +196,24 @@ class TraverseVeto {
         depthByBox: Map<List<Float>, Float>? = null, // PISTE2 : proximités par boîte vers le suivi — null = repli géométrie.
         noLight: Boolean = false,
     ): TraverseDecision {
-        parked.update(detections, atMs, groundOf(motion)?.let { it > ParkedProof.PAN_SPEED } == true)
+        val camera = anchors.update(detections, atMs)
+        val ground = anchors.motion ?: motion
+        sweepStep = camera.takeIf { anchors.motion != null }
+        parked.update(detections, atMs, camera == null && groundOf(motion)?.let { it > ParkedProof.PAN_SPEED } == true, camera)
         val live = detections.filterNot(parked::isParked)
         val picked = seenByInstance(live)
-        val stopped = stoppedKeys(picked, focalPx, atMs, motion)
+        val stopped = stoppedKeys(picked, focalPx, atMs, ground)
         val hushed = if (atMs < 0L) emptySet() else approach.cameraMovedKeys
         val blocking = findBlocking(picked, focalPx, stopped, hushed)
         previousSeen = stillMemoryOf(picked, focalPx, atMs)
-        val tracked = approachVerdict(live, atMs, motion, depthByBox)
+        val tracked = approachVerdict(live, atMs, ground, depthByBox)
         // Vert confirmé : le vert gagne toujours (ordre user du 02/11). Le
         // suivi (instantané + pistes) tourne quand même, tenu chaud pour
         // trancher dès le flip rouge ; seule la sortie veto est tue.
-        val veto = (blocking != null || tracked.approaching) && !lightGreen
+        // Sous balayage prouvé, une piste qui n'est plus nourrie est sortie du cadre
+        // ou prouvée garée : son tau ne tient plus le veto, caméra posée rien ne change.
+        val approaching = tracked.approaching && (tracked.tauFresh || anchors.motion == null)
+        val veto = (blocking != null || approaching) && !lightGreen
         currentState = nextState(lightGreen || noLight, veto)
         return TraverseDecision(
             state = currentState,
@@ -243,11 +260,29 @@ class TraverseVeto {
         if (seen in stopped) return null
         if (seen.key in hushed || vehicleKey(seen.detection.label) in hushed) return null
         val previous = matchOf(seen)?.area ?: fallbackArea(seen.key)
-        val growing = previous != null && isGrowingBeyondJitter(previous, seen.box.area)
+        val growing = previous != null && isGrowingBeyondJitter(previous, seen.box.area) && !isEnteringOnSweep(seen)
         val meters = distanceOf(seen.detection, focalPx)
         val near = meters != null && meters < VETO_METERS && nearConfirmed(seen)
         if (!growing && !near) return null
         return Blocking(seen.detection.label, meters)
+    }
+
+    /**
+     * Sous balayage prouvé, une boîte que le cadre coupe grandit parce qu'elle
+     * rentre : son bord libre suit la caméra. Une voiture qui roule et entre va
+     * plus vite que le balayage, sa croissance reste une croissance.
+     */
+    private fun isEnteringOnSweep(seen: Seen): Boolean {
+        val step = sweepStep ?: return false
+        val before = matchOf(seen)?.box ?: return false
+        val box = seen.detection.box
+        val width = seen.detection.width.toFloat()
+        val moved = when {
+            box[0] <= EDGE_PX -> box[2] - before.x2
+            box[2] >= width - EDGE_PX -> box[0] - before.x1
+            else -> return false
+        }
+        return abs(moved / width - step.dx) <= ENTRY_TOLERANCE
     }
 
     /**
@@ -427,6 +462,12 @@ class TraverseVeto {
     private data class Blocking(val label: String, val meters: Float?)
 
     companion object {
+        /** Marge du cadre (px) sous laquelle un bord est coupé. */
+        private const val EDGE_PX = 1f
+
+        /** Écart toléré entre bord libre et caméra (fraction d'image par frame) : le tremblé de SAM. */
+        private const val ENTRY_TOLERANCE = 0.02f
+
         /** Score de confiance minimal d'un véhicule pris au sérieux (strictement dépassé). */
         const val SCORE_MIN = 0.35f
 

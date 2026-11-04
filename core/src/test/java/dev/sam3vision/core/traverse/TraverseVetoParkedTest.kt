@@ -109,4 +109,45 @@ class TraverseVetoParkedTest {
         veto.frame(6, last, motion = slow)
         assertTrue(veto.isParked(last))
     }
+
+    /** Repères fixes (640×480) balayés à [shift] px par frame. */
+    private fun poles(index: Int, shift: Float): Array<Detection> =
+        List(5) { it }.map { Detection("pole", 0.8f, listOf(60f + it * 110f + shift * index, 30f, 80f + it * 110f + shift * index, 120f), 640, 480) }
+            .toTypedArray()
+
+    @Test
+    fun `garee balayee - le veto tombe a la preuve et ne revient pas`() {
+        val veto = TraverseVeto()
+        repeat(4) { index -> veto.frame(index, car(listOf(220f - 16f * index, 140f, 420f - 16f * index, 340f)), *poles(index, -16f)) }
+        repeat(8) { offset ->
+            val index = 4 + offset
+            val decision = veto.frame(index, car(listOf(220f - 16f * index, 140f, 420f - 16f * index, 340f)), *poles(index, -16f))
+            assertFalse("frame $index", decision.veto)
+        }
+        assertTrue("les repères disent le balayage", veto.cameraMotion != null)
+    }
+
+    @Test
+    fun `voiture qui roule pendant le balayage - le veto tient`() {
+        val veto = TraverseVeto()
+        repeat(12) { index ->
+            val driving = car(listOf(100f + 30f * index, 140f, 300f + 30f * index, 340f))
+            val decision = veto.frame(index, driving, *poles(index, -16f))
+            assertTrue("frame $index", decision.veto)
+        }
+    }
+
+    @Test
+    fun `voiture qui entre plus vite que le balayage - sa croissance bloque`() {
+        val veto = TraverseVeto()
+        repeat(4) { index -> veto.frame(index, *poles(index, -8f)) }
+        var blocked = false
+        repeat(3) { offset ->
+            val index = 4 + offset
+            // Boîte lointaine, coupée à gauche : la voiture entre à 60 px par frame.
+            val entering = Detection("car", 0.9f, listOf(0f, 200f, 20f + 60f * offset, 240f), 640, 480)
+            blocked = blocked || veto.frame(index, entering, *poles(index, -8f)).veto
+        }
+        assertTrue(blocked)
+    }
 }

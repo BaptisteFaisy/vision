@@ -317,6 +317,74 @@ class ParkedProofTest {
     }
 
     @Test
+    fun `preuve jamais rejugee - elle expire`() {
+        // Sous 3 ips la fenêtre n'est plus jugeable : sans expiration, une voiture
+        // qui démarre gardait sa preuve jusqu'à sortir du cadre.
+        val proof = ParkedProof()
+        proof.feed(6) { box(320f) }
+        var last = det(box(320f))
+        repeat(4) { index ->
+            last = det(box(340f + index * 20f))
+            proof.update(listOf(last), 5 * step + (index + 1) * 500L)
+        }
+        assertFalse(proof.isParked(last))
+    }
+
+    @Test
+    fun `garee balayee - prouvee dans le repere de la rue`() {
+        val proof = ParkedProof()
+        var last = det(box(320f))
+        repeat(8) { index ->
+            last = det(box(420f - index * 25f))
+            proof.update(listOf(last), index * step, camera = CameraStep(-25f / 640f, 0f))
+        }
+        assertTrue(proof.isParked(last))
+    }
+
+    @Test
+    fun `voiture suivie par la camera - jamais prouvee`() {
+        // Fixe dans l'image, mais les repères disent que la caméra tourne : elle roule.
+        val proof = ParkedProof()
+        repeat(12) { index ->
+            val followed = det(box(shaky(index)))
+            proof.update(listOf(followed), index * step, camera = CameraStep(0.04f, 0f))
+            assertFalse("frame $index", proof.isParked(followed))
+        }
+    }
+
+    @Test
+    fun `garee sortie par le balayage - reprise a son retour, a sa place`() {
+        val proof = ParkedProof()
+        val still = CameraStep(0f, 0f)
+        repeat(6) { proof.update(listOf(det(box(320f))), it * step, camera = still) }
+        proof.update(emptyList(), 2_000L, camera = CameraStep(-0.5f, 0f))
+        proof.update(emptyList(), 3_000L, camera = still)
+        val back = det(listOf(0f, 180f, 100f, 300f))
+        proof.update(listOf(back), 3_200L, camera = CameraStep(0.1f, 0f))
+        assertTrue("morceau revenu à sa place dans la rue", proof.isParked(back))
+    }
+
+    @Test
+    fun `boite ailleurs dans la rue - pas de reprise`() {
+        val proof = ParkedProof()
+        val still = CameraStep(0f, 0f)
+        repeat(6) { proof.update(listOf(det(box(320f))), it * step, camera = still) }
+        proof.update(emptyList(), 2_000L, camera = still)
+        val other = det(listOf(0f, 180f, 100f, 300f))
+        proof.update(listOf(other), 3_200L, camera = still)
+        assertFalse(proof.isParked(other))
+    }
+
+    @Test
+    fun `sans reperes - pas de memoire hors cadre`() {
+        val proof = ParkedProof()
+        val last = proof.feed(6) { box(320f) }
+        proof.update(emptyList(), 3_000L)
+        proof.update(listOf(last), 3_200L)
+        assertFalse(proof.isParked(last))
+    }
+
+    @Test
     fun `absence longue - la piste est oubliee`() {
         val proof = ParkedProof()
         val last = proof.feed(6) { box(320f) }

@@ -80,7 +80,7 @@ class CrossingParkedVideoTest {
             val detections = frame.objects.toDetections(frame.width, frame.height)
             val decision = veto.update(false, detections, focalPx, timed.atMs)
             val out = engine.onFrame(
-                frame, readingsOf(frame, focalPx), "", timed.atMs,
+                frame, readingsOf(frame, focalPx), "", timed.atMs, motion = veto.cameraMotion,
                 carVeto = decision.veto, parked = veto::isParked,
             )
             Step(timed.atMs, out.verdict, out.carMoving, out.posts.firstOrNull()?.text)
