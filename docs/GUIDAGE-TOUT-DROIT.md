@@ -82,6 +82,11 @@ dans `LiveProbeState.clearView`, lue par `HazardSignal.steeredBy`.
 - **Sans distance** : un objet coupé par le bas est proche (`UNSEEN_DEPTH_M`,
   1,5 m) ; un objet aux bords connus reste dans le plan à la portée, il ne
   l'annule plus. Sans bords ni distance, le plan garde son repli.
+- **Passage piéton** : hors Traversée, l'alignement (niveau 2) se tait pendant un
+  ordre d'écart, l'annonce « Crosswalk. » reste. Il disait « Left. » sans voir les
+  obstacles, et écrasait les mots d'esquive (46 sur 56 s le 04/11).
+- **Repli du guetteur** : quand le chemin ne conseille rien, l'opposé du centre,
+  avec la même règle plein axe à droite (5 % du cadre autour de l'axe).
 - **Serveur** : `resolveDecision` est local d'abord. `passage` ne juge que des
   centres en fraction d'image, sans mètres ni murs : son « libre » ne tait plus
   un bouché local, et il n'ajoute un bouché que si le local n'en a pas.

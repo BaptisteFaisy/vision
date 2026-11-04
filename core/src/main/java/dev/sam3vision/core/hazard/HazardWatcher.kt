@@ -5,6 +5,7 @@ import dev.sam3vision.core.distance.DistanceReading
 import dev.sam3vision.core.live.ClearView
 import dev.sam3vision.core.live.GuidanceSide
 import dev.sam3vision.core.live.GuidanceWord
+import dev.sam3vision.core.live.PeoplePath
 import dev.sam3vision.core.live.PositionText
 import dev.sam3vision.core.live.SteeringCap
 import dev.sam3vision.core.speech.SpeechLanguage
@@ -164,12 +165,13 @@ object HazardText {
 
     /**
      * Côté d'évitement conseillé : l'opposé de l'obstacle (à gauche de
-     * l'axe = on passe à droite). Axe pile ou heure inconnue = droite par
-     * défaut (prior, à valider rue : on serre à droite). Seule source du
-     * côté, lue par le mot continu ([avoidWord]).
+     * l'axe = on passe à droite). Plein axe ou heure inconnue = droite, la
+     * règle de [PeoplePath.AXIS_TIE_X], sans mémoire : à 1 % du centre, le
+     * bruit du cadre ne choisit plus le côté. Lue par le mot continu
+     * ([avoidWord]) quand le chemin ne conseille rien.
      */
     fun avoidSide(centerX: Float?): SteeringCap =
-        if (centerX == null || centerX <= AXIS_MID) SteeringCap.Right else SteeringCap.Left
+        if (centerX == null || centerX <= AXIS_MID + PeoplePath.AXIS_TIE_X / 2f) SteeringCap.Right else SteeringCap.Left
 
     /** « Attention … » pour [name] selon [language], située à [centerX] (`null` = sans heure). */
     fun phrase(

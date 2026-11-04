@@ -356,13 +356,13 @@ internal object CrossingLateralWatch {
         pose: CameraPose?,
         lens: LensSpec,
         atMs: Long,
-        language: SpeechLanguage, repeatAhead: Boolean = false,
+        language: SpeechLanguage, repeatAhead: Boolean = false, muteWord: Boolean = false,
     ): CrossingLateralPatch? {
         val patch = crossingLateralPatchOf(
             lateral, arrival, objects, width, height, readings, pose, lens, atMs, language, approach, repeatAhead,
         )
         if (patch == null && _flow.value == null) AntiRepeat.forget(AntiRepeat.KEY_CROSSWALK_ANNOUNCE) // 2e absence : vue perdue, la suivante reparle
-        _flow.value = patch
+        _flow.value = if (muteWord) patch?.copy(lateral = null, lateralClip = null) else patch
         return patch
     }
 
@@ -384,7 +384,8 @@ internal object CrossingLateralWatch {
  * l'user s'aligne à la voix (« Gauche. », « Droite. », « Tout droit. »,
  * « Sur le passage. »), le feu et le veto gardant la priorité du son (mots
  * doux, `urgent = false`). Loin ou invisible, la mémoire retombe (une ligne
- * côté sonde, plafond respecté). « Crosswalk. » redit toutes les 2 s hors traversée (8, devant le repli 12) ; 1 fois par vue en traversée.
+ * côté sonde, plafond respecté). [dodging] : hors traversée, un écart en cours tait
+ * le mot — un « Gauche. » d'alignement contredit l'esquive. « Crosswalk. » redit toutes les 2 s hors traversée (8, devant le repli 12) ; 1 fois par vue en traversée.
  */
 internal fun feedCrossingLateral(
     traversing: Boolean,
@@ -396,9 +397,12 @@ internal fun feedCrossingLateral(
     lens: LensSpec,
     atMs: Long,
     language: SpeechLanguage,
+    dodging: Boolean = false,
 ) {
     if (!traversing) {
-        CrossingLateralWatch.update(objects, width, height, readings, pose, lens, atMs, language, repeatAhead = true)
+        CrossingLateralWatch.update(
+            objects, width, height, readings, pose, lens, atMs, language, repeatAhead = true, muteWord = dodging,
+        )
         return
     }
     val near = CrossingOffer.seesNearCrosswalk(

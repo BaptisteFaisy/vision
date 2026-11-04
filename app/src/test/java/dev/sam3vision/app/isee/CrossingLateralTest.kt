@@ -172,6 +172,18 @@ class CrossingLateralTest {
     }
 
     @Test
+    fun `esquive en cours tait le mot d alignement, pas le passage`() {
+        CrossingLateralWatch.reset()
+        val objects = listOf(obj("crosswalk", listOf(10f, 100f, 100f, 500f)))
+        feedCrossingLateral(
+            false, objects, 512, 1138, emptyList(), null, LensSpec.Default, 0L, SpeechLanguage.Fr, dodging = true,
+        )
+        assertNull(CrossingLateralWatch.flow.value?.lateral)
+        assertNull(CrossingLateralWatch.flow.value?.lateralClip)
+        assertNotNull(CrossingLateralWatch.flow.value)
+    }
+
+    @Test
     fun `lookup offre, profondeur lue ou nulle sans mesure`() {
         val box = listOf(156f, 700f, 356f, 1100f)
         val objects = listOf(obj("crosswalk", box))

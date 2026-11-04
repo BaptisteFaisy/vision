@@ -135,17 +135,35 @@ internal fun LiveProbe.computeRest(
     } else null
     val phrase = phraseOf(placed, readings, frame, at, speechLanguage,
         lens.widthFovDeg(frame.width, frame.height))
-    // Sur le passage, le guidage latéral se tait (déjà arrivé : un « Gauche. »
-    // d'alignement y serait ambigu avec l'évitement) — sans toucher son fichier
-    // (plafond 500) : sa mémoire retombe ici au lieu d'être nourrie.
-    if (onWalk) CrossingLateralWatch.reset()
-    else feedCrossingLateral(crossingActive, frame.objects, frame.width, frame.height, readings, distances.effectivePose(), lens, at, speechLanguage)
+    feedLateralOf(frame, readings, onWalk, crossingActive, at)
     feedCrosswalkLost(crossingActive, frame.objects, at, speechLanguage)
     pulse.feed(at, voice.lastDecision, placed)
     // Compteur de marches : le masque exact borne les frames suivantes (repli boîte sinon).
     StairCannyCount.setMaskPlane(stairsMaskPlaneOf(frame.objects, frame.width, frame.height, grays))
     muteProbeLine(frame, readings, phrase)
     return ProbeRest(rawDetections, readings, placed, cross, phrase, verdict = verdictFrame, onCrosswalk = onWalk)
+}
+
+/**
+ * Guidage latéral de la frame. Sur le passage il se tait (déjà arrivé : un
+ * « Gauche. » d'alignement y serait ambigu avec l'évitement) : sa mémoire retombe
+ * ici au lieu d'être nourrie. Pendant un ordre d'écart, seul le mot se tait.
+ */
+private fun LiveProbe.feedLateralOf(
+    frame: LiveFrame,
+    readings: List<DistanceReading>,
+    onWalk: Boolean,
+    crossingActive: Boolean,
+    at: Long,
+) {
+    if (onWalk) {
+        CrossingLateralWatch.reset()
+        return
+    }
+    feedCrossingLateral(
+        crossingActive, frame.objects, frame.width, frame.height, readings, distances.effectivePose(),
+        distances.lensSpec, at, speechLanguage, dodging = voice.clearView?.order != null,
+    )
 }
 
 /**

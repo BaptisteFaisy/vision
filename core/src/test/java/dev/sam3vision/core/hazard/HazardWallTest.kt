@@ -5,6 +5,7 @@ import dev.sam3vision.core.live.AvoidOrder
 import dev.sam3vision.core.live.ClearView
 import dev.sam3vision.core.live.GuidanceSide
 import dev.sam3vision.core.live.PlacedLabel
+import dev.sam3vision.core.live.SteeringCap
 import dev.sam3vision.core.speech.SpeechLanguage
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
@@ -113,5 +114,13 @@ class HazardSteeredTest {
         val body = HazardSignal(detected = true, meters = 3f, label = "pole", centerX = 0.45f)
 
         assertEquals("Right.", HazardWatcher().onSignal(body, 0L, SpeechLanguage.En)?.phrase)
+    }
+
+    @Test
+    fun `plein axe a droite, un pour cent du cadre ne change pas le cote`() {
+        assertEquals(SteeringCap.Right, HazardText.avoidSide(0.50f))
+        assertEquals(SteeringCap.Right, HazardText.avoidSide(0.51f))
+        assertEquals(SteeringCap.Right, HazardText.avoidSide(0.54f))
+        assertEquals(SteeringCap.Left, HazardText.avoidSide(0.56f))
     }
 }
