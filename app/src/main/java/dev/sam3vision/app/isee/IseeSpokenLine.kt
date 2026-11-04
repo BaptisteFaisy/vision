@@ -38,14 +38,8 @@ internal fun BoxWithConstraintsScope.SpokenLine(caption: SpokenCaption?, fromUse
         Modifier.align(Alignment.TopCenter).offset(y = top).padding(horizontal = 24.dp).heightIn(max = room),
         horizontalAlignment = Alignment.CenterHorizontally,
     ) {
-        Text(
-            if (fromUser) "YOU" else "ISEE",
-            color = Color(if (fromUser) IseePortrait.YOU_INK else IseePortrait.SEE_INK),
-            fontSize = 12.sp,
-            fontWeight = FontWeight.ExtraBold,
-            letterSpacing = 2.sp,
-            modifier = Modifier.padding(bottom = 6.dp),
-        )
+        // Pas de pastille locuteur (demande user 2026-11-04) : la couleur
+        // de la phrase suffit (bleu user, ambre iSee).
         CaptionText(caption, fromUser, compact)
     }
 }

@@ -5,7 +5,6 @@ import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Box
-import androidx.compose.foundation.layout.BoxScope
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.padding
@@ -84,7 +83,7 @@ internal fun Modifier.neonEdge(color: Color, shape: RoundedCornerShape): Modifie
         .border(1.5.dp, color.copy(alpha = 0.95f), shape)
 
 @Composable
-internal fun BoxScope.PlaceModeChip(
+internal fun PlaceModeChip(
     mode: PictoPlaceMode,
     modifier: Modifier,
     onToggle: () -> Unit,

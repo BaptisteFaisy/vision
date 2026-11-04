@@ -4,9 +4,11 @@ import androidx.compose.animation.core.Animatable
 import androidx.compose.animation.core.FastOutSlowInEasing
 import androidx.compose.animation.core.tween
 import androidx.compose.foundation.background
+import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.BoxScope
 import androidx.compose.foundation.layout.BoxWithConstraintsScope
+import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.WindowInsets
 import androidx.compose.foundation.layout.asPaddingValues
 import androidx.compose.foundation.layout.fillMaxSize
@@ -98,23 +100,28 @@ internal fun BoxWithConstraintsScope.PortraitCamera(
 
 /**
  * Bascules manuelles Traversée et lieu (sans elles, l'ordre vocal seul les arme) :
- * ex-puce de l'ancienne carte, remontée en haut-centre.
+ * une seule rangée en haut-centre, lieu à gauche (demande user 2026-11-04).
  */
 @Composable
 private fun BoxScope.ModeToggles(probe: LiveProbe, viewModel: IseeViewModel, mode: PictoPlaceMode) {
     // Chips chiffres : Traversée et lieu seuls, invisibles aux pixels.
-    CrossingChip(
-        probe.collectRest(),
+    Row(
         Modifier.align(Alignment.TopCenter).padding(top = 12.dp),
-        onToggle = { viewModel.modeChips.toggleCrossing() },
-        onBounds = viewModel.modeChips.crossing::setBounds,
-    )
-    PlaceModeChip(
-        mode,
-        Modifier.align(Alignment.TopCenter).padding(top = 52.dp),
-        onToggle = { viewModel.modeChips.togglePlace() },
-        onBounds = viewModel.modeChips.place::setBounds,
-    )
+        horizontalArrangement = Arrangement.spacedBy(8.dp),
+    ) {
+        PlaceModeChip(
+            mode,
+            Modifier,
+            onToggle = { viewModel.modeChips.togglePlace() },
+            onBounds = viewModel.modeChips.place::setBounds,
+        )
+        CrossingChip(
+            probe.collectRest(),
+            Modifier,
+            onToggle = { viewModel.modeChips.toggleCrossing() },
+            onBounds = viewModel.modeChips.crossing::setBounds,
+        )
+    }
 }
 
 /**
