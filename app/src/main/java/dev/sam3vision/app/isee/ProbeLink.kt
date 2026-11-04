@@ -113,12 +113,14 @@ internal class ProbeLink(
         outage.onTick(nowMs, healthy, warmed = answeredAtMs != null, degradedAvailable = guidanceActive())
 
     /** Échecs consécutifs depuis la dernière réponse aboutie. */
+    @get:Synchronized
     var consecutiveFailures = 0
-        @get:Synchronized private set
+        private set
 
     /** Reprises : réponses abouties qui ont suivi au moins un échec. */
+    @get:Synchronized
     var reconnects = 0
-        @get:Synchronized private set
+        private set
 
     /**
      * Séquence du dernier vol soldé (-1 = aucun) : un vol plus ancien qui se
