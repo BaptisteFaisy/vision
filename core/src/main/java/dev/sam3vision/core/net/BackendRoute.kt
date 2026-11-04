@@ -44,6 +44,10 @@ object BackendRoute {
      * Impose [factory] au trafic backend ; `true` si ça change quelque chose
      * (l'appelant vide alors les pools, sinon les connexions gardées suivraient
      * l'ancienne route).
+     *
+     * Comparaison par **identité** : `Network.getSocketFactory()` alloue un
+     * objet neuf à chaque appel — l'appelant retient le réseau installé et
+     * consulte [sameCellularRouteInstalled] au lieu de réimposer à chaque rappel.
      */
     @Synchronized
     fun install(factory: SocketFactory): Boolean {
@@ -77,6 +81,18 @@ object BackendRoute {
  */
 fun wantsCellularRoute(cellularUp: Boolean, defaultValidated: Boolean): Boolean =
     cellularUp && !defaultValidated
+
+/**
+ * Vrai quand la route cellulaire imposée est déjà celle du réseau [currentKey]
+ * (clés = `Network.toString()`, le netId système) : réimposer viderait les
+ * pools pour rien — et `evictAll()` tue le WebSocket du direct (connexion sans
+ * appel en vol, comptée idle par OkHttp). Garde les rappels réseau répétés
+ * (capacités, signal) de couper le direct en session lunettes.
+ *
+ * Pure, testée en JVM.
+ */
+fun sameCellularRouteInstalled(routeActive: Boolean, installedKey: String?, currentKey: String?): Boolean =
+    routeActive && installedKey != null && installedKey == currentKey
 
 /**
  * Fabrique qui suit [BackendRoute] : chaque socket créé part sur la fabrique

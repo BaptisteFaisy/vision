@@ -8,6 +8,7 @@ import android.net.NetworkRequest
 import android.util.Log
 import dev.sam3vision.core.net.BackendRoute
 import dev.sam3vision.core.net.drainBackendPools
+import dev.sam3vision.core.net.sameCellularRouteInstalled
 import dev.sam3vision.core.net.wantsCellularRoute
 
 /**
@@ -43,6 +44,8 @@ object GlassesNetworkRoute {
     private var manager: ConnectivityManager? = null
     private var cellular: Network? = null
     private var defaultValidated = true
+    /** Clé (`Network.toString()`, netId) du réseau dont la fabrique est imposée, `null` = aucune. */
+    private var installedKey: String? = null
     private var cellularCallback: ConnectivityManager.NetworkCallback? = null
     private var defaultCallback: ConnectivityManager.NetworkCallback? = null
 
@@ -76,6 +79,7 @@ object GlassesNetworkRoute {
             manager = null
             cellular = null
             defaultValidated = true
+            installedKey = null
             runCatching { cm?.unregisterNetworkCallback(cellularCallback ?: return@runCatching) }
             runCatching { cm?.unregisterNetworkCallback(defaultCallback ?: return@runCatching) }
             cellularCallback = null
@@ -163,12 +167,22 @@ object GlassesNetworkRoute {
     /**
      * Applique la route voulue (appel sous [lock]) : cellulaire si le défaut
      * n'est pas validé et le cellulaire monté, défaut sinon. Ne vide les pools
-     * qu'à la bascule effective.
+     * qu'à la bascule effective — les rappels répétés pour le même réseau
+     * (capacités, signal) sont des no-ops, sinon chaque rappel tuerait le
+     * WebSocket du direct (voir [sameCellularRouteInstalled]).
      */
     private fun applyLocked() {
         val network = cellular
         val want = wantsCellularRoute(network != null, defaultValidated)
-        val changed = if (want) BackendRoute.install(network!!.socketFactory) else BackendRoute.clear()
+        val key = network?.toString()
+        if (want && sameCellularRouteInstalled(BackendRoute.active, installedKey, key)) return
+        val changed = if (want && network != null) {
+            installedKey = key
+            BackendRoute.install(network.socketFactory)
+        } else {
+            installedKey = null
+            BackendRoute.clear()
+        }
         if (!changed) return
         drainBackendPools()
         Log.i(TAG, "route lunettes : backend sur " + if (want) "cellulaire" else "route par défaut")
