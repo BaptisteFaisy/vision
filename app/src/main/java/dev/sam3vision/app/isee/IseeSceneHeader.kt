@@ -21,9 +21,10 @@ import dev.sam3vision.core.iseedesign.IseeScene
  * 2026-11-03 sur demande user). Tiré de `IseeScenePane.kt` : que de
  * l'affichage, aucune logique de capture.
  */
-/** En-tête : la pastille d'état en haut à droite ; en blanc sur la rue quand elle est ouverte. */
+/** En-tête : la pastille d'état en haut à droite ; caméra ouverte, elle rejoint la rangée des puces (voir `ModeToggles`), l'en-tête reste vide. */
 @Composable
 internal fun Header(scene: IseeScene, onPicture: Boolean, modifier: Modifier = Modifier) {
+    if (onPicture) return
     Row(modifier.statusBarsPadding().padding(horizontal = 22.dp, vertical = 10.dp), horizontalArrangement = Arrangement.End) {
         StatusChip(scene, onPicture)
     }
@@ -31,7 +32,7 @@ internal fun Header(scene: IseeScene, onPicture: Boolean, modifier: Modifier = M
 
 /** Pastille d'état : bleu à l'écoute, ambre quand iSee parle, discrète sinon. */
 @Composable
-private fun StatusChip(scene: IseeScene, onPicture: Boolean) {
+internal fun StatusChip(scene: IseeScene, onPicture: Boolean) {
     val (bg, fg) = when (scene) {
         IseeScene.LISTENING -> Color(IseePortrait.YOU) to Color.White
         IseeScene.VOICE -> Color(IseePortrait.SEE) to Color(IseePortrait.INK)

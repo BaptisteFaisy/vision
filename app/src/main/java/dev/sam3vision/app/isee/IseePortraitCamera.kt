@@ -30,6 +30,7 @@ import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import dev.sam3vision.app.FirstPixelWatcher
+import dev.sam3vision.core.iseedesign.IseeScene
 import dev.sam3vision.core.iseedesign.focusPull
 import dev.sam3vision.core.picto.PictoPlaceMode
 
@@ -56,7 +57,7 @@ internal fun BoxWithConstraintsScope.PortraitCamera(
     open: Float,
     height: Dp,
     showGlasses: Boolean,
-    ghost: Boolean,
+    ghost: Boolean, scene: IseeScene,
 ) {
     if (open <= 0.001f && !ghost && state.glassesPhoto == null) return
     val focus = focusPull(open)
@@ -94,16 +95,17 @@ internal fun BoxWithConstraintsScope.PortraitCamera(
         }
         ProbeNoticeScoped(probe)
         HeaderShade(Modifier.fillMaxSize())
-        ModeToggles(probe, viewModel, state.placeMode)
+        ModeToggles(probe, viewModel, state.placeMode, scene, open)
     }
 }
 
 /**
- * Bascules manuelles Traversée et lieu (sans elles, l'ordre vocal seul les arme) :
- * une seule rangée en haut-centre, lieu à gauche (demande user 2026-11-04).
+ * Rangée haut-centre de la rue : lieu, Traversée, pastille d'état (demande
+ * user 2026-11-04). La pastille n'y est que caméra franchement ouverte
+ * (même seuil que l'en-tête : pas de doublon pendant l'ouverture).
  */
 @Composable
-private fun BoxScope.ModeToggles(probe: LiveProbe, viewModel: IseeViewModel, mode: PictoPlaceMode) {
+private fun BoxScope.ModeToggles(probe: LiveProbe, viewModel: IseeViewModel, mode: PictoPlaceMode, scene: IseeScene, open: Float) {
     // Chips chiffres : Traversée et lieu seuls, invisibles aux pixels.
     Row(
         Modifier.align(Alignment.TopCenter).padding(top = 12.dp),
@@ -121,6 +123,7 @@ private fun BoxScope.ModeToggles(probe: LiveProbe, viewModel: IseeViewModel, mod
             onToggle = { viewModel.modeChips.toggleCrossing() },
             onBounds = viewModel.modeChips.crossing::setBounds,
         )
+        if (open > 0.5f) StatusChip(scene, onPicture = true)
     }
 }
 
