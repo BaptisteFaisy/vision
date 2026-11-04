@@ -118,6 +118,7 @@ fun shortEndpoint(endpoint: String): String {
  */
 fun liveProbeNotice(state: LiveProbeState): String? {
     state.error?.let { if (state.link.consecutiveFailures != 1) return it }
+    if (state.link.kind == ProbeLinkKind.Outage) return OUTAGE_LINE
     if (state.link.silent) return silenceNotice(state.link.lastAnswerAgeMs)
     if (state.frames > 0) return null
     if (state.warming && state.timeoutSec > 0) return "waking the SAM GPU… (up to ${state.timeoutSec} s)"
@@ -133,7 +134,9 @@ fun liveProbeNotice(state: LiveProbeState): String? {
 fun silenceNotice(ageMs: Long): String = "$SILENCE_PREFIX ${ageMs / 1_000} s — link silent (retrying)"
 
 /**
- * Message d'échec lisible, qui distingue les trois cas réels :
+ * Message d'échec lisible, qui distingue les cas réels :
+ * - panne ([ProbeLinkKind.Outage]) : 45 s sans réponse malgré les reprises, le serveur
+ *   ne sert plus — dit franchement au lieu de compter les secondes ;
  * - silence ([ProbeLinkState.silent]) : le lien ne répond plus depuis N s ;
  * - lien chaud qui répondait il y a une seconde : réponse lente, ce n'est pas un réveil ;
  * - aucune réponse encore ([ProbeLinkKind.Cold]/[ProbeLinkKind.Idle]) : conteneur Modal
@@ -150,8 +153,12 @@ fun silenceNotice(ageMs: Long): String = "$SILENCE_PREFIX ${ageMs / 1_000} s —
 /** Bascule lunettes → cellulaire en cours : le DNS a suivi la route morte, ça repart seul. */
 const val HANDOVER_LINE = "cellular handover… (retrying on the next frame)"
 
+/** Panne franche : 45 s sans réponse malgré les reprises — le serveur ne sert plus. */
+const val OUTAGE_LINE = "server unreachable — GPU queue, retrying…"
+
 fun probeFailureText(error: Throwable, link: ProbeLinkState = ProbeLinkState()): String = when {
     isHandoverTransient(error) -> HANDOVER_LINE
+    link.kind == ProbeLinkKind.Outage -> OUTAGE_LINE
     !error.isTransient && !isLinkRefusal(error) -> error.message ?: "SAM call failed"
     link.silent -> silenceNotice(link.lastAnswerAgeMs)
     link.kind == ProbeLinkKind.Warm -> "slow answer — retrying on the next frame"

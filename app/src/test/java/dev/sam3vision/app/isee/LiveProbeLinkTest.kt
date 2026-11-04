@@ -286,6 +286,68 @@ class LiveProbeLinkTest {
         assertNull("rien sans tenue", heldOutageLine(null, null, 0L, 1_000L))
     }
 
+    @Test
+    fun `silence avec echecs repetes devient panne franche`() {
+        val link = ProbeLink()
+        link.onAnswer(10_000)
+        link.onSent(11_000)
+        repeat(LINK_OUTAGE_MIN_FAILURES) { link.onFailure() }
+
+        assertEquals("sous le seuil : silence", ProbeLinkKind.Silent, link.snapshot(10_000 + LINK_OUTAGE_MS).kind)
+        assertEquals(
+            "45 s + 6 échecs : panne",
+            ProbeLinkKind.Outage,
+            link.snapshot(10_000 + LINK_OUTAGE_MS + 1).kind,
+        )
+
+        link.onAnswer(10_000 + LINK_OUTAGE_MS + 2_000)
+        assertEquals("une réponse solde la panne", ProbeLinkKind.Warm, link.snapshot(10_000 + LINK_OUTAGE_MS + 2_100).kind)
+    }
+
+    @Test
+    fun `la panne exige des echecs et un envoi`() {
+        val quiet = ProbeLink()
+        quiet.onAnswer(10_000)
+        quiet.onSent(11_000)
+        repeat(LINK_OUTAGE_MIN_FAILURES - 1) { quiet.onFailure() }
+        assertEquals(
+            "5 échecs : encore silence",
+            ProbeLinkKind.Silent,
+            quiet.snapshot(10_000 + LINK_OUTAGE_MS + 1).kind,
+        )
+
+        val idle = ProbeLink()
+        idle.onAnswer(10_000)
+        repeat(LINK_OUTAGE_MIN_FAILURES) { idle.onFailure() }
+        assertEquals(
+            "sans envoi : l'âge n'accuse pas",
+            ProbeLinkKind.Warm,
+            idle.snapshot(10_000 + LINK_OUTAGE_MS + 1).kind,
+        )
+    }
+
+    @Test
+    fun `la panne se dit franchement et s_efface au retour`() {
+        val outage = ProbeLinkState(ProbeLinkKind.Outage, 46_000, consecutiveFailures = 6)
+
+        assertEquals(OUTAGE_LINE, probeFailureText(ApiError.Timeout(), outage))
+        assertEquals(OUTAGE_LINE, probeFailureText(ApiError.Http(500, "x"), outage))
+        assertEquals(
+            OUTAGE_LINE,
+            liveProbeNotice(LiveProbeState(frames = 12, error = OUTAGE_LINE, link = outage)),
+        )
+        assertEquals(
+            "même sans erreur posée, la panne parle",
+            OUTAGE_LINE,
+            liveProbeNotice(LiveProbeState(link = outage)),
+        )
+        assertEquals(OUTAGE_LINE, linkErrorOf("no reply for 44 s — link silent (retrying)", outage))
+        assertNull(
+            "retour du lien : la panne s'efface",
+            linkErrorOf(OUTAGE_LINE, ProbeLinkState(ProbeLinkKind.Warm, 100)),
+        )
+    }
+
     private companion object {
         const val ENDPOINT = "https://sam.test"
         const val AUTRE = "https://autre.test"

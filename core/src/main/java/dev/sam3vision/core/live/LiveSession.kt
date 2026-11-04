@@ -123,6 +123,15 @@ class LiveSession(
     private val busyUntilMs = AtomicLong(0L)
 
     /**
+     * Échéance du backoff « famine serveur » (`5xx`, délai répétés) + compteur
+     * d'échecs consécutifs : même discipline que [busyUntilMs] (frame jetée sans
+     * appel), mais en exponentiel plafonné — un proxy qui parque 30 s ne mérite
+     * pas une frame toutes les 450 ms. Atomiques : deux créneaux concurrents.
+     */
+    private val famineUntilMs = AtomicLong(0L)
+    private val consecutiveServerErrors = AtomicInteger(0)
+
+    /**
      * Concepts normalisés **une fois** : [prompts] est figé à la construction, or la
      * normalisation (découpe, minuscules, dédup) tournait à chaque frame — du CPU payé
      * deux fois par seconde pour une liste qui ne change jamais en séance.
@@ -270,6 +279,8 @@ class LiveSession(
     private suspend fun runGated(send: suspend () -> Result<LiveFrame>): Result<LiveFrame>? {
         // Serveur occupé (`429`) : on ne martèle pas le verrou GPU, la frame saute.
         if (clock() < busyUntilMs.get()) return null
+        // Famine serveur (`5xx`, délai répétés) : envois espacés, pas martelés.
+        if (clock() < famineUntilMs.get()) return null
         val era = gate.generation
         if (!gate.tryStart(era)) return null
         val startedAt = clock()
@@ -278,6 +289,7 @@ class LiveSession(
             // `429` : le serveur garde la connexion mais demande du temps (§9.3) —
             // les 250 ms suivantes sautent, sans handshake ni reprise.
             if (result.exceptionOrNull() is ApiError.RateLimited) busyUntilMs.set(clock() + BUSY_BACKOFF_MS)
+            noteServerError(result)
             // Échec : le handshake de reprise part en fond (FIX-16), recouvert par l'inter-frame.
             if (result.isFailure) preconnect()
             // Premier succès : le conteneur est chaud, le délai froid retombe au normal.
@@ -290,6 +302,32 @@ class LiveSession(
         } finally {
             gate.finish(era)
         }
+    }
+
+    /**
+     * Famine serveur : `5xx` ou délai consécutifs (file GPU épuisée, proxy qui
+     * parque). Au-delà de [FAMINE_AFTER_ERRORS], les envois s'espacent en
+     * exponentiel plafonné ([famineDelayMs]) ; un succès solde le compteur. Les
+     * autres échecs (réseau, refus locaux) ne comptent ni ne soldent : seul un
+     * succès prouve que le serveur sert de nouveau.
+     */
+    private fun noteServerError(result: Result<LiveFrame>) {
+        val failure = result.exceptionOrNull()
+        val starved = failure is ApiError.Timeout ||
+            (failure is ApiError.Http && failure.code >= 500)
+        if (result.isSuccess) {
+            consecutiveServerErrors.set(0)
+            return
+        }
+        if (!starved) return
+        val n = consecutiveServerErrors.incrementAndGet()
+        if (n >= FAMINE_AFTER_ERRORS) famineUntilMs.set(clock() + famineDelayMs(n))
+    }
+
+    /** Espacement après [n] échecs serveur consécutifs : 1 s, 2 s, 4 s, 8 s max. */
+    internal fun famineDelayMs(n: Int): Long {
+        val shift = (n - FAMINE_AFTER_ERRORS).coerceIn(0, 3)
+        return (FAMINE_BASE_MS shl shift).coerceAtMost(FAMINE_MAX_MS)
     }
 
     /**
@@ -338,6 +376,8 @@ class LiveSession(
         serverStats.reset()
         belowBudget.set(0)
         busyUntilMs.set(0L)
+        famineUntilMs.set(0L)
+        consecutiveServerErrors.set(0)
         warmup.reset()
     }
 
@@ -373,6 +413,15 @@ class LiveSession(
          * gardée) : 250 ms sans envoi, puis reprise à la cadence normale.
          */
         const val BUSY_BACKOFF_MS = 250L
+
+        /**
+         * Famine serveur (`5xx`, délai) : au-delà de [FAMINE_AFTER_ERRORS] échecs
+         * consécutifs, les envois s'espacent (1 s, 2 s, 4 s… plafonnés) au lieu de
+         * marteler une file GPU épuisée. Un succès solde tout.
+         */
+        const val FAMINE_AFTER_ERRORS = 3
+        const val FAMINE_BASE_MS = 1_000L
+        const val FAMINE_MAX_MS = 8_000L
 
         /**
          * Bord de travail déclaré au serveur : 512, la taille exacte envoyée par
