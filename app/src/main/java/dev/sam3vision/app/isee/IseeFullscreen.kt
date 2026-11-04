@@ -8,9 +8,9 @@ import androidx.core.view.WindowInsetsCompat
 import androidx.core.view.WindowInsetsControllerCompat
 
 /**
- * La scène iSee est plein écran : la barre de statut (heure, batterie) ne recouvre
+ * Le direct est plein écran : la barre de statut (heure, batterie) ne recouvre
  * plus la caméra. Un balayage depuis le haut la rappelle temporairement, Android la
- * re-cache seul. Hors scène (Réglages…), la barre revient.
+ * re-cache seul. Hors direct (iSee, Réglages…), la barre revient.
  */
 @Composable
 internal fun HideStatusBarWhileComposed() {

@@ -12,7 +12,10 @@
 - **Fond blanc**, plein écran. En-tête : pastille d'état seule (wordmark
   « iSee » retiré le 2026-11-03 sur demande user), en blanc sur la rue
   quand la caméra est ouverte, en encre sinon ; bandeau blanc derrière
-  les boutons système du bas.
+  les boutons système du bas. Le bandeau système du haut (heure, batterie,
+  notifications) est blanc lui aussi, aux icônes sombres, sans ligne noire
+  (blanc demandé le 2026-11-04 : la barre n'est plus cachée sur iSee,
+  seul le direct la cache).
 - **Une seule boule de verre** au liquide marbré (`IseePortraitOrb`) : reflet
   de boîte à lumière, irisation au bord, liseré. Le verre **n'a pas de couleur
   propre**, et son irisation reste **très légère et seulement sur le haut** :

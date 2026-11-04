@@ -18,20 +18,21 @@ import androidx.compose.ui.unit.dp
 import androidx.core.view.WindowCompat
 
 /**
- * Écrans sans barre système du haut : la scène iSee et le direct (caméra plein
- * écran dans les deux cas). Un seul effet au niveau navigation (voir AppNav) :
- * un effet par écran se battait au changement de route — le `show()` du
- * dispose iSee passait après le `hide()` du direct, qui gardait sa barre.
+ * Écrans sans barre système du haut : le direct seul (caméra plein écran).
+ * iSee garde sa barre, en blanc comme son fond. Un seul effet au niveau
+ * navigation (voir AppNav) : un effet par écran se battait au changement de
+ * route — le `show()` d'un dispose passait après le `hide()` du direct, qui
+ * gardait sa barre.
  *
  * Écrans clairs (fond blanc) : le bandeau système y est blanc, aux icônes
  * sombres. Les autres écrans sombres gardent leurs icônes claires.
  */
-/** Routes sans barre système du haut : iSee et direct (caméra plein écran). */
-internal fun hidesStatusBar(route: Route): Boolean = route == Route.Isee || route == Route.Live
+/** Routes sans barre système du haut : le direct seul (caméra plein écran). */
+internal fun hidesStatusBar(route: Route): Boolean = route == Route.Live
 
 internal fun whiteStatusBar(route: Route): Boolean = when (route) {
-    Route.Settings, Route.Caregiver, Route.Onboarding -> true
-    Route.Isee, Route.Capture, Route.Analysis, Route.Chat, Route.Live,
+    Route.Isee, Route.Settings, Route.Caregiver, Route.Onboarding -> true
+    Route.Capture, Route.Analysis, Route.Chat, Route.Live,
     Route.Bench, Route.VoiceNav, is Route.Tap -> false
 }
 
@@ -49,7 +50,8 @@ internal fun BoxScope.WhiteTopBar(route: Route) {
 /**
  * Bandeau blanc derrière la barre système du haut, sur les écrans clairs
  * ([whiteStatusBar]) : posé explicitement, sans dépendre du fond de chaque
- * écran. Nul quand la barre est cachée (scène iSee).
+ * écran — y compris sur iSee quand la caméra occupe le haut. Nul quand la
+ * barre est cachée (direct).
  */
 @Composable
 internal fun BoxScope.TopScrim() {
