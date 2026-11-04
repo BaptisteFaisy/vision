@@ -72,7 +72,7 @@ class FindIndoorTest {
 
     @Test
     fun `niveaux dedans ordonnes cherche puis user puis humain puis chat puis portes`() {
-        assertEquals(listOf(0, 1, 2, 9, 13), FindIndoorLevels.ORDER)
+        assertEquals(listOf(0, 1, 3, 9, 13), FindIndoorLevels.ORDER)
         assertEquals(0, FindIndoorLevels.FIND)
         assertEquals(13, FindIndoorLevels.DOOR_WALL)
         assertTrue(FindIndoorLevels.ORDER == FindIndoorLevels.ORDER.sorted())

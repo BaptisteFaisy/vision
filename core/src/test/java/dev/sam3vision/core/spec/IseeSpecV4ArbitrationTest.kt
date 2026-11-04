@@ -49,11 +49,11 @@ class IseeSpecV4ArbitrationTest {
     fun `ecrase = jamais redit sauf re-detecte actuel`() {
         val memory = CrushedMemory()
 
-        memory.crushed(level = 5, text = "Curb.")
+        memory.crushed(level = 6, text = "Curb.")
         // Re-détecté à la frame suivante : redit.
-        assertTrue(memory.shouldSpeak(level = 5, currentlyDetected = true))
+        assertTrue(memory.shouldSpeak(level = 6, currentlyDetected = true))
         // Plus détecté : jamais redit.
-        assertFalse(memory.shouldSpeak(level = 5, currentlyDetected = false))
+        assertFalse(memory.shouldSpeak(level = 6, currentlyDetected = false))
     }
 
     @Test

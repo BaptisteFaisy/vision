@@ -5,7 +5,7 @@ package dev.sam3vision.app.voicenav
  * partent en clips offline (<100 ms), jamais en synthèse.
  *
  * - manœuvres du moteur (niveau 11) : phrase de [VoiceNavEngineDriver.say] ;
- * - rappel (niveau 3) : mot redit toutes les [GPS_REMINDER_MS].
+ * - rappel (niveau 4) : mot redit toutes les [GPS_REMINDER_MS].
  *
  * Pur JVM : testé sans Android.
  */

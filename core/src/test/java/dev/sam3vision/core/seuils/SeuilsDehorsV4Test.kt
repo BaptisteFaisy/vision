@@ -33,10 +33,10 @@ import org.junit.Test
 /**
  * Seuils, phrases et positions dehors — SPEC v4 (mission seuils-dehors).
  *
- * Humains niveau 2 (< 10 m, phrase + cadran + distance, imminent ≤ 2 m =
- * mot immédiat), grillages/murs/barrières niveau 4 (< 6 m, 4 s), bordures
- * niveau 5 (< 6 m, 2 s), escaliers niveau 6 (jalons 2/1/0,5 + marches dites,
- * 2 s), poteaux/mobilier/divers niveau 7 (< 6 m, 2 s), passages niveau 8
+ * Humains niveau 3 (< 10 m, phrase + cadran + distance, imminent ≤ 2 m =
+ * mot immédiat), grillages/murs/barrières niveau 5 (< 6 m, 4 s), bordures
+ * niveau 6 (< 6 m, 2 s), escaliers niveau 7 (jalons 2/1/0,5 + marches dites,
+ * 2 s), poteaux/mobilier/divers niveau 8 (< 6 m, 2 s), passages niveau 2
  * (< 4 m, annonce 1 fois par vue + « devant » toutes les 2 s hors
  * Traversée + alignement au changement + arrivée 1 fois), trottoirs
  * niveau 10 (inchangés), textes EN voitures (présence
@@ -57,10 +57,10 @@ class SeuilsDehorsV4Test {
     private fun softPerson(meters: Float) =
         HazardSignal(detected = true, meters = meters, label = "person", centerX = 0.5f)
 
-    // Humains — niveau 2.
+    // Humains — niveau 3.
 
     @Test
-    fun `humain a 9m dit mot continu niveau 2 des la 1re frame`() {
+    fun `humain a 9m dit mot continu niveau 3 des la 1re frame`() {
         val signal = HazardSignal.of(listOf(centered("person", 9f)), 512, 1138)
         assertTrue(signal.detected)
         val watcher = HazardWatcher()
@@ -96,7 +96,7 @@ class SeuilsDehorsV4Test {
     }
 
     @Test
-    fun `personne presente = mot continu niveau 2 sans cooldown ni rearmement`() {
+    fun `personne presente = mot continu niveau 3 sans cooldown ni rearmement`() {
         val watcher = HazardWatcher()
         val signal = softPerson(5f)
 
@@ -110,10 +110,10 @@ class SeuilsDehorsV4Test {
         assertTrue(cue.urgent)
     }
 
-    // Grillages, murs, barrières — niveau 4.
+    // Grillages, murs, barrières — niveau 5.
 
     @Test
-    fun `cloture mur barriere parlent niveau 4 sous 6m`() {
+    fun `cloture mur barriere parlent niveau 5 sous 6m`() {
         for (label in listOf("fence", "grillage", "barrier")) {
             val watcher = HazardWatcher()
             val signal = HazardSignal(detected = true, meters = 5.5f, label = label, centerX = 0.5f)
@@ -124,7 +124,7 @@ class SeuilsDehorsV4Test {
             assertEquals("label $label", "fence-avoid", cue.antiRepeatKey)
             assertTrue("label $label", cue.urgent)
         }
-        // Murs (ordre user du 02/11) : jamais nommés, mot d'évitement continu niveau 4.
+        // Murs (ordre user du 02/11) : jamais nommés, mot d'évitement continu niveau 5.
         for (label in listOf("wall", "mur")) {
             val watcher = HazardWatcher()
             val signal = HazardSignal(detected = true, meters = 5.5f, label = label, centerX = 0.5f)
@@ -154,7 +154,7 @@ class SeuilsDehorsV4Test {
     }
 
     @Test
-    fun `grillage mot continu niveau 4 sans cooldown`() {
+    fun `grillage mot continu niveau 5 sans cooldown`() {
         val watcher = HazardWatcher()
         val signal = HazardSignal(detected = true, meters = 3f, label = "fence", centerX = 0.5f)
         assertEquals("Right.", watcher.onSignal(signal, 1_000L, En)!!.phrase)
@@ -167,10 +167,10 @@ class SeuilsDehorsV4Test {
         assertTrue(cue.urgent)
     }
 
-    // Poteaux, mobilier vertical, divers — niveau 7.
+    // Poteaux, mobilier vertical, divers — niveau 8.
 
     @Test
-    fun `poteau mot continu niveau 7 des la 1re frame`() {
+    fun `poteau mot continu niveau 8 des la 1re frame`() {
         assertTrue(HazardConcepts.isSpoken("pole"))
         assertTrue(HazardConcepts.isSpoken("poteau"))
         assertTrue(HazardConcepts.isPole("poteau"))
@@ -185,7 +185,7 @@ class SeuilsDehorsV4Test {
     }
 
     @Test
-    fun `lampadaire panneau animal poubelle souvenirs niveau 7`() {
+    fun `lampadaire panneau animal poubelle souvenirs niveau 8`() {
         for (label in listOf("street lamp", "sign", "animal", "chat", "trash can", "poubelle", "souvenir shop", "beanie", "socks")) {
             assertTrue("parlé $label", HazardConcepts.isSpoken(label))
             val watcher = HazardWatcher()
@@ -234,10 +234,10 @@ class SeuilsDehorsV4Test {
         assertEquals("misc-avoid", HazardWatcher.KEY_MISC_AVOID)
     }
 
-    // Bordures — niveau 5.
+    // Bordures — niveau 6.
 
     @Test
-    fun `bordure detectee sous 6m niveau 5`() {
+    fun `bordure detectee sous 6m niveau 6`() {
         val signal = CurbSignal.of(listOf(centered("curb", 5.5f)), 512, 1138)
         assertTrue(signal.detected)
         val watcher = CurbWatcher()
@@ -277,10 +277,10 @@ class SeuilsDehorsV4Test {
         assertNotNull(watcher.onSignal(signal, 3_200L, En))
     }
 
-    // Escaliers — niveau 6.
+    // Escaliers — niveau 7.
 
     @Test
-    fun `escalier annonce standard niveau 6`() {
+    fun `escalier annonce standard niveau 7`() {
         val watcher = StairWatcher()
         val signal = StairSignal(detected = true, confidence = 0.9f, lineCount = 0, roiTop = 0, roiBottom = 0)
         watcher.onSignal(signal, 1_000L, En, StairDirection.Up, 0.2f)
@@ -334,10 +334,10 @@ class SeuilsDehorsV4Test {
         assertNotNull(watcher.onSignal(signal, 3_300L, En))
     }
 
-    // Grillage ouvert/fermé — niveau 4.
+    // Grillage ouvert/fermé — niveau 5.
 
     @Test
-    fun `grillage ferme niveau 4 sous 6m`() {
+    fun `grillage ferme niveau 5 sous 6m`() {
         val signal = FenceOpeningSignal.of(listOf(centered("fence", 5f)), 512, 1138)
         assertTrue(signal.detected)
         val watcher = FenceOpeningWatcher()
@@ -361,7 +361,7 @@ class SeuilsDehorsV4Test {
         assertNotNull(watcher.onSignal(signal, 5_200L, En))
     }
 
-    // Passages piétons — niveau 8, 3 couches.
+    // Passages piétons — niveau 2, 3 couches.
 
     @Test
     fun `passage annonce 1 fois par vue sans repetition sous 4m`() {
@@ -399,7 +399,7 @@ class SeuilsDehorsV4Test {
         watcher.onFrame(true, En)
         assertNotNull(watcher.onFrame(true, En))
         assertEquals("crosswalk-arrival", CrossingGuidance.KEY_ARRIVAL)
-        assertEquals(8, CrossingGuidance.LEVEL)
+        assertEquals(2, CrossingGuidance.LEVEL)
     }
 
     // Trottoirs — niveau 10, inchangés.
@@ -438,20 +438,20 @@ class SeuilsDehorsV4Test {
 
     @Test
     fun `niveaux et cles v4 des watchers dehors`() {
-        assertEquals(2, HazardWatcher.LEVEL_PERSON)
-        assertEquals(4, HazardWatcher.LEVEL_FENCE)
-        assertEquals(7, HazardWatcher.LEVEL_POLE)
+        assertEquals(3, HazardWatcher.LEVEL_PERSON)
+        assertEquals(5, HazardWatcher.LEVEL_FENCE)
+        assertEquals(8, HazardWatcher.LEVEL_POLE)
         assertEquals("human-soft", HazardWatcher.KEY_HUMAN_SOFT)
         assertEquals("human-imminent", HazardWatcher.KEY_HUMAN_IMMINENT)
         assertEquals("pole-avoid", HazardWatcher.KEY_POLE_AVOID)
         assertEquals("wall-avoid", HazardWatcher.KEY_WALL_AVOID)
         assertEquals("fence-avoid", HazardWatcher.KEY_FENCE_AVOID)
         assertEquals("misc-avoid", HazardWatcher.KEY_MISC_AVOID)
-        assertEquals(5, CurbWatcher.LEVEL)
+        assertEquals(6, CurbWatcher.LEVEL)
         assertEquals("curb", CurbWatcher.KEY_CURB)
-        assertEquals(6, StairWatcher.LEVEL)
+        assertEquals(7, StairWatcher.LEVEL)
         assertEquals("stairs", StairWatcher.KEY_STAIRS)
-        assertEquals(4, FenceOpeningWatcher.LEVEL)
+        assertEquals(5, FenceOpeningWatcher.LEVEL)
         assertEquals("fence", FenceOpeningWatcher.KEY_FENCE)
         assertEquals(10, SidewalkWatcher.LEVEL)
         assertEquals("sidewalk", SidewalkWatcher.KEY_SIDEWALK)

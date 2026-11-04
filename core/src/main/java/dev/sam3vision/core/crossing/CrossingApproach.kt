@@ -4,7 +4,7 @@ import dev.sam3vision.core.live.SteeringCap
 import dev.sam3vision.core.speech.SpeechLanguage
 
 /**
- * Guetteur d'annonce du passage piéton (SPEC v4, niveau 8, couche 1/3) :
+ * Guetteur d'annonce du passage piéton (SPEC v4, niveau 2, couche 1/3) :
  * [CONFIRM_FRAMES] frames de suite avec un passage en vue parlent une fois
  * (« Gauche, 2 mètres »), à 4 m ou moins ([ANNOUNCE_METERS], **distance du
  * bord proche** : le sol d'abord, la profondeur en repli — voir
@@ -127,13 +127,13 @@ class CrossingApproachWatcher(
 
         /**
          * « Devant » redit toutes les 2 s tant que le passage reste devant
-         * (ordre user du 02/11, hors Traversée — niveau 8, devant le repli
+         * (ordre user du 02/11, hors Traversée — niveau 2, devant le repli
          * gauche/droite 12).
          */
         const val REPEAT_AHEAD_MS = 2_000L
 
         /** Niveau VoiceBus v4 : passages piétons (annonce < 4 m, 3 couches). */
-        const val LEVEL = 8
+        const val LEVEL = 2
 
         /** Clé AntiRepeat v4 : annonce du passage (2 s, répétition du « devant »). */
         const val KEY_ANNOUNCE = "crosswalk-announce"

@@ -367,7 +367,7 @@ class CurbWatcher(
 
 
         /** Niveau VoiceBus v4 : bordures (< 6 m). */
-        const val LEVEL = 5
+        const val LEVEL = 6
 
         /** Clé AntiRepeat v4 : bordures (2 s). */
         const val KEY_CURB = "curb"

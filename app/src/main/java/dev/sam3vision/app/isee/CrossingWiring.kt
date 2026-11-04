@@ -463,7 +463,7 @@ internal fun crossingLateralLevel(traversing: Boolean): Int =
     if (traversing) CrossingLevels.HUMAN else OutdoorLevel.CROSSWALK
 
 /**
- * Voix du guidage latéral sur le bus (SPEC v4, niveau 8 dehors, 101 en
+ * Voix du guidage latéral sur le bus (SPEC v4, niveau 2 dehors, 101 en
  * Traversée) : mot d'alignement en clip (clé alignement, au changement),
  * annonce localisée (clé annonce 2 s), arrivée (clé arrivée, 1 fois). Sans
  * file ni rattrapage : l'écrasé n'est jamais redit (son tour est rendu).

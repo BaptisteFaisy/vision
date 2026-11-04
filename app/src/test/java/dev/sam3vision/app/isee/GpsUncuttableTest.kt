@@ -30,7 +30,7 @@ private class GpsFakeSpeaker : VoiceBusSpeaker {
 
 /**
  * Mots de guidage incoupables (ordre user du 02/11/2026) : une manœuvre
- * (niveau 11) ou un rappel (niveau 3) en cours va au bout — tout le monde
+ * (niveau 11) ou un rappel (niveau 4) en cours va au bout — tout le monde
  * attend la fin du mot (≤0,5 s, clips offline) sauf la parole user (1, le
  * micro garde son silence), la bordure (5, même jour : elle interrompt
  * « droite » / « gauche », voir [CurbGuidancePriorityTest]) et les escaliers

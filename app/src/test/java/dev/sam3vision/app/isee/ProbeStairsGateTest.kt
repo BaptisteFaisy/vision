@@ -23,7 +23,7 @@ import org.junit.Test
 
 /**
  * Annonce escaliers sans porte (SPEC v4) : l'escalier nommé par SAM parle
- * au bus niveau 6, sans porte GPS ni porte escaliers — escalier sans
+ * au bus niveau 7, sans porte GPS ni porte escaliers — escalier sans
  * lecture de distance (labels seuls : ni hauteur connue, ni pose, ni
  * ancre) : le cas du terrain du 31/10.
  *
@@ -71,7 +71,7 @@ class ProbeStairsGateTest {
     }
 
     @Test
-    fun `escalier nomme poste niveau 6 sans porte`() = runTest {
+    fun `escalier nomme poste niveau 7 sans porte`() = runTest {
         val (probe, fake, scope) = harness(this)
         try {
             respond(probe, fake, "A", "B")

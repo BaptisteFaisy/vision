@@ -37,7 +37,7 @@ class DisplayArbiterTest {
     @Test
     fun `niveaux miroirs de la voix et cadences de reaffirmation`() {
         assertEquals(0, DisplayLevel.VEHICLE.voice)
-        assertEquals(6, DisplayLevel.STAIRS.voice)
+        assertEquals(7, DisplayLevel.STAIRS.voice)
         assertEquals(100, DisplayLevel.VERDICT.voice)
         assertEquals(12, DisplayLevel.DIRECTION.voice)
         assertEquals(0L, DisplayLevel.VEHICLE.cadenceMs)

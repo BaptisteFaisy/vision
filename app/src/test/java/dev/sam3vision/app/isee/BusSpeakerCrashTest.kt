@@ -103,7 +103,7 @@ class BusSpeakerCrashTest {
         runCurrent()
         assertEquals("le lecteur a bien été appelé", 1, rig.sink.attempts)
 
-        // Le lecteur est réparé : le niveau 4 (FENCE), supérieur au niveau 2 tenu par la
+        // Le lecteur est réparé : le niveau 5 (FENCE), supérieur au niveau 3 tenu par la
         // parole morte, doit repasser. S'il était encore collé à 2, `post` le jetterait.
         rig.sink.faulty = false
         VoiceBus.post(OutdoorLevel.FENCE, "Fence.", "guide_left")

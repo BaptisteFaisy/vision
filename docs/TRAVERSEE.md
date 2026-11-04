@@ -44,7 +44,7 @@ Règle, dans cet ordre :
 | Niveau | Quoi | Règle |
 |---|---|---|
 | **100** | Verdict | § 1, devant les humains (101) et les bordures (102), jamais coupé par eux. Il passe **après** les mots d'obstacle dehors (2 à 12) et après la parole du user (1) : la protection contre l'écrasement est le **ré-armement** (§ 1, `VoiceBus.post` rend `false`, `rearm` rejoue), pas une escalade de priorité — décision du 02/11/2026, voitures muettes dehors et cran 0 sans producteur (A9 § 3 D8, § 4.4) |
-| 101 | Humains du passage + alignement | Après le verdict (humains : même phrase qu'au niveau 2 : phrase + cadran + distance, imminent immédiat ; alignement passage : mot + annonce + arrivée, niveau 8 dehors, 101 en Traversée) |
+| 101 | Humains du passage + alignement | Après le verdict (humains : même phrase qu'au niveau 3 : phrase + cadran + distance, imminent immédiat ; alignement passage : mot + annonce + arrivée, niveau 2 dehors, 101 en Traversée) |
 | 102 | Bordures du passage | Après les humains (montée / descente) |
 
 Chaque place `null` se tait (pas de remplissage : un verdict seul ne fait
@@ -57,7 +57,7 @@ qui **précède** le verdict (plus petit nombre = plus forte priorité, donc
 
 - **Chat muet** : les réponses attendent (file du niveau 9) et reprennent à
   la sortie du mode, jamais perdues.
-- **GPS muet** : ni manœuvres (11), ni rappels (3) tant que le mode est
+- **GPS muet** : ni manœuvres (11), ni rappels (4) tant que le mode est
   actif. La progression route se tait ; au rappel proche, le mode s'arme
   une seule fois (« Mode traversée activé. » reste en synthèse ? Non :
   clip `cross_on` « Crossing mode on. »).
@@ -80,7 +80,7 @@ qui **précède** le verdict (plus petit nombre = plus forte priorité, donc
   ego-motion fond + gyro) — une boîte qui suit la caméra (pan sur une
   voiture garée) n'est pas un mouvement.
 
-## 5. Proposition du mode (niveau 8)
+## 5. Proposition du mode (niveau 2)
 
 Le passage piéton < 4 m (bord proche : sol d'abord, profondeur en repli) s'annonce (« Crosswalk. » devant — joué < 500 ms
 redit toutes les 2 s hors Traversée — « Left. »/« Right. » sur les côtés,
