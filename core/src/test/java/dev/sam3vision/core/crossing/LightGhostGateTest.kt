@@ -77,4 +77,37 @@ class LightGhostGateTest {
         gate.admits(sawBox = false, lampRead = false)
         assertTrue(gate.admits(sawBox = true, lampRead = true, poleOnly = true))
     }
+
+    @Test
+    fun `rouge de poteau non tranche - en attente, et deux frames apres`() {
+        val gate = LightGhostGate()
+        gate.admits(sawBox = true, lampRead = true, poleOnly = true)
+        assertTrue(gate.polePending)
+        repeat(LightGhostGate.POLE_BRIDGE_FRAMES) {
+            gate.admits(sawBox = false, lampRead = false)
+            assertTrue(gate.polePending)
+        }
+        gate.admits(sawBox = false, lampRead = false)
+        assertFalse(gate.polePending)
+    }
+
+    @Test
+    fun `sans rouge de poteau - jamais en attente`() {
+        val gate = LightGhostGate()
+        assertFalse(gate.polePending)
+        repeat(5) {
+            gate.admits(sawBox = false, lampRead = false)
+            assertFalse(gate.polePending)
+        }
+        gate.admits(sawBox = true, lampRead = false)
+        assertFalse(gate.polePending)
+    }
+
+    @Test
+    fun `feu confirme - plus d'attente, il parle`() {
+        val gate = LightGhostGate()
+        gate.admits(sawBox = true, lampRead = true)
+        gate.admits(sawBox = true, lampRead = true, poleOnly = true)
+        assertFalse(gate.polePending)
+    }
 }

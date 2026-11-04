@@ -208,6 +208,43 @@ class CrossingSweepVideoTest {
         assertTrue(held.all { it.verdict == CrossingVerdict.DontCross })
     }
 
+    private fun poleRed(on: Boolean) =
+        CrossingLight(if (on) listOf(0.4f, 0.1f, 0.5f, 0.2f) else null, CrossingState.Red, redProven = true, poleOnly = true)
+
+    @Test
+    fun `vrai rouge vu au seul poteau - jamais Cross, meme avant la confirmation`() {
+        val steps = replay(fixed, light = { poleRed(true) })
+        assertTrue(steps.none { it.said == "Cross." })
+    }
+
+    @Test
+    fun `lampe de poteau qui scintille - jamais Cross entre deux lectures`() {
+        var frames = 0
+        val steps = replay(fixed, light = {
+            frames += 1
+            poleRed(frames % 3 != 0)
+        })
+        assertTrue(steps.none { it.said == "Cross." })
+    }
+
+    @Test
+    fun `aucun rouge de poteau - le Cross legitime ne change pas`() {
+        val without = replay(fixed).map { it.said }
+        val quiet = replay(fixed, light = { poleRed(false) }).map { it.said }
+        assertEquals(without, quiet)
+    }
+
+    @Test
+    fun `faux rouge bref - Cross revient, jamais Don't cross`() {
+        var frames = 0
+        val steps = replay(fixed, light = {
+            frames += 1
+            poleRed(frames % 12 == 0)
+        })
+        assertTrue(steps.count { it.said == "Cross." } >= 3)
+        assertTrue(steps.settled().none { it.said == "Don't cross." })
+    }
+
     @Test
     fun `lampe rouge lue - Don't cross des la premiere frame`() {
         val steps = replay(fixed, light = { frame -> unlitLight(frame).copy(redProven = true) })
