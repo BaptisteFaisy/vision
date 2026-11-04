@@ -73,7 +73,7 @@ data class FreeSpace(val leftM: Float, val rightM: Float) {
          * limite le pas), [EDGE_MARGIN_M] est déduit, le résultat est borné à
          * `[0, MAX_HALF_M]`. Un bord non mesuré (distance `null`, non finie ou
          * ≤ 0) n'informe pas : un bord qu'on n'a pas mesuré n'est pas un bord
-         * collé. Aucun bord mesuré d'un côté ⇒ [DEFAULT_HALF_M] de ce côté.
+         * collé, pas plus qu'un bord qui passe l'axe ([spansAxis]). Aucun bord mesuré d'un côté ⇒ [DEFAULT_HALF_M] de ce côté.
          *
          * Un bord pile sur l'axe (écart nul) compte **à droite**, par la même
          * convention d'égalité que [side] : il n'y a alors aucune place de ce
@@ -113,9 +113,21 @@ data class FreeSpace(val leftM: Float, val rightM: Float) {
          * mesuré n'informe pas.
          */
         private fun lateralMeters(label: PlacedLabel, hfovDeg: Float): Float? {
+            if (spansAxis(label)) return null
             val depth = label.meters?.takeIf { it.isFinite() && it > 0f } ?: return null
             val lateral = (label.centerX - AXIS_MID) * 2f * depth * LensSpec.halfTangent(hfovDeg)
             return lateral.takeIf { it.isFinite() }
+        }
+
+        /**
+         * Vrai si la boîte de [label] passe des deux côtés de l'axe : une bordure qui barre
+         * l'image n'est ni à gauche ni à droite. Son centre tombait à 0,49 ou 0,51 selon le
+         * bruit, et le côté conseillé basculait avec lui (Samsung, 04/11).
+         */
+        private fun spansAxis(label: PlacedLabel): Boolean {
+            val x0 = label.x0 ?: return false
+            val x1 = label.x1 ?: return false
+            return minOf(x0, x1) < AXIS_MID && maxOf(x0, x1) > AXIS_MID
         }
 
         /**

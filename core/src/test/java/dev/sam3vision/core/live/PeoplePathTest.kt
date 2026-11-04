@@ -98,13 +98,14 @@ class PeoplePathTest {
 
     @Test
     fun `le couloir suit le cap entre deux personnes`() {
-        // À 1 m, le proche est lu à 2 m : à 1,5 m sa bande couvrirait le champ.
+        // Le plus proche de l'axe est à droite, mais la personne de gauche y mange la place :
+        // les deux trous se valent, plein axe à droite (ordre user du 04/11).
         val labels = listOf(placed("personne", 0.30f, 4f), placed("personne", 0.55f, 2.0f))
         val decision = Guidance.decide(labels)
 
         assertTrue(decision.blocked)
-        assertEquals(GuidanceSide.Left, decision.side)
-        assertEquals("Gauche.", Guidance.phrase(decision, SpeechLanguage.Fr))
+        assertEquals(GuidanceSide.Right, decision.side)
+        assertEquals("Droite.", Guidance.phrase(decision, SpeechLanguage.Fr))
     }
 
     @Test

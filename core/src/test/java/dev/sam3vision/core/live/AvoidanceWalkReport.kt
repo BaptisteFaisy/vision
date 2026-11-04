@@ -40,7 +40,7 @@ object WalkReport {
 
     /** Le rapport complet, 5 Hz puis 1,5 Hz. */
     fun render(): String = buildString {
-        appendLine("MARCHE EN BOUCLE FERMÉE - ${WalkModel.SEEDS} seeds, 1,2 m/s, image vieille de 0,7 s")
+        appendLine("MARCHE EN BOUCLE FERMÉE - ${WalkModel.SEEDS} seeds, 1,2 m/s, image vieille de 0,3 s")
         for (rate in RATES_HZ) {
             val stats = playAll(rate)
             appendLine()

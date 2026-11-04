@@ -17,6 +17,14 @@ livré et ses preuves (tâche, fichiers, chiffres) dans l'arbre.
 - **Fait** : `LightGhostGate` exige 3 frames de suite d'une boîte sans lampe lue. Une lampe lue compte tout de suite, un feu confirmé reparle en une frame. Ligne debug `ISEE_CROSS` à chaque frame bloquée.
 - **Preuves** : fantômes 2 frames au plus (scores 0,36 à 0,67), vrais feux 93 frames sur 93. `LightGhostGateTest`, `CrossingSweepVideoTest`, `docs/TRAVERSEE.md` § 21. Dans la rue : non mesuré. Les blocages `roule=true` du même terrain restent à expliquer.
 
+## 2026-11-04 — iSee : guider vers le plus grand espace libre, dès 10 m (branche `fix/isee-ecart-axe`)
+
+- **Demande** : « ça n'esquive pas bien les humains, peut-être un système d'historique », puis « il doit guider vers l'endroit où il y a le plus d'espace libre », « avec tous les obstacles, donc murs, poteaux, barrière », « il faut que ça s'active dès que l'obstacle est à 10 m ou moins » (ordres user du 04/11).
+- **Constat sur le Samsung** (logcat 16:55, 2 min, `1.0.1930-979cf7d`) : pas de retard, 260 ms en médiane et 302 ms au 90e centile. Les distances tiennent (facteur 1,08 sous 4 m, 5 avant). Le juge lui-même tirait à pile ou face : personne plein axe sous 4 m, rien d'autre de parlé à moins de 4,5 m, 152 gauche pour 128 droite, 39 changements de côté par minute.
+- **Cause racine** : le côté suivait la sortie la plus proche d'un cap, sensible à tout objet lointain ou sans distance. `FreeSpace` plaçait un bord par son centre : une bordure qui barre l'image tombait à 0,49 ou 0,51, collée à gauche puis à droite. Une `curb` comptait comme un obstacle à contourner.
+- **Fait** : `WidestGap` décide du côté pour toutes les voix ; l'ordre d'écart part dès 10 m (`ClearPath.ORDER_RANGE_M`, 4 m avant) pour tous les obstacles ; `FreeSpace` ignore un bord qui passe l'axe ; le décalage suit le juge ; une bordure ne se contourne plus. Égalité à droite, sans mémoire (ordre du 03/11). Le simulateur prend la latence mesurée, 0,3 s au lieu de 0,7 s. Journal `HazardVoice` : `place=` donne les deux trous.
+- **Preuves** : `WidestGapTest` ; marche simulée à 0,3 s contre `master` dans les mêmes conditions, à 5 Hz (le téléphone tourne à 8,7 images/s) : contacts 12 → 5, passages sous 0,25 m 20 → 11, écart moyen plus large, changements de côté 0,4 → 0 (poteau plein axe), 0,6 → 0 (personne plein axe), 0,8 → 0,3 (personne de face). Recul à 1,5 Hz : contacts 4 → 6, passages sous 0,25 m 14 → 16. Pas encore de preuve en rue.
+
 ## 2026-11-04 — iSee : distances stables et plus de voix contraire pendant l'esquive (branche `fix/isee-ecart-stable`)
 
 - **Demande** : « cela n'esquive pas avec droite et gauche les obstacles, donc humain, barrière, poteau, murs » (ordre user du 04/11, après essai de `1.0.1928-e0690c8`).

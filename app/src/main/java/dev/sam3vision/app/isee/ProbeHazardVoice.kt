@@ -3,6 +3,7 @@ package dev.sam3vision.app.isee
 import dev.sam3vision.core.distance.DistanceReading
 import dev.sam3vision.core.hazard.HazardConcepts
 import dev.sam3vision.core.hazard.HazardSignal
+import dev.sam3vision.core.live.ClearView
 
 /**
  * Ligne diagnostique danger d'une frame (DEBUG seul, tag `HazardVoice`) :
@@ -16,6 +17,7 @@ internal fun hazardVoiceLine(
     readings: List<DistanceReading>,
     signal: HazardSignal,
     phrase: String?,
+    view: ClearView? = null,
 ): String {
     val line = StringBuilder(160)
     line.append("lectures=").append(readings.size).append(" dangers=[")
@@ -29,7 +31,8 @@ internal fun hazardVoiceLine(
     }
     return line.append("] signal=").append(signal.detected).append('/').append(signal.meters)
         .append("m/").append(signal.label).append("/cx=").append(signal.centerX)
-        .append(" juge=").append(signal.side).append(" phrase=").append(phrase)
+        .append(" juge=").append(signal.side).append(" place=").append(view?.room?.left).append('/')
+        .append(view?.room?.right).append(" phrase=").append(phrase)
         .toString()
 }
 

@@ -183,7 +183,7 @@ class GuidanceAnnouncer(
         // de la piste (TTC, espace libre) et non du « côté le moins encombré » d'une
         // frame. Un obstacle pile dans l'axe n'a pas de côté : le couloir parle seul.
         val order = view.order?.takeUnless { decision.contactStop }
-        val cue = nudgeOf(atMs, labels, hfovDeg, ageMs, speedMps, space, order)
+        val cue = nudgeOf(atMs, labels, hfovDeg, ageMs, speedMps, space, view.cap.takeUnless { decision.contactStop })
         if (cue != null) return nudgeWord(atMs, cue, language)
         if (decision.blocked) return blockedWord(atMs, decision, language)
         // Écart manquant, couloir libre : l'ordre tient tant que l'écart manque.
@@ -342,8 +342,8 @@ class GuidanceAnnouncer(
      * Décalage latéral : obstacle proche qui s'approche — mot du côté où aller.
      * [free] est la place libre de la frame : le drapeau [LateralNudge.tight]
      * est re-vérifié ici (`canShift`), pour que la couche voix ne reçoive
-     * jamais un décalage « serré » contredit par le terrain. [order] impose son
-     * côté : le décalage ne juge que des centres, [ClearPath] les bords de boîte.
+     * jamais un décalage « serré » contredit par le terrain. [judged] impose son
+     * côté : le décalage ne juge que des centres, [ClearPath] toute la place.
      */
     private fun nudgeOf(
         atMs: Long,
@@ -352,7 +352,7 @@ class GuidanceAnnouncer(
         ageMs: Long,
         speedMps: Float?,
         free: FreeSpace,
-        order: AvoidOrder?,
+        judged: SteeringCap?,
     ): LateralNudge? {
         val cue = nudge.onFrame(
             atMs = atMs,
@@ -362,7 +362,7 @@ class GuidanceAnnouncer(
             speedMps = speedMps,
             free = free,
         ) ?: return null
-        val tightened = tightOf(if (order != null) cue.copy(side = order.cap) else cue, free)
+        val tightened = tightOf(if (judged != null) cue.copy(side = judged) else cue, free)
         lastNudge = tightened
         return tightened
     }

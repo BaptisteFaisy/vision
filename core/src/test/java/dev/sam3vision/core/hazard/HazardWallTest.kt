@@ -121,6 +121,16 @@ class HazardSteeredTest {
         assertEquals(SteeringCap.Right, HazardText.avoidSide(0.50f))
         assertEquals(SteeringCap.Right, HazardText.avoidSide(0.51f))
         assertEquals(SteeringCap.Right, HazardText.avoidSide(0.54f))
-        assertEquals(SteeringCap.Left, HazardText.avoidSide(0.56f))
+        assertEquals(SteeringCap.Left, HazardText.avoidSide(0.60f))
+    }
+
+    @Test
+    fun `un mur ou un poteau a 9 m fait parler le guetteur, cote du juge`() {
+        for (label in listOf("wall", "pole", "barrier")) {
+            val obstacle = PlacedLabel(label, 0.5f, 0.5f, 9f, 0.47f, 0.53f)
+            val view = ClearView(AvoidOrder(GuidanceSide.Left, obstacle), GuidanceSide.Left)
+            val cue = HazardWatcher().onSignal(HazardSignal.none().steeredBy(view), 1_000L, SpeechLanguage.En)
+            assertEquals(label, "Left.", cue?.phrase)
+        }
     }
 }

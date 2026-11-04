@@ -63,13 +63,21 @@ qu'on entend) et le repli (12). Elles lisent maintenant la **même réponse** :
 dans `LiveProbeState.clearView`, lue par `HazardSignal.steeredBy`.
 
 - **Intrusion** : mesurée en mètres sur les **bords de boîte**, de l'axe marché
-  au bord de l'objet, sous `Guidance.RANGE_METERS` (4 m). Écart voulu : 1 m aux
+  au bord de l'objet, dès `ClearPath.ORDER_RANGE_M` (10 m, ordre user du 04/11), pour
+  tous les obstacles. Écart voulu : 1 m aux
   corps et aux fixes. L'ordre tient tant que l'écart manque : c'est la fin de
   l'esquive, pas la sortie d'une bande d'image.
-- **Côté** : `GuidanceExit`, le chemin de `PeoplePath.plan` à la marge la plus
-  large qui passe (1 m, 0,6 m, 25 cm) ; sinon trou de grillage, sinon le côté
-  le moins encombré. Borné au trottoir, sauf si la borne renvoie vers une
-  personne. Plein axe (écart de cap sous 0,1) : à droite, sans mémoire.
+- **Côté** : vers le plus grand espace libre (`WidestGap`, ordre user du 04/11), pour
+  tous les obstacles : personnes, murs, poteaux, barrières. La largeur d'image est
+  découpée en trous entre les obstacles, épaules comprises ; seul compte ce qu'on va
+  atteindre, jusqu'à 2 m derrière l'obstacle (jamais moins de 4 m). Un objet sans
+  distance ni coupé par le bas ne compte pas. Une bordure ne se contourne pas.
+  Bornée au trottoir, sauf si la borne renvoie vers une personne. Obstacle sans
+  distance ou frame bouchée : trou de grillage, sinon le côté le moins encombré.
+- **Égalité** : à droite, sans mémoire (ordre user du 03/11). Elle vaut 15 % d'image
+  de différence entre les deux trous (corps à ±7,5 % de l'axe, le balancement de la
+  marche vaut 0,077 au 90e centile, soit ±0,75 m à 10 m). La droite doit avoir de
+  quoi passer : sinon le plus grand trou gagne.
 - **Mur longé** (`ClearPath.isRail`) : objet long, boîte qui sort du cadre sur un
   côté sans franchir l'axe. Son bord intérieur est un point de fuite : seule sa
   distance au bord du cadre le situe. Il ne parle que sous 0,5 m. S'il franchit

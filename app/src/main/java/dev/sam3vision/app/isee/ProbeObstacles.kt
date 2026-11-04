@@ -100,7 +100,7 @@ internal fun obstacleFrame(
     if (BuildConfig.DEBUG) android.util.Log.d("CurbVoice", curbVoiceLine(readings, curbSignal, curbCue?.phrase, st.crossingActive))
     val hazardSignal = hazardSignalOf(st, readings, placeMode())
     val hazardCue = watchers.hazard.onSignal(hazardSignal, nowMs, lang)
-    if (BuildConfig.DEBUG) android.util.Log.d("HazardVoice", hazardVoiceLine(readings, hazardSignal, hazardCue?.phrase))
+    if (BuildConfig.DEBUG) android.util.Log.d("HazardVoice", hazardVoiceLine(readings, hazardSignal, hazardCue?.phrase, st.clearView))
     // Dedans : seule la personne parle (cran 3, le même que dehors) —
     // bordures, mobilier et 101/102 se taisent (le verdict 100, lui,
     // parle toujours en Traversée).

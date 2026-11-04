@@ -45,6 +45,10 @@ grillages/murs/barrières 5, bordures 6, escaliers 7, poteaux/divers 8.
 | 11 | GPS manœuvres et événements | Aux événements moteur | Synthèse réseau (GPS) |
 | 12 | Repli | **Rien à dire + silence 300 ms** : gauche, droite ou tout droit selon GPS + obstacles | `guide_left`, `guide_right`, `guide_straight` |
 
+Portée de l'esquive (ordre user du 04/11) : dehors hors Traversée, tout obstacle à moins
+d'1 m de l'axe parle à son niveau dès 10 m (`ClearPath.ORDER_RANGE_M`), au-delà des seuils de
+détection du tableau ; le côté va vers le plus grand espace libre (`WidestGap`).
+
 ## 2. Traversée exclusive : 100 à 102
 
 Détail : `docs/TRAVERSEE.md`.

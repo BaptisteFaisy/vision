@@ -29,7 +29,7 @@ internal fun resolveDecision(
 }
 
 /**
- * Bouché vu du serveur seul : le côté vient du chemin local quand il en a un
+ * Bouché vu du serveur seul : le côté vient de la place locale quand il y en a
  * (le serveur ignore les murs et enverrait dedans), sinon du serveur, à défaut
  * la gauche — comme l'égalité côté serveur. Veto local 1 m : si ce côté ne
  * garantit pas 1 m à une personne et que l'autre les garantit, on bascule.
@@ -63,10 +63,10 @@ private fun samDecision(
     )
 }
 
-/** Côté d'un bouché serveur : chemin local d'abord, sinon le sien sous veto personne. */
+/** Côté d'un bouché serveur : place locale d'abord, sinon le sien sous veto personne. */
 private fun samSide(passage: Passage, labels: List<PlacedLabel>, hfovDeg: Float, range: Float): GuidanceSide {
     val cleaned = labels.filter { Guidance.isObstacle(it) }
-    PeoplePath.plan(cleaned, range, hfovDeg)?.takeIf { it.detour }?.let { return it.side }
+    WidestGap.of(cleaned, range, hfovDeg)?.let { return it.side }
     val side = if (passage.side == "right") GuidanceSide.Right else GuidanceSide.Left
     val other = if (side == GuidanceSide.Right) GuidanceSide.Left else GuidanceSide.Right
     val vetoed = !PeoplePath.clearsSide(labels, side, range, hfovDeg) &&
