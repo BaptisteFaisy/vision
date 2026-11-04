@@ -70,8 +70,9 @@ const val MASK_ENCODING_POLY = "poly"
 
 /**
  * Passage conseillé par le serveur SAM (`passage` de la réponse `/live`) : le
- * couloir est-il bouché par une personne, et par où passer. Absent (`null`)
- * sur un backend antérieur : la décision gauche/droite reste alors locale.
+ * couloir est-il bouché par une personne, une barrière ou un poteau, et par
+ * où passer. Absent (`null`) sur un backend antérieur : la décision
+ * gauche/droite reste alors locale.
  */
 data class Passage(
     val blocked: Boolean,
