@@ -17,6 +17,12 @@ data class PeoplePath(
     val clearanceM: Float,
     val fits: Boolean,
 ) {
+    /**
+     * Vrai si le cap s'écarte vraiment de tout droit : un cap resté sur l'axe ne
+     * contourne rien, son côté n'est qu'une convention — l'appelant garde son repli.
+     */
+    val detour: Boolean get() = fits && abs(headingX - 0.5f) > EDGE_EPS
+
     companion object {
 
         /**
@@ -35,10 +41,30 @@ data class PeoplePath(
         const val EDGE_X = 0.02f
 
         /**
+         * Marges essayées autour d'un obstacle fixe (m), la plus large d'abord :
+         * 1 m comme aux personnes quand ça passe, 0,6 m sur un trottoir serré,
+         * le corps seul en dernier recours — on ne frôle que si rien d'autre ne
+         * passe. Sans cet ordre, un poteau ne gardait que 25 cm : l'épaule.
+         */
+        private val STATIC_MARGINS_M = floatArrayOf(1f, 0.6f, Guidance.RAY_HALF_WIDTH_M)
+
+        /**
+         * Deux sorties à moins de cet écart de cap sont à égalité : obstacle plein
+         * axe, on passe à droite, sans que le bruit du cadre change le côté. Une
+         * règle sans mémoire, pas une tenue (ordre user du 03/11).
+         */
+        internal const val AXIS_TIE_X = 0.1f
+
+        /** Écart au corps (m) sous lequel deux sorties à égalité se valent. */
+        internal const val CLEARANCE_TIE_M = 0.05f
+
+        /**
          * Cap qui passe au plus près de [aimX] ([Guidance.RANGE_METERS] et champ
-         * [hfovDeg] comme le couloir) : `null` si rien n'est à portée, si un
-         * obstacle à portée a une géométrie incomplète (sans distance finie > 0
-         * ou sans centre fini), ou si le champ ou la visée sont infaisables
+         * [hfovDeg] comme le couloir), à la marge la plus large qui passe
+         * ([STATIC_MARGINS_M]) : `null` si rien n'est à portée, si un obstacle à
+         * portée a une géométrie incomplète (ni distance ni bords, ou sans centre
+         * fini — [ClearPath.depthOf] situe un objet aux bords connus), ou si le
+         * champ ou la visée sont infaisables
          * (`coerceIn` propage NaN : une projection NaN rendrait tout cap
          * « libre » — repli : l'appelant garde son ancien comportement).
          * Une passe O(n), un seul `tan`, tampons pré-alloués, pur et testé en JVM.
@@ -53,11 +79,13 @@ data class PeoplePath(
             if (!halfTangent.isFinite() || halfTangent <= 0f) return null
             if (!aimX.isFinite()) return null
             val bands = ObstacleBands(labels.size)
-            if (!bands.collect(labels, rangeMeters, halfTangent)) return null
             val aim = aimX.coerceIn(EDGE_X, 1f - EDGE_X)
-            val heading = bands.select(aim)
-            if (heading == null) return PeoplePath(aim, sideOf(aim), bands.clearance(aim), false)
-            return PeoplePath(heading, sideOf(heading), bands.clearance(heading), true)
+            for (margin in STATIC_MARGINS_M) {
+                if (!bands.collect(labels, rangeMeters, halfTangent, margin)) return null
+                val heading = bands.select(aim) ?: continue
+                return PeoplePath(heading, sideOf(heading), bands.clearance(heading), true)
+            }
+            return PeoplePath(aim, sideOf(aim), bands.clearance(aim), false)
         }
 
         /** Côté du cap : à gauche sous l'axe, à droite dessus (pile au centre ⇒ droite). */
@@ -153,9 +181,6 @@ internal fun bodyHalfM(label: PlacedLabel, lateralPerX: Float): Float {
 /** Frontière de bande : en deçà, le cap est hors bande (le bord lui-même passe). */
 private const val EDGE_EPS = 1e-4f
 
-/** Égalité des distances à la visée : en deçà, le plus petit cap gagne (à gauche). */
-private const val TIE_EPS = 1e-6f
-
 /**
  * Largeur de champ à [depth] mètres : ce que vaut tout l'axe x en mètres —
  * même projection que le trait du couloir (`halfTangent` borné caméra).
@@ -172,62 +197,88 @@ private class ObstacleBands(size: Int) {
     private var count = 0
 
     /**
-     * Remplit les bandes en une passe : faux si un obstacle à portée a une
-     * géométrie incomplète, ou si rien n'est à portée (même règle que le
-     * couloir : distance absente ou non finie = à portée, par prudence).
+     * Remplit les bandes en une passe, [staticMargin] autour des obstacles fixes :
+     * faux si un obstacle à portée a une géométrie incomplète, ou si rien n'est à
+     * portée (même règle que le couloir : distance absente = à portée, par
+     * prudence). Un mur longé ([ClearPath.isRail]) ferme tout son côté.
      */
-    fun collect(labels: List<PlacedLabel>, rangeMeters: Float, halfTangent: Float): Boolean {
+    fun collect(labels: List<PlacedLabel>, rangeMeters: Float, halfTangent: Float, staticMargin: Float): Boolean {
+        count = 0
         var index = 0
         while (index < labels.size) {
             val label = labels[index]
             index++
             val meters = label.meters
             if (meters != null && meters.isFinite() && meters > rangeMeters) continue
-            val depth = if (meters != null && meters.isFinite() && meters > 0f) {
-                meters
-            } else {
-                return false
+            if (ClearPath.isRail(label)) {
+                addRail(label, rangeMeters, halfTangent, staticMargin)
+                continue
             }
+            val depth = ClearPath.depthOf(label, rangeMeters) ?: return false
             val center = label.centerX
             if (!center.isFinite()) return false
             val lateralPerX = lateralPerX(depth, halfTangent)
             val person = PersonLabels.isBody(label.label)
             val body = bodyHalfM(label, lateralPerX)
-            val margin = if (person) PeoplePath.MIN_CLEARANCE_M else Guidance.RAY_HALF_WIDTH_M
+            val margin = if (person) PeoplePath.MIN_CLEARANCE_M else staticMargin
             val half = (body + margin) / lateralPerX
-            val start = center - half
-            val end = center + half
-            if (!start.isFinite() || !end.isFinite()) return false
-            lo[count] = start
-            hi[count] = end
-            centers[count] = center
-            bodies[count] = body
-            widths[count] = lateralPerX
-            count++
+            if (!add(center - half, center + half, center, body, lateralPerX)) return false
         }
         return count > 0
     }
 
+    /** Ajoute une bande, faux si elle n'est pas finie (une projection NaN libérerait tout). */
+    private fun add(start: Float, end: Float, center: Float, body: Float, perX: Float): Boolean {
+        if (!start.isFinite() || !end.isFinite()) return false
+        lo[count] = start
+        hi[count] = end
+        centers[count] = center
+        bodies[count] = body
+        widths[count] = perX
+        count++
+        return true
+    }
+
     /**
-     * Cap valide le plus proche de [aim] : la visée si elle passe, sinon le
-     * bord de bande valide le plus proche (`null` = tout est bouché). À égalité,
-     * le plus grand écart au corps, puis le plus petit cap (à gauche).
+     * Bande d'un mur longé : tout son côté, jusqu'au cap qui garde l'écart voulu
+     * à portée. Son bord intérieur ne le situe pas (point de fuite), sa distance
+     * latérale si ; sans mesure, on le suppose à [ClearPath.UNSEEN_DEPTH_M].
+     */
+    private fun addRail(label: PlacedLabel, rangeMeters: Float, halfTangent: Float, staticMargin: Float) {
+        val lateral = ClearPath.railLateralM(label, halfTangent)
+            ?: (ClearPath.UNSEEN_DEPTH_M * halfTangent)
+        val perX = lateralPerX(rangeMeters, halfTangent)
+        val margin = minOf(staticMargin, ClearPath.RAIL_CLEARANCE_M)
+        val toward = if (label.centerX < 0.5f) -1f else 1f
+        val wall = 0.5f + toward * lateral / perX
+        val inner = wall - toward * margin / perX
+        if (toward < 0f) add(-1f, inner, wall, 0f, perX) else add(inner, 2f, wall, 0f, perX)
+    }
+
+    /**
+     * Cap valide le plus proche de [aim] : la visée si elle passe, sinon le bord
+     * de bande valide le plus proche (`null` = tout est bouché). Deux sorties à
+     * égalité de cap ([PeoplePath.AXIS_TIE_X]) : le plus grand écart au corps,
+     * puis la droite.
      */
     fun select(aim: Float): Float? {
         if (isFree(aim, -1)) return aim
-        var best = 0f
-        var bestDist = Float.MAX_VALUE
-        var found = false
+        val left = nearest(aim, below = true)
+        val right = nearest(aim, below = false)
+        if (left == null || right == null) return left ?: right
+        val gap = (aim - left) - (right - aim)
+        if (abs(gap) > PeoplePath.AXIS_TIE_X) return if (gap < 0f) left else right
+        return if (clearance(left) > clearance(right) + PeoplePath.CLEARANCE_TIE_M) left else right
+    }
+
+    /** Sortie valide la plus proche de [aim], du côté [below], `null` si aucune. */
+    private fun nearest(aim: Float, below: Boolean): Float? {
+        var best: Float? = null
         fun consider(x: Float, skip: Int) {
-            if (x < PeoplePath.EDGE_X || x > 1f - PeoplePath.EDGE_X || !isFree(x, skip)) return
-            val dist = abs(x - aim)
-            if (!found || dist < bestDist - TIE_EPS ||
-                (abs(dist - bestDist) <= TIE_EPS && tieWins(x, best))
-            ) {
-                best = x
-                bestDist = dist
-                found = true
-            }
+            if (x < PeoplePath.EDGE_X || x > 1f - PeoplePath.EDGE_X || (x < aim) != below) return
+            if (!isFree(x, skip)) return
+            val current = best
+            if (current == null || abs(x - aim) < abs(current - aim)) best = x
         }
         consider(PeoplePath.EDGE_X, -1)
         consider(1f - PeoplePath.EDGE_X, -1)
@@ -237,16 +288,7 @@ private class ObstacleBands(size: Int) {
             consider(hi[i], i)
             i++
         }
-        return if (found) best else null
-    }
-
-    /** Égalité de distance : [x] gagne sur [best] au plus grand écart, puis au plus petit cap. */
-    private fun tieWins(x: Float, best: Float): Boolean {
-        val gapX = clearance(x)
-        val gapBest = clearance(best)
-        if (gapX > gapBest + TIE_EPS) return true
-        if (gapBest > gapX + TIE_EPS) return false
-        return x < best
+        return best
     }
 
     /** Vrai si [x] est hors de toute bande sauf celle de [skip] (son propre bord passe). */

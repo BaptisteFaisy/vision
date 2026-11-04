@@ -103,6 +103,13 @@ class GuidanceAnnouncer(
     var lastNudge: LateralNudge? = null
         private set
 
+    /**
+     * Lecture du chemin de la dernière frame ([ClearPath], `null` avant la
+     * première) : le guetteur y lit son côté, une seule tête pour les deux voix.
+     */
+    var lastView: ClearView? = null
+        private set
+
     /** Instant du dernier « Stop. » du rail : la direction opposée suit à la frame d'après. */
     private var stopSaidAtMs: Long? = null
 
@@ -110,7 +117,6 @@ class GuidanceAnnouncer(
     private var lastRailLevel: RailLevel = RailLevel.NONE
 
     private val nudge = LateralNudgeTracker()
-    private val staticAvoidance = StaticAvoidanceTracker(repeatMs)
 
     /**
      * Frame observée à [atMs] : renvoie la consigne à prononcer, ou `null` s'il faut
@@ -123,11 +129,9 @@ class GuidanceAnnouncer(
      * connaît la focale la passe).
      * [sidewalk] est le trottoir vu caméra : sur voie libre, un côté suspend le
      * cap (ordre de retour), une absence parle prudemment ; le bouché prime.
-     * [samPassage] est le passage conseillé par SAM : bouché et côté du
-     * serveur, obstacle chiffré du téléphone ; `null` (backend antérieur) =
-     * décision locale. Le serveur ne voit que les bloqueurs (personnes,
-     * barrières, poteaux) : un mur, une barrière ou un poteau qui bouche
-     * localement reprend la main sur son « libre » ([resolveDecision]).
+     * [samPassage] est le passage conseillé par SAM : il ajoute un bouché que
+     * le local n'a pas vu, jamais il n'en retire un ([resolveDecision]) ; `null`
+     * (backend antérieur) = décision locale.
      * [holeSide] est le côté du trou de grillage (ouvert,
      * proche, localisé par l'appelant) : sur couloir bouché sans chemin
      * optimal, on part vers lui sauf humain à moins de 1 m — sinon
@@ -162,27 +166,28 @@ class GuidanceAnnouncer(
         rail: RailState? = null,
     ): String? {
         val effective = routeCap ?: cap
-        val space = free ?: FreeSpace.of(labels, hfovDeg)
+        lastRailLevel = rail?.clearanceM?.let { SidewalkRail.levelOf(it, lastRailLevel) } ?: RailLevel.NONE
+        val space = roomBeside(free ?: FreeSpace.of(labels, hfovDeg), rail)
         val range = rangeFor(speedMps)
         val decision = resolveDecision(
             labels, effective, range, hfovDeg, space, speedMps, holeSide, samPassage)
         lastDecision = decision
         lastSidewalk = sidewalk
         lastNudge = null
+        val view = ClearPath.view(labels, hfovDeg, space, holeSide)
+        lastView = view
         safetySpeak(atMs, rail, decision, labels, hfovDeg, range, language, ageMs)?.let { return it }
+        if (safetyOwns(rail, decision, ageMs)) return null
         // L'évitement passe DEVANT la décision de couloir : en foule le couloir est
         // bouché presque en permanence, et c'est justement là que l'ordre doit venir
         // de la piste (TTC, espace libre) et non du « côté le moins encombré » d'une
         // frame. Un obstacle pile dans l'axe n'a pas de côté : le couloir parle seul.
-        val cue = nudgeOf(atMs, labels, hfovDeg, ageMs, speedMps, space)
+        val order = view.order?.takeUnless { decision.contactStop }
+        val cue = nudgeOf(atMs, labels, hfovDeg, ageMs, speedMps, space, order)
         if (cue != null) return nudgeWord(atMs, cue, language)
-        // Statique à portée : mot du côté libre à 1 m, devant le couloir.
-        val statObstacle = StaticAvoidance.nearest(labels)
-        val statWord = statObstacle?.let { staticAvoidance.onFrame(it, labels, atMs, hfovDeg = hfovDeg) }
-        if (statObstacle != null && staticAvoidance.isActive() && statWord != GuidanceWord.Stop) {
-            return statWord?.let { sideWord(atMs, it, language) }
-        }
         if (decision.blocked) return blockedWord(atMs, decision, language)
+        // Écart manquant, couloir libre : l'ordre tient tant que l'écart manque.
+        if (order != null) return sideWord(atMs, GuidanceWord.fromSide(order.side), language)
         // Rail trottoir : sous la sécurité, devant la voie libre. Il possède la
         // frame dès qu'il a quelque chose à dire — s'il est retenu (redite,
         // frame périmée), on se tait plutôt que de dire « Tout droit. ».
@@ -245,10 +250,31 @@ class GuidanceAnnouncer(
         speak(atMs, directionKey(word.text(language)), word.text(language), repeatMs)
 
     /**
+     * Place de la frame, sans le côté d'une bordure sous la sécurité : ni le
+     * couloir ni l'écart ne renvoient vers elle ([GuidanceBounds.boundedSide]).
+     */
+    private fun roomBeside(space: FreeSpace, rail: RailState?): FreeSpace {
+        if (lastRailLevel != RailLevel.SAFETY) return space
+        return when (rail?.side) {
+            GuidanceSide.Left -> space.copy(leftM = 0f)
+            GuidanceSide.Right -> space.copy(rightM = 0f)
+            null -> space
+        }
+    }
+
+    /**
+     * Sécurité en cours : elle possède la frame même quand sa redite se tait —
+     * sinon le décalage redirait, entre deux redites, le côté de la bordure.
+     */
+    private fun safetyOwns(rail: RailState?, decision: GuidanceDecision, ageMs: Long): Boolean =
+        lastRailLevel == RailLevel.SAFETY && rail?.side != null && !Timing.isStale(ageMs) &&
+            !(decision.blocked && decision.contactStop)
+
+    /**
      * Sécurité bordure (< 1 m ⇒ inverse forcé), devant tout sauf le
-     * stop-contact. Le niveau est re-jugé ici (marge + mémoire) : l'hystérésis
-     * vit dans l'annonceur. Mêmes clés que [railSpeak] (une consigne = une
-     * clé) : la redite est partagée entre sécurité et rail. `null` = pas de
+     * stop-contact. Le niveau est re-jugé en tête de frame (marge + mémoire) :
+     * l'hystérésis vit dans l'annonceur. Mêmes clés que [railSpeak] (une consigne
+     * = une clé) : la redite est partagée entre sécurité et rail. `null` = pas de
      * sécurité (ou frame périmée), la frame continue.
      */
     private fun safetySpeak(
@@ -261,7 +287,6 @@ class GuidanceAnnouncer(
         language: SpeechLanguage,
         ageMs: Long,
     ): String? {
-        lastRailLevel = rail?.clearanceM?.let { SidewalkRail.levelOf(it, lastRailLevel) } ?: RailLevel.NONE
         val side = rail?.side
         if (lastRailLevel != RailLevel.SAFETY || side == null || Timing.isStale(ageMs)) return null
         if (decision.blocked && decision.contactStop) return null
@@ -317,7 +342,8 @@ class GuidanceAnnouncer(
      * Décalage latéral : obstacle proche qui s'approche — mot du côté où aller.
      * [free] est la place libre de la frame : le drapeau [LateralNudge.tight]
      * est re-vérifié ici (`canShift`), pour que la couche voix ne reçoive
-     * jamais un décalage « serré » contredit par le terrain.
+     * jamais un décalage « serré » contredit par le terrain. [order] impose son
+     * côté : le décalage ne juge que des centres, [ClearPath] les bords de boîte.
      */
     private fun nudgeOf(
         atMs: Long,
@@ -326,6 +352,7 @@ class GuidanceAnnouncer(
         ageMs: Long,
         speedMps: Float?,
         free: FreeSpace,
+        order: AvoidOrder?,
     ): LateralNudge? {
         val cue = nudge.onFrame(
             atMs = atMs,
@@ -335,7 +362,7 @@ class GuidanceAnnouncer(
             speedMps = speedMps,
             free = free,
         ) ?: return null
-        val tightened = tightOf(cue, free)
+        val tightened = tightOf(if (order != null) cue.copy(side = order.cap) else cue, free)
         lastNudge = tightened
         return tightened
     }
@@ -413,9 +440,9 @@ class GuidanceAnnouncer(
         lastDecision = null
         lastSidewalk = null
         lastNudge = null
+        lastView = null
         lastRailLevel = RailLevel.NONE
         nudge.reset()
-        staticAvoidance.reset()
     }
 
     companion object {

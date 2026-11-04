@@ -1,8 +1,13 @@
 package dev.sam3vision.core.hazard
 
 import dev.sam3vision.core.distance.DistanceReading
+import dev.sam3vision.core.live.AvoidOrder
+import dev.sam3vision.core.live.ClearView
+import dev.sam3vision.core.live.GuidanceSide
+import dev.sam3vision.core.live.PlacedLabel
 import dev.sam3vision.core.speech.SpeechLanguage
 import org.junit.Assert.assertEquals
+import org.junit.Assert.assertFalse
 import org.junit.Assert.assertNull
 import org.junit.Assert.assertTrue
 import org.junit.Test
@@ -57,5 +62,56 @@ class HazardWallTest {
         assertEquals("Droite.", watcher.onSignal(signal, 1_300L, SpeechLanguage.Fr)!!.phrase)
         val moved = HazardSignal(detected = true, meters = 1.5f, label = "mur", centerX = 0.8f)
         assertEquals("Gauche.", watcher.onSignal(moved, 1_350L, SpeechLanguage.Fr)!!.phrase)
+    }
+}
+
+/** Le guetteur suit le chemin : le côté vient de la scène, plus du centre seul. */
+class HazardSteeredTest {
+
+    private val pole = PlacedLabel("pole", 0.7f, 0.5f, 1.5f, 0.68f, 0.72f)
+
+    private fun view(side: GuidanceSide, threat: PlacedLabel = pole) =
+        ClearView(AvoidOrder(side, threat), side)
+
+    @Test
+    fun `ordre fait parler un obstacle hors de la bande centrale`() {
+        val signal = HazardSignal.none().steeredBy(view(GuidanceSide.Left))
+
+        assertTrue(signal.detected)
+        assertEquals("pole", signal.label)
+        assertEquals(1.5f, signal.meters!!, 0.001f)
+        assertEquals(GuidanceSide.Left, signal.side)
+    }
+
+    @Test
+    fun `sans ordre le signal vide reste vide`() {
+        assertFalse(HazardSignal.none().steeredBy(ClearView(null, GuidanceSide.Left)).detected)
+        assertFalse(HazardSignal.none().steeredBy(null).detected)
+    }
+
+    @Test
+    fun `corps retenu garde son label, le cote vient de la scene`() {
+        val body = HazardSignal(detected = true, meters = 14f, label = "person", centerX = 0.45f)
+
+        val signal = body.steeredBy(view(GuidanceSide.Left))
+
+        assertEquals("person", signal.label)
+        assertEquals(GuidanceSide.Left, signal.side)
+    }
+
+    @Test
+    fun `le mot suit le cote du chemin, pas l opposé du centre`() {
+        val body = HazardSignal(detected = true, meters = 3f, label = "pole", centerX = 0.45f)
+
+        val cue = HazardWatcher().onSignal(body.copy(side = GuidanceSide.Left), 0L, SpeechLanguage.En)
+
+        assertEquals("Left.", cue?.phrase)
+    }
+
+    @Test
+    fun `sans chemin le mot reste l opposé du centre`() {
+        val body = HazardSignal(detected = true, meters = 3f, label = "pole", centerX = 0.45f)
+
+        assertEquals("Right.", HazardWatcher().onSignal(body, 0L, SpeechLanguage.En)?.phrase)
     }
 }

@@ -94,13 +94,13 @@ class ProbeStairsPriorityTest {
     fun `esquive humaine tait l annonce escaliers`() = runTest {
         // Hors couloir (pas bouché) mais dans la fenêtre d'esquive (2 m de l'axe).
         val probe = probe(this, guide = true)
-        probe.voice.phrase(0L, listOf(personne(0.78f, 3.0f)), SteeringCap.Straight)
+        val first = probe.voice.phrase(0L, listOf(personne(0.78f, 3.0f)), SteeringCap.Straight)
         probe.voice.phrase(250L, listOf(personne(0.78f, 2.6f)), SteeringCap.Straight)
-        val third = probe.voice.phrase(500L, listOf(personne(0.78f, 2.2f)), SteeringCap.Straight)
+        probe.voice.phrase(500L, listOf(personne(0.78f, 2.2f)), SteeringCap.Straight)
 
         assertTrue(probe.stairsYieldToAvoidance())
-        assertNotNull(third)
-        assertTrue(preemptsCrossing(third!!))
+        assertNotNull(first)
+        assertTrue(preemptsCrossing(first!!))
     }
 
     @Test

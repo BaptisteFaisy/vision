@@ -1,6 +1,7 @@
 package dev.sam3vision.core.live
 
 import dev.sam3vision.core.distance.DistanceReading
+import dev.sam3vision.core.distance.Pinhole
 import dev.sam3vision.core.model.Detection
 import dev.sam3vision.core.model.LiveFrame
 import dev.sam3vision.core.model.SegObject
@@ -79,6 +80,7 @@ fun placedLabels(frame: LiveFrame, readings: List<DistanceReading>): List<Placed
         if (position != null) {
             placed += PlacedLabel(
                 position.label, position.centerX, position.centerY, meters[obj.box], position.x0, position.x1,
+                cutBottom = Pinhole.isCutBottom(obj.box, frame.height),
             )
         }
         i++

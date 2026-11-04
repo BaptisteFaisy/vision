@@ -1,5 +1,6 @@
 package dev.sam3vision.core.distance
 
+import dev.sam3vision.core.hazard.HazardConcepts
 import dev.sam3vision.core.model.Detection
 import kotlin.jvm.Volatile
 
@@ -60,8 +61,9 @@ object Pinhole {
     }
 
     /**
-     * Bord haut coupé : la hauteur ne mesure plus l'objet (tête hors cadre).
-     * Refusé, comme le bord bas — aucune des deux coupes n'a de mesure.
+     * Bord haut coupé : la hauteur ne mesure plus l'objet (tête hors cadre). Le
+     * sténopé se tait ; un obstacle parlé garde le plan de sol, ses pieds sont
+     * dans l'image (voir [DistanceMeter.measure]).
      */
     fun isCutTop(box: List<Float>, tolerancePx: Float = EDGE_TOLERANCE_PX): Boolean {
         if (box.size < 4) return false
@@ -237,9 +239,12 @@ class DistanceMeter(
      * la mesure n'est alors pas lissée, mais elle est quand même rendue).
      * Les boîtes masquées par une meilleure détection ([Occlusion]) sont écartées :
      * leur hauteur ne mesure plus l'objet.
-     * Une boîte coupée par le bord haut **ou bas** est écartée : sa hauteur ne
-     * mesure plus l'objet et, coupée en bas, sa ligne de pieds n'est plus dans
-     * l'image — aucune des deux branches de la lane ne peut conclure (voir [readOne]).
+     * Une boîte coupée en bas est écartée : sa ligne de pieds n'est plus dans
+     * l'image, aucune branche ne peut conclure. Coupée en haut, sa hauteur ne
+     * mesure plus l'objet : seul un obstacle parlé ([HazardConcepts.isSpoken])
+     * garde le plan de sol — un poteau plus haut que le cadre reste mesuré tant
+     * que son pied est visible, le sol, la bordure et le passage restent refusés
+     * (voir [readOne]).
      */
     fun measure(
         width: Int,
@@ -273,7 +278,8 @@ class DistanceMeter(
         // la mesure (hauteur vraie, pieds exacts) ; la lecture garde la boîte
         // détecteur (overlay, appariement profondeur).
         val box = detection.maskBox?.takeIf { it.size >= 4 } ?: detection.box
-        if (Pinhole.isCutTop(box)) return null
+        val cutTop = Pinhole.isCutTop(box)
+        if (cutTop && !HazardConcepts.isSpoken(detection.label)) return null
         // Bas coupé (pieds sous le cadre) : aucune mesure, `null`. Le sténopé ne
         // peut pas parler (hauteur tronquée) et le plan de sol non plus — sa
         // formule demande la ligne des pieds, qui est précisément sous le cadre.
@@ -292,7 +298,7 @@ class DistanceMeter(
         // — sténopé via [rawMeters], plan de sol via [groundMeters] — lisent des
         // bords haut/bas sur leurs rayons idéaux.
         val measured = undistortedBox(box, width, height, principalX, principalY)
-        val raw = rawMeters(detection.label, measured, focalPx, principalY, height) ?: return null
+        val raw = rawMeters(detection.label, measured, focalPx, principalY, height, cutTop) ?: return null
         val id = trackId ?: UNTRACKED_ID
         val smoothed = if (trackId == null) {
             raw.meters
@@ -309,7 +315,8 @@ class DistanceMeter(
      * [DistanceFusion] (poids sténopé [KnownSizes.fusionWeight], poids sol
      * [GroundWeight] depuis la dépression des pieds). Un objet sans hauteur de
      * classe connue peut donc être mesuré s'il est posé au sol et que la pose est
-     * réglée — sans jamais inventer de chiffre.
+     * réglée — sans jamais inventer de chiffre. [cutTop] tait le sténopé : la
+     * hauteur de la boîte ne mesure plus l'objet, seul le sol peut parler.
      */
     private fun rawMeters(
         label: String,
@@ -317,8 +324,9 @@ class DistanceMeter(
         focalPx: Float,
         principalY: Float,
         height: Int,
+        cutTop: Boolean,
     ): RawReading? {
-        val standing = KnownSizes.heightMeters(label)
+        val standing = if (cutTop) null else KnownSizes.heightMeters(label)
             ?.let { Pinhole.distanceMeters(box, it, focalPx) }
         val ground = groundMeters(box, focalPx, principalY, height)
         val meters = DistanceFusion.combine(

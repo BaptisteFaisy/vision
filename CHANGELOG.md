@@ -3,6 +3,13 @@
 Le journal part du 2026-10-26 après 19 h : le commit de départ, puis une entrée par fait
 livré et ses preuves (tâche, fichiers, chiffres) dans l'arbre.
 
+## 2026-11-04 — iSee : un seul juge de l'écart latéral (branche `fix/isee-ecart-obstacles`)
+
+- **Demande** : « il ne s'écarte pas bien des objets, donc murs, barrière, humain, poteau » (ordre user du 04/11).
+- **Cause racine** : quatre décideurs choisissaient le côté avec quatre géométries (`StaticAvoidance`, `LateralNudge`, couloir et serveur, `HazardWatcher`) et se contredisaient sur un même obstacle ; le `passage` serveur, en pixels, sans mètres ni murs, écrasait la décision locale ; une boîte coupée en haut perdait sa distance même pied au sol visible.
+- **Fait** : `ClearPath` est le seul juge (mètres sur les bords de boîte, écart de 1 m tenu tant qu'il manque), lu par le couloir, le décalage et le guetteur ; `StaticAvoidance` retiré ; `resolveDecision` local d'abord ; distance au sol pour une boîte coupée en haut. Mur longé et barrière de face séparés par la fermeture (`closingMps`, `closingSpanMs`).
+- **Preuves** : marche simulée en boucle fermée (`AvoidanceWalkTest`, 14 scènes, 20 seeds, vraie mesure et vraie voix, image vieille de 0,7 s) : contacts 50 → 10 sur 280 à 5 Hz, 33 → 7 à 1,5 Hz ; passages sous 0,25 m 68 → 26 et 64 → 26. Reste : côté qui bascule en plein virage sur une personne décalée (S5, S13, 1 à 2 contacts sur 20 contre 0), la règle « plein axe à droite sans mémoire » du 03/11 étant conservée ; couloir de 2,4 m plus bavard (11 mots contre 5,3). Pas encore de preuve en rue.
+
 ## 2026-11-04 — iSee : le guidage quitte le workspace Modal désactivé (branche `fix/isee-route-compte-coupe`)
 
 - **Demande** : « il affiche toujours ecran blanc » après `mode GPS` sur le Redmi (ordre user du 04/11).

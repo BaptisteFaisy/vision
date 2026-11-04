@@ -55,6 +55,44 @@ courtes § 46, pastille 500 ms), silence 10 s (`sidewalk`). Coupé en traversée
   300 ms nulle part — voir `docs/REVUE-V4.md` R-12). À implémenter avant
   la première prise rue (item 11 de `docs/RECETTE-RUE.md`).
 
+## 4 bis. Écart latéral : un seul juge (`ClearPath`, 04/11)
+
+Deux voix disent « Left. » / « Right. » : le guetteur (niveaux 3/5/8, la voix
+qu'on entend) et le repli (12). Elles lisent maintenant la **même réponse** :
+`ClearPath.view`, calculée une fois par frame dans `GuidanceAnnouncer`, publiée
+dans `LiveProbeState.clearView`, lue par `HazardSignal.steeredBy`.
+
+- **Intrusion** : mesurée en mètres sur les **bords de boîte**, de l'axe marché
+  au bord de l'objet, sous `Guidance.RANGE_METERS` (4 m). Écart voulu : 1 m aux
+  corps et aux fixes. L'ordre tient tant que l'écart manque : c'est la fin de
+  l'esquive, pas la sortie d'une bande d'image.
+- **Côté** : `GuidanceExit`, le chemin de `PeoplePath.plan` à la marge la plus
+  large qui passe (1 m, 0,6 m, 25 cm) ; sinon trou de grillage, sinon le côté
+  le moins encombré. Borné au trottoir, sauf si la borne renvoie vers une
+  personne. Plein axe (écart de cap sous 0,1) : à droite, sans mémoire.
+- **Mur longé** (`ClearPath.isRail`) : objet long, boîte qui sort du cadre sur un
+  côté sans franchir l'axe. Son bord intérieur est un point de fuite : seule sa
+  distance au bord du cadre le situe. Il ne parle que sous 0,5 m. S'il franchit
+  l'axe, le cap finit dedans : c'est un obstacle.
+- **Longé ou de face** : une boîte seule ne sépare pas un mur longé d'une barrière
+  dont on frôle le bout. Le mur reste à la même distance quand on avance, la
+  barrière se rapproche : à 0,7 m/s de fermeture sur 800 ms de mesures au moins
+  (`closingSpanMs`), l'objet n'est plus longé. Le lacet d'une marche (≈ 5°) balaie
+  le point de fuite : il est toléré, sauf sur un objet mesuré d'approche inconnue.
+- **Sans distance** : un objet coupé par le bas est proche (`UNSEEN_DEPTH_M`,
+  1,5 m) ; un objet aux bords connus reste dans le plan à la portée, il ne
+  l'annule plus. Sans bords ni distance, le plan garde son repli.
+- **Serveur** : `resolveDecision` est local d'abord. `passage` ne juge que des
+  centres en fraction d'image, sans mètres ni murs : son « libre » ne tait plus
+  un bouché local, et il n'ajoute un bouché que si le local n'en a pas.
+- **Hors périmètre** : Traversée et dedans gardent le guetteur d'avant
+  (`hazardSignalOf`). La sécurité bordure possède sa frame, y compris entre deux
+  redites, et retire son côté de la place libre.
+
+Le palier lointain ne change pas : corps et poteau jusqu'à 15 m dans la bande
+centrale, avec le côté du chemin lointain quand il en a un. Limite connue :
+l'obstacle sorti du cadre n'a plus de mémoire, tout se juge dans l'image.
+
 ## 5. Ce que le guidage n'est plus (supprimé en v4)
 
 - Mots SAM/TwinLite à chaque frame, arbitrage bouché/libre, « obstacle,
@@ -71,6 +109,7 @@ courtes § 46, pastille 500 ms), silence 10 s (`sidewalk`). Coupé en traversée
 | Bus vocal (plus petit gagne, écrasé jeté) | `app/.../isee/VoiceBus.kt` (`post`, `userSpeaking`, `chatSpeaking`) |
 | Antirépétition (table centrale) | `core/.../live/AntiRepeat.kt` (`allow`, clés § 5 voix) |
 | Clips anglais (catalogue + lecteur) | `core/.../speech/IseeClipsEn.kt`, `tools/isee-clips-en-catalog.json`, `app/.../isee/IseeClipPlayer.kt` |
+| Écart latéral : intrusion, côté, mur longé | `core/.../live/ClearPath.kt`, `GuidanceExit.kt`, `PeoplePath.kt` |
 | Voix de proximité (sans file) | `app/.../isee/ProximityVoice.kt` (`speak`, clips d'abord) |
 | Moteur GPS + rappel 15 s | `app/.../voicenav/VoiceNavEngineDriver.kt`, `VoiceNavGpsVoice.kt` (`gpsReminderPhrase`) |
 | Chat : attente + reprise | `app/.../isee/ChatWaitResume.kt` (rang 9) |

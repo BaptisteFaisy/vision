@@ -5,6 +5,7 @@ import dev.sam3vision.core.curb.SidewalkRail
 import dev.sam3vision.core.curb.SidewalkPosition
 import dev.sam3vision.core.distance.LensSpec
 import dev.sam3vision.core.hazard.FenceOpeningSignal
+import dev.sam3vision.core.live.ClearView
 import dev.sam3vision.core.live.GuidanceAnnouncer
 import dev.sam3vision.core.live.GuidanceDecision
 import dev.sam3vision.core.live.PlacedLabel
@@ -71,6 +72,9 @@ internal class ProbeVoice(
      */
     val lastDecision: GuidanceDecision? get() = guidance.lastDecision
 
+    /** Chemin de la dernière frame guidée (`null` guidage coupé) : le guetteur y lit son côté. */
+    val clearView: ClearView? get() = if (guide) guidance.lastView else null
+
     /**
      * Phrase à dire pour la frame, ou `null` (muet) : le guidage, sinon
      * silence. [manualCap] est le cap demandé à la voix.
@@ -115,6 +119,9 @@ internal class ProbeVoice(
         if (!guide) return null
         val decision = guidance.lastDecision ?: return null
         if (decision.blocked) return SteeringCue.from(decision)
+        guidance.lastView?.order?.let {
+            return SteeringCue(decision.cap, blocked = false, passage = it.cap, urgent = true)
+        }
         guidance.lastNudge?.let { return SteeringCue(decision.cap, blocked = false, passage = it.side, urgent = true) }
         val back = guidance.lastSidewalk?.let { SidewalkKeep.returnCap(it) }
         if (back != null) return SteeringCue(decision.cap, blocked = false, passage = back)

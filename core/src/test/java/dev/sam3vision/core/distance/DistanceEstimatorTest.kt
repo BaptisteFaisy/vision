@@ -127,9 +127,31 @@ class DistanceEstimatorTest {
         val box = listOf(100f, 0f, 200f, 200f)
         assertTrue(Pinhole.isCutTop(box))
         assertTrue(DistanceMeter().measure(width, height, listOf(detection("personne", box))).isEmpty())
-        // même avec une pose : la tête hors cadre ne se mesure pas
+    }
+
+    @Test
+    fun `poteau tete coupee garde le sol tant que son pied est visible`() {
+        val box = listOf(100f, 0f, 120f, 300f)
         val posed = DistanceMeter().apply { pose = CameraPose(1.5f) }
-        assertTrue(posed.measure(width, height, listOf(detection("personne", box))).isEmpty())
+        val reading = posed.measure(width, height, listOf(detection("pole", box))).single()
+        val ground = GroundPlane.forwardMeters(300f, CameraPose(1.5f), focal, principalY, height)!!
+        assertEquals(ground, reading.meters, 0.01f)
+    }
+
+    @Test
+    fun `personne tete coupee ne lit pas sa hauteur tronquee`() {
+        val box = listOf(100f, 0f, 200f, 300f)
+        val posed = DistanceMeter().apply { pose = CameraPose(1.5f) }
+        val ground = GroundPlane.forwardMeters(300f, CameraPose(1.5f), focal, principalY, height)!!
+        assertEquals(ground, posed.measure(width, height, listOf(detection("personne", box))).single().meters, 0.01f)
+    }
+
+    @Test
+    fun `sol et bordure tete coupee restent sans lecture`() {
+        val posed = DistanceMeter().apply { pose = CameraPose(1.5f) }
+        val box = listOf(100f, 0f, 200f, 300f)
+        assertTrue(posed.measure(width, height, listOf(detection("sidewalk", box))).isEmpty())
+        assertTrue(posed.measure(width, height, listOf(detection("curb", box))).isEmpty())
     }
 
     @Test

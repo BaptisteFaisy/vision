@@ -8,11 +8,10 @@ import org.junit.Assert.assertTrue
 import org.junit.Test
 
 /**
- * Priorité passage serveur / décision locale : le serveur ([Passage]) juge
- * les bloqueurs à pleine résolution et remplace le local — sauf quand il
- * dit « libre » alors qu'un mur, une barrière ou un poteau bouche le
- * couloir localement : le local reprend la main, avec le côté de
- * [Guidance.decide]. Les personnes restent jugées par le serveur.
+ * Priorité passage serveur / décision locale : le local d'abord. Le serveur
+ * ne juge que des centres de boîte, sans mètres ni murs : son « libre » ne
+ * tait jamais un bouché local, et son bouché ne s'ajoute que si le local n'a
+ * rien vu, avec le côté du chemin local quand il en a un.
  */
 class GuidanceResolverTest {
 
@@ -90,9 +89,28 @@ class GuidanceResolverTest {
     }
 
     @Test
-    fun `serveur libre + personne locale = serveur gagne`() {
+    fun `serveur libre + personne locale = local garde`() {
         val labels = listOf(at("personne", 0.5f, 2f))
-        assertTrue(local(labels).blocked)
-        assertFalse(resolve(labels, free).blocked)
+        assertEquals(local(labels), resolve(labels, free))
+        assertTrue(resolve(labels, free).blocked)
+    }
+
+    @Test
+    fun `serveur libre + poubelle locale = local garde`() {
+        val labels = listOf(at("poubelle", 0.5f, 2f))
+        assertEquals(local(labels), resolve(labels, free))
+        assertTrue(resolve(labels, free).blocked)
+    }
+
+    @Test
+    fun `serveur bouche et mur du cote serveur = le chemin local evite le mur`() {
+        // Personne à 7 m (hors de la portée proche) : le local ne bouche pas.
+        val labels = listOf(
+            PlacedLabel("personne", 0.62f, 0.5f, 7f, 0.60f, 0.64f),
+            PlacedLabel("mur", 0.2f, 0.5f, 2f, 0.05f, 0.35f),
+        )
+        assertFalse(local(labels).blocked)
+        val got = resolve(labels, Passage(blocked = true, side = "left"))
+        assertEquals(GuidanceSide.Right, got.side)
     }
 }

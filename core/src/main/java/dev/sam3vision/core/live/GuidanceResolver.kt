@@ -1,14 +1,14 @@
 package dev.sam3vision.core.live
 
-import dev.sam3vision.core.hazard.HazardConcepts
 import dev.sam3vision.core.model.Passage
 
 /**
- * Décision de couloir de la frame : locale ([Guidance.decide]) sauf passage
- * serveur ([Passage]) qui la remplace — le serveur ne juge que les
- * bloqueurs (personnes, barrières, poteaux), donc un mur, une barrière ou
- * un poteau qui bouche localement reprend la main sur son « libre ».
- * Pur JVM, extrait de [GuidanceAnnouncer.onFrame] (plafond 50 lignes).
+ * Décision de couloir de la frame : **locale d'abord** ([Guidance.decide]). Le
+ * téléphone a les mètres, les bords de boîte, les murs et le trottoir ; le
+ * serveur ([Passage]) ne juge que des centres de boîte en fraction d'image, sans
+ * distance ni mur. Son « libre » ne fait donc jamais taire un bouché local, et
+ * il ne peut qu'ajouter un bouché que le local n'a pas vu. Pur JVM, extrait de
+ * [GuidanceAnnouncer.onFrame] (plafond 50 lignes).
  */
 internal fun resolveDecision(
     labels: List<PlacedLabel>,
@@ -24,30 +24,16 @@ internal fun resolveDecision(
         labels, cap, rangeMeters, hfovDeg, free = free, speedMps = speedMps,
         holeSide = holeSide,
     )
-    val server = samPassage?.let { samDecision(it, labels, cap, hfovDeg, rangeMeters) }
-    if (server != null && !server.blocked && localStaticBlocks(local)) return local
-    return server ?: local
+    if (local.blocked || samPassage?.blocked != true) return local
+    return samDecision(samPassage, labels, cap, hfovDeg, rangeMeters, free)
 }
 
 /**
- * Le serveur ne juge que les bloqueurs ([Passage]) : un mur, une barrière
- * ou un poteau qui bouche le couloir localement reprend la main sur un
- * « libre » serveur (ordre user : les murs s'esquivent, ils ne se disent
- * pas — et ils comptent pour décider gauche/droite).
- */
-private fun localStaticBlocks(decision: GuidanceDecision): Boolean {
-    if (!decision.blocked) return false
-    val label = decision.obstacle?.label ?: return false
-    return HazardConcepts.isWall(label) || StaticAvoidance.isStaticObstacle(label)
-}
-
-/**
- * Décision lue dans le passage SAM : bouché et côté viennent du serveur
- * (les mêmes boîtes, jugées à pleine résolution), l'obstacle chiffré des
- * mesures du téléphone. Sans côté (contrat rompu), la gauche — comme
- * l'égalité côté serveur. Veto local 1 m : si le côté serveur ne
- * garantit pas 1 m à une personne et que l'autre côté les garantit,
- * on bascule (la sécurité locale prime sur le juge lointain).
+ * Bouché vu du serveur seul : le côté vient du chemin local quand il en a un
+ * (le serveur ignore les murs et enverrait dedans), sinon du serveur, à défaut
+ * la gauche — comme l'égalité côté serveur. Veto local 1 m : si ce côté ne
+ * garantit pas 1 m à une personne et que l'autre les garantit, on bascule.
+ * L'obstacle chiffré vient des mesures du téléphone.
  */
 private fun samDecision(
     passage: Passage,
@@ -55,17 +41,9 @@ private fun samDecision(
     cap: SteeringCap,
     hfovDeg: Float,
     range: Float,
+    free: FreeSpace,
 ): GuidanceDecision {
-    if (!passage.blocked) return GuidanceDecision(blocked = false, cap = cap)
-    val side = if (passage.side == "right") GuidanceSide.Right else GuidanceSide.Left
-    val other = if (side == GuidanceSide.Right) GuidanceSide.Left else GuidanceSide.Right
-    val use = if (!PeoplePath.clearsSide(labels, side, range, hfovDeg) &&
-        PeoplePath.clearsSide(labels, other, range, hfovDeg)
-    ) {
-        other
-    } else {
-        side
-    }
+    val use = GuidanceBounds.boundedSide(samSide(passage, labels, hfovDeg, range), free)
     val exit = if (use == GuidanceSide.Right) SteeringCap.Right else SteeringCap.Left
     val obstacle = labels
         .mapNotNull { label -> label.meters?.takeIf { it.isFinite() }?.let { label to it } }
@@ -83,4 +61,15 @@ private fun samDecision(
         passage = exit,
         shiftMeters = Guidance.shiftOf(obstacle?.meters, half, hfovDeg),
     )
+}
+
+/** Côté d'un bouché serveur : chemin local d'abord, sinon le sien sous veto personne. */
+private fun samSide(passage: Passage, labels: List<PlacedLabel>, hfovDeg: Float, range: Float): GuidanceSide {
+    val cleaned = labels.filter { Guidance.isObstacle(it) }
+    PeoplePath.plan(cleaned, range, hfovDeg)?.takeIf { it.detour }?.let { return it.side }
+    val side = if (passage.side == "right") GuidanceSide.Right else GuidanceSide.Left
+    val other = if (side == GuidanceSide.Right) GuidanceSide.Left else GuidanceSide.Right
+    val vetoed = !PeoplePath.clearsSide(labels, side, range, hfovDeg) &&
+        PeoplePath.clearsSide(labels, other, range, hfovDeg)
+    return if (vetoed) other else side
 }

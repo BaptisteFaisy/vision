@@ -32,6 +32,16 @@ data class PlacedLabel(
      * quelle au lieu de deviner un mouvement.
      */
     val closingMps: Float? = null,
+    /**
+     * Temps couvert par les mesures de [closingMps] (ms) : deux mesures bruitées
+     * à 200 ms d'écart font une pente sans valeur ([ClearPath.isRail]).
+     */
+    val closingSpanMs: Long = 0L,
+    /**
+     * Boîte coupée par le bas du cadre : sans distance, l'objet est quand même
+     * **proche** — sa base est sous l'image ([ClearPath.depthOf]).
+     */
+    val cutBottom: Boolean = false,
 ) {
     /** Repère lisible **français** (interface et signature de scène) : « à 9 heures ». */
     val position: String get() = PositionText.clockLabel(centerX)

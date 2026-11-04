@@ -68,15 +68,15 @@ class GuidanceAnnouncerRailTest {
     fun `decalage lateral gagne sur le rail`() {
         val announcer = GuidanceAnnouncer()
         val etat = bordG(0.4f, RailLevel.DRIFT)
-        announcer.onFrame(0L, listOf(murDroite(3.0f)), SpeechLanguage.Fr, rail = etat)
+        assertEquals("Gauche.", announcer.onFrame(0L, listOf(murDroite(3.0f)), SpeechLanguage.Fr, rail = etat))
         announcer.onFrame(250L, listOf(murDroite(2.6f)), SpeechLanguage.Fr, rail = etat)
-        assertEquals("Gauche.", announcer.onFrame(500L, listOf(murDroite(2.2f)), SpeechLanguage.Fr, rail = etat))
+        announcer.onFrame(500L, listOf(murDroite(2.2f)), SpeechLanguage.Fr, rail = etat)
         assertNotNull("décalage attendu devant le rail", announcer.lastNudge)
     }
 
     @Test
     fun `couloir bouche gagne sur le rail`() {
-        assertEquals("left.", GuidanceAnnouncer().onFrame(0L, listOf(personne(2f)), rail = bordG(0.2f, RailLevel.EDGE)))
+        assertEquals("right.", GuidanceAnnouncer().onFrame(0L, listOf(personne(2f)), rail = bordG(0.2f, RailLevel.EDGE)))
     }
 
     @Test
@@ -125,9 +125,9 @@ class GuidanceAnnouncerRailTest {
 
     @Test
     fun `securite gagne sur le decalage lateral`() {
-        // Même mur qui approche que `decalage lateral gagne sur le rail`
-        // (qui dirait « Gauche. » à 500 ms) : la sécurité parle d'abord et
-        // possède la frame — le décalage ne passe jamais devant.
+        // Même mur qui approche que `decalage lateral gagne sur le rail` (qui
+        // dit « Gauche. ») : la sécurité parle d'abord et possède la frame, y
+        // compris entre deux redites — jamais le côté de la bordure.
         val announcer = GuidanceAnnouncer()
         val etat = RailState(GuidanceSide.Left, 0.9f, RailLevel.SAFETY)
         fun frame(atMs: Long, mur: Float) =
@@ -136,6 +136,7 @@ class GuidanceAnnouncerRailTest {
         assertNull(announcer.lastNudge)
         assertNull(frame(250L, 2.6f))
         assertNull(frame(500L, 2.2f))
+        assertNull(frame(750L, 2.0f))
         assertEquals("Droite.", frame(3_000L, 2.0f))
     }
 

@@ -190,6 +190,7 @@ internal fun LiveProbe.publishRest(active: LiveSession, frame: LiveFrame, rest: 
         current.copy(
             frames = current.frames + 1,
             distanceLayer = distanceLayerOf(frame, rest.readings),
+            clearView = voice.clearView,
             samDetections = rest.rawDetections,
             spoken = rest.phrase ?: current.spoken,
             spokenSeq = if (rest.phrase != null) current.spokenSeq + 1 else current.spokenSeq,

@@ -107,7 +107,7 @@ class GuidanceFenceOpeningTest {
 
     @Test
     fun `decide chemin optimal garde la main sur le trou`() {
-        val labels = listOf(PlacedLabel("poteau", 0.5f, 0.5f, 2f, 0.4f, 0.6f))
+        val labels = listOf(PlacedLabel("poteau", 0.6f, 0.5f, 2f, 0.5f, 0.7f))
 
         val decision = Guidance.decide(labels, holeSide = GuidanceSide.Right)
 

@@ -43,7 +43,7 @@ PERSONS = frozenset({
 })
 
 # Statiques qui bouchent comme une personne (barrière, poteau), sur le même
-# canonique : miroir de ``StaticAvoidance.isStaticObstacle`` (client).
+# canonique : miroir de ``HazardConcepts.isPole`` et ``isBarrier`` (client).
 STATICS = frozenset({"barrier", "pole"})
 
 

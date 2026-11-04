@@ -2,6 +2,8 @@ package dev.sam3vision.core.hazard
 
 import dev.sam3vision.core.distance.DistanceMeter
 import dev.sam3vision.core.distance.DistanceReading
+import dev.sam3vision.core.live.ClearView
+import dev.sam3vision.core.live.GuidanceSide
 import dev.sam3vision.core.live.GuidanceWord
 import dev.sam3vision.core.live.PositionText
 import dev.sam3vision.core.live.SteeringCap
@@ -29,7 +31,22 @@ data class HazardSignal(
     val centerX: Float? = null,
     /** Piste de la personne retenue (voir [HazardCue.trackId] ; `null` sans suivi). */
     val trackId: Int? = null,
+    /** Côté conseillé ([ClearPath]), `null` = l'opposé de [centerX] ([HazardText.avoidSide]). */
+    val side: GuidanceSide? = null,
 ) {
+    /**
+     * Signal lu avec le chemin de la frame : [view] donne le côté, jugé sur toute
+     * la scène, et son ordre fait parler un obstacle que la bande centrale ne voit
+     * pas (bord de boîte dans le couloir, centre dehors). Un corps déjà retenu le
+     * reste : le côté, lui, tient compte de tout ce qui est proche.
+     */
+    fun steeredBy(view: ClearView?): HazardSignal {
+        if (view == null) return this
+        if (detected) return copy(side = view.side)
+        val threat = view.order?.threat ?: return this
+        return HazardSignal(true, threat.meters, threat.label, threat.centerX, threat.trackId, view.side)
+    }
+
     companion object {
         /** Signal vide : jamais d'exception sur le chemin du direct. */
         fun none(): HazardSignal = HazardSignal(detected = false, meters = null, label = null)
@@ -190,6 +207,7 @@ class HazardWatcher {
         val level: Int,
         val trackId: Int? = null,
         val wall: Boolean = false,
+        val side: GuidanceSide? = null,
     )
 
     /**
@@ -208,7 +226,8 @@ class HazardWatcher {
         val label = signal.label ?: return null
         if (!HazardConcepts.isSpoken(label)) return null
         return Candidate(HazardConcepts.kindOf(label), signal.meters, signal.centerX,
-            HazardConcepts.levelOf(label), trackId = signal.trackId, wall = HazardConcepts.isWall(label))
+            HazardConcepts.levelOf(label), trackId = signal.trackId, wall = HazardConcepts.isWall(label),
+            side = signal.side)
     }
 
     /**
@@ -218,7 +237,8 @@ class HazardWatcher {
      * divers) : le bus ne freine jamais l'esquive.
      */
     private fun onContinuous(candidate: Candidate, nowMs: Long, language: SpeechLanguage): HazardCue? {
-        val word = HazardText.avoidWord(language, candidate.centerX)
+        val word = candidate.side?.let { GuidanceWord.fromSide(it).text(language) }
+            ?: HazardText.avoidWord(language, candidate.centerX)
         if (word == lastAvoidWord && nowMs - lastAvoidMs < AVOID_REPEAT_MS) return null
         lastAvoidWord = word
         lastAvoidMs = nowMs

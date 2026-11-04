@@ -27,6 +27,20 @@ class PersonTrackTest {
     )
 
     @Test
+    fun `la fermeture dit le temps de mesures qu elle couvre`() {
+        val tracker = PersonTracker()
+        val first = tracker.onFrame(0L, listOf(label(0.5f, 4.0f))).single()
+        val second = tracker.onFrame(200L, listOf(label(0.5f, 3.8f))).single()
+        val unmeasured = tracker.onFrame(400L, listOf(label(0.5f))).single()
+        val third = tracker.onFrame(900L, listOf(label(0.5f, 3.0f))).single()
+
+        assertEquals(0L, first.label.closingSpanMs)
+        assertEquals(200L, second.label.closingSpanMs)
+        assertEquals("une frame sans mesure n'allonge rien", 200L, unmeasured.label.closingSpanMs)
+        assertEquals(900L, third.label.closingSpanMs)
+    }
+
+    @Test
     fun `une personne qui avance garde son id et sa fermeture`() {
         val tracker = PersonTracker()
         val a = tracker.onFrame(0L, listOf(label(0.5f, 4.0f))).single()

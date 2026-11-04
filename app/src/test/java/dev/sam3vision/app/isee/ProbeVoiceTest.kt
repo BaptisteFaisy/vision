@@ -61,7 +61,7 @@ class ProbeVoiceTest {
         assertTrue("chemin attendu", cue != null)
         assertEquals(SteeringCap.Straight, cue?.cap)
         assertEquals(true, cue?.blocked)
-        assertEquals(SteeringCap.Left, cue?.arrowDir())
+        assertEquals(SteeringCap.Right, cue?.arrowDir())
         assertTrue(voice.detour)
     }
 
