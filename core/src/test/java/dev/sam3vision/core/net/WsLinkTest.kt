@@ -111,6 +111,29 @@ class WsLinkTest {
     }
 
     @Test
+    fun `la preuve frame ne vaut que dans sa fenetre`() {
+        val link = link()
+
+        assertFalse("socket muet : rien servi", link.frameProvenWithin(500L))
+        link.markFrameProof()
+        assertTrue(link.frameProvenWithin(500L))
+
+        now += 501
+        assertFalse("preuve périmée : le socket ne sert plus", link.frameProvenWithin(500L))
+    }
+
+    @Test
+    fun `reconnecter oublie la preuve frame`() {
+        val link = link()
+        link.markFrameProof()
+        assertTrue(link.frameProvenWithin(Long.MAX_VALUE))
+
+        link.startConnecting()
+
+        assertFalse("un socket neuf n'a encore rien servi", link.frameProvenWithin(Long.MAX_VALUE))
+    }
+
+    @Test
     fun `l interface changee est detectee, une inconnue ne compte pas`() {
         val link = link()
 
@@ -122,18 +145,35 @@ class WsLinkTest {
     }
 
     @Test
-    fun `l invalidation rend la main tout de suite`() {
+    fun `la premiere invalidation rend la main tout de suite`() {
+        val link = link()
+        now += 10_000
+
+        link.onInvalidate("cell")
+
+        assertEquals("l'événement compte, même gratuit", 1, link.attemptCount)
+        assertTrue("premier idle/silence : reprise immédiate", link.canAttempt())
+        assertEquals(WsLinkState.Degraded, link.current)
+        assertEquals("cell", link.snapshot().iface)
+    }
+
+    @Test
+    fun `l invalidation garde le backoff des echecs precedents`() {
         val link = link()
         now += 10_000
         link.onFailure()
         link.onFailure()
         assertFalse(link.canAttempt())
 
+        // Un idle/silence qui effaçait le backoff, c'était la boucle déco/reco :
+        // chaque réouverture repartait immédiate, sans jamais atteindre le palier muet.
         link.onInvalidate("cell")
 
-        assertTrue("reprise immédiate", link.canAttempt())
-        assertEquals(WsLinkState.Degraded, link.current)
-        assertEquals("cell", link.snapshot().iface)
+        assertEquals(3, link.attemptCount)
+        assertFalse("le backoff court toujours", link.canAttempt())
+        assertEquals("3ᵉ palier sans jitter", 1_000L, link.waitMs())
+        now += 1_000
+        assertTrue("la fenêtre écoulée rend la main", link.canAttempt())
     }
 
     @Test

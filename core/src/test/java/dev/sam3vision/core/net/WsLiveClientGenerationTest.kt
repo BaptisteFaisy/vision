@@ -5,6 +5,7 @@ import kotlinx.coroutines.delay
 import kotlinx.coroutines.runBlocking
 import org.json.JSONObject
 import org.junit.Assert.assertEquals
+import org.junit.Assert.assertFalse
 import org.junit.Assert.assertTrue
 import org.junit.Test
 
@@ -103,7 +104,7 @@ class WsLiveClientGenerationTest {
     }
 
     @Test
-    fun `une fermeture idle 1001 dit son motif sans consommer de backoff`() = runBlocking {
+    fun `une fermeture idle 1001 dit son motif, compte sans delai`() = runBlocking {
         var transport: ContractWsTransport? = null
         transport = ContractWsTransport { _ ->
             transport?.disconnect(WsClosedAbnormally(1001, "idle"))
@@ -118,9 +119,60 @@ class WsLiveClientGenerationTest {
         assertTrue("attendu Network, obtenu $failure", failure is ApiError.Network)
         assertEquals("le repli POST a été tenté, son erreur remonte", "POST /live : serveur éteint", failure?.message)
         assertEquals("motif 1001 gardé", 1001, client.linkSnapshot.lastCloseCode)
-        assertEquals("un idle n'est pas un échec", 0, link.attemptCount)
-        assertTrue("reprise immédiate, sans backoff", link.canAttempt())
+        // Un idle qui ne comptait pas, c'était la boucle : chaque réouverture
+        // repartait immédiate, sans jamais armer le backoff ni le palier muet.
+        assertEquals("l'idle compte, mais sans délai", 1, link.attemptCount)
+        assertTrue("premier idle : reprise immédiate", link.canAttempt())
         assertEquals(WsLinkState.Degraded, client.linkState.value)
+    }
+
+    @Test
+    fun `des idle 1001 repetes sans preuve arment le backoff`() = runBlocking {
+        var transport: ContractWsTransport? = null
+        transport = ContractWsTransport { _ ->
+            transport?.disconnect(WsClosedAbnormally(1001, "idle"))
+            emptyList()
+        }
+        val link = WsLink()
+        val http = failingHttpClient(ApiError.Network("POST /live : serveur éteint"))
+        val client = WsLiveClient(
+            base, transport, 1_000, http, binaryWs = false, link = link,
+            httpFallback = WsHttpFallback(probeEvery = 1),
+        )
+
+        client.live("QQ==", listOf("person"), 640, 4)
+        client.live("QQ==", listOf("person"), 640, 4)
+        assertEquals(2, link.attemptCount)
+        assertFalse("2ᵉ idle consécutif : backoff armé", link.canAttempt())
+        assertEquals("un envoi par tentative WS", 2, transport?.sent?.size)
+
+        val refused = client.live("QQ==", listOf("person"), 640, 4).exceptionOrNull()
+        assertTrue("attendu Network, obtenu $refused", refused is ApiError.Network)
+        assertTrue(refused?.message.orEmpty().contains("reconnexion"))
+        assertEquals("pas de 3ᵉ handshake dans la fenêtre", 2, transport?.sent?.size)
+        client.close()
+    }
+
+    @Test
+    fun `un timeout sur un socket qui sert epargne le socket et ses soeurs`() = runBlocking {
+        val transport = GenerationTransport()
+        val client = WsLiveClient(base, transport, timeoutMs = 500, http = RecordingLiveClient(), binaryWs = false)
+
+        val slow = async { client.live("QQ==", listOf("person"), 640, 4) }
+        delay(350)
+        // Une sœur répondue pendant l'attente : le socket sert, le timeout est
+        // une lenteur, pas une mort — le déco/reco + le massacre des sœurs
+        // à chaque frame lente, c'était la boucle.
+        transport.answering = true
+        client.live("QQ==", listOf("person"), 640, 4).getOrThrow()
+        transport.answering = false
+
+        val slowError = slow.await().exceptionOrNull()
+        assertTrue("attendu Timeout, obtenu $slowError", slowError is ApiError.Timeout)
+        assertEquals("pas de réouverture : le socket sert", 1, transport.opens)
+        assertEquals("socket épargné", 0, transport.closes)
+        assertTrue(client.isConnected)
+        client.close()
     }
 
     @Test

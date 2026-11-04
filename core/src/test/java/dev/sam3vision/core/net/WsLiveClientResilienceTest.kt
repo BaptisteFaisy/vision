@@ -159,6 +159,38 @@ class WsLiveClientResilienceTest {
     }
 
     @Test
+    fun `des silences repetes sans preuve arment le backoff`() = runBlocking {
+        var now = 0L
+        val link = WsLink(clock = { now }, random = { 0.5 })
+        val transport = LinkTransport()
+        val client = client(transport, link = link, timeoutMs = 120_000)
+        val budget = link.silenceBudgetMs(120_000)
+
+        val first = async { client.live("QQ==", listOf("person"), 640, 4) }
+        withTimeout(2_000) { while (transport.sent.isEmpty()) delay(5) }
+        now += budget + 1
+        client.checkSilence()
+        first.await()
+        assertEquals("le silence compte", 1, link.attemptCount)
+        assertTrue("premier silence : reprise immédiate", link.canAttempt())
+
+        val second = async { client.live("QQ==", listOf("person"), 640, 4) }
+        withTimeout(2_000) { while (transport.opens < 2) delay(5) }
+        withTimeout(2_000) { while (transport.sent.size < 2) delay(5) }
+        now += budget + 1
+        client.checkSilence()
+        second.await()
+        assertEquals(2, link.attemptCount)
+        assertFalse("2ᵉ silence consécutif : backoff armé", link.canAttempt())
+
+        val refused = client.live("QQ==", listOf("person"), 640, 4).exceptionOrNull()
+        assertTrue("attendu Network, obtenu $refused", refused is ApiError.Network)
+        assertTrue(refused?.message.orEmpty().contains("reconnexion"))
+        assertEquals("pas de 3ᵉ handshake dans la fenêtre", 2, transport.opens)
+        client.close()
+    }
+
+    @Test
     fun `un socket repondant n est jamais declare muet`() = runBlocking {
         var now = 0L
         val link = WsLink(clock = { now })
