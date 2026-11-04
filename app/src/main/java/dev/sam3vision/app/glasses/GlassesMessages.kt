@@ -1,5 +1,7 @@
 package dev.sam3vision.app.glasses
 
+import com.meta.wearable.dat.core.types.DeviceSessionError
+
 /**
  * Tous les textes des lunettes, écrits une seule fois, avec leur gravité. Aucun d'eux ne
  * contient de clé ni de token : les erreurs du SDK sont résumées par leur description.
@@ -29,10 +31,15 @@ object GlassesMessages {
         "Glasses not connected yet: unfold them, put them on your nose, check Bluetooth, then restart the session.",
     )
 
-    /** La session meurt avant de servir : l'app réessaie seule, l'utilisateur patiente. */
-    fun sessionRetrying(attempt: Int, max: Int) = GlassesMessage(
+    /**
+     * La session meurt avant de servir : l'app réessaie seule, l'utilisateur patiente.
+     * La cause sue se nomme ([GlassesSessionOpener]) : sans elle, la boucle restait
+     * muette sur le pourquoi et chaque occurrence suivante s'identifie seule.
+     */
+    fun sessionRetrying(attempt: Int, max: Int, cause: DeviceSessionError? = null) = GlassesMessage(
         MessageKind.INFO,
-        "Glasses cut the session instantly, retrying ($attempt/$max)…",
+        "Glasses cut the session instantly" + (if (cause == null) "" else " ($cause)") +
+            ", retrying ($attempt/$max)…",
     )
 
     /** La session établie est tombée : l'app rouvre seule, l'utilisateur patiente. */

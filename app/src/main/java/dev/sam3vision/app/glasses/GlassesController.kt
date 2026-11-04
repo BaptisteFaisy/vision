@@ -277,7 +277,7 @@ class GlassesController(
             launch { created.state.collect { state -> onSessionState(created, state) } }
             launch {
                 // Session oubliée : ses erreurs tardives n'écrasent pas la nouvelle.
-                created.errors.collect { error -> if (created === session) reportSessionError(error, activity, ::note, _state.value.phase, _state.value.message) }
+                created.errors.collect { error -> if (created === session) opener.onSessionError(error) }
             }
         }
         created.start()
