@@ -406,4 +406,68 @@ class LiveSessionTest {
 
         assertEquals("une séance neuve ne paie pas le 429 passé", 2, client.calls)
     }
+
+    @Test
+    fun `trois 500 de suite espacent les envois une seconde`() = runBlocking {
+        val client = FakeLiveClient()
+        client.result = Result.failure(ApiError.Http(500, "x"))
+        var now = 10_000L
+        val session = LiveSession(client, clock = { now })
+
+        repeat(3) { session.runFrame("QQ==") }
+        assertEquals("les 3 premières partent", 3, client.calls)
+        assertNull("4e : espacée sans appel", session.runFrame("QQ=="))
+        assertEquals(3, client.calls)
+        now += LiveSession.FAMINE_BASE_MS - 1
+        assertNull("999 ms : toujours espacé", session.runFrame("QQ=="))
+        now += 1
+        session.runFrame("QQ==")
+        assertEquals("1 s : ça repart", 4, client.calls)
+    }
+
+    @Test
+    fun `la famine double jusqu_a huit secondes puis un succes solde`() = runBlocking {
+        val client = FakeLiveClient()
+        client.result = Result.failure(ApiError.Timeout())
+        var now = 10_000L
+        val session = LiveSession(client, clock = { now })
+
+        // Barème pur : 1 s, 2 s, 4 s, 8 s plafonné.
+        assertEquals(1_000L, session.famineDelayMs(3))
+        assertEquals(2_000L, session.famineDelayMs(4))
+        assertEquals(4_000L, session.famineDelayMs(5))
+        assertEquals(8_000L, session.famineDelayMs(6))
+        assertEquals(8_000L, session.famineDelayMs(60))
+
+        repeat(3) { session.runFrame("QQ==") }
+        now += 1_000L
+        session.runFrame("QQ==")
+        assertEquals(4, client.calls)
+        now += 2_000L - 1
+        assertNull("le 4e échec espace 2 s", session.runFrame("QQ=="))
+        assertEquals(4, client.calls)
+
+        client.result = Result.success(LiveFrame(640, 480, 321, emptyList()))
+        now += 1
+        assertNotNull("un succès repart aussitôt", session.runFrame("QQ=="))
+        client.result = Result.failure(ApiError.Timeout())
+        session.runFrame("QQ==")
+        assertEquals("le succès a soldé le compteur", 6, client.calls)
+        assertNotNull("2e échec : pas d'espacement", session.runFrame("QQ=="))
+        assertEquals(7, client.calls)
+    }
+
+    @Test
+    fun `reset oublie la famine`() = runBlocking {
+        val client = FakeLiveClient()
+        client.result = Result.failure(ApiError.Http(503, "x"))
+        var now = 10_000L
+        val session = LiveSession(client, clock = { now })
+
+        repeat(3) { session.runFrame("QQ==") }
+        session.reset()
+        session.runFrame("QQ==")
+
+        assertEquals("une séance neuve ne paie pas la famine passée", 4, client.calls)
+    }
 }

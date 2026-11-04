@@ -228,8 +228,10 @@ class WsLiveClient(
 
     /**
      * Tick de surveillance : plus aucune réponse ni preuve de vie depuis le silence toléré
-     * ⇒ socket zombie (conteneur arrêté, radio perdue sans FIN). On le ferme ici plutôt
-     * que de laisser la frame suivante payer son budget devant un écran figé.
+     * ⇒ socket zombie (conteneur arrêté, radio perdue sans FIN) — ou handshake parqué au
+     * proxy (capacité GPU épuisée, aucun `101` : `startConnecting` arme la même horloge).
+     * On le ferme ici plutôt que de laisser la frame suivante payer son budget devant un
+     * écran figé ; l'invalidation compte (backoff, palier muet).
      */
     internal fun checkSilence() {
         val silent = synchronized(lock) {

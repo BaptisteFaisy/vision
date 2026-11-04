@@ -23,6 +23,16 @@ internal const val LINK_WAKE_STALE_MS = 300_000L
 /** Préfixe du texte de silence : il se remplace au lieu de s'empiler dans l'état. */
 internal const val SILENCE_PREFIX = "no reply for"
 
+/**
+ * Au-delà, un silence avec échecs répétés n'est plus « le lien » mais une panne
+ * franche : le serveur ne répond plus depuis 45 s malgré les reprises (file GPU
+ * Modal épuisée, proxy qui parque). L'écran le dit au lieu de compter les secondes.
+ */
+internal const val LINK_OUTAGE_MS = 45_000L
+
+/** Échecs consécutifs exigés pour parler de panne : un silence sans échecs reste un silence. */
+internal const val LINK_OUTAGE_MIN_FAILURES = 6
+
 /** Délai minimum entre deux essais manuels : marteler « Réessayer » ne martèle pas le serveur. */
 internal const val RETRY_COOLDOWN_MS = 5_000L
 
@@ -39,6 +49,9 @@ enum class ProbeLinkKind {
 
     /** Plus de [LINK_SILENCE_MS] sans réponse **à un envoi** : on parle du lien, plus du GPU. */
     Silent,
+
+    /** Silence + [LINK_OUTAGE_MIN_FAILURES] échecs depuis [LINK_OUTAGE_MS] : panne franche. */
+    Outage,
 }
 
 /**
@@ -73,6 +86,8 @@ internal class ProbeLink(
     private val now: () -> Long = { System.currentTimeMillis() },
     private val silenceMs: Long = LINK_SILENCE_MS,
     private val wakeStaleMs: Long = LINK_WAKE_STALE_MS,
+    private val outageMs: Long = LINK_OUTAGE_MS,
+    private val outageMinFailures: Int = LINK_OUTAGE_MIN_FAILURES,
 ) {
     /** Instant de la dernière réponse aboutie (`null` = aucune encore sur ce réveil). */
     private var answeredAtMs: Long? = null
@@ -237,6 +252,7 @@ internal class ProbeLink(
         val outstanding = sent != null && (at == null || sent > at)
         val kind = when {
             at == null -> if (coldArmed) ProbeLinkKind.Cold else ProbeLinkKind.Idle
+            age > outageMs && outstanding && consecutiveFailures >= outageMinFailures -> ProbeLinkKind.Outage
             age > silenceMs && outstanding -> ProbeLinkKind.Silent
             else -> ProbeLinkKind.Warm
         }
@@ -274,8 +290,9 @@ internal class ProbeLink(
  * (backend arrêté, réponse illisible) est conservée telle quelle. Pure, testée en JVM.
  */
 internal fun linkErrorOf(current: String?, next: ProbeLinkState): String? = when {
+    next.kind == ProbeLinkKind.Outage -> OUTAGE_LINE
     next.silent -> silenceNotice(next.lastAnswerAgeMs)
-    current != null && current.startsWith(SILENCE_PREFIX) -> null
+    current != null && (current.startsWith(SILENCE_PREFIX) || current == OUTAGE_LINE) -> null
     else -> current
 }
 
