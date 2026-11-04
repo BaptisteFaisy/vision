@@ -19,7 +19,7 @@ User-Agent: sam3-vision-android/1.0
 Content-Type: multipart/form-data; boundary=----sam3vision<uuid sans tirets>
 
 champs texte : model | prompt | size | n=1 | response_format=b64_json | output_format=png
-fichier      : name="image"; filename="photo.jpg", image/jpeg, <octets JPEG 768 px>
+fichier      : name="image"; filename="photo.jpg", image/jpeg, <octets JPEG 512 px q60>
 ```
 
 - **Base URL et clé** : les mêmes que la dictée Meta (`Settings.asrBaseUrl` =

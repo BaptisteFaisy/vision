@@ -11,7 +11,7 @@ import org.junit.Test
 
 /**
  * Le magasin des repères : un dossier par picto, les entrées abîmées
- * ignorées (jamais fatales), le nom par défaut quand l'aidant n'en met pas.
+ * ignorées (jamais fatales), le nom par défaut quand aucun nom n'est donné.
  */
 class PictoStoreTest {
 

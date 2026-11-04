@@ -15,11 +15,16 @@ import kotlin.math.max
 /** Côté max d'une frame de reconnaissance : 96 px suffisent au gabarit 24 px. */
 const val PICTO_FRAME_EDGE = 96
 
-/** Côté max de la photo envoyée à la génération : le détail sans le poids. */
-const val PICTO_PHOTO_EDGE = 768
+/**
+ * Côté max de la photo envoyée à la génération : 512 px suffisent au
+ * redessin (le modèle ne prend que la géométrie) et l'upload s'allège
+ * (poids non mesuré sur le téléphone). Sert aussi au gabarit local,
+ * réduit à 24 px de toute façon (`TEMPLATE_EDGE`).
+ */
+const val PICTO_PHOTO_EDGE = 512
 
-/** Qualité JPEG de la photo envoyée : objet net, upload de quelques centaines de Ko. */
-private const val PICTO_PHOTO_QUALITY = 75
+/** Qualité JPEG de la photo envoyée : objet net, upload allégé. */
+private const val PICTO_PHOTO_QUALITY = 60
 
 /**
  * Frame de la sonde (JPEG base64) → niveaux de gris réduits pour le matcher.

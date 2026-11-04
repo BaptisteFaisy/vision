@@ -13,8 +13,9 @@ const val IMAGE_SIZE_SQUARE = "1024x1024"
  * Consigne envoyée avec la photo : redessiner l'objet principal centré en
  * pictogramme minimaliste — silhouette noire épaisse sur fond jaune uni, sans
  * ombre, sans texte, sans décor. En anglais : le modèle y est plus fiable.
- * [hint] est le nom donné par l'aidant (« boîte de médicaments »), joint tel
- * quel quand il est renseigné pour lever les ambiguïtés (deux objets proches).
+ * [hint] est le nom parlé (« mode find my X », ordre vocal du Direct),
+ * joint tel quel quand il est renseigné pour lever les ambiguïtés
+ * (deux objets proches) ; vide depuis le bouton (objet principal centré).
  */
 fun pictoPrompt(hint: String): String {
     val subject = hint.trim().ifEmpty { "the main centered object" }

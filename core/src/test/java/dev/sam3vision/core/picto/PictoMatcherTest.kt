@@ -169,7 +169,7 @@ class PictoPromptTest {
     }
 
     @Test
-    fun `le nom de l'aidant leve l'ambiguite`() {
+    fun `le nom parle leve l'ambiguite`() {
         assertTrue(pictoPrompt("boîte de médicaments").contains("boîte de médicaments"))
     }
 }
