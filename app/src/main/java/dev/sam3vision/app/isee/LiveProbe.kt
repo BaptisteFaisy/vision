@@ -402,7 +402,6 @@ _state.update { it.cleared() }
         wifiLock.hold() // direct ouvert : la radio ne dort plus (repli silencieux sinon).
         rate.record(at)
         link.onSent(at) // envoi réel : le silence du lien ne se dit que sur un envoi sans réponse.
-        noteLight() // un envoi prouve que la frame a passé la garde nuit/noir.
         // Échéance posée par l'appelant (`admits`/`markSent`) : `dispatch` envoie, il ne décide pas.
         // Nouvelle frame : la chronologie repart de l'exposition du capteur.
         chronology.beginFrame(captureAtNs, encodedAtNs, glassesSeq)

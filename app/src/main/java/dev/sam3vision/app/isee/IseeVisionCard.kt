@@ -342,8 +342,6 @@ private fun IseeCameraWiring(
         }
         // Compteur de marches : la luminance part au Canny sur le fil de l'analyse.
         glue.host.onLuma = { luma -> StairCannyCount.offerLuma(luma) }
-        // Veto nuit/noir : la sonde compte et dit « luminosité insuffisante » (jamais « link silent »).
-        glue.host.onLowLight = { viewModel.probe.noteLowLight() }
     }
     // Carte retirée (fin de la scène) : plus d'image à proposer au partage.
     DisposableEffect(glue.host) {

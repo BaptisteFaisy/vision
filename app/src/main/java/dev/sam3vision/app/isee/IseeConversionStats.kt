@@ -18,26 +18,12 @@ internal class IseeConversionStats {
     @Volatile
     var droppedFrames = 0L
 
-    /** Frames vetoées par la garde nuit/noir (jamais envoyées à SAM) : comptées, loguées. */
-    @Volatile
-    var lowLightVetoes = 0L
-
     /** Frames floues (diagnostic seul, sans veto) : comptées dans le log de conversion. */
     @Volatile
     var blurryFrames = 0L
 
     /** Intervalle de la dernière frame analysée (ms), publié dans `capsplit` (`int`). */
     var lastIntervalMs = 0L
-
-    /** Vrai quand la dernière frame était nuit/noir : la phrase ne part qu'à la transition. */
-    @Volatile
-    var wasDark = false
-
-    /**
-     * Passage au noir : le host y branche son rappel `onLowLight`, invoqué avec
-     * [LOW_LIGHT_PHRASE] une fois par transition (pas de spam).
-     */
-    var onDarkTransition: (() -> Unit)? = null
 
     /**
      * Porte `wantsFrame` fermée : la frame est jetée (KEEP_ONLY_LATEST gardé), comptée
@@ -46,21 +32,7 @@ internal class IseeConversionStats {
     fun noteDropped() {
         droppedFrames += 1
         if (droppedFrames % LOG_EVERY_DROPS == 0L) {
-            android.util.Log.i("sam3vision", "analyse: $droppedFrames frames jetées (porte fermée), veto nuit $lowLightVetoes")
-        }
-    }
-
-    /**
-     * Garde nuit/noir : la frame ne part ni à SAM ni au picto (veto conservateur —
-     * pas de description inventée sur du noir), comptée dans [lowLightVetoes]. La
-     * phrase ne part qu'à la transition ([wasDark]) ; le direct aidant montre la
-     * frame quand même (des pixels noirs honnêtes valent mieux que le silence).
-     */
-    fun noteLowLight() {
-        lowLightVetoes += 1
-        if (!wasDark) {
-            wasDark = true
-            onDarkTransition?.invoke()
+            android.util.Log.i("sam3vision", "analyse: $droppedFrames frames jetées (porte fermée)")
         }
     }
 
@@ -79,7 +51,7 @@ internal class IseeConversionStats {
         if (frames % LOG_EVERY_FRAMES != 0) return
         val direct = if (shareBytes >= 0) ", direct ${shareBytes / 1024} Ko" else ""
         android.util.Log.i("sam3vision",
-            "conversion: ${ms} ms (capteur ${size.first}×${size.second}, jpeg ${bytes / 1024} Ko$direct, jetées $droppedFrames, veto nuit $lowLightVetoes, floues $blurryFrames)")
+            "conversion: ${ms} ms (capteur ${size.first}×${size.second}, jpeg ${bytes / 1024} Ko$direct, jetées $droppedFrames, floues $blurryFrames)")
         android.util.Log.i(LiveLatencyLog.TAG, TimingsText.capsplit(ageMs, encMs, b64Ms, cbMs, ms, lastIntervalMs))
     }
 

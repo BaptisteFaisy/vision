@@ -10,10 +10,9 @@ import org.junit.Assert.assertTrue
 import org.junit.Test
 
 /**
- * Silence juste, veto câblé, jambe dans les diags, retry borné : le lien n'accuse
- * plus le réseau quand rien n'est envoyé (veto nuit, porte fermée), le veto remonte
- * à l'UI au lieu de rester dans les logs, et la jambe WS se lit dans le panneau.
- * Horloges injectées : aucun test ne dort.
+ * Silence juste, jambe dans les diags, retry borné : le lien n'accuse plus le
+ * réseau quand rien n'est envoyé (porte fermée), et la jambe WS se lit dans le
+ * panneau. Horloges injectées : aucun test ne dort.
  */
 class LiveProbeSilenceTest {
 
@@ -53,47 +52,6 @@ class LiveProbeSilenceTest {
         link.reset()
 
         assertEquals(ProbeLinkKind.Idle, link.snapshot(999_999).kind)
-    }
-
-    @Test
-    fun `le veto nuit dit luminosite insuffisante, jamais link silent`() {
-        val vetoed = LiveProbeState(dark = true, lowLightVetoes = 41)
-
-        assertEquals(LOW_LIGHT_PHRASE, liveProbeNotice(vetoed))
-        val stale = LiveProbeState(dark = true, error = "no reply for 9 s — link silent (retrying)")
-        assertEquals("le veto prime sur une erreur périmée", LOW_LIGHT_PHRASE, liveProbeNotice(stale))
-        assertFalse(liveProbeNotice(vetoed)!!.contains("link silent"))
-        assertFalse(liveProbeNotice(vetoed)!!.contains("network cut"))
-        assertTrue(liveProbeDetails(vetoed).contains("dark: true · vetoes 41"))
-        assertTrue(liveProbeDetails(LiveProbeState()).none { it.startsWith("dark:") })
-    }
-
-    @Test
-    fun `noteLowLight compte et noteLight efface`() = runTest {
-        val (probe, _) = probeHarness(this)
-
-        probe.noteLowLight()
-        probe.noteLowLight()
-        assertTrue(probe.state.value.dark)
-        assertEquals(2L, probe.state.value.lowLightVetoes)
-
-        probe.noteLight()
-        assertFalse("la lumière efface le veto", probe.state.value.dark)
-        assertEquals("le compteur survit", 2L, probe.state.value.lowLightVetoes)
-    }
-
-    @Test
-    fun `un envoi prouve le retour de la lumiere`() = runTest {
-        val (probe, fake) = probeHarness(this)
-        probe.noteLowLight()
-
-        probe.onFrame("A")
-        advanceUntilIdle()
-        fake.respond("A", LiveFrame(width = 512, height = 384, elapsedMs = 120L, objects = emptyList()))
-        advanceUntilIdle()
-
-        assertEquals("la frame est partie", 1, fake.sent)
-        assertFalse("l'envoi lève le veto", probe.state.value.dark)
     }
 
     @Test
