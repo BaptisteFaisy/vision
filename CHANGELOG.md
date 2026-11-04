@@ -3,6 +3,15 @@
 Le journal part du 2026-10-26 après 19 h : le commit de départ, puis une entrée par fait
 livré et ses preuves (tâche, fichiers, chiffres) dans l'arbre.
 
+## 2026-11-04 — iSee : carte légèrement abaissée, ombre sans toucher les boutons (branche `isee-map-plus-bas`)
+
+- **Demande** : baisser un peu la carte sur l'écran iSee, l'ombre sous la
+  carte ne devant pas toucher les 3 boutons système (ordre user du 04/11/2026).
+- **Fait** : `isee/IseeGuidanceMap.kt` : marge bas de carte `navInset + 10 dp`
+  → `navInset + 8 dp` (ombre carte 6 dp : ~2 dp de jour au-dessus des boutons).
+- **Preuves** : gardes `check-isee-design` + `check-kotlin-limits` OK ;
+  CI PR #1142 verte (run 41752908990, `ci-core` + `ci-app`).
+
 ## 2026-11-04 — iSee : bloc caméra réduit à 60 % (70 % en guidage), la phrase respire (branche `isee-camera-60-texte`)
 
 - **Demande** : réduire un peu la hauteur caméra pour que le texte parlé —
