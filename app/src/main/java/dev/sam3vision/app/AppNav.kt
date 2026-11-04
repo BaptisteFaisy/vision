@@ -140,18 +140,18 @@ private fun BenchRequestEffect(push: (Route) -> Unit) {
 
 
 /**
- * Destination dictée sur le direct : la session de navigation de l'accueil la
- * reçoit **telle quelle** (mêmes parseurs qu'une dictée de l'accueil) ;
- * l'écran navigation est poussé par [VoiceNavStateEffect] dès que la session
- * quitte le repos. Sans cette passerelle, « aller gare Montparnasse » dit sur
- * le direct répondait par une description de la pièce.
+ * Destination dictée sur le direct : l'accueil la reçoit **telle quelle**
+ * (mêmes parseurs qu'une dictée de l'accueil), puis on revient à l'accueil :
+ * confirmation, carte, modes et traversée y vivent, pas sur le direct.
+ * Sans ce retour, « aller gare Montparnasse » dit sur le direct ouvrait la
+ * confirmation sans jamais la montrer. Ordre non traité → on reste où on est.
  */
 @Composable
-private fun NavOrderEffect(isee: IseeViewModel) {
+private fun NavOrderEffect(isee: IseeViewModel, home: () -> Unit) {
     val request by NavOrderRequest.pending.collectAsState()
     LaunchedEffect(request) {
         val transcript = NavOrderRequest.consume() ?: return@LaunchedEffect
-        isee.acceptNavOrder(transcript)
+        if (isee.acceptNavOrder(transcript)) home()
     }
 }
 
@@ -198,7 +198,7 @@ fun AppNav(
     StartRouteEffect(state.settings, state.settingsReady) { names = listOf(routeToName(Route.Caregiver)) }
     BenchRequestEffect(push)
     RouteRequestEffect(push)
-    NavOrderEffect(isee)
+    NavOrderEffect(isee, home)
     VoiceNavStateEffect(isee, route, pop)
     BackHandler(enabled = stack.size > 1) { pop() }
     // Accueil iSee plein écran : le téléphone ne doit pas se mettre en veille.
