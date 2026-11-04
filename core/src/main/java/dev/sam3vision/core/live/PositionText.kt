@@ -38,6 +38,11 @@ data class PlacedLabel(
      */
     val closingSpanMs: Long = 0L,
     /**
+     * Centre moyen de la piste sur 1 s ([PersonTracker]), `null` sans piste : le
+     * balancement de la marche ne s'y lit plus ([ClearPath.axisX]).
+     */
+    val steadyX: Float? = null,
+    /**
      * Boîte coupée par le bas du cadre : sans distance, l'objet est quand même
      * **proche** — sa base est sous l'image ([ClearPath.depthOf]).
      */

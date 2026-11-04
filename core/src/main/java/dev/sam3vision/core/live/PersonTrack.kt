@@ -190,6 +190,8 @@ class PersonTracker(
     private fun observe(track: Track, label: PlacedLabel, atMs: Long) {
         track.lastMs = atMs
         track.centerX = label.centerX
+        if (label.centerX.isFinite()) track.centers.add(Center(atMs, label.centerX))
+        track.centers.removeAll { it.atMs < atMs - STEADY_MS }
         val meters = label.meters?.takeIf { it.isFinite() } ?: return
         track.lastMeters = meters
         track.samples.add(Sample(atMs, meters))
@@ -247,13 +249,22 @@ class PersonTracker(
         val closing = track.closing
         return TrackedLabel(
             trackId = track.id,
-            label = label.copy(trackId = track.id, closingMps = closing, closingSpanMs = spanOf(track.samples)),
+            label = label.copy(
+                trackId = track.id,
+                closingMps = closing,
+                closingSpanMs = spanOf(track.samples),
+                steadyX = steadyOf(track.centers),
+            ),
             meters = meters,
             closingMps = closing,
             ttcS = Timing.ttcSeconds(meters, closing),
             ageFrames = (frameIndex - track.firstFrame + 1L).toInt(),
         )
     }
+
+    /** Centre moyen de [centers], `null` avant deux vues : une vue ne moyenne rien. */
+    private fun steadyOf(centers: List<Center>): Float? =
+        if (centers.size < 2) null else centers.sumOf { it.x.toDouble() }.div(centers.size).toFloat()
 
     /** Temps couvert par [samples] (ms), 0 avant deux mesures. */
     private fun spanOf(samples: List<Sample>): Long =
@@ -272,10 +283,16 @@ class PersonTracker(
 
         /** Mesures datées de la fenêtre glissante : `(atMs, mètres)`, la plus vieille en tête. */
         val samples = ArrayList<Sample>(4)
+
+        /** Centres datés de la dernière seconde : leur moyenne efface le balancement. */
+        val centers = ArrayList<Center>(8)
     }
 
     /** Une mesure datée : la seule matière dont on tire une vitesse. */
     private data class Sample(val atMs: Long, val meters: Float)
+
+    /** Un centre daté : la matière de [PlacedLabel.steadyX]. */
+    private data class Center(val atMs: Long, val x: Float)
 
     /** Une paire candidate (indices de piste et de label) et son coût. */
     private data class Match(val track: Int, val label: Int, val cost: Float)
@@ -286,6 +303,12 @@ class PersonTracker(
 
         /** Marqueur « ce label n'appartient à aucune piste » dans [ownersOf]. */
         const val NO_TRACK = -1
+
+        /**
+         * Fenêtre du centre moyen (ms) : sur l'essai Samsung du 04/11, 1 s fait tomber les
+         * changements de côté de 15 à 4 sur 176 frames, sans marge d'égalité.
+         */
+        const val STEADY_MS = 1_000L
 
         /** Fenêtre d'estimation de la fermeture (ms) : 1,5 s, comme la veille des pistes. */
         const val WINDOW_MS = 1_500L

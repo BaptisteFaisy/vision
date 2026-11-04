@@ -20,10 +20,24 @@ class WidestGapTest {
     private fun sideOf(vararg labels: PlacedLabel): GuidanceSide? = ClearPath.view(labels.toList(), hfov).side
 
     @Test
-    fun `personne plein axe a droite malgre le balancement du telephone`() {
+    fun `le balancement ne change pas le cote, la position moyenne decide`() {
         for (x in listOf(0.43f, 0.47f, 0.50f, 0.53f, 0.57f)) {
-            assertEquals("x=$x", GuidanceSide.Right, sideOf(box("person", x - 0.08f, x + 0.08f, 3f)))
+            val swaying = box("person", x - 0.08f, x + 0.08f, 3f).copy(steadyX = 0.50f)
+            assertEquals("x=$x", GuidanceSide.Right, sideOf(swaying))
         }
+    }
+
+    @Test
+    fun `obstacle un peu a droite on passe a gauche, de pres comme de loin`() {
+        assertEquals(GuidanceSide.Left, sideOf(box("person", 0.47f, 0.61f, 3f)))
+        assertEquals(GuidanceSide.Left, sideOf(box("person", 0.53f, 0.57f, 9f)))
+        assertEquals(GuidanceSide.Left, sideOf(box("pole", 0.54f, 0.56f, 6f)))
+    }
+
+    @Test
+    fun `obstacle un peu a gauche on passe a droite, de pres comme de loin`() {
+        assertEquals(GuidanceSide.Right, sideOf(box("person", 0.39f, 0.53f, 3f)))
+        assertEquals(GuidanceSide.Right, sideOf(box("person", 0.43f, 0.47f, 9f)))
     }
 
     @Test
@@ -98,7 +112,8 @@ class WidestGapTest {
     @Test
     fun `de loin le balancement ne fait pas osciller le cote`() {
         for (x in listOf(0.44f, 0.50f, 0.56f)) {
-            assertEquals("x=$x", GuidanceSide.Right, sideOf(box("person", x - 0.02f, x + 0.02f, 9f)))
+            val swaying = box("person", x - 0.02f, x + 0.02f, 9f).copy(steadyX = 0.50f)
+            assertEquals("x=$x", GuidanceSide.Right, sideOf(swaying))
         }
     }
 
@@ -121,8 +136,8 @@ class WidestGapTest {
     @Test
     fun `l egalite ne pousse pas dans un mur`() {
         assertEquals(GuidanceSide.Left, GapRoom(left = 0.02f, right = 0f).side)
-        assertEquals(GuidanceSide.Right, GapRoom(left = 0.30f, right = 0.25f).side)
-        assertEquals(GuidanceSide.Left, GapRoom(left = 0.40f, right = 0.20f).side)
+        assertEquals(GuidanceSide.Right, GapRoom(left = 0.30f, right = 0.26f).side)
+        assertEquals(GuidanceSide.Left, GapRoom(left = 0.33f, right = 0.25f).side)
     }
 
     @Test

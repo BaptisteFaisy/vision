@@ -125,11 +125,18 @@ object ClearPath {
         return gapM(label, lateralPerX(depth, halfTangent)) < clearance
     }
 
+    /**
+     * Centre de [label] pour juger l'écart : sa position moyenne, sans le balancement de
+     * la marche. Le côté reste recalculé à chaque frame, seule la mesure est lissée.
+     */
+    internal fun axisX(label: PlacedLabel): Float = label.steadyX?.takeIf { it.isFinite() } ?: label.centerX
+
     /** Écart de l'axe au bord de [label] (m), 0 si la boîte coupe l'axe. */
     private fun gapM(label: PlacedLabel, perX: Float): Float {
         val half = bodyHalfM(label, perX) / perX
-        val low = label.centerX - half
-        val high = label.centerX + half
+        val center = axisX(label)
+        val low = center - half
+        val high = center + half
         return when {
             low > AXIS -> (low - AXIS) * perX
             high < AXIS -> (AXIS - high) * perX
