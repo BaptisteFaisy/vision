@@ -74,10 +74,8 @@ internal class IseeCameraHost(private val context: Context) : CameraBindHost {
     /** Enregistrement et photo de la fenêtre : la liaison lui confie ses captures. */
     private val recorder = IseeCameraRecorder(context, executor)
 
-    /** Compteurs et journal de conversion ; la phrase nuit/noir reste branchée ici. */
-    private val stats = IseeConversionStats().also {
-        it.onDarkTransition = { onLowLight?.invoke(LOW_LIGHT_PHRASE) }
-    }
+    /** Compteurs et journal de conversion. */
+    private val stats = IseeConversionStats()
 
     /** Frames converties depuis la liaison caméra (le log de coût ne tire qu'un coup sur 20). */
     private var conversionFrames: Int
@@ -88,11 +86,6 @@ internal class IseeCameraHost(private val context: Context) : CameraBindHost {
     var droppedFrames: Long
         get() = stats.droppedFrames
         private set(value) { stats.droppedFrames = value }
-
-    /** Frames vetoées par la garde nuit/noir (jamais envoyées à SAM) : comptées, loguées. */
-    var lowLightVetoes: Long
-        get() = stats.lowLightVetoes
-        private set(value) { stats.lowLightVetoes = value }
 
     /** Frames floues (diagnostic seul, sans veto) : comptées dans le log de conversion. */
     var blurryFrames: Long
@@ -115,11 +108,6 @@ internal class IseeCameraHost(private val context: Context) : CameraBindHost {
 
     /** Gouverneur de sous-exposition (scènes cramées), armé à la liaison. */
     private val exposure = IseeExposureDriver()
-
-    /** Vrai quand la dernière frame était nuit/noir : la phrase ne part qu'à la transition. */
-    private var wasDark: Boolean
-        get() = stats.wasDark
-        set(value) { stats.wasDark = value }
 
     /** L'implémentation [IseeCameraActions] exposée au ViewModel. */
     val actions: IseeCameraActions = object : IseeCameraActions {
@@ -165,19 +153,11 @@ internal class IseeCameraHost(private val context: Context) : CameraBindHost {
     var jpegQuality: (() -> Int)? = null
 
     /**
-     * Luminance de la frame convertie (y compris vetoée : le veto nuit/noir ne coupe
-     * que [onFrame]), sur le fil de l'analyse : branchée par la fenêtre, consommée par le
-     * compteur de marches. Pas appelée sur le chemin de repli `Bitmap` (pas
-     * de plan Y à lire) : le compte vieillit alors jusqu'à expirer.
+     * Luminance de la frame convertie, sur le fil de l'analyse : branchée par la
+     * fenêtre, consommée par le compteur de marches. Pas appelée sur le chemin de
+     * repli `Bitmap` (pas de plan Y à lire) : le compte vieillit alors jusqu'à expirer.
      */
     var onLuma: ((ByteArray) -> Unit)? = null
-
-    /**
-     * Nuit/noir détecté : invoquée sur le fil de l'analyse avec [LOW_LIGHT_PHRASE],
-     * une fois par passage au noir (pas de spam). Branchée par la fenêtre ; la frame
-     * vetoée ne part ni à SAM ni au picto, le direct aidant la montre quand même.
-     */
-    var onLowLight: ((String) -> Unit)? = null
 
     /** Caméra liée : sa caractéristique optique sert de calibrage aux distances. */
     private var boundCamera: androidx.camera.core.Camera? = null
@@ -297,14 +277,6 @@ internal class IseeCameraHost(private val context: Context) : CameraBindHost {
         val ageMs = (enteredAtNs - captureStamp(proxy.imageInfo.timestamp, enteredAtNs)) / NS_PER_MS
         encoded.luma?.also { onLuma?.invoke(it) }?.let(::noteSharpness)
         val shareBytes = offerEncodedShare(encoded, startedAt)
-        if (lightVerdict(encoded.mean) == LightVerdict.LOW_LIGHT) {
-            noteLowLight()
-            // Veto nuit : pas de b64 ni de rappel — capsplit honnête (b64/cb à zéro).
-            countConversion(++conversionFrames, SystemClock.elapsedRealtime() - startedAt,
-                proxy.width to proxy.height, encoded.sam.size, shareBytes, ageMs, encMs, 0, 0)
-            return
-        }
-        wasDark = false
         val b64Start = SystemClock.elapsedRealtime()
         val b64 = jpegBytesToBase64(encoded.sam)
         val stamp = captureStamp(proxy.imageInfo.timestamp, SystemClock.elapsedRealtimeNanos())
@@ -355,7 +327,7 @@ internal class IseeCameraHost(private val context: Context) : CameraBindHost {
     /**
      * Single `Bitmap` fallback (non-YUV 4:2:0 buffer): decoded once, compressed
      * once for SAM plus once for the live stream when due — never two `toBitmap`.
-     * Luminance comes from ARGB pixels (same night/black guard as the NV21 pass).
+     * Luminance comes from ARGB pixels (same exposure-governor feed as the NV21 pass).
      */
     private fun bitmapFallback(proxy: ImageProxy, quality: Int, shareDue: Boolean): SinglePass {
         val upright = uprightScaled(proxy.toBitmap(), proxy.imageInfo.rotationDegrees, ISEE_FRAME_EDGE)
@@ -368,9 +340,6 @@ internal class IseeCameraHost(private val context: Context) : CameraBindHost {
 
     /** Délégateur : comptage des frames jetées (voir [IseeConversionStats.noteDropped]). */
     private fun noteDropped() = stats.noteDropped()
-
-    /** Délégateur : garde nuit/noir + phrase de transition (voir [IseeConversionStats.noteLowLight]). */
-    private fun noteLowLight() = stats.noteLowLight()
 
     /** Délégateur : piqué de la frame (voir [IseeConversionStats.noteSharpness]). */
     private fun noteSharpness(luma: ByteArray) = stats.noteSharpness(luma)

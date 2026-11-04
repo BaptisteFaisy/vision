@@ -1,19 +1,13 @@
 package dev.sam3vision.app.isee
 
 /**
- * Mesure lumière et piqué des frames iSee : garde nuit/noir (veto conservateur)
- * et diagnostic de flou (compté, jamais veté). Pur, testé en JVM, extrait de
- * `IseeCameraPane` (plafond 500 lignes).
+ * Mesure lumière et piqué des frames iSee : la luminance moyenne nourrit le
+ * gouverneur d'exposition, le flou est diagnostiqué (compté, jamais veté).
+ * Pur, testé en JVM, extrait de `IseeCameraPane` (plafond 500 lignes).
+ *
+ * Il n'y a plus de veto nuit/noir : toute frame convertie part (ordre user,
+ * la garde bloquait les tests et masquait l'état du lien).
  */
-
-/** Phrase unique dite quand la nuit ou le noir veto une frame : un seul texte partout. */
-const val LOW_LIGHT_PHRASE = "luminosité insuffisante"
-
-/**
- * Luminance moyenne (0-255) sous laquelle une frame est nuit/noir : seuil volontairement
- * bas — seuls le noir et la nuit vetoent, une pièce sombre reste décrite.
- */
-const val DARK_MEAN_MAX = 12.0
 
 /**
  * Variance laplacienne sous laquelle une frame compte floue : seuil indicatif, à valider
@@ -21,24 +15,8 @@ const val DARK_MEAN_MAX = 12.0
  */
 const val BLUR_VAR_MIN = 50.0
 
-/** Verdict lumière d'une frame, depuis sa luminance. */
-enum class LightVerdict {
-    /** Assez de lumière : la frame part. */
-    OK,
-    /** Nuit/noir : veto conservateur, la frame ne part ni à SAM ni au picto. */
-    LOW_LIGHT,
-}
-
 /**
- * Garde lumière : nuit/noir → [LightVerdict.LOW_LIGHT] (veto), sinon [LightVerdict.OK].
- * Pure, testée en JVM.
- */
-fun lightVerdict(mean: Double): LightVerdict =
-    if (mean < DARK_MEAN_MAX) LightVerdict.LOW_LIGHT else LightVerdict.OK
-
-/**
- * Luminance moyenne (0-255) d'un plan de luminance (passe NV21). Plan vide → 255 :
- * une mesure absente ne veto rien (panne de mesure, pas nuit noire).
+ * Luminance moyenne (0-255) d'un plan de luminance (passe NV21). Plan vide → 255.
  */
 fun meanLuma(luma: ByteArray): Double {
     if (luma.isEmpty()) return 255.0

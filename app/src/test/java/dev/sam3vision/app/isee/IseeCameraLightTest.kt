@@ -5,29 +5,16 @@ import org.junit.Assert.assertTrue
 import org.junit.Test
 
 /**
- * Garde lumière de la page caméra : la nuit et le noir veto la frame (phrase unique,
- * pas d'envoi SAM), le flou est seulement diagnostiqué. Pur, testé en JVM.
+ * Mesure lumière de la page caméra : la luminance moyenne nourrit le gouverneur
+ * d'exposition (plus de veto nuit/noir : toute frame convertie part), le flou
+ * est seulement diagnostiqué. Pur, testé en JVM.
  */
 class IseeCameraLightTest {
 
     @Test
-    fun `la phrase de nuit est unique et exacte`() {
-        assertEquals("luminosité insuffisante", LOW_LIGHT_PHRASE)
-    }
-
-    @Test
-    fun `le noir veto, la piece sombre passe`() {
-        assertEquals(LightVerdict.LOW_LIGHT, lightVerdict(0.0))
-        assertEquals(LightVerdict.LOW_LIGHT, lightVerdict(DARK_MEAN_MAX - 0.1))
-        assertEquals(LightVerdict.OK, lightVerdict(DARK_MEAN_MAX))
-        assertEquals(LightVerdict.OK, lightVerdict(40.0))
-    }
-
-    @Test
-    fun `une mesure absente ne veto rien`() {
+    fun `une mesure absente rend le blanc`() {
         assertEquals(255.0, meanLuma(ByteArray(0)), 0.0)
         assertEquals(255.0, meanLumaFromArgb(IntArray(0)), 0.0)
-        assertEquals(LightVerdict.OK, lightVerdict(meanLuma(ByteArray(0))))
     }
 
     @Test

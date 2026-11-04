@@ -93,11 +93,11 @@ internal fun restKeyOf(s: LiveProbeState): ProbeRestKey =
     )
 
 /** Champs lus par la notice centrale ([liveProbeNotice]) : ni pixels ni chiffres. */
-internal data class ProbeNoticeKey(val frames: Int, val error: String?, val warming: Boolean, val dark: Boolean)
+internal data class ProbeNoticeKey(val frames: Int, val error: String?, val warming: Boolean)
 
 /** La clé notice d'un instantané. */
 internal fun noticeKeyOf(s: LiveProbeState): ProbeNoticeKey =
-    ProbeNoticeKey(s.frames, s.error, s.warming, s.dark)
+    ProbeNoticeKey(s.frames, s.error, s.warming)
 
 /**
  * Instantanés pixels : le plein état, réémis quand les pixels bougent

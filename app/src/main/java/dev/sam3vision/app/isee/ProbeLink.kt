@@ -285,20 +285,6 @@ internal fun LiveProbe.noteFailure(error: Throwable, timings: FrameTimings? = nu
 }
 
 /**
- * Veto nuit/noir : la frame ne part ni à SAM ni au picto — comptée, et dite à
- * l'UI ([liveProbeNotice]) au lieu d'un silence réseau qui mentirait (rien n'est envoyé).
- */
-internal fun LiveProbe.noteLowLight() {
-    _state.update { it.copy(dark = true, lowLightVetoes = it.lowLightVetoes + 1) }
-}
-
-/** Retour de la lumière : un envoi prouve que la frame a passé la garde nuit/noir. */
-internal fun LiveProbe.noteLight() {
-    if (!_state.value.dark) return
-    _state.update { it.copy(dark = false) }
-}
-
-/**
  * 1re réponse aboutie : le conteneur est chaud, le délai froid retombe au délai
  * normal — **une fois pour tout le réveil**. Aucune session froide ne survit à la
  * chauffe : `coldSession` lit `session` (session unique, FIX-18), il n'y a donc plus

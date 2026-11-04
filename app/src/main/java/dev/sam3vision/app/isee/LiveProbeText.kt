@@ -67,7 +67,6 @@ fun liveProbeDetails(state: LiveProbeState): List<String> = buildList {
         add("transport: ${state.transport}")
     }
     if (state.skippedFrames > 0) add("skipped: ${state.skippedFrames} refused")
-    if (state.dark || state.lowLightVetoes > 0) add("dark: ${state.dark} · vetoes ${state.lowLightVetoes}")
     state.motion?.let { add(motionSummary(it)) }
     if (state.timings.known) {
         addAll(TimingsText.detail(state.timings))
@@ -105,17 +104,14 @@ fun shortEndpoint(endpoint: String): String {
 }
 
 /**
- * Ce qui se dit **au centre de la fenêtre** : veto nuit/noir, réveil du GPU en cours,
+ * Ce qui se dit **au centre de la fenêtre** : réveil du GPU en cours,
  * backend arrêté, silence du lien, ou simple attente de la première analyse. `null`
  * quand tout va bien.
  *
- * Le veto passe **avant** l'erreur : rien n'est envoyé, donc tout texte accusant le
- * lien serait périmé — et le veto remonte à l'UI au lieu de rester dans les logs.
  * L'erreur passe **avant** la garde `frames > 0` : un lien muet doit se dire même après
  * la première frame (audit C3 — sinon on marche avec des masques figés crus à jour).
  */
 fun liveProbeNotice(state: LiveProbeState): String? {
-    if (state.dark) return LOW_LIGHT_PHRASE
     state.error?.let { return it }
     if (state.link.silent) return silenceNotice(state.link.lastAnswerAgeMs)
     if (state.frames > 0) return null
