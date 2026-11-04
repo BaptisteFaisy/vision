@@ -1,5 +1,6 @@
 package dev.sam3vision.core.net
 
+import kotlinx.coroutines.runBlocking
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
 import org.junit.Assert.assertTrue
@@ -58,7 +59,7 @@ class WsLinkTest {
     }
 
     @Test
-    fun `un succes remet compteur et backoff a zero`() {
+    fun `un 101 ne remet pas le backoff, seule une reponse oui`() {
         val link = link()
         repeat(4) {
             now += 10_000
@@ -67,12 +68,20 @@ class WsLinkTest {
         assertEquals(4, link.attemptCount)
         assertEquals(WsLinkState.Degraded, link.current)
 
+        // Un `101` tout seul ne prouve pas que le serveur répond (conteneur
+        // accepté-mais-muet) : le remettre à zéro ici, c'était la boucle de
+        // reconnexion à période fixe (chaque `101` retombait au délai nul).
         link.onOpen("wifi")
 
         assertEquals(WsLinkState.Open, link.current)
-        assertEquals(0, link.attemptCount)
-        assertTrue("reprise immédiate après succès", link.canAttempt())
+        assertEquals("le compteur survit au 101", 4, link.attemptCount)
+        assertFalse("le backoff court toujours", link.canAttempt())
         assertEquals("wifi", link.snapshot().iface)
+
+        link.markProof()
+
+        assertEquals(0, link.attemptCount)
+        assertTrue("reprise immédiate après une vraie réponse", link.canAttempt())
         // La coupure suivante repart d'un premier délai nul, pas du plafond atteint.
         now += 1
         assertEquals(0L, link.onFailure() - now)
@@ -163,6 +172,68 @@ class WsLinkTest {
         link.onOpen("wifi")
 
         assertEquals(230L, link.snapshot().lastHandshakeMs)
+    }
+
+    @Test
+    fun `le palier muet ralentit encore apres 8 echecs sans reponse`() {
+        val link = link()
+        val delays = (1..10).map {
+            now += 70_000 // toujours au-delà de la fenêtre armée précédente
+            link.onFailure() - now
+        }
+
+        assertEquals(
+            "palier normal puis palier muet (32 s, 60 s plafonné)",
+            listOf(0L, 500L, 1_000L, 2_000L, 4_000L, 8_000L, 8_000L, 32_000L, 60_000L, 60_000L),
+            delays,
+        )
+    }
+
+    @Test
+    fun `panne muette a 8, sortie a la premiere reponse`() {
+        val link = link()
+        assertFalse(link.muteAccepted)
+
+        repeat(7) {
+            now += 10_000
+            link.onFailure()
+        }
+        assertFalse("7 échecs : palier normal", link.muteAccepted)
+
+        now += 10_000
+        link.onFailure()
+        assertTrue("8 échecs sans réponse : panne muette", link.muteAccepted)
+
+        link.markProof()
+        assertFalse(link.muteAccepted)
+        assertEquals(0, link.attemptCount)
+    }
+
+    @Test
+    fun `la sonde ne part qu en panne muette et fenetre ecoulee`() = runBlocking {
+        val link = link()
+        val sick = RecordingLiveClient(healthAnswer = { Result.failure(ApiError.Network("sonde malade")) })
+
+        assertTrue("hors panne : rien fait, la frame part", link.mutedProbe(sick))
+        assertEquals("aucune sonde hors panne", 0, sick.healthCalls)
+
+        repeat(8) {
+            now += 70_000
+            link.onFailure()
+        }
+        now += 40_000 // au-delà de la fenêtre muette de 32 s
+        assertTrue("fenêtre écoulée : sonde envoyée", !link.mutedProbe(sick))
+        assertEquals(1, sick.healthCalls)
+        assertEquals("échec de sonde : compteur incrémenté", 9, link.attemptCount)
+
+        assertFalse("fenêtre pas écoulée : refus sans sonde", link.mutedProbe(sick))
+        assertEquals(1, sick.healthCalls)
+
+        val healthy = RecordingLiveClient()
+        now += 70_000
+        assertTrue("sonde saine : la frame part", link.mutedProbe(healthy))
+        assertEquals(0, link.attemptCount)
+        assertFalse(link.muteAccepted)
     }
 
     @Test

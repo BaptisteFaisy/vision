@@ -12,10 +12,11 @@ import org.junit.Test
 
 /**
  * Handshake asynchrone : `open()` rend `true` avant le `101` (OkHttp), les échecs
- * arrivent plus tard par `onClosed`. La reprise n'aboutit qu'au `101` : un `true`
- * optimiste ne remet ni le compteur ni le backoff (sinon chaque échec retombait à
- * la première marche — reprise immédiate en boucle, « no reply for 60 s »), et un
- * `101` tardif ne ressuscite rien. Horloge injectée : aucune attente réelle.
+ * arrivent plus tard par `onClosed`. Ni le `true` optimiste ni le `101` ne remettent
+ * le compteur (sinon chaque échec retombait à la première marche — reprise immédiate
+ * en boucle face à un serveur qui accepte sans répondre) : seule une réponse reçue
+ * prouve la reprise. Un `101` tardif ne ressuscite rien. Horloge injectée : aucune
+ * attente réelle.
  */
 class WsLiveClientHandshakeTest {
 
@@ -30,6 +31,7 @@ class WsLiveClientHandshakeTest {
         var auto101 = false
         private val onOpens = mutableListOf<() -> Unit>()
         private val onCloseds = mutableListOf<(Throwable?) -> Unit>()
+        private val onTexts = mutableListOf<(String) -> Unit>()
 
         override fun open(
             url: String,
@@ -41,6 +43,7 @@ class WsLiveClientHandshakeTest {
             opens += 1
             onOpens += onOpen
             onCloseds += onClosed
+            onTexts += onText
             if (auto101) onOpen()
             return true
         }
@@ -58,6 +61,9 @@ class WsLiveClientHandshakeTest {
 
         /** Le handshake n° [index] échoue en async, sans `101` (radio coupée). */
         fun fail(index: Int, error: Throwable = IOException("radio coupée")) = onCloseds[index](error)
+
+        /** Le socket n° [index] reçoit une trame (orpheline si l'`id` n'est pas en vol). */
+        fun reply(index: Int, text: String) = onTexts[index](text)
     }
 
     /**
@@ -128,8 +134,13 @@ class WsLiveClientHandshakeTest {
         assertEquals(WsLinkState.Connecting, client.linkState.value)
 
         transport.accept(1)
-        assertEquals("`101` courant : reprise aboutie", 0, link.attemptCount)
+        assertEquals("`101` courant : ouvert, mais compteur intact", 1, link.attemptCount)
         assertEquals(WsLinkState.Open, client.linkState.value)
+
+        // Une trame, même orpheline (`id` inconnu), prouve que le serveur répond :
+        // c'est elle qui remet le compteur à zéro, pas le `101`.
+        transport.reply(1, """{"id":999}""")
+        assertEquals("première réponse : reprise aboutie", 0, link.attemptCount)
         client.close()
         assertTrue(second.await().exceptionOrNull() is ApiError.Network)
     }
@@ -197,9 +208,12 @@ class WsLiveClientHandshakeTest {
         now += 230
         transport.accept(1)
         assertEquals(WsLinkState.Open, client.linkState.value)
-        assertEquals(0, client.linkSnapshot.attempts)
+        assertEquals("le 101 ne remet pas le compteur", 1, client.linkSnapshot.attempts)
         assertEquals(230L, client.linkSnapshot.lastHandshakeMs)
         assertEquals("le refus survit au succès", 404, client.linkSnapshot.lastCloseCode)
+
+        transport.reply(1, """{"id":999}""")
+        assertEquals("une réponse remet le compteur", 0, client.linkSnapshot.attempts)
 
         transport.fail(1, WsClosedAbnormally(1001, "idle"))
         assertTrue(second.await().exceptionOrNull() is ApiError.Network)

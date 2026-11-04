@@ -4,6 +4,7 @@ import java.util.Timer
 import kotlin.concurrent.timer
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
+import kotlinx.coroutines.withTimeoutOrNull
 
 /**
  * État du lien du direct, tel que l'écran peut le dire :
@@ -24,12 +25,20 @@ enum class WsLinkState { Closed, Connecting, Open, Degraded }
  * n'a pas encore eu sa chance). [maxDelayMs] : borne **dure**, jitter compris. [jitterRatio]
  * étale les reprises de plusieurs téléphones (0.25 = ±25 %). [silenceMarginMs] : marge
  * ajoutée aux deux intervalles de ping pour décider qu'un socket est muet.
+ *
+ * Panne muette ([muteAfterAttempts] échecs sans aucune réponse, `101` compris) : le
+ * backoff passe au palier muet ([muteMaxDelayMs]) et les reprises deviennent des
+ * sondes `/health` bornées ([muteProbeTimeoutMs]) au lieu de pleines frames — un
+ * serveur qui accepte sans répondre ne mérite plus ni handshake ni 28 Ko par cycle.
  */
 data class LinkBudget(
     val baseDelayMs: Long = 500L,
     val maxDelayMs: Long = 8_000L,
     val jitterRatio: Double = 0.25,
     val silenceMarginMs: Long = 5_000L,
+    val muteAfterAttempts: Int = 8,
+    val muteMaxDelayMs: Long = 60_000L,
+    val muteProbeTimeoutMs: Long = 10_000L,
 )
 
 /**
@@ -56,8 +65,11 @@ data class LinkSnapshot(
  *
  * Règle de reprise : un échec incrémente [attemptCount] et arme [nextAttempt] ; tant que
  * l'horloge n'a pas atteint cette date, [canAttempt] refuse, donc **aucune ouverture**
- * (pas de tempête de handshakes sur une radio cellulaire). Un succès ([onOpen]) remet
- * compteur, backoff et date à zéro : la coupure suivante repart d'un premier délai nul.
+ * (pas de tempête de handshakes sur une radio cellulaire). Une réponse reçue
+ * ([markProof]) remet compteur, backoff et date à zéro : la coupure suivante repart
+ * d'un premier délai nul. Le `101` seul ne remet rien : un serveur peut accepter
+ * sans jamais répondre (conteneur muet), et chaque `101` retombant au délai nul,
+ * c'était la boucle de reconnexion à période fixe.
  *
  * Non thread-safe par construction : [WsLiveClient] l'appelle sous son propre verrou.
  */
@@ -83,8 +95,18 @@ class WsLink(
     /** État courant, sans collecte de flux. */
     val current: WsLinkState get() = _state.value
 
-    /** Nombre d'échecs consécutifs depuis le dernier [onOpen]. */
+    /** Nombre d'échecs consécutifs depuis la dernière réponse ([markProof]). */
     val attemptCount: Int get() = attempts
+
+    /**
+     * Panne muette : [muteAfterAttempts] échecs sans aucune réponse — le serveur
+     * accepte (`101`) sans jamais répondre, ou ne répond à rien. Les reprises
+     * passent au palier muet ([delayFor]) et aux sondes `/health` ([mutedProbe]).
+     */
+    val muteAccepted: Boolean get() = attempts >= budget.muteAfterAttempts
+
+    /** Borne d'une sonde de reprise ([mutedProbe]) : au-delà, malade. */
+    val muteProbeTimeoutMs: Long get() = budget.muteProbeTimeoutMs
 
     /** Date (horloge injectée) de la prochaine ouverture autorisée. */
     val nextAttempt: Long get() = nextAttemptAtMs
@@ -111,11 +133,14 @@ class WsLink(
         _state.value = WsLinkState.Connecting
     }
 
-    /** Handshake accepté : `Open`, et remise à zéro complète (compteur, backoff, preuve). */
+    /**
+     * Handshake accepté : `Open`, interface et durée du handshake retenues. Le compteur
+     * et le backoff SURVIVENT : seul un `101` ne prouve pas que le serveur répond
+     * (conteneur accepté-mais-muet) — la remise à zéro attend la première réponse
+     * ([markProof]), sinon chaque `101` retombait au délai nul, en boucle.
+     */
     fun onOpen(iface: String?) {
         this.iface = iface
-        attempts = 0
-        nextAttemptAtMs = 0L
         lastProofAtMs = clock()
         lastHandshakeMs = (clock() - connectStartMs).coerceAtLeast(0L)
         _state.value = WsLinkState.Open
@@ -157,8 +182,14 @@ class WsLink(
     /** L'interface en service a changé depuis le dernier socket (une inconnue ne compte pas). */
     fun ifaceChanged(current: String?): Boolean = iface != null && current != null && iface != current
 
-    /** Preuve de vie du socket : réponse reçue, ou handshake tout juste accepté. */
+    /**
+     * Preuve de vie : une réponse est arrivée — même orpheline, elle prouve que le
+     * serveur répond. Remet compteur ET backoff à zéro : la reprise aboutit ici,
+     * pas au `101` (un handshake accepté sans réponse ne prouve rien).
+     */
     fun markProof() {
+        attempts = 0
+        nextAttemptAtMs = 0L
         lastProofAtMs = clock()
     }
 
@@ -193,15 +224,35 @@ class WsLink(
     /**
      * Délai avant la reprise n° [attempt] : nulle pour la première (l'appelant doit
      * pouvoir réessayer tout de suite), puis `base × 2ⁿ` plafonné, étalé par le jitter.
-     * Le résultat est **borné durement** à [LinkBudget.maxDelayMs], jitter compris.
+     * Le résultat est **borné durement**, jitter compris : [LinkBudget.maxDelayMs],
+     * ou [LinkBudget.muteMaxDelayMs] en panne muette (la croissance continue au-delà
+     * du premier plafond au lieu d'y marteler — 8 s puis 32 s puis 60 s plafonné).
      */
     private fun delayFor(attempt: Int): Long {
         if (attempt <= 1) return 0L
+        val cap = if (attempt >= budget.muteAfterAttempts) budget.muteMaxDelayMs else budget.maxDelayMs
         val growth = budget.baseDelayMs shl minOf(attempt - 2, 24)
-        val capped = minOf(budget.maxDelayMs, growth)
+        val capped = minOf(cap, growth)
         val jitter = capped * budget.jitterRatio * (2.0 * random() - 1.0)
-        return (capped + jitter).toLong().coerceIn(0L, budget.maxDelayMs)
+        return (capped + jitter).toLong().coerceIn(0L, cap)
     }
+}
+
+/**
+ * Sonde de reprise en panne muette ([muteAccepted]) : un GET `/health` borné au lieu
+ * d'une pleine frame (~28 Ko + handshake). `true` = hors panne (rien fait) ou sonde
+ * saine (compteur remis, la frame part) ; `false` = fenêtre pas écoulée ou sonde
+ * malade (fenêtre réarmée, la frame est refusée sans handshake).
+ *
+ * Concurrence : deux frames en vol peuvent sonder deux fois (GET idempotent) ; le
+ * compteur reste approché, la fenêtre suivante corrige. Une sonde qui dépasse
+ * [LinkBudget.muteProbeTimeoutMs] vaut malade (un backend sain répond en ms).
+ */
+internal suspend fun WsLink.mutedProbe(http: LiveClient): Boolean {
+    if (!muteAccepted || !canAttempt()) return !muteAccepted
+    val ok = withTimeoutOrNull(muteProbeTimeoutMs) { http.health().getOrNull()?.ok } == true
+    if (ok) markProof() else onFailure()
+    return ok
 }
 
 /** Période du tick de surveillance : un silence est vu en une seconde, coût négligeable. */
