@@ -28,10 +28,10 @@ if __name__ == "__main__": sys.modules.setdefault("test_units", sys.modules["__m
 
 from tests_units import (boot_tests, concepts_street_tests, crossing_concepts_tests,  # noqa: E402
                          deploy_tests, depth_deploy_tests, depth_shortlist_tests, depth_tests,
-                         detr_evict_tests, feux_guard_tests,
-                         latency_tests,
+                         detr_evict_tests, feux_guard_tests, latency_tests,
                          live_fast_tests, live_fast_perf_tests, llm_tests, m1_vectors_tests,
-                         merge_tests, native_tests, post_tests, preproc_tests, segmentation_tests,
+                         merge_tests, native_tests, passage_tests, post_tests, preproc_tests,
+                         segmentation_tests,
                          tracking_tests,
                          valhalla_grid_tests, weights_tests, ws_binary_tests, ws_guard_tests,
                          ws_pump_tests, ws_send_tests)
@@ -397,8 +397,8 @@ RUNNERS = (
      depth_shortlist_tests.test_depth_shortlist),
     ("profondeur : shortlist câblée au run_frame", "fast_core",
      depth_shortlist_tests.test_depth_shortlist_frame),
-    ("live_fast : passage (décision)", "passage", live_fast_tests.test_passage_decision),
-    ("live_fast : passage (tolérance)", "passage", live_fast_tests.test_passage_tolerance),
+    ("live_fast : passage (décision)", "passage", passage_tests.test_passage_decision),
+    ("live_fast : passage (tolérance)", "passage", passage_tests.test_passage_tolerance),
     # Apport du 20:30 (poids embarqués + snapshot mémoire) préservé par la fusion.
     ("poids : comportement historique sans levier", "fast_core", weights_tests.test_weights_default),
     ("poids : lecture locale + local_files_only", "fast_core", weights_tests.test_weights_local),
