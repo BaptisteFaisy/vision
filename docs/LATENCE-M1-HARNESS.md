@@ -23,9 +23,10 @@ Le gain CPU client complet (plus de base64 construit) viendra du câblage de
 
 ## 2. Sélection de la jambe (build, pas d'option cachée)
 
-- `live.ws.text` dans `local.properties` (gitignoré, jamais commité) → `WS_TEXT`
+- `live.ws.binary` dans `local.properties` (gitignoré, jamais commité) → `WS_BINARY`
   (`app/build.gradle.kts`, même motif que `live.local.overlay`) ;
-- vide (défaut) = binaire M1 ; `true` = JSON texte même si le serveur lit le
+- vide (défaut) = JSON texte (l'ingress Modal tue l'opcode 0x2, 11/2026) ;
+  `true` = binaire M1 même si le serveur annonce le texte (sonde filaire).
   binaire (`LiveMaskTransport.clientFor`, parseur `buildFlagOn` testé en JVM) ;
 - deux APK construits du même SHA par `build-serveur` (§ 4), un par jambe ;
 - chaque session annonce sa jambe en logcat sous le tag `ISEE_LAT`
@@ -59,9 +60,9 @@ dump + `meta.txt` + verdicts, vérifie la jambe, puis **éteint** l'émulateur
 ne purge que les préfixes `asr|llm|mwdat|sam31|sam|tts`, `live.*` survit) :
 
 ```bash
-printf 'live.ws.text=true\n' >> local.properties   # local, gitignoré
-build-serveur <worktree> assembleDebug             # → APK jambe text
-scp <r630>:builds/<nom>/app/build/outputs/apk/debug/app-debug.apk /tmp/latence-m1-harness/apks/app-text.apk
+printf 'live.ws.binary=true\n' >> local.properties   # local, gitignoré
+build-serveur <worktree> assembleDebug             # → APK sonde binaire
+scp <r630>:builds/<nom>/app/build/outputs/apk/debug/app-debug.apk /tmp/latence-m1-harness/apks/app-binary-probe.apk
 sed -i '/^live\.ws\.text=/d' local.properties
 build-serveur <worktree> assembleDebug             # → APK jambe binary (défaut)
 scp <r630>:builds/<nom>/app/build/outputs/apk/debug/app-debug.apk /tmp/latence-m1-harness/apks/app-binary.apk

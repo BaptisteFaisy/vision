@@ -63,6 +63,7 @@ class LiveClientFactoryTest {
         val client = liveClientWith(
             baseUrl = "https://exemple.invalid",
             timeoutSeconds = 10L,
+            binaryWs = true,
             onBinaryChange = legs::add,
             transportFor = { transport },
         )

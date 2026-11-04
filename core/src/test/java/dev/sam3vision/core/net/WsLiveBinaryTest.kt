@@ -62,15 +62,15 @@ class WsLiveBinaryTest {
     }
 
     @Test
-    fun `par defaut la frame part en binaire`() = runBlocking {
-        val transport = ContractWsTransport()
-            .apply { answerBytesWith { bytes -> listOf(NetContract.frameReply(binaryIdOf(bytes))) } }
+    fun `par defaut la frame part en texte`() = runBlocking {
+        // Défaut inversé 11/2026 : l'ingress Modal tue l'opcode binaire 0x2.
+        val transport = ContractWsTransport { json -> listOf(NetContract.frameReply(json.getInt("id"))) }
         val client = WsLiveClient(base, transport, 1_000, RecordingLiveClient())
 
         client.live("SUVLFw==", null, 640, 4).getOrThrow()
 
-        assertEquals(1, transport.sentBytes.size)
-        assertTrue("aucun texte par défaut", transport.sent.isEmpty())
+        assertEquals(1, transport.sent.size)
+        assertTrue("aucune trame binaire par défaut", transport.sentBytes.isEmpty())
     }
 
     @Test
@@ -172,7 +172,8 @@ class WsLiveBinaryTest {
         val transport = ContractWsTransport()
             .apply { answerBytesWith { bytes -> listOf(NetContract.frameReply(binaryIdOf(bytes))) } }
         val legs = mutableListOf<Boolean>()
-        val client = WsLiveClient(base, transport, 1_000, RecordingLiveClient(), onBinaryChange = legs::add)
+        val client = WsLiveClient(base, transport, 1_000, RecordingLiveClient(), binaryWs = true,
+            onBinaryChange = legs::add)
 
         client.live("SUVLFw==", null, 640, 4).getOrThrow()
         client.live("SUVLFw==", null, 640, 4).getOrThrow()
@@ -196,7 +197,8 @@ class WsLiveBinaryTest {
         val transport = ContractWsTransport { json -> listOf(NetContract.frameReply(json.getInt("id"))) }
             .apply { answerBytesWith { listOf(NetContract.errorReply(-1)) } }
         val legs = mutableListOf<Boolean>()
-        val client = WsLiveClient(base, transport, 1_000, RecordingLiveClient(), onBinaryChange = legs::add)
+        val client = WsLiveClient(base, transport, 1_000, RecordingLiveClient(), binaryWs = true,
+            onBinaryChange = legs::add)
 
         client.live("SUVLFw==", null, 640, 4).getOrThrow()
         client.live("SUVLFw==", null, 640, 4).getOrThrow()

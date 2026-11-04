@@ -123,8 +123,8 @@ data class LiveHealth(
     val device: String,
     val gpu: String,
     /**
-     * Le serveur lit-il les trames WS binaires M1 (FIX-4) ? Absent = `true` (ancien
-     * serveur : on tente le binaire, repli JSON à la sonde `id: -1` comme avant).
+     * Le serveur lit-il les trames WS binaires M1 (FIX-4) ? Absent = `false`
+     * (l'ingress Modal tue l'opcode 0x2, 11/2026) — repasser `true` après preuve.
      */
-    val wsBinary: Boolean = true,
+    val wsBinary: Boolean = false,
 )

@@ -47,6 +47,47 @@ internal class PendingFrame(val reply: CompletableDeferred<String>, val binary: 
 /** Signal interne : `id: -1` reçu — la frame binaire en vol repart en JSON. */
 internal object FallbackToJson : Exception("WS binaire refusé (id -1) : repli JSON")
 
+/**
+ * Jambe WS (binaire M1 opt-in / JSON), hors de [WsLiveClient] (garde des 500
+ * lignes). Le binaire colle jusqu'au premier refus (`id: -1`, close tueuse,
+ * bit santé) ; le repli texte colle ensuite. Non synchronisée : l'appelant
+ * tient déjà le verrou du client.
+ */
+internal class WsLeg(
+    private val enabled: Boolean,
+    private val onChange: ((Boolean) -> Unit)?,
+) {
+    private var refused = false
+    private var noted = false
+
+    /** `true` tant qu'aucun refus n'a figé le texte. */
+    val isBinary: Boolean get() = enabled && !refused
+
+    /** Jambe d'envoi, annoncée une seule fois. */
+    fun sendLeg(): Boolean {
+        val binary = isBinary
+        if (!noted) {
+            noted = true
+            onChange?.invoke(binary)
+        }
+        return binary
+    }
+
+    /** Bit `ws_binary` du `/health` (FIX-4) : impose la jambe, annonce si déjà notée. */
+    fun use(binary: Boolean) {
+        refused = !binary
+        if (noted) onChange?.invoke(isBinary)
+    }
+
+    /** Orphelin `id: -1` ou close tueuse : bascule texte. Rend true si bascule. */
+    fun refuse(): Boolean {
+        if (!enabled || refused) return false
+        refused = true
+        onChange?.invoke(false)
+        return true
+    }
+}
+
 /** Message de requête : le corps de `POST /live` (mêmes knobs) plus l'`id` de corrélation. */
 internal fun frameMessage(
     id: Int,

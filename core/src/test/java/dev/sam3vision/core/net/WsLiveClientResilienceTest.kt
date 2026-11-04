@@ -35,6 +35,8 @@ class WsLiveClientResilienceTest {
         var answering = false
         val sent = mutableListOf<String>()
         val sentBytes = mutableListOf<ByteArray>()
+        /** Fermetures simulables : le test tue le socket comme l'ingress Modal (1000 propre). */
+        val closers = mutableListOf<(Throwable?) -> Unit>()
         private val readers = mutableListOf<(String) -> Unit>()
 
         override fun open(
@@ -47,6 +49,7 @@ class WsLiveClientResilienceTest {
             opens += 1
             if (!openResult) return false
             readers += onText
+            closers += onClosed
             onOpen()
             return true
         }
@@ -300,6 +303,32 @@ class WsLiveClientResilienceTest {
         assertEquals("un seul handshake", 1, transport.opens)
         assertEquals(0, link.attemptCount)
         assertFalse(link.muteAccepted)
+        client.close()
+    }
+
+    @Test
+    fun `close inattendue avec binaire en vol rejoue en JSON et fige la jambe texte`() = runBlocking {
+        val transport = LinkTransport().apply { answering = true }
+        val legs = mutableListOf<Boolean>()
+        val client = WsLiveClient(base, transport, 5_000, failingHttpClient(), binaryWs = true,
+            onBinaryChange = legs::add, keepAlive = null,
+            httpFallback = WsHttpFallback(probeEvery = 1))
+
+        val pending = async { client.live("QQ==", listOf("person"), 640, 4) }
+        withTimeout(5_000) { while (transport.sentBytes.isEmpty()) delay(10) }
+        // Kill propre façon ingress Modal (11/2026) : close 1000 sans réponse.
+        transport.closers.last()(null)
+
+        pending.await().getOrThrow()
+
+        assertEquals("la frame tuée rejoue en JSON", 1, transport.sent.size)
+        assertEquals("même id rejoué", 1, JSONObject(transport.sent.single()).getInt("id"))
+        assertEquals("jambe texte annoncée", listOf(true, false), legs)
+        assertEquals("deux handshakes (tué + neuf)", 2, transport.opens)
+
+        client.live("QQ==", listOf("person"), 640, 4).getOrThrow()
+        assertEquals("les suivantes partent en texte", 1, transport.sentBytes.size)
+        assertEquals(2, transport.sent.size)
         client.close()
     }
 }

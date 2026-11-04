@@ -37,10 +37,10 @@ fun liveClient(
     /** Masques demandés (`mask_encoding`) ; `false` = boîtes et scores seuls (`none`). */
     masks: Boolean = true,
     /**
-     * Envoi WS binaire M1 (JPEG brut, −33 % à la montée). `true` par défaut : le
-     * serveur déployé lit le binaire, avec repli JSON si le serveur le refuse.
+     * Envoi WS binaire M1 (JPEG brut, −33 % à la montée). `false` : l'ingress
+     * Modal tue l'opcode 0x2 (11/2026) — repasser `true` après preuve filaire.
      */
-    binaryWs: Boolean = true,
+    binaryWs: Boolean = false,
     /** Annonce du transport (`true` = binaire) : première frame, puis au repli texte. */
     onBinaryChange: ((Boolean) -> Unit)? = null,
     /** Réseau poussé par la plateforme (défaut : inconnu, rien n'est bloqué). */
@@ -93,7 +93,7 @@ internal fun liveClientWith(
     maskEdge: Int = 0,
     withDepth: Boolean = false,
     masks: Boolean = true,
-    binaryWs: Boolean = true,
+    binaryWs: Boolean = false,
     onBinaryChange: ((Boolean) -> Unit)? = null,
     net: NetworkState = NetworkState.Always,
     budget: LinkBudget = LinkBudget(),

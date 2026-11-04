@@ -42,9 +42,9 @@ object LiveMaskTransport {
      * les usages qui ne dessinent jamais de masque (pastilles, guidage) — aucun des
      * deux écrans actuels, qui affichent tous deux les masques (`LiveScreen`,
      * `IseeVisionCard`, `GlassesMaskLayer`), donc opt-in explicite.
-     * [binaryWs] force le transport WS (`false` = JSON texte, jambe base64 du A/B
-     * `docs/LATENCE-M1-HARNESS.md`) ; par défaut le build décide (`live.ws.text`) et
-     * le binaire M1 reste le transport (même défaut que la fabrique).
+     * [binaryWs] force le transport WS (`false` = JSON texte) ; par défaut le build
+     * décide (`live.ws.binary`, sonde opt-in) et le texte reste le transport
+     * (l'ingress Modal tue l'opcode 0x2, 11/2026 — même défaut que la fabrique).
      */
     fun clientFor(
         base: String,
@@ -52,7 +52,7 @@ object LiveMaskTransport {
         marks: WireMarks? = null,
         withDepth: Boolean = false,
         masks: Boolean = true,
-        binaryWs: Boolean = !buildFlagOn(BuildConfig.WS_TEXT, false),
+        binaryWs: Boolean = buildFlagOn(BuildConfig.WS_BINARY, false),
     ): LiveClient = liveClient(
         base,
         timeout,

@@ -63,10 +63,11 @@ class WsLiveClientNetworkTest {
     }
 
     @Test
-    fun `health sans bit ws_binary garde la jambe binaire avec sonde`() {
+    fun `health sans bit ws_binary prend la jambe texte`() {
         TestHttpServer { TestHttpServer.Response(200, """{"ok":true,"model":"sam3.1","device":"cuda","gpu":"A100"}""") }.use { server ->
             val health = runBlocking { HttpLiveClient(server.baseUrl).health().getOrThrow() }
-            assertTrue(health.wsBinary)
+            // Défaut inversé 11/2026 : l'ingress Modal tue l'opcode binaire 0x2.
+            assertFalse(health.wsBinary)
         }
     }
 

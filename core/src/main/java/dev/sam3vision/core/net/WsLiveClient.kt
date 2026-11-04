@@ -10,8 +10,8 @@ import kotlinx.coroutines.withTimeoutOrNull
 import org.json.JSONObject
 
 /**
- * Direct par WebSocket : une trame par frame sur `/live/ws` (binaire M1 par défaut, JSON
- * puis POST /live en replis). La réponse porte le **même `id`**, corrélée par **file par
+ * Direct par WebSocket : une trame par frame sur `/live/ws` (JSON par défaut, binaire
+ * M1 opt-in, POST /live en repli). La réponse porte le **même `id`**, corrélée par **file par
  * `id`** — le serveur peut répondre dans le désordre. Mesuré côté Modal : 50,3 ms en
  * WebSocket contre 81,4 ms en POST, soit ~31 ms gagnés par frame ; un `id` inconnu est
  * ignoré, et le health est délégué au client HTTP [http] (aucun `/health` dupliqué).
@@ -43,8 +43,8 @@ class WsLiveClient(
     private val withDepth: Boolean = false,
     /** Masques demandés (`mask_encoding`) ; `false` = boîtes et scores seuls (`none`). */
     private val masks: Boolean = true,
-    /** Binaire M1 : JPEG brut (−33 % à la montée). Un `{"id":-1,…}` replie les frames en JSON. */
-    private val binaryWs: Boolean = true,
+    /** Binaire M1 opt-in (`false` : l'ingress Modal tue l'opcode 0x2, 11/2026). */
+    binaryWs: Boolean = false,
     /** Annonce du transport (`true` = binaire) : une fois à la première frame, puis au repli. */
     private val onBinaryChange: ((Boolean) -> Unit)? = null,
     /** Keepalive (FIX-17) : ping toutes les 30 s sans frame, support du watchdog. `null` = rien. */
@@ -73,11 +73,8 @@ class WsLiveClient(
     /** Horloges du lien (ping + watchdog) : un seul minuteur par session, rendu par [close]. */
     private var pump: WsLinkPump? = null
 
-    /** Le serveur a répondu `id: -1` : les frames suivantes partent en JSON (repli collant). */
-    private var binaryRefused = false
-
-    /** Le transport initial a déjà été annoncé à [onBinaryChange] (une fois par session). */
-    private var legNoted = false
+    /** Jambe WS : état + annonces ([WsLeg], verrou du client tenu par l'appelant). */
+    private val leg = WsLeg(binaryWs, onBinaryChange)
 
     override suspend fun live(
         jpegB64: String,
@@ -86,7 +83,7 @@ class WsLiveClient(
         maxObjects: Int,
     ): Result<LiveFrame> {
         val id = synchronized(lock) { ++nextId }
-        val binary = synchronized(lock) { sendLegLocked() }
+        val binary = synchronized(lock) { leg.sendLeg() }
         // Message (~28 Ko) assemblé hors verrou : `onText` (même lock) ne doit pas attendre.
         val sender: () -> Boolean
         if (binary) {
@@ -112,7 +109,7 @@ class WsLiveClient(
     ): Result<LiveFrame> {
         if (jpeg.isEmpty()) return Result.failure(ApiError.BadResponse(WS_BAD_IMAGE))
         val id = synchronized(lock) { ++nextId }
-        val binary = synchronized(lock) { sendLegLocked() }
+        val binary = synchronized(lock) { leg.sendLeg() }
         val sender: () -> Boolean
         if (binary) {
             val bytes = binaryFrame(id, jpeg, prompts, workEdge, maxObjects, maskFormat, maskEdge, withDepth, masks)
@@ -250,15 +247,9 @@ class WsLiveClient(
     /** Budget courant, exposé aux tests : la preuve de la décroissance froid → normal. */
     internal val currentTimeoutMs: Long get() = synchronized(lock) { timeoutMs }
 
-    /**
-     * Jambe imposée par le bit `ws_binary` du `/health` (FIX-4) : le serveur annonce
-     * s'il lit le binaire M1, sans aller-retour de sonde. `false` = JSON direct.
-     */
+    /** Jambe imposée par le bit `ws_binary` du `/health` (FIX-4). `false` = JSON direct. */
     fun useBinaryWs(binary: Boolean) {
-        synchronized(lock) {
-            binaryRefused = !binary
-            if (legNoted) onBinaryChange?.invoke(binaryWs && !binaryRefused)
-        }
+        synchronized(lock) { leg.use(binary) }
     }
 
     /** Le WebSocket ne sert pas au health : un seul appel `/health`, celui du client HTTP. */
@@ -390,30 +381,10 @@ class WsLiveClient(
         reply.complete(text)
     }
 
-    /**
-     * Transport de la frame qui part, avec l'annonce initiale à [onBinaryChange] (appel
-     * sous [lock] : un seul passage annonce, les deux chemins partagent le choix).
-     */
-    private fun sendLegLocked(): Boolean {
-        val binary = binaryWs && !binaryRefused
-        if (!legNoted) {
-            legNoted = true
-            onBinaryChange?.invoke(binary)
-        }
-        return binary
-    }
-
-    /**
-     * Orphelin `{"id":-1,"error":…}` : serveur sans WS binaire. La plus ancienne frame
-     * binaire en vol repart en JSON, les suivantes partent en texte. Zéro JSON construit :
-     * le marqueur `"error"` suffit (sous [lock]).
-     */
+    /** Orphelin `{"id":-1,"error":…}` : serveur sans WS binaire → repli JSON (sous [lock]). */
     private fun noteBinaryRefused(id: Int, text: String) {
-        if (!binaryWs || id != UNKNOWN_WS_ID || ERROR_MARK !in text) return
-        if (!binaryRefused) {
-            binaryRefused = true
-            onBinaryChange?.invoke(false)
-        }
+        if (id != UNKNOWN_WS_ID || ERROR_MARK !in text) return
+        leg.refuse()
         pending.values.firstOrNull { it.binary }?.reply?.completeExceptionally(FallbackToJson)
     }
 
@@ -440,6 +411,22 @@ class WsLiveClient(
             }
         }
         if (stale) return
+        // Jambe tuée sans réponse (ingress Modal 11/2026 : close 1000 propre dès
+        // l'envoi binaire) : les frames binaires en vol rejouent en JSON et la
+        // jambe texte colle — sinon chaque frame suivante se fait re-tuer pareil.
+        val killedBinary = synchronized(lock) {
+            val unexpected = link.current != WsLinkState.Closed &&
+                !(error is WsClosedAbnormally && error.code == IDLE_CLOSE_CODE)
+            val kill = unexpected && leg.isBinary && pending.values.any { it.binary }
+            if (kill) leg.refuse()
+            kill
+        }
+        if (killedBinary) {
+            val replayed = synchronized(lock) {
+                pending.filterValues { it.binary }.keys.toList().mapNotNull { pending.remove(it) }
+            }
+            replayed.forEach { it.reply.completeExceptionally(FallbackToJson) }
+        }
         failPending(error?.let(::wsCloseError) ?: ApiError.Network(WS_CLOSED))
     }
 

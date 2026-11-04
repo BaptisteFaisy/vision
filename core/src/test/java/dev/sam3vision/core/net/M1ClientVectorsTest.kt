@@ -149,7 +149,10 @@ class M1ClientVectorsTest {
         val expected = byteArrayOf(0, 0, 0, headerBytes.size.toByte()) + headerBytes + jpeg
         val transport = ContractWsTransport()
             .apply { answerBytesWith { listOf(NetContract.frameReply(1)) } }
-        val client = WsLiveClient("https://sam.example", transport, 1_000, RecordingLiveClient())
+        // Jambe binaire explicite : le défaut est le texte depuis 11/2026
+        // (l'ingress Modal tue l'opcode 0x2) ; ce test épingle le contrat binaire.
+        val client = WsLiveClient("https://sam.example", transport, 1_000, RecordingLiveClient(),
+            binaryWs = true)
 
         client.live("/9gBAgM=", listOf("person", "door"), 640, 4).getOrThrow()
 
