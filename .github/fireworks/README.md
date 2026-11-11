@@ -21,9 +21,11 @@ remplacerait une ligne commune, lui, reste au modèle. C'est ce qui a arrêté l
 boucle du 29/10 (#215 rebasée six fois sur `CHANGELOG.md`, une saisine et un
 quota par rebase). Les empreintes et plafonds vivent dans `quota.py`.
 
-Les deux modules sont chargés par `conflict_agent.py` depuis `origin/master`
-(import direct d'abord) : le sweep ne copie que le script d'agent dans `/tmp`,
-et une branche de PR peut être antérieure à ce découpage.
+Les modules voisins (`union_journal.py`, `quota.py`, `compilation_gate.py`,
+`zc_a2a.py` — transport A2A vers l'agent `b`) sont chargés par
+`conflict_agent.py` depuis `origin/master` (import direct d'abord) : le sweep
+ne copie que le script d'agent dans `/tmp`, et une branche de PR peut être
+antérieure à ce découpage.
 
 ## Contrat d'appel
 
