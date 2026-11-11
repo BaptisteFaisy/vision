@@ -8,10 +8,11 @@ vérifiées.
 ## Agent de conflit (`conflict_agent.py`)
 
 Quand le sweep de `pr-auto-merge` échoue à rebaser une PR, il appelle
-`conflict_agent.py` dans son clone, rebase en cours. L'agent demande au modèle
-Fireworks la résolution de chaque fichier en conflit, termine le rebase, pousse
-sur la branche de la PR avec bail et rend compte en commentaire. La file reprend
-au passage suivant ; seule la CI verte fait merger.
+`conflict_agent.py` dans son clone, rebase en cours. L'agent demande à l'agent
+`b` du daemon zeroclaw des runners (A2A, provider InferHub) la résolution de
+chaque fichier en conflit, termine le rebase, pousse sur la branche de la PR
+avec bail et rend compte en commentaire. La file reprend au passage suivant ;
+seule la CI verte fait merger.
 
 Les journaux en ajout pur (`CHANGELOG.md`, `CHANGELOG`) ne passent jamais par le
 modèle : deux entrées écrites en tête de fichier ne sont pas un désaccord, elles
@@ -27,7 +28,7 @@ et une branche de PR peut être antérieure à ce découpage.
 ## Contrat d'appel
 
 ```bash
-FIREWORKS_API_KEY=... python3 conflict_agent.py resolve \
+python3 conflict_agent.py resolve \
   --repo BaptisteFaisy/vision --pr 118 --branch feat/x --sha <tête>
 ```
 
@@ -39,10 +40,10 @@ Le script est lu sur `origin/master` (pas sur la branche de la PR, qui peut
 
 | Variable / secret | Défaut | Effet |
 |---|---|---|
-| secret `FIREWORKS_API_KEY` | — | sans lui, l'agent ne fait rien |
-| var `FIREWORKS_MODEL` | `accounts/fireworks/models/minimax-m3p1-flash` | modèle interrogé |
-| var `FIREWORKS_BASE_URL` | `https://api.fireworks.ai/inference/v1/chat/completions` | point d'API |
-| var `FIREWORKS_AGENT_RESOLVE` | `1` | `0` coupe l'agent sans toucher au code |
+| jeton passerelle | `~/.config/zeroclaw-serveur/token` | sans lui, l'agent ne fait rien |
+| var `CONFLICT_ZC_AGENT` | `b` | agent interrogé (A2A) |
+| var `CONFLICT_ZC_URL` | `http://127.0.0.1:42617` | passerelle du daemon |
+| var `CONFLICT_AGENT_RESOLVE` | `1` | `0` coupe l'agent sans toucher au code |
 
 ## Garde-fous
 

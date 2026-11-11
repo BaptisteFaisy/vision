@@ -1,10 +1,11 @@
 #!/usr/bin/env python3
-"""Agent de conflit Fireworks pour la file pr-auto-merge.
+"""Agent de conflit pour la file pr-auto-merge (agent `b`, InferHub).
 
 Appelé par le sweep DANS son clone quand un rebase bute sur un conflit : il
-fait résoudre chaque conflit élémentaire par un modèle Fireworks, recopie le
-reste du fichier intact (jamais de réécriture complète : un gros fichier serait
-tronqué), boucle sur les arrêts (commits vidés sautés), pousse et rend compte.
+fait résoudre chaque conflit élémentaire par l'agent `b` du daemon zeroclaw de
+la machine des runners (A2A, provider InferHub), recopie le reste du fichier
+intact (jamais de réécriture complète : un gros fichier serait tronqué), boucle
+sur les arrêts (commits vidés sautés), pousse et rend compte.
 `union_journal.py` réunit les journaux sans modèle ; `quota.py` borne les
 saisines (cooldown, plafond horaire, 3 par PR en 30 min).
 
@@ -50,20 +51,23 @@ quota = _charger("quota")
 # v3 : porte de compilation à côté (`compilation_gate.py`) : plafond de 500 lignes.
 compilation_gate = _charger("compilation_gate")
 
-MODEL_DEFAULT = "accounts/fireworks/models/minimax-m3p1-flash"
-API_DEFAULT = "https://api.fireworks.ai/inference/v1/chat/completions"
+# Passerelle du daemon zeroclaw des runners (r630) : l'agent `b` y est publié
+# en A2A et parle à InferHub. Jeton lu dans le fichier 600 de la passerelle.
+ZC_URL_DEFAULT = "http://127.0.0.1:42617"
+ZC_AGENT_DEFAULT = "b"
+ZC_TOKEN_DEFAULT = "~/.config/zeroclaw-serveur/token"
+ZC_TOKEN_FALLBACK = "/opt/zeroclaw/ephem/data/gateway-admin.token"
 MAX_FILES = 100
 MAX_FILE_BYTES = 200_000
 MAX_HUNKS = 20
 HUNK_MAX_CHARS = 12_000
 MAX_ROUNDS = 10
 BUDGET_S = 240
+# 90 s par conflit élémentaire : la boucle tient dans les 5 min du step.
 CALL_TIMEOUT_S = 90
-MAX_TOKENS = 8_000
-TEMPERATURE = 0.2
 LABEL_OK = "agent-conflit"
 LABEL_HUMAN = "intervention-humaine"
-COMMENT_PREFIX = "_fireworks · agent de conflit (MiniMax M3.1 Flash)_"
+COMMENT_PREFIX = "_agent `b` (InferHub) · agent de conflit_"
 REFUSED_PREFIXES = (".github/", ".mergify.yml")
 
 
@@ -81,7 +85,7 @@ def sh(args, **kw):
 
 
 def log(message):
-    print("fireworks-agent: %s" % message, flush=True)
+    print("agent-conflit: %s" % message, flush=True)
 
 
 def pr_labels(repo, pr):
@@ -188,23 +192,52 @@ def build_hunk_messages(path, hunk):
             {"role": "user", "content": "\n".join(parts)}]
 
 
-def fw_complete(api_url, key, model, messages):
-    """Un appel chat/completions Fireworks, rend le texte réponse."""
-    payload = json.dumps({"model": model, "messages": messages,
-                          "temperature": TEMPERATURE,
-                          "max_tokens": MAX_TOKENS}).encode("utf-8")
-    req = urllib.request.Request(api_url, data=payload, method="POST")
-    req.add_header("Authorization", "Bearer " + key)
-    req.add_header("Content-Type", "application/json")
+def zc_token():
+    """Jeton de la passerelle zeroclaw (fichier 600) ; None s'il est absent."""
+    candidats = (os.environ.get("CONFLICT_ZC_TOKEN_FILE") or ZC_TOKEN_DEFAULT,
+                 ZC_TOKEN_FALLBACK)
+    for candidat in candidats:
+        try:
+            with open(os.path.expanduser(candidat), encoding="utf-8") as fh:
+                token = fh.read().strip()
+        except OSError:
+            continue
+        if token:
+            return token
+    return None
+
+
+def agent_complete(zc, messages):
+    """Un échange A2A avec l'agent `b` du daemon, rend le texte de sa réponse."""
+    url, agent, token = zc
+    prompt = "\n\n".join(m["content"] for m in messages)
+    payload = json.dumps({
+        "jsonrpc": "2.0", "id": "conflit", "method": "SendMessage",
+        "params": {"message": {
+            "role": "ROLE_USER", "messageId": "conflit-vision",
+            "parts": [{"kind": "text", "text": prompt}]}},
+    }).encode("utf-8")
+    req = urllib.request.Request("%s/a2a/%s" % (url.rstrip("/"), agent),
+                                data=payload, method="POST",
+                                headers={"Authorization": "Bearer " + token,
+                                         "Content-Type": "application/json",
+                                         "A2A-Version": "1.0"})
     try:
         with urllib.request.urlopen(req, timeout=CALL_TIMEOUT_S) as resp:
-            data = json.loads(resp.read().decode("utf-8"))
+            data = json.loads(resp.read().decode("utf-8", "replace") or "{}")
     except Exception as exc:                                   # noqa: BLE001
-        raise AgentError("appel Fireworks : %s" % str(exc)[:200])
-    try:
-        return data["choices"][0]["message"]["content"]
-    except (KeyError, IndexError, TypeError):
-        raise AgentError("réponse Fireworks illisible (pas de choices[0])")
+        raise AgentError("passerelle %s : %s" % (url, str(exc)[:200]))
+    if "error" in data:
+        raise AgentError("erreur A2A (%s) : %s"
+                         % (agent, json.dumps(data["error"])[:200]))
+    tache = (data.get("result") or {}).get("task") or {}
+    texte = "\n".join(partie.get("text", "")
+                       for artefact in tache.get("artifacts") or []
+                       for partie in artefact.get("parts") or []
+                       if isinstance(partie, dict))
+    if not texte.strip():
+        raise AgentError("réponse vide de l'agent `%s`" % agent)
+    return texte
 
 
 def extract_file(text):
@@ -227,7 +260,7 @@ def still_marked(content):
     return False
 
 
-def resolve_one(api_url, key, model, path, deadline, dry_run):
+def resolve_one(zc, path, deadline, dry_run):
     """Résout un fichier conflit par conflit, le reste recopié intact."""
     if time.time() > deadline:
         raise AgentError("budget de %d s dépassé" % BUDGET_S)
@@ -268,7 +301,7 @@ def resolve_one(api_url, key, model, path, deadline, dry_run):
         if total > HUNK_MAX_CHARS:
             raise AgentError("conflit élémentaire trop gros : %s" % path)
         messages = build_hunk_messages(path, seg)
-        resolved = extract_file(fw_complete(api_url, key, model, messages))
+        resolved = extract_file(agent_complete(zc, messages))
         if still_marked(resolved):
             raise AgentError("le modèle a rendu des marqueurs : %s" % path)
         out.append(resolved.rstrip("\n"))
@@ -295,17 +328,18 @@ Skip = quota.Saisine if quota else _SaisineLocale
 
 def env_or(name, default):
     """Variable d'env ou défaut. GitHub injecte une var absente comme ""
-    (et non unset) : `os.environ.get(n, d)` rendrait "" → 400 Fireworks."""
+    (et non unset) : `os.environ.get(n, d)` rendrait "" → agent vide."""
     return os.environ.get(name) or default
 
 
 def preflight(repo, pr, sha, dry_run, now):
-    """Garde-fous et lecture des fichiers en conflit. Rend (clé, modèle, url, fichiers)."""
-    if os.environ.get("FIREWORKS_AGENT_RESOLVE", "1") == "0":
-        raise Skip("désactivé (FIREWORKS_AGENT_RESOLVE=0)")
-    key = os.environ.get("FIREWORKS_API_KEY", "")
-    if not key and not dry_run:
-        raise Skip("pas de clé FIREWORKS_API_KEY")
+    """Garde-fous et lecture des fichiers en conflit. Rend (zc, fichiers)."""
+    if os.environ.get("CONFLICT_AGENT_RESOLVE", "1") == "0" or \
+            os.environ.get("FIREWORKS_AGENT_RESOLVE", "1") == "0":
+        raise Skip("désactivé (CONFLICT_AGENT_RESOLVE=0)")
+    token = zc_token()
+    if not token and not dry_run:
+        raise Skip("pas de jeton passerelle (%s)" % ZC_TOKEN_DEFAULT)
     if quota is not None:
         quota.gc_stamps(now)
     labels = pr_labels(repo, pr)
@@ -320,9 +354,10 @@ def preflight(repo, pr, sha, dry_run, now):
     if not files:
         raise Skip("aucun fichier en conflit")
     check_round_files(files)
-    model = env_or("FIREWORKS_MODEL", MODEL_DEFAULT)
-    api_url = env_or("FIREWORKS_BASE_URL", API_DEFAULT)
-    return key, model, api_url, files
+    zc = (env_or("CONFLICT_ZC_URL", ZC_URL_DEFAULT),
+          env_or("CONFLICT_ZC_AGENT", ZC_AGENT_DEFAULT),
+          token or "")
+    return zc, files
 
 
 def push_url(repo):
@@ -385,7 +420,7 @@ def autorisation_saisine(pr, sha):
         quota.autoriser(pr, sha)
 
 
-def finish_loop(api_url, key, model, deadline, autorisation=None):
+def finish_loop(zc, deadline, autorisation=None):
     """Boucle multi-passes : résout chaque arrêt, continue/skip. Rend fichiers."""
     resolved = []
     env = dict(os.environ, GIT_EDITOR="true")
@@ -405,7 +440,7 @@ def finish_loop(api_url, key, model, deadline, autorisation=None):
                     autorisation()
                     autorise = True
                 for path in reste:
-                    resolve_one(api_url, key, model, path, deadline, False)
+                    resolve_one(zc, path, deadline, False)
             resolved.extend(files)
         done, err = continue_or_skip(env)
         if not rebase_in_progress():
@@ -452,8 +487,7 @@ def cmd_resolve(args):
     repo, pr = args.repo, args.pr
     now = time.time()
     try:
-        key, model, api_url, files = preflight(repo, pr, args.sha,
-                                               args.dry_run, now)
+        zc, files = preflight(repo, pr, args.sha, args.dry_run, now)
     except Skip as exc:
         log(str(exc))
         return 2
@@ -463,13 +497,13 @@ def cmd_resolve(args):
     if args.dry_run:
         try:
             for path in files:
-                resolve_one(api_url, key, model, path, deadline, True)
+                resolve_one(zc, path, deadline, True)
         except AgentError as exc:
             return fail(repo, pr, str(exc))
         return 0
     # Le dry-run ne touche jamais l'empreinte (ni cooldown ni plafond horaire).
     try:
-        resolved = finish_loop(api_url, key, model, deadline,
+        resolved = finish_loop(zc, deadline,
                                lambda: autorisation_saisine(pr, args.sha))
     except Skip as exc:
         # Union faite, saisine refusée : rien n'est poussé, l'appelant abandonne
