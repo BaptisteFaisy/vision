@@ -8,13 +8,13 @@
 # propre au lieu d'échouer. Poussée avec bail (lease) : jamais d'écrasement
 # d'un push d'auteur arrivé entre-temps. Forks exclus ; brouillons rebasés
 # et réconciliés mais jamais mergés.
-# Conflits (v30, 2026-11-11) : l'agent `b` (InferHub, daemon zeroclaw du runner)
-# tente de les résoudre (.github/fireworks/conflict_agent.py, A2A) : résolution
+# Conflits (v5, 2026-10-28) : l'agent Fireworks tente de les résoudre
+# (.github/fireworks/conflict_agent.py, modèle MiniMax M3.1 Flash) : résolution
 # conflit par conflit, fin du rebase, push avec bail, compte rendu sur la PR.
-# Sans le jeton de la passerelle (fichier 600 du daemon), on saute comme avant
-# et l'auteur rebase à la main. Coupe-circuit : CONFLICT_AGENT_RESOLVE=0.
+# Sans le secret FIREWORKS_API_KEY, on saute comme avant et l'auteur rebase à
+# la main. Coupe-circuit : variable de dépôt FIREWORKS_AGENT_RESOLVE=0.
 # Conflits brouillons (v6, 2026-10-28) : le sweep traite aussi les brouillons
-# (rebase + agent `b`) sans jamais les merger, et les DIRTY comme les
+# (rebase + agent Fireworks) sans jamais les merger, et les DIRTY comme les
 # BEHIND — la CI est la seule voie de résolution (plus de janitor local).
 # Auth push (v7, 2026-10-28) : PAT dans l'URL (x-access-token) au lieu du
 # helper gh, qui rend 403 « denied » sur les runners alors que l'API écrit.
@@ -864,7 +864,7 @@ jobs:
             export GIT_EDITOR=true
             CLONE_FAIT=1
           }
-          rebaser() { # rebase la PR sur master ; l'agent `b` résout les conflits
+          rebaser() { # rebase la PR sur master ; l'agent Fireworks résout les conflits
               if git fetch -q "$AUTH_URL" "pull/$PR/head:pr-$PR" 2>/dev/null \
                 && git checkout -q "pr-$PR" 2>/dev/null \
                 && git rebase -q origin/master >/dev/null 2>&1; then
@@ -892,7 +892,7 @@ jobs:
                 git rebase --abort >/dev/null 2>&1 || true
                 git checkout -q master 2>/dev/null || true
                 case "$rc" in
-                  0) echo "PR #$PR : conflit résolu par l'agent b" ;;
+                  0) echo "PR #$PR : conflit résolu par l'agent Fireworks" ;;
                   *) echo "PR #$PR sautée (conflit, à l'auteur de rebaser)" ;;
                 esac
               fi
@@ -924,7 +924,8 @@ jobs:
           # Quand une file est active, le balayeur ne merge plus et ne rebase
           # plus : c'est la file qui met en file, qui met à jour la PR contre
           # `master` et qui rejoue les checks sur l'arbre fusionné du lot.
-          # Le balayeur garde ce que la file ne sait pas faire : résoudre un            # conflit (DIRTY) et relancer une panne d'infrastructure (BLOCKED).
+          # Le balayeur garde ce que la file ne sait pas faire : résoudre un
+          # conflit (DIRTY) et relancer une panne d'infrastructure (BLOCKED).
           if [ "${QUEUE:-false}" = "true" ]; then
             case "$STATE" in
               CLEAN|BEHIND)
