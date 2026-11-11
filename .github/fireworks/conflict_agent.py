@@ -17,14 +17,12 @@ seul). Codes : 0 poussé, 1 échec commenté, 2 rien à faire. Aucun secret deda
 """
 
 import argparse
-import json
 import os
 import re
 import subprocess
 import sys
 import time
 import types
-import urllib.request
 
 
 def _charger(nom):
@@ -48,15 +46,14 @@ def _charger(nom):
 
 union_journal = _charger("union_journal")
 quota = _charger("quota")
+zc_a2a = _charger("zc_a2a")
 # v3 : porte de compilation à côté (`compilation_gate.py`) : plafond de 500 lignes.
 compilation_gate = _charger("compilation_gate")
 
 # Passerelle du daemon zeroclaw des runners (r630) : l'agent `b` y est publié
-# en A2A et parle à InferHub. Jeton lu dans le fichier 600 de la passerelle.
-ZC_URL_DEFAULT = "http://127.0.0.1:42617"
+# en A2A et parle à InferHub (`zc_a2a.py` porte le transport et le jeton).
+ZC_URL_DEFAULT = zc_a2a.URL_DEFAULT if zc_a2a else "http://127.0.0.1:42617"
 ZC_AGENT_DEFAULT = "b"
-ZC_TOKEN_DEFAULT = "~/.config/zeroclaw-serveur/token"
-ZC_TOKEN_FALLBACK = "/opt/zeroclaw/ephem/data/gateway-admin.token"
 MAX_FILES = 100
 MAX_FILE_BYTES = 200_000
 MAX_HUNKS = 20
@@ -194,50 +191,19 @@ def build_hunk_messages(path, hunk):
 
 def zc_token():
     """Jeton de la passerelle zeroclaw (fichier 600) ; None s'il est absent."""
-    candidats = (os.environ.get("CONFLICT_ZC_TOKEN_FILE") or ZC_TOKEN_DEFAULT,
-                 ZC_TOKEN_FALLBACK)
-    for candidat in candidats:
-        try:
-            with open(os.path.expanduser(candidat), encoding="utf-8") as fh:
-                token = fh.read().strip()
-        except OSError:
-            continue
-        if token:
-            return token
-    return None
+    return zc_a2a.token() if zc_a2a else None
 
 
 def agent_complete(zc, messages):
-    """Un échange A2A avec l'agent `b` du daemon, rend le texte de sa réponse."""
+    """Un échange A2A avec l'agent du daemon, rend le texte de sa réponse."""
+    if zc_a2a is None:
+        raise AgentError("module zc_a2a absent (déploiement ancien)")
     url, agent, token = zc
     prompt = "\n\n".join(m["content"] for m in messages)
-    payload = json.dumps({
-        "jsonrpc": "2.0", "id": "conflit", "method": "SendMessage",
-        "params": {"message": {
-            "role": "ROLE_USER", "messageId": "conflit-vision",
-            "parts": [{"kind": "text", "text": prompt}]}},
-    }).encode("utf-8")
-    req = urllib.request.Request("%s/a2a/%s" % (url.rstrip("/"), agent),
-                                data=payload, method="POST",
-                                headers={"Authorization": "Bearer " + token,
-                                         "Content-Type": "application/json",
-                                         "A2A-Version": "1.0"})
     try:
-        with urllib.request.urlopen(req, timeout=CALL_TIMEOUT_S) as resp:
-            data = json.loads(resp.read().decode("utf-8", "replace") or "{}")
-    except Exception as exc:                                   # noqa: BLE001
-        raise AgentError("passerelle %s : %s" % (url, str(exc)[:200]))
-    if "error" in data:
-        raise AgentError("erreur A2A (%s) : %s"
-                         % (agent, json.dumps(data["error"])[:200]))
-    tache = (data.get("result") or {}).get("task") or {}
-    texte = "\n".join(partie.get("text", "")
-                       for artefact in tache.get("artifacts") or []
-                       for partie in artefact.get("parts") or []
-                       if isinstance(partie, dict))
-    if not texte.strip():
-        raise AgentError("réponse vide de l'agent `%s`" % agent)
-    return texte
+        return zc_a2a.send(url, agent, token, prompt, CALL_TIMEOUT_S)
+    except RuntimeError as exc:
+        raise AgentError(str(exc)[:300])
 
 
 def extract_file(text):
