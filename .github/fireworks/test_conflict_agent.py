@@ -177,10 +177,10 @@ class RebaseLoopTest(unittest.TestCase):
         failed = subprocess.run(["git", "rebase", base_branch],
                                 capture_output=True)
         self.assertNotEqual(failed.returncode, 0)
-        with mock.patch.object(conflict_agent, "fw_complete",
+        with mock.patch.object(conflict_agent, "agent_complete",
                                return_value="```\nRESOLU\n```"):
             resolved = conflict_agent.finish_loop(
-                "http://x", "K", "M", time.time() + 60)
+                ("http://x", "b", "K"), time.time() + 60)
         self.assertEqual(sorted(resolved), ["f.txt", "g.txt"])
         self.assertFalse(conflict_agent.rebase_in_progress())
         log = run("log", "--format=%s").stdout
@@ -201,9 +201,9 @@ class RebaseLoopTest(unittest.TestCase):
         failed = subprocess.run(["git", "rebase", base_branch],
                                 capture_output=True)
         self.assertNotEqual(failed.returncode, 0)
-        with mock.patch.object(conflict_agent, "fw_complete",
+        with mock.patch.object(conflict_agent, "agent_complete",
                                return_value="```\nZ\n```"):
-            conflict_agent.finish_loop("http://x", "K", "M",
+            conflict_agent.finish_loop(("http://x", "b", "K"),
                                        time.time() + 60)
         self.assertFalse(conflict_agent.rebase_in_progress())
         log = run("log", "--format=%s").stdout
@@ -228,7 +228,7 @@ class RebaseLoopTest(unittest.TestCase):
         with mock.patch.object(conflict_agent, "resolve_one",
                                return_value=None):
             with self.assertRaises(conflict_agent.AgentError) as ctx:
-                conflict_agent.finish_loop("http://x", "K", "M",
+                conflict_agent.finish_loop(("http://x", "b", "K"),
                                            time.time() + 60)
         self.assertIn("arrêts", str(ctx.exception))
 
@@ -311,10 +311,10 @@ class UnionSansModeleTest(unittest.TestCase):
         failed = subprocess.run(["git", "rebase", base_branch],
                                 capture_output=True)
         self.assertNotEqual(failed.returncode, 0)
-        with mock.patch.object(conflict_agent, "fw_complete",
+        with mock.patch.object(conflict_agent, "agent_complete",
                                side_effect=AssertionError("modèle appelé")):
             resolved = conflict_agent.finish_loop(
-                "http://x", "K", "M", time.time() + 60)
+                ("http://x", "b", "K"), time.time() + 60)
         self.assertEqual(resolved, ["CHANGELOG.md"])
         self.assertFalse(conflict_agent.rebase_in_progress())
 
