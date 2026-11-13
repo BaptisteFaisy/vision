@@ -50,10 +50,10 @@ queue_rules:
     # voisines se paie en latence sur toutes les autres. 30 s garde le
     # regroupement des rafales (le balayeur en produit) sans imposer une minute
     # d'attente à une PR seule.
-    batch_max_wait_time: 30 seconds
+    batch_max_wait_time: "10 seconds"
     merge_method: rebase
     update_method: rebase
-    checks_timeout: 20 min
+    checks_timeout: 5 min
     max_checks_retries: 1
 
 merge_queue:
